@@ -273,16 +273,6 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - Integrate with their existing tools
 - Use as an AI agent via MCP
 
-## 💰 Business Model (For Sustainability)
-
-While the code is MIT-licensed and free:
-- **Managed Hosting**: $99-999/month
-- **Implementation Services**: $5k-15k
-- **Training & Consulting**: $200/hour
-- **Enterprise Support**: Custom pricing
-
-Revenue supports continued development of the open-source project.
-
 ## 📈 Stats
 
 - **Frameworks**: 12+ supported
