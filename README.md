@@ -15,26 +15,38 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **MCP-Enabled**: Can act as an AI agent via Model Context Protocol
 - **Enterprise-Grade**: Designed for real compliance workflows
 
+## ✅ Current Status: Phase 1 Complete!
+
+The platform is now **fully functional** with:
+- 🔐 User authentication (JWT-based with refresh tokens)
+- 📊 Compliance dashboard with real-time metrics
+- 🎯 Framework selection (8 frameworks, 800+ controls)
+- 📋 Control management and filtering
+- 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls)
+- 📜 AU-2 compliant audit logging
+- 🔒 Enterprise security (Helmet, CORS, rate limiting, bcrypt)
+
 ## 🚀 Quick Start
 
 ```bash
 # Clone the repository
-git clone https://github.com/conteh-consulting/ai-grc-platform.git
+git clone https://github.com/sherifconteh-collab/ai-grc-platform.git
 cd ai-grc-platform
 
-# Set up database
-createdb ai_grc_platform
-psql ai_grc_platform < db/schema.sql
-psql ai_grc_platform < db/seeds/01_nist_csf_2.0.sql
-psql ai_grc_platform < db/seeds/02_nist_ai_rmf.sql
-psql ai_grc_platform < db/seeds/03_iso_soc2_others.sql
-
-# Install dependencies (coming soon)
+# Backend setup
+cd backend
 npm install
+# Create .env file (see backend/.env for configuration)
+npm run seed  # Seeds database with frameworks and controls
+npm start     # Starts on port 3001
 
-# Start the application (coming soon)
-npm run dev
+# Frontend setup (in new terminal)
+cd frontend
+npm install
+npm run dev   # Starts on port 3000
 ```
+
+**First login:** Visit http://localhost:3000/register to create your account!
 
 ## 📚 Supported Frameworks
 
@@ -77,6 +89,68 @@ ai-grc-platform/
 ├── docs/                # Documentation
 └── README.md
 ```
+
+## 🎯 What Makes This Different?
+
+**This is NOT a clone of Vanta, Drata, SecureFrame, or other commercial GRC tools.**
+
+### Unique Differentiators:
+
+1. **100% Open Source & Free**
+   - MIT licensed - use, modify, sell without restrictions
+   - Self-hostable - your data stays on your infrastructure
+   - No per-user fees, no vendor lock-in
+   - Commercial tools cost $30K-200K/year
+
+2. **Auto-Crosswalk Technology™** ⭐
+   - **When you implement ONE control, we automatically satisfy similar controls across other frameworks**
+   - Example: Implement NIST CSF "GV.OC-01" → Auto-satisfies ISO 27001 "A.5.1.1" + SOC 2 "CC1.1"
+   - 90%+ similarity threshold ensures defensible mappings
+   - Commercial tools make you implement same control multiple times
+
+3. **AI Governance Focus**
+   - Deep NIST AI RMF integration (most tools don't have this)
+   - SBOM integration for AI model supply chain tracking
+   - STIG integration for vulnerability mapping to controls
+   - Purpose-built for modern AI systems compliance
+
+4. **CMDB-Driven Approach**
+   - Link hardware/software assets directly to controls
+   - See which assets are/aren't covered by controls
+   - Automated evidence collection from your infrastructure
+   - Most tools treat assets as separate from compliance
+
+5. **Automated SSP Generation**
+   - Generate System Security Plans (NIST 800-171, FedRAMP) from your implementations
+   - Export to Word/PDF with one click
+   - Pre-filled based on actual control implementations
+   - Commercial tools charge extra for this feature
+
+6. **Developer-First**
+   - REST API for everything
+   - MCP server for AI agent integration
+   - Extensible plugin architecture
+   - Git-like version control for policies
+
+### What We're NOT Trying to Be:
+- ❌ Not a continuous monitoring tool (use Wiz, Orca, Lacework for that)
+- ❌ Not a pen testing tool (use Cobalt, Pentest, HackerOne)
+- ❌ Not a vendor risk management tool (use SecurityScorecard, BitSight)
+- ✅ We're a **compliance management and evidence organization platform**
+
+### Comparison:
+
+| Feature | This Platform | Vanta/Drata | Hyperproof | OneTrust |
+|---------|---------------|-------------|------------|----------|
+| Cost | **Free** | $30K-200K/yr | $50K-150K/yr | $100K+/yr |
+| Open Source | ✅ | ❌ | ❌ | ❌ |
+| Self-Hosted | ✅ | ❌ | ❌ | ❌ |
+| Auto-Crosswalk | ✅ | ❌ | ❌ | ❌ |
+| AI Governance (NIST AI RMF) | ✅ | ❌ | ❌ | ❌ |
+| SBOM Integration | ✅ | ❌ | ❌ | ❌ |
+| SSP Auto-Generation | ✅ | ❌ | Paid Add-on | Paid Add-on |
+| CMDB Integration | ✅ | Partial | ❌ | Partial |
+| MCP/API-First | ✅ | API Only | Limited API | Limited API |
 
 ## 💡 Key Features
 
