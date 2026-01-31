@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI GRC Platform - Demo Mockup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .nav-tab:hover {
+            background: #f0f0f0;
+        }
+
+        .nav-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Login Screen */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+        }
+
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-card h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .login-card p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Dashboard Screen */
+        .dashboard {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+        }
+
+        .dashboard h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .dashboard .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .frameworks-section {
+            margin-top: 30px;
+        }
+
+        .frameworks-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .framework-progress {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .framework-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .framework-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .framework-percent {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s;
+        }
+
+        /* Framework Selection */
+        .framework-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .framework-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .framework-card:hover {
+            border-color: #667eea;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .framework-card.selected {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .framework-card h3 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .framework-card p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .framework-card .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #667eea;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Controls Screen */
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            padding: 10px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            width: 300px;
+        }
+
+        .controls-table {
+            width: 100%;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls-table th {
+            background: #667eea;
+            color: white;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .controls-table td {
+            padding: 16px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .controls-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-implemented {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-crosswalk {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .crosswalk-tag {
+            background: #764ba2;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+
+        .highlight {
+            background: #ffeaa7;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #fdcb6e;
+        }
+
+        .highlight h3 {
+            color: #d63031;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showScreen('login')">🔐 Login</button>
+            <button class="nav-tab" onclick="showScreen('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showScreen('frameworks')">🎯 Framework Selection</button>
+            <button class="nav-tab" onclick="showScreen('controls')">✅ Controls</button>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="login" class="screen active">
+            <div class="login-container">
+                <div class="login-card">
+                    <h1>AI GRC Platform</h1>
+                    <p>Intelligent compliance management</p>
+                    <form>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" placeholder="Enter your email" value="demo@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" placeholder="Enter your password" value="••••••••••••">
+                        </div>
+                        <button type="button" class="btn" onclick="showScreen('dashboard')">Sign In</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboard" class="screen">
+            <div class="dashboard">
+                <h1>Compliance Dashboard</h1>
+                <p class="subtitle">Welcome back! Here's your compliance overview.</p>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Overall Compliance</h3>
+                        <div class="number">67%</div>
+                        <div class="subtitle">Across all frameworks</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Active Frameworks</h3>
+                        <div class="number">8</div>
+                        <div class="subtitle">NIST, ISO, SOC2, FISCAM, FFIEC</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Controls</h3>
+                        <div class="number">567</div>
+                        <div class="subtitle">168 implemented</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Auto-Crosswalked</h3>
+                        <div class="number">43</div>
+                        <div class="subtitle">Controls satisfied automatically</div>
+                    </div>
+                </div>
+
+                <div class="highlight">
+                    <h3>🚀 KEY FEATURE: Auto-Crosswalk</h3>
+                    <p><strong>When you implement ONE control, we automatically satisfy similar controls across other frameworks!</strong></p>
+                    <p style="margin-top: 10px;">Example: Implement NIST CSF "GV.OC-01" → Automatically satisfies ISO 27001 "A.5.1.1" and SOC 2 "CC1.1" (90%+ similarity)</p>
+                </div>
+
+                <div class="frameworks-section">
+                    <h2>Framework Compliance</h2>
+
+                    <div class="framework-progress">
+                        <div class="framework-header">
+                            <span class="framework-name">NIST Cybersecurity Framework 2.0</span>
+                            <span class="framework-percent">72%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 72%"></div>
+                        </div>
+                    </div>
+
+                    <div class="framework-progress">
+                        <div class="framework-header">
+                            <span class="framework-name">ISO 27001:2022</span>
+                            <span class="framework-percent">68%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 68%"></div>
+                        </div>
+                    </div>
+
+                    <div class="framework-progress">
+                        <div class="framework-header">
+                            <span class="framework-name">NIST 800-53 (Moderate)</span>
+                            <span class="framework-percent">45%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 45%"></div>
+                        </div>
+                    </div>
+
+                    <div class="framework-progress">
+                        <div class="framework-header">
+                            <span class="framework-name">SOC 2 Type II</span>
+                            <span class="framework-percent">81%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 81%"></div>
+                        </div>
+                    </div>
+
+                    <div class="framework-progress">
+                        <div class="framework-header">
+                            <span class="framework-name">NIST AI RMF</span>
+                            <span class="framework-percent">55%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 55%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Framework Selection Screen -->
+        <div id="frameworks" class="screen">
+            <div class="dashboard">
+                <h1>Select Your Frameworks</h1>
+                <p class="subtitle">Choose the compliance frameworks your organization needs to meet</p>
+
+                <div class="framework-grid">
+                    <div class="framework-card selected">
+                        <h3>NIST CSF 2.0</h3>
+                        <p>Comprehensive cybersecurity framework with 6 functions</p>
+                        <span class="badge">106 controls</span>
+                    </div>
+
+                    <div class="framework-card selected">
+                        <h3>ISO 27001:2022</h3>
+                        <p>International standard for information security management</p>
+                        <span class="badge">93 controls</span>
+                    </div>
+
+                    <div class="framework-card selected">
+                        <h3>NIST 800-53</h3>
+                        <p>Security and privacy controls for federal systems</p>
+                        <span class="badge">208 controls</span>
+                    </div>
+
+                    <div class="framework-card">
+                        <h3>SOC 2 Type II</h3>
+                        <p>Trust service criteria for service organizations</p>
+                        <span class="badge">64 controls</span>
+                    </div>
+
+                    <div class="framework-card">
+                        <h3>NIST AI RMF</h3>
+                        <p>AI Risk Management Framework</p>
+                        <span class="badge">47 controls</span>
+                    </div>
+
+                    <div class="framework-card">
+                        <h3>NIST 800-171</h3>
+                        <p>Protecting Controlled Unclassified Information</p>
+                        <span class="badge">110 controls</span>
+                    </div>
+
+                    <div class="framework-card">
+                        <h3>FISCAM</h3>
+                        <p>Federal Information System Controls Audit Manual</p>
+                        <span class="badge">60 controls</span>
+                    </div>
+
+                    <div class="framework-card">
+                        <h3>FFIEC</h3>
+                        <p>Federal Financial Institutions Examination Council</p>
+                        <span class="badge">72 controls</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Screen -->
+        <div id="controls" class="screen">
+            <div class="dashboard">
+                <div class="controls-header">
+                    <h1>NIST CSF 2.0 Controls</h1>
+                    <input type="text" class="search-box" placeholder="Search controls...">
+                </div>
+
+                <table class="controls-table">
+                    <thead>
+                        <tr>
+                            <th>Control ID</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Crosswalks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>GV.OC-01</strong></td>
+                            <td>Organizational cybersecurity strategy is established</td>
+                            <td><span class="status-badge status-implemented">Implemented</span></td>
+                            <td>
+                                ISO 27001: A.5.1.1
+                                <span class="crosswalk-tag">Auto-satisfied</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>GV.OC-02</strong></td>
+                            <td>Internal and external stakeholders are understood</td>
+                            <td><span class="status-badge status-implemented">Implemented</span></td>
+                            <td>
+                                SOC 2: CC1.2
+                                <span class="crosswalk-tag">Auto-satisfied</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>GV.OC-03</strong></td>
+                            <td>Legal, regulatory requirements understood</td>
+                            <td><span class="status-badge status-crosswalk">Satisfied via crosswalk</span></td>
+                            <td>
+                                From: ISO 27001: A.18.1.1 (95% similarity)
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>ID.AM-01</strong></td>
+                            <td>Physical devices and systems inventoried</td>
+                            <td><span class="status-badge status-implemented">Implemented</span></td>
+                            <td>
+                                NIST 800-53: CM-8
+                                <span class="crosswalk-tag">Auto-satisfied</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>ID.AM-02</strong></td>
+                            <td>Software platforms inventoried</td>
+                            <td><span class="status-badge status-pending">Not Started</span></td>
+                            <td>NIST 800-53: CM-8, ISO 27001: A.8.1.1</td>
+                        </tr>
+                        <tr>
+                            <td><strong>PR.AC-01</strong></td>
+                            <td>Identities and credentials managed</td>
+                            <td><span class="status-badge status-implemented">Implemented</span></td>
+                            <td>
+                                NIST 800-53: IA-2, SOC 2: CC6.1
+                                <span class="crosswalk-tag">2 auto-satisfied</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="highlight" style="margin-top: 30px;">
+                    <h3>💡 How Auto-Crosswalk Works</h3>
+                    <p><strong>Step 1:</strong> You implement "GV.OC-01" in NIST CSF</p>
+                    <p><strong>Step 2:</strong> System finds all controls with 90%+ similarity</p>
+                    <p><strong>Step 3:</strong> Automatically marks ISO 27001 "A.5.1.1" as satisfied</p>
+                    <p style="margin-top: 10px;"><strong>Result:</strong> Implement 1 control, satisfy 3+ controls across frameworks! ✨</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showScreen(screenId) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+
+            // Remove active from all tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected screen
+            document.getElementById(screenId).classList.add('active');
+
+            // Activate corresponding tab
+            event.target.classList.add('active');
+        }
+
+        // Make framework cards selectable
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.framework-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    this.classList.toggle('selected');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

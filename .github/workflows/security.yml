@@ -1,0 +1,126 @@
+name: Security Checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Backend - npm audit
+        run: |
+          cd backend
+          npm ci
+          npm audit --audit-level=moderate
+
+      - name: Frontend - npm audit
+        run: |
+          cd frontend
+          npm ci
+          npm audit --audit-level=moderate
+
+  secret-scanning:
+    name: Scan for Hardcoded Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks - Detect secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  malicious-code-detection:
+    name: Detect Suspicious Code Patterns
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for dangerous functions
+        run: |
+          echo "🔍 Checking for potentially dangerous code patterns..."
+
+          FOUND_ISSUES=0
+
+          # Check for eval()
+          if grep -r "eval(" --include="*.js" --include="*.ts" . --exclude-dir=node_modules; then
+            echo "⚠️  WARNING: eval() found - requires manual review"
+            FOUND_ISSUES=1
+          fi
+
+          # Check for child_process without allowlist
+          if grep -r "child_process" --include="*.js" --include="*.ts" . --exclude-dir=node_modules; then
+            echo "⚠️  WARNING: child_process usage found - requires manual review"
+            FOUND_ISSUES=1
+          fi
+
+          # Check for dynamic require/import
+          if grep -rE "require\(.*\+|import\(.*\+" --include="*.js" --include="*.ts" . --exclude-dir=node_modules; then
+            echo "⚠️  WARNING: Dynamic require/import found - requires manual review"
+            FOUND_ISSUES=1
+          fi
+
+          # Check for suspicious network calls
+          if grep -r "http://" --include="*.js" --include="*.ts" . --exclude-dir=node_modules | grep -v "localhost\|127.0.0.1\|example.com"; then
+            echo "⚠️  WARNING: Non-HTTPS external URLs found - requires manual review"
+            FOUND_ISSUES=1
+          fi
+
+          # Check for base64 encoding (common obfuscation)
+          if grep -rE "atob\(|btoa\(|Buffer\..*base64" --include="*.js" --include="*.ts" . --exclude-dir=node_modules; then
+            echo "⚠️  WARNING: Base64 encoding/decoding found - requires manual review"
+            FOUND_ISSUES=1
+          fi
+
+          # Check for cryptocurrency-related code
+          if grep -riE "bitcoin|ethereum|crypto\s*mining|webworker.*hash" --include="*.js" --include="*.ts" . --exclude-dir=node_modules; then
+            echo "❌ ERROR: Cryptocurrency-related code found - BLOCKED"
+            exit 1
+          fi
+
+          if [ $FOUND_ISSUES -eq 1 ]; then
+            echo ""
+            echo "⚠️  Suspicious patterns found - manual security review required"
+            echo "This PR needs careful review before merging"
+          else
+            echo "✅ No suspicious patterns detected"
+          fi
+
+  license-check:
+    name: Check Dependency Licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install license-checker
+        run: npm install -g license-checker
+
+      - name: Check backend licenses
+        run: |
+          cd backend
+          npm ci
+          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0" --summary
+
+      - name: Check frontend licenses
+        run: |
+          cd frontend
+          npm ci
+          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0" --summary

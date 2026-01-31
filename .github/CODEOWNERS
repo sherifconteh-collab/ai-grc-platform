@@ -1,0 +1,27 @@
+# CODEOWNERS - Defines who must review code changes
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owner - all files require review
+* @sherifconteh-collab
+
+# Critical security files require extra scrutiny
+/backend/src/middleware/auth.js @sherifconteh-collab
+/backend/src/routes/auth.js @sherifconteh-collab
+/backend/src/utils/auditLogger.js @sherifconteh-collab
+/backend/src/config/database.js @sherifconteh-collab
+
+# Database schema and migrations
+/db/schema.sql @sherifconteh-collab
+/db/migrations/ @sherifconteh-collab
+/backend/migrations/ @sherifconteh-collab
+
+# Configuration files
+/.github/ @sherifconteh-collab
+/package*.json @sherifconteh-collab
+/backend/package*.json @sherifconteh-collab
+/frontend/package*.json @sherifconteh-collab
+/.gitignore @sherifconteh-collab
+
+# Security and documentation
+/SECURITY.md @sherifconteh-collab
+/LICENSE @sherifconteh-collab
