@@ -1,0 +1,36 @@
+{
+  "name": "ai-grc-platform-backend",
+  "version": "1.0.0",
+  "description": "Backend API for AI GRC Platform",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [
+    "grc",
+    "compliance",
+    "nist",
+    "iso27001"
+  ],
+  "author": "Conteh Consulting LLC",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "joi": "^18.0.2",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^7.0.13",
+    "pg": "^8.11.3",
+    "uuid": "^13.0.0",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

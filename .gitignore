@@ -1,0 +1,144 @@
+# Environment variables (NEVER COMMIT THESE!)
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+postgres-data/
+pgdata/
+*.sql.backup
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/
+dist/
+build/
+.next/
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.python-version
+
+# IDE and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage and Testing
+coverage/
+.nyc_output/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+
+# Build artifacts
+*.o
+*.a
+*.exe
+*.out
+*.app
+
+# Secrets and credentials (CRITICAL - NEVER COMMIT!)
+secrets.json
+credentials.json
+*.key
+*.pem
+*.cert
+*.crt
+serviceAccount.json
+firebase-adminsdk.json
+.envrc
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation builds
+docs/_build/
+site/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Cloud provider credentials
+.aws/
+.gcloud/
+.azure/
+
+# Local development
+.local/
+local-data/
+
+# Test/development temporary files
+login_response.json
+add-frameworks.json
+add-priority-column.js
+fix-org-frameworks-table.js
