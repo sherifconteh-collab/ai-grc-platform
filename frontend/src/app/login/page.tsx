@@ -13,15 +13,21 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🔵 LOGIN FORM: handleSubmit called');
+    console.log('🔵 LOGIN FORM: email=', email, 'password length=', password.length);
     setError('');
     setLoading(true);
 
     try {
+      console.log('🔵 LOGIN FORM: Calling login function...');
       await login(email, password);
+      console.log('🔵 LOGIN FORM: Login successful!');
     } catch (err: any) {
+      console.log('🔴 LOGIN FORM: Login error:', err);
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
+      console.log('🔵 LOGIN FORM: handleSubmit complete');
     }
   };
 
@@ -73,6 +79,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
+            onClick={() => console.log('🔴 BUTTON CLICKED!')}
             className="w-full bg-purple-600 text-white py-3 rounded-md font-semibold hover:bg-purple-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in...' : 'Sign In'}

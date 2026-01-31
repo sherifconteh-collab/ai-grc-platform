@@ -7,6 +7,7 @@ import Link from 'next/link';
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -31,7 +32,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register(email, password, fullName);
+      await register(email, password, fullName, organizationName);
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     } finally {
@@ -81,6 +82,21 @@ export default function RegisterPage() {
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               placeholder="Enter your email"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="organizationName" className="block text-sm font-medium text-gray-700 mb-2">
+              Organization Name
+            </label>
+            <input
+              id="organizationName"
+              type="text"
+              value={organizationName}
+              onChange={(e) => setOrganizationName(e.target.value)}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              placeholder="Enter your organization name"
             />
           </div>
 

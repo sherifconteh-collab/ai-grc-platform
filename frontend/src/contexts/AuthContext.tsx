@@ -16,7 +16,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, organizationName: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -41,40 +41,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      console.log('Checking auth with token:', token?.substring(0, 20) + '...');
       const response = await authAPI.getCurrentUser();
-      setUser(response.data.data.user);
+      console.log('Auth check response:', response.data);
+
+      // /me endpoint returns user data directly in response.data.data, not nested in "user"
+      const userData = response.data.data;
+      setUser({
+        id: userData.id,
+        email: userData.email,
+        fullName: userData.full_name,
+        role: userData.role,
+        organizationId: userData.organization.id
+      });
     } catch (error) {
       console.error('Auth check failed:', error);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (email: string, password: string) => {
+    console.log('🟢 AUTH CONTEXT: login called with email=', email);
     try {
+      console.log('🟢 AUTH CONTEXT: Making API call to /auth/login...');
       const response = await authAPI.login({ email, password });
-      const { user, accessToken, refreshToken } = response.data.data;
+      console.log('🟢 AUTH CONTEXT: API response received:', response.data);
+      const { user, tokens } = response.data.data;
 
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      setUser(user);
+      localStorage.setItem('accessToken', tokens.accessToken);
+      localStorage.setItem('refreshToken', tokens.refreshToken);
 
+      // Convert snake_case to camelCase
+      setUser({
+        id: user.id,
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role,
+        organizationId: user.organization_id
+      });
+
+      console.log('🟢 AUTH CONTEXT: Redirecting to dashboard...');
       router.push('/dashboard');
     } catch (error: any) {
+      console.log('🔴 AUTH CONTEXT: Login error:', error);
       throw new Error(error.response?.data?.error || 'Login failed');
     }
   };
 
-  const register = async (email: string, password: string, fullName: string) => {
+  const register = async (email: string, password: string, fullName: string, organizationName: string) => {
     try {
-      const response = await authAPI.register({ email, password, fullName });
-      const { user, accessToken, refreshToken } = response.data.data;
+      const response = await authAPI.register({ email, password, fullName, organizationName });
+      const { user, organization, tokens } = response.data.data;
 
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      setUser(user);
+      localStorage.setItem('accessToken', tokens.accessToken);
+      localStorage.setItem('refreshToken', tokens.refreshToken);
+
+      // Convert snake_case to camelCase
+      setUser({
+        id: user.id,
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role,
+        organizationId: organization.id
+      });
 
       router.push('/dashboard');
     } catch (error: any) {

@@ -407,4 +407,109 @@ router.get('/:orgId', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/v1/organizations/:orgId/controls
+ * Get all controls for an organization's selected frameworks
+ */
+router.get('/:orgId/controls', authenticateToken, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const { frameworkId, status, priority } = req.query;
+
+    // Verify user belongs to this organization
+    if (req.user.organizationId !== orgId && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied to this organization'
+      });
+    }
+
+    // Build dynamic WHERE clause based on filters
+    let whereClause = 'WHERE of.organization_id = $1';
+    const params = [orgId];
+    let paramCounter = 2;
+
+    if (frameworkId) {
+      whereClause += ` AND f.id = $${paramCounter}`;
+      params.push(frameworkId);
+      paramCounter++;
+    }
+
+    if (status) {
+      whereClause += ` AND ci.status = $${paramCounter}`;
+      params.push(status);
+      paramCounter++;
+    }
+
+    if (priority) {
+      whereClause += ` AND fc.priority = $${paramCounter}`;
+      params.push(priority);
+      paramCounter++;
+    }
+
+    const result = await pool.query(
+      `SELECT
+        fc.id,
+        fc.control_id,
+        fc.title,
+        fc.description,
+        fc.priority,
+        f.id as framework_id,
+        f.code as framework_code,
+        f.name as framework_name,
+        COALESCE(ci.status, 'not_started') as status,
+        ci.implementation_details,
+        ci.assigned_to,
+        ci.updated_at as status_updated_at,
+        (SELECT COUNT(*) FROM control_mappings cm
+         WHERE (cm.source_control_id = fc.id OR cm.target_control_id = fc.id)
+         AND cm.similarity_score >= 90) as mapping_count
+      FROM organization_frameworks of
+      JOIN frameworks f ON f.id = of.framework_id
+      JOIN framework_controls fc ON fc.framework_id = f.id
+      LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = of.organization_id
+      ${whereClause}
+      ORDER BY f.code, fc.control_id`,
+      params
+    );
+
+    const controls = result.rows.map(row => ({
+      id: row.id,
+      controlId: row.control_id,
+      title: row.title,
+      description: row.description,
+      priority: row.priority,
+      frameworkId: row.framework_id,
+      frameworkCode: row.framework_code,
+      frameworkName: row.framework_name,
+      status: row.status,
+      implementationDetails: row.implementation_details,
+      assignedTo: row.assigned_to,
+      statusUpdatedAt: row.status_updated_at,
+      mappingCount: parseInt(row.mapping_count) || 0
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        organizationId: orgId,
+        controls,
+        totalControls: controls.length,
+        filters: {
+          frameworkId: frameworkId || null,
+          status: status || null,
+          priority: priority || null
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get organization controls error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get organization controls'
+    });
+  }
+});
+
 export default router;

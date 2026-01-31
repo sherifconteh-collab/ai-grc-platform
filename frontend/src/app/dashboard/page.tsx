@@ -32,7 +32,24 @@ export default function DashboardPage() {
   const loadStats = async () => {
     try {
       const response = await dashboardAPI.getStats();
-      setStats(response.data.data);
+      const backendData = response.data.data;
+
+      // Transform backend response to match frontend expectations
+      setStats({
+        overallCompliance: backendData.overall.compliancePercentage,
+        totalControls: backendData.overall.totalControls,
+        implementedControls: backendData.overall.implemented,
+        satisfiedViaAutoCrosswalk: backendData.overall.satisfiedViaCrosswalk,
+        applicableControls: backendData.overall.totalApplicable,
+        frameworks: backendData.frameworks.map((fw: any) => ({
+          id: fw.id,
+          code: fw.code,
+          name: fw.name,
+          totalControls: fw.totalControls,
+          implementedControls: fw.implemented,
+          compliancePercentage: fw.compliancePercentage
+        }))
+      });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load dashboard');
       console.error('Dashboard error:', err);
@@ -66,25 +83,25 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard
                 title="Overall Compliance"
-                value={`${stats.overallCompliance}%`}
+                value={`${stats.overallCompliance || 0}%`}
                 subtitle="Across all frameworks"
                 gradient="from-purple-600 to-indigo-600"
               />
               <StatCard
                 title="Total Controls"
-                value={stats.totalControls.toString()}
-                subtitle={`${stats.implementedControls} implemented`}
+                value={(stats.totalControls || 0).toString()}
+                subtitle={`${stats.implementedControls || 0} implemented`}
                 gradient="from-blue-600 to-cyan-600"
               />
               <StatCard
                 title="Active Frameworks"
-                value={stats.frameworks.length.toString()}
+                value={(stats.frameworks?.length || 0).toString()}
                 subtitle="Selected by your organization"
                 gradient="from-green-600 to-teal-600"
               />
               <StatCard
                 title="Auto-Crosswalked"
-                value={stats.satisfiedViaAutoCrosswalk.toString()}
+                value={(stats.satisfiedViaAutoCrosswalk || 0).toString()}
                 subtitle="Controls satisfied automatically"
                 gradient="from-orange-600 to-pink-600"
               />

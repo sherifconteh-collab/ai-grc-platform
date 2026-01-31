@@ -14,13 +14,18 @@ const api = axios.create({
 // Request interceptor - add auth token
 api.interceptors.request.use(
   (config) => {
+    console.log('🟡 API CLIENT: Making request to', config.method?.toUpperCase(), config.url);
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('🟡 API CLIENT: Added auth token to request');
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.log('🔴 API CLIENT: Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor - handle token refresh
@@ -64,8 +69,13 @@ api.interceptors.response.use(
 
 // Auth APIs
 export const authAPI = {
-  register: (data: { email: string; password: string; fullName: string }) =>
-    api.post('/auth/register', data),
+  register: (data: { email: string; password: string; fullName: string; organizationName: string }) =>
+    api.post('/auth/register', {
+      email: data.email,
+      password: data.password,
+      full_name: data.fullName,
+      organization_name: data.organizationName,
+    }),
 
   login: (data: { email: string; password: string }) =>
     api.post('/auth/login', data),
@@ -76,6 +86,11 @@ export const authAPI = {
 
   refreshToken: (refreshToken: string) =>
     api.post('/auth/refresh', { refreshToken }),
+};
+
+// Framework APIs
+export const frameworkAPI = {
+  getAll: () => api.get('/frameworks'),
 };
 
 // Dashboard APIs

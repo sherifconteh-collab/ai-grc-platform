@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { organizationAPI } from '@/lib/api';
+import { organizationAPI, frameworkAPI } from '@/lib/api';
 
 interface Framework {
   id: string;
@@ -14,68 +14,9 @@ interface Framework {
   selected?: boolean;
 }
 
-const AVAILABLE_FRAMEWORKS: Framework[] = [
-  {
-    id: '1',
-    code: 'NIST-CSF-2.0',
-    name: 'NIST Cybersecurity Framework 2.0',
-    description: 'Comprehensive cybersecurity framework with 6 functions',
-    controlCount: 106,
-  },
-  {
-    id: '2',
-    code: 'ISO-27001',
-    name: 'ISO 27001:2022',
-    description: 'International standard for information security management',
-    controlCount: 93,
-  },
-  {
-    id: '3',
-    code: 'NIST-800-53',
-    name: 'NIST 800-53 (Moderate)',
-    description: 'Security and privacy controls for federal systems',
-    controlCount: 208,
-  },
-  {
-    id: '4',
-    code: 'SOC2',
-    name: 'SOC 2 Type II',
-    description: 'Trust service criteria for service organizations',
-    controlCount: 64,
-  },
-  {
-    id: '5',
-    code: 'NIST-AI-RMF',
-    name: 'NIST AI Risk Management Framework',
-    description: 'Framework for managing AI risks',
-    controlCount: 47,
-  },
-  {
-    id: '6',
-    code: 'NIST-800-171',
-    name: 'NIST 800-171',
-    description: 'Protecting Controlled Unclassified Information',
-    controlCount: 110,
-  },
-  {
-    id: '7',
-    code: 'FISCAM',
-    name: 'FISCAM',
-    description: 'Federal Information System Controls Audit Manual',
-    controlCount: 60,
-  },
-  {
-    id: '8',
-    code: 'FFIEC',
-    name: 'FFIEC',
-    description: 'Federal Financial Institutions Examination Council',
-    controlCount: 72,
-  },
-];
-
 export default function FrameworksPage() {
   const { user } = useAuth();
-  const [frameworks, setFrameworks] = useState<Framework[]>(AVAILABLE_FRAMEWORKS);
+  const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -83,9 +24,27 @@ export default function FrameworksPage() {
 
   useEffect(() => {
     if (user?.organizationId) {
+      loadFrameworks();
       loadSelectedFrameworks();
     }
   }, [user]);
+
+  const loadFrameworks = async () => {
+    try {
+      const response = await frameworkAPI.getAll();
+      // Backend returns raw data, not wrapped in { data: { data: ... } }
+      const backendFrameworks = response.data.map((f: any) => ({
+        id: f.id,
+        code: f.code,
+        name: f.name,
+        description: f.description || '',
+        controlCount: parseInt(f.control_count) || 0
+      }));
+      setFrameworks(backendFrameworks);
+    } catch (err) {
+      console.error('Failed to load frameworks:', err);
+    }
+  };
 
   const loadSelectedFrameworks = async () => {
     try {
@@ -93,7 +52,7 @@ export default function FrameworksPage() {
       const selected = response.data.data.frameworks.map((f: any) => f.id);
       setSelectedFrameworks(selected);
     } catch (err) {
-      console.error('Failed to load frameworks:', err);
+      console.error('Failed to load selected frameworks:', err);
     } finally {
       setLoading(false);
     }
