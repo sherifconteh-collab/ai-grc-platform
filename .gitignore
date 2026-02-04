@@ -136,6 +136,11 @@ docker-compose.override.yml
 # Uploaded evidence files
 uploads/
 
+# Paid-tier files (live in ai-grc-platform-pro, overlaid locally)
+backend/migrations/003_feature_gating.sql
+backend/src/middleware/featureGate.js
+backend/src/routes/evidence.js
+
 # Local development
 .local/
 local-data/

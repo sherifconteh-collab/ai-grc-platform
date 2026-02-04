@@ -458,9 +458,8 @@ router.get('/:orgId/controls', authenticateToken, async (req, res) => {
         f.code as framework_code,
         f.name as framework_name,
         COALESCE(ci.status, 'not_started') as status,
-        ci.implementation_details,
+        ci.implementation_notes,
         ci.assigned_to,
-        ci.updated_at as status_updated_at,
         (SELECT COUNT(*) FROM control_mappings cm
          WHERE (cm.source_control_id = fc.id OR cm.target_control_id = fc.id)
          AND cm.similarity_score >= 90) as mapping_count
@@ -483,9 +482,8 @@ router.get('/:orgId/controls', authenticateToken, async (req, res) => {
       frameworkCode: row.framework_code,
       frameworkName: row.framework_name,
       status: row.status,
-      implementationDetails: row.implementation_details,
+      implementationNotes: row.implementation_notes,
       assignedTo: row.assigned_to,
-      statusUpdatedAt: row.status_updated_at,
       mappingCount: parseInt(row.mapping_count) || 0
     }));
 
