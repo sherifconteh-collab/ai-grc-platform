@@ -36,6 +36,35 @@ const conversations = new Map();
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
 const THINKING_BUDGET = parseInt(process.env.THINKING_BUDGET_TOKENS, 10) || 10000;
 const MAX_TOKENS = parseInt(process.env.MAX_TOKENS, 10) || 16000;
+const MAX_RETRIES = 3;
+
+/**
+ * Call client.messages.create with automatic retry on transient 500 errors.
+ * Anthropic 500s are server-side and resolve on their own; retrying with
+ * exponential back-off is the documented recovery path.
+ *
+ * @param {object} params – same shape as client.messages.create
+ * @returns {Promise<import('@anthropic-ai/sdk').Message>}
+ */
+async function createWithRetry(params) {
+  let lastErr;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await client.messages.create(params);
+    } catch (err) {
+      lastErr = err;
+      // Retry only on 500 (server error) or 529 (overloaded)
+      if (err.status === 500 || err.status === 529) {
+        const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      // Any other status (400, 401, 422 …) – fail immediately
+      throw err;
+    }
+  }
+  throw lastErr;
+}
 
 /**
  * Seed a new conversation and return its ID.
@@ -78,17 +107,18 @@ export async function sendMessage(conversationId, userText) {
     content: userText
   });
 
-  // 2. API call – replay the full history, thinking blocks untouched
-  const response = await client.messages.create({
+  // 2. API call – replay the full history, thinking blocks untouched.
+  //    Build params without a `system` key when none is set; passing
+  //    system: undefined can serialise to null and trigger a 500.
+  const params = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    thinking: {
-      type: 'enabled',
-      budget_tokens: THINKING_BUDGET
-    },
-    system: convo.systemPrompt || undefined,
+    thinking: { type: 'enabled', budget_tokens: THINKING_BUDGET },
     messages: convo.messages   // ← sent verbatim; never filtered
-  });
+  };
+  if (convo.systemPrompt) params.system = convo.systemPrompt;
+
+  const response = await createWithRetry(params);
 
   // 3. Store the FULL content array (thinking + text + anything else)
   //    This is the critical step: response.content is pushed as-is.
@@ -114,16 +144,15 @@ export async function sendMessage(conversationId, userText) {
  * @returns {{ textBlocks: string[] }}
  */
 export async function oneShotMessage(prompt, systemPrompt) {
-  const response = await client.messages.create({
+  const params = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    thinking: {
-      type: 'enabled',
-      budget_tokens: THINKING_BUDGET
-    },
-    system: systemPrompt || undefined,
+    thinking: { type: 'enabled', budget_tokens: THINKING_BUDGET },
     messages: [{ role: 'user', content: prompt }]
-  });
+  };
+  if (systemPrompt) params.system = systemPrompt;
+
+  const response = await createWithRetry(params);
 
   const textBlocks = response.content
     .filter(block => block.type === 'text')
