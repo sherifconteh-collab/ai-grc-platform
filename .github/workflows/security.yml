@@ -117,10 +117,10 @@ jobs:
         run: |
           cd backend
           npm ci
-          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0" --summary
+          license-checker --production --excludePrivatePackages --onlyAllow "MIT;MIT-0;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;LGPL-3.0-or-later;CC-BY-4.0" --summary
 
       - name: Check frontend licenses
         run: |
           cd frontend
           npm ci
-          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0" --summary
+          license-checker --production --excludePrivatePackages --onlyAllow "MIT;MIT-0;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;LGPL-3.0-or-later;CC-BY-4.0" --summary
