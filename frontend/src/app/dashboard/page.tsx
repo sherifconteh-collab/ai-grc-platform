@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { dashboardAPI } from '@/lib/api';
+import { dashboardAPI, implementationsAPI } from '@/lib/api';
 
 interface Stats {
   overallCompliance: number;
@@ -24,10 +24,21 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activity, setActivity] = useState<{ id?: string; changed_by_name: string; control_code: string; control_title: string; old_status: string; new_status: string; changed_at: string; notes?: string }[]>([]);
 
   useEffect(() => {
     loadStats();
+    loadActivity();
   }, []);
+
+  const loadActivity = async () => {
+    try {
+      const response = await implementationsAPI.getActivityFeed({ limit: 10 });
+      setActivity(response.data.data);
+    } catch (err) {
+      console.error('Activity feed error:', err);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -149,6 +160,40 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Recent Activity Feed */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Activity</h2>
+              {activity.length > 0 ? (
+                <div className="space-y-3">
+                  {activity.map((item, i) => (
+                    <div key={item.id || i} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-sm font-bold flex-shrink-0">
+                        {(item.changed_by_name || '?').charAt(0)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-900">{item.changed_by_name}</span>
+                          <span className="text-xs font-mono text-purple-600">{item.control_code}</span>
+                          <span className="text-xs text-gray-400">{item.control_title}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{item.old_status}</span>
+                          <span className="text-gray-400 text-xs">→</span>
+                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{item.new_status}</span>
+                          <span className="text-xs text-gray-400 ml-auto">
+                            {new Date(item.changed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {item.notes && <p className="text-xs text-gray-500 italic mt-0.5">{item.notes}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No recent activity. Start by implementing controls!</p>
+              )}
             </div>
           </>
         ) : null}

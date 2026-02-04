@@ -14,6 +14,10 @@ import auditRoutes from './routes/audit.js';
 import organizationsRoutes from './routes/organizations.js';
 import controlsRoutes from './routes/controls.js';
 import dashboardRoutes from './routes/dashboard.js';
+import rolesRoutes from './routes/roles.js';
+import implementationsRoutes from './routes/implementations.js';
+import evidenceRoutes from './routes/evidence.js';
+import usersRoutes from './routes/users.js';
 import { authenticateToken } from './middleware/auth.js';
 import pool from './config/database.js';
 
@@ -101,6 +105,26 @@ app.use('/api/v1/controls', apiLimiter, controlsRoutes);
 // DASHBOARD ROUTES (protected)
 // ==========================================
 app.use('/api/v1/dashboard', apiLimiter, dashboardRoutes);
+
+// ==========================================
+// RBAC ROUTES (protected)
+// ==========================================
+app.use('/api/v1/roles', apiLimiter, rolesRoutes);
+
+// ==========================================
+// CONTROL IMPLEMENTATIONS ROUTES (protected)
+// ==========================================
+app.use('/api/v1/implementations', apiLimiter, implementationsRoutes);
+
+// ==========================================
+// EVIDENCE ROUTES (protected)
+// ==========================================
+app.use('/api/v1/evidence', apiLimiter, evidenceRoutes);
+
+// ==========================================
+// USERS ROUTES (protected)
+// ==========================================
+app.use('/api/v1/users', apiLimiter, usersRoutes);
 
 // ==========================================
 // PROTECTED API ROUTES

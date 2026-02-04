@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { organizationAPI, controlsAPI } from '@/lib/api';
@@ -17,6 +18,7 @@ interface Control {
 
 export default function ControlsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [controls, setControls] = useState<Control[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,7 +183,7 @@ export default function ControlsPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredControls.length > 0 ? (
                     filteredControls.map((control) => (
-                      <tr key={control.id} className="hover:bg-gray-50 cursor-pointer">
+                      <tr key={control.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/dashboard/controls/${control.id}`)}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-mono font-semibold text-gray-900">
                             {control.controlId}

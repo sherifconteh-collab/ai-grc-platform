@@ -11,6 +11,7 @@ import {
   logLogout,
   AuditEventType
 } from '../utils/auditLogger.js';
+import { initializeOrganizationRoles } from '../services/roleService.js';
 
 const router = express.Router();
 
@@ -135,6 +136,13 @@ router.post('/register', async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // Initialize default roles after transaction commits so the org exists for FK lookups
+    try {
+      await initializeOrganizationRoles(organization.id, user.id);
+    } catch (roleError) {
+      console.warn('Warning: Could not initialize roles:', roleError.message);
+    }
 
     // Log registration with AU-2 compliant audit logging
     await logAccountCreated(
@@ -468,6 +476,25 @@ router.get('/me', authenticateToken, async (req, res) => {
 
     const user = result.rows[0];
 
+    // Get user's roles and permissions
+    const rolesResult = await pool.query(
+      `SELECT r.name, r.description
+       FROM user_roles ur
+       JOIN roles r ON r.id = ur.role_id
+       WHERE ur.user_id = $1`,
+      [req.user.id]
+    );
+
+    const permissionsResult = await pool.query(
+      `SELECT DISTINCT p.name
+       FROM user_roles ur
+       JOIN roles r ON r.id = ur.role_id
+       JOIN role_permissions rp ON rp.role_id = r.id
+       JOIN permissions p ON p.id = rp.permission_id
+       WHERE ur.user_id = $1`,
+      [req.user.id]
+    );
+
     res.json({
       success: true,
       data: {
@@ -481,7 +508,9 @@ router.get('/me', authenticateToken, async (req, res) => {
           id: user.org_id,
           name: user.org_name,
           industry: user.industry
-        }
+        },
+        roles: rolesResult.rows.map(r => r.name),
+        permissions: permissionsResult.rows.map(p => p.name)
       }
     });
 

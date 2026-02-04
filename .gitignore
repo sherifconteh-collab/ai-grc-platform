@@ -133,6 +133,9 @@ docker-compose.override.yml
 .gcloud/
 .azure/
 
+# Uploaded evidence files
+uploads/
+
 # Local development
 .local/
 local-data/

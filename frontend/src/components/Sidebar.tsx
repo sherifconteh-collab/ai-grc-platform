@@ -8,7 +8,9 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
   { name: 'Frameworks', href: '/dashboard/frameworks', icon: '🎯' },
   { name: 'Controls', href: '/dashboard/controls', icon: '✅' },
+  { name: 'Evidence', href: '/dashboard/evidence', icon: '📄' },
   { name: 'Audit Logs', href: '/dashboard/audit', icon: '📝' },
+  { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
 ];
 
 export default function Sidebar() {
@@ -40,7 +42,7 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-1">
         {navigation.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href);
           return (
             <Link
               key={item.name}

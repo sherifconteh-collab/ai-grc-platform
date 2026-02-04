@@ -10,6 +10,8 @@ interface User {
   fullName: string;
   role: string;
   organizationId: string;
+  roles: string[];
+  permissions: string[];
 }
 
 interface AuthContextType {
@@ -52,7 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: userData.email,
         fullName: userData.full_name,
         role: userData.role,
-        organizationId: userData.organization.id
+        organizationId: userData.organization.id,
+        roles: userData.roles || [],
+        permissions: userData.permissions || []
       });
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -81,7 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: user.email,
         fullName: user.full_name,
         role: user.role,
-        organizationId: user.organization_id
+        organizationId: user.organization_id,
+        roles: [],
+        permissions: []
       });
 
       console.log('🟢 AUTH CONTEXT: Redirecting to dashboard...');
@@ -106,7 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: user.email,
         fullName: user.full_name,
         role: user.role,
-        organizationId: organization.id
+        organizationId: organization.id,
+        roles: [],
+        permissions: []
       });
 
       router.push('/dashboard');

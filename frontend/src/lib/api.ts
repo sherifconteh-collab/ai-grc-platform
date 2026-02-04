@@ -160,4 +160,76 @@ export const auditAPI = {
   getUserLogs: (userId: string) => api.get(`/audit/user/${userId}`),
 };
 
+// Implementations APIs
+export const implementationsAPI = {
+  getAll: (params?: { frameworkId?: string; status?: string; assignedTo?: string; priority?: string; controlId?: string }) =>
+    api.get('/implementations', { params }),
+
+  getById: (id: string) => api.get(`/implementations/${id}`),
+
+  updateStatus: (id: string, data: { status: string; notes?: string }) =>
+    api.patch(`/implementations/${id}/status`, data),
+
+  assign: (id: string, data: { assignedTo?: string | null; dueDate?: string | null; notes?: string }) =>
+    api.patch(`/implementations/${id}/assign`, data),
+
+  review: (id: string, data: { notes?: string; stillApplicable?: boolean; evidenceUpdated?: boolean }) =>
+    api.post(`/implementations/${id}/review`, data),
+
+  getActivityFeed: (params?: { limit?: number; offset?: number }) =>
+    api.get('/implementations/activity/feed', { params }),
+
+  getDueControls: (params?: { days?: number }) =>
+    api.get('/implementations/due/upcoming', { params }),
+};
+
+// Evidence APIs
+export const evidenceAPI = {
+  getAll: (params?: { search?: string; tags?: string; limit?: number; offset?: number }) =>
+    api.get('/evidence', { params }),
+
+  upload: (formData: FormData) =>
+    api.post('/evidence/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+
+  getById: (id: string) => api.get(`/evidence/${id}`),
+
+  download: (id: string) => api.get(`/evidence/${id}/download`, { responseType: 'blob' }),
+
+  update: (id: string, data: { description?: string; tags?: string[] }) =>
+    api.put(`/evidence/${id}`, data),
+
+  remove: (id: string) => api.delete(`/evidence/${id}`),
+
+  link: (id: string, data: { controlIds: string[]; notes?: string }) =>
+    api.post(`/evidence/${id}/link`, data),
+
+  unlink: (evidenceId: string, controlId: string) =>
+    api.delete(`/evidence/${evidenceId}/unlink/${controlId}`),
+};
+
+// Roles APIs
+export const rolesAPI = {
+  getAll: () => api.get('/roles'),
+
+  create: (data: { name: string; description: string; permissions: string[] }) =>
+    api.post('/roles', data),
+
+  update: (roleId: string, data: { name?: string; description?: string; permissions?: string[] }) =>
+    api.put(`/roles/${roleId}`, data),
+
+  remove: (roleId: string) => api.delete(`/roles/${roleId}`),
+
+  getAllPermissions: () => api.get('/roles/permissions/all'),
+
+  assignRole: (data: { userId: string; roleIds: string[] }) =>
+    api.post('/roles/assign', data),
+
+  getUserRoles: (userId: string) => api.get(`/roles/user/${userId}`),
+};
+
+// Users APIs
+export const usersAPI = {
+  getOrgUsers: () => api.get('/users'),
+};
+
 export default api;
