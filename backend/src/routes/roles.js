@@ -97,7 +97,7 @@ router.post('/', authenticateToken, requirePermission('users.assign_roles'), asy
       await client.query(`
         INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent)
         VALUES ($1, $2, $3, $4, $5, $6)
-      `, [req.user.userId, 'create_role', 'role', roleId, req.ip, req.headers['user-agent']]);
+      `, [req.user.id, 'create_role', 'role', roleId, req.ip, req.headers['user-agent']]);
 
       await client.query('COMMIT');
 
@@ -188,7 +188,7 @@ router.put('/:roleId', authenticateToken, requirePermission('users.assign_roles'
       await client.query(`
         INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent)
         VALUES ($1, $2, $3, $4, $5, $6)
-      `, [req.user.userId, 'update_role', 'role', roleId, req.ip, req.headers['user-agent']]);
+      `, [req.user.id, 'update_role', 'role', roleId, req.ip, req.headers['user-agent']]);
 
       await client.query('COMMIT');
 
@@ -260,7 +260,7 @@ router.delete('/:roleId', authenticateToken, requirePermission('users.assign_rol
     await pool.query(`
       INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent)
       VALUES ($1, $2, $3, $4, $5, $6)
-    `, [req.user.userId, 'delete_role', 'role', roleId, req.ip, req.headers['user-agent']]);
+    `, [req.user.id, 'delete_role', 'role', roleId, req.ip, req.headers['user-agent']]);
 
     res.json({
       success: true,
@@ -355,14 +355,14 @@ router.post('/assign', authenticateToken, requirePermission('users.assign_roles'
       INSERT INTO user_roles (user_id, role_id, assigned_by)
       VALUES ${values}
       ON CONFLICT (user_id, role_id) DO NOTHING
-    `, [userId, ...roleIds, req.user.userId]);
+    `, [userId, ...roleIds, req.user.id]);
 
     // Log action
     await pool.query(`
       INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent, details)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [
-      req.user.userId,
+      req.user.id,
       'assign_roles',
       'user',
       userId,

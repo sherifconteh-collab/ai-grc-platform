@@ -24,8 +24,7 @@ router.get('/', authenticateToken, async (req, res) => {
         ci.notes,
         ci.completed_at,
         ci.last_reviewed_at,
-        ci.created_at,
-        ci.updated_at,
+        ci.implementation_date,
         fc.control_id as control_code,
         fc.title as control_title,
         fc.description as control_description,
@@ -198,7 +197,7 @@ router.patch('/:id/status', authenticateToken, requirePermission('controls.write
     const { id } = req.params;
     const { status, notes } = req.body;
     const organizationId = req.user.organizationId;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const validStatuses = ['not_started', 'in_progress', 'implemented', 'verified', 'not_applicable'];
     if (!validStatuses.includes(status)) {
@@ -227,7 +226,7 @@ router.patch('/:id/status', authenticateToken, requirePermission('controls.write
     const oldStatus = currentResult.rows[0].status;
 
     // Update the implementation
-    const updateFields = ['status = $1', 'updated_at = NOW()'];
+    const updateFields = ['status = $1'];
     const params = [status];
     let paramIndex = 2;
 
@@ -303,7 +302,7 @@ router.patch('/:id/assign', authenticateToken, requirePermission('controls.assig
     const { id } = req.params;
     const { assignedTo, dueDate, notes } = req.body;
     const organizationId = req.user.organizationId;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // Verify assignee belongs to the organization
     if (assignedTo) {
@@ -320,7 +319,7 @@ router.patch('/:id/assign', authenticateToken, requirePermission('controls.assig
       }
     }
 
-    const updateFields = ['updated_at = NOW()'];
+    const updateFields = [];
     const params = [];
     let paramIndex = 1;
 
@@ -395,15 +394,14 @@ router.post('/:id/review', authenticateToken, requirePermission('controls.write'
     const { id } = req.params;
     const { notes, stillApplicable, evidenceUpdated } = req.body;
     const organizationId = req.user.organizationId;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const result = await pool.query(`
       UPDATE control_implementations
       SET
         last_reviewed_at = NOW(),
         last_reviewed_by = $1,
-        notes = COALESCE($2, notes),
-        updated_at = NOW()
+        notes = COALESCE($2, notes)
       WHERE id = $3 AND organization_id = $4
       RETURNING *
     `, [userId, notes, id, organizationId]);

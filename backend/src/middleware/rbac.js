@@ -10,7 +10,7 @@ import pool from '../config/database.js';
 export const requirePermission = (requiredPermission) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user.userId;
+      const userId = req.user.id;
       const organizationId = req.user.organizationId;
 
       // Check if user has the required permission through their roles
@@ -53,7 +53,7 @@ export const requirePermission = (requiredPermission) => {
 export const requireAnyPermission = (permissions) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user.userId;
+      const userId = req.user.id;
       const organizationId = req.user.organizationId;
 
       const result = await pool.query(`
@@ -95,7 +95,7 @@ export const requireAnyPermission = (permissions) => {
 export const requireAllPermissions = (permissions) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user.userId;
+      const userId = req.user.id;
       const organizationId = req.user.organizationId;
 
       // Get all permissions user has
