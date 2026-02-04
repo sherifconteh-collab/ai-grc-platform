@@ -14,18 +14,13 @@ const api = axios.create({
 // Request interceptor - add auth token
 api.interceptors.request.use(
   (config) => {
-    console.log('🟡 API CLIENT: Making request to', config.method?.toUpperCase(), config.url);
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('🟡 API CLIENT: Added auth token to request');
     }
     return config;
   },
-  (error) => {
-    console.log('🔴 API CLIENT: Request interceptor error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor - handle token refresh

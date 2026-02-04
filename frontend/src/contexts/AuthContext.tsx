@@ -43,9 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      console.log('Checking auth with token:', token?.substring(0, 20) + '...');
       const response = await authAPI.getCurrentUser();
-      console.log('Auth check response:', response.data);
 
       // /me endpoint returns user data directly in response.data.data, not nested in "user"
       const userData = response.data.data;
@@ -69,11 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    console.log('🟢 AUTH CONTEXT: login called with email=', email);
     try {
-      console.log('🟢 AUTH CONTEXT: Making API call to /auth/login...');
       const response = await authAPI.login({ email, password });
-      console.log('🟢 AUTH CONTEXT: API response received:', response.data);
       const { user, tokens } = response.data.data;
 
       localStorage.setItem('accessToken', tokens.accessToken);
@@ -90,10 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         permissions: []
       });
 
-      console.log('🟢 AUTH CONTEXT: Redirecting to dashboard...');
       router.push('/dashboard');
     } catch (error: any) {
-      console.log('🔴 AUTH CONTEXT: Login error:', error);
       throw new Error(error.response?.data?.error || 'Login failed');
     }
   };

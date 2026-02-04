@@ -117,10 +117,10 @@ jobs:
         run: |
           cd backend
           npm ci
-          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;LGPL-3.0-or-later" --summary
+          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;CC-BY-4.0;LGPL-3.0-or-later;Unlicense" --summary
 
       - name: Check frontend licenses
         run: |
           cd frontend
           npm ci
-          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;LGPL-3.0-or-later" --excludePackages "@img/sharp-libvips-linux-x64;@img/sharp-libvips-linux-arm64;@img/sharp-libvips-linux-arm;@img/sharp-libvips-linux-s390x;@img/sharp-libvips-linux-ppc64le" --summary
+          license-checker --production --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;CC0-1.0;CC-BY-4.0;LGPL-3.0-or-later;Unlicense" --excludePackages "@img/sharp-libvips-linux-x64;@img/sharp-libvips-linux-arm64;@img/sharp-libvips-linux-arm;@img/sharp-libvips-linux-s390x;@img/sharp-libvips-linux-ppc64le" --summary
