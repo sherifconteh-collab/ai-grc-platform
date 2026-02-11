@@ -1,4 +1,4 @@
-# AI GRC Platform - Project Status
+# ControlWeave - Project Status
 
 **Date**: January 27, 2026
 **Status**: Alpha - Database Layer Complete

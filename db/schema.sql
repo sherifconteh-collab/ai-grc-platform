@@ -1,4 +1,4 @@
--- AI GRC Platform - Multi-Framework Database Schema
+-- ControlWeave - Multi-Framework Database Schema
 -- Supports: NIST CSF 2.0, NIST AI RMF, ISO 27001, SOC 2, HIPAA, GDPR, PCI DSS, CIS, COBIT, ISO 42001, FedRAMP, CMMC
 
 -- Enable UUID extension

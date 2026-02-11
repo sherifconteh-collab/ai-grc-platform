@@ -643,7 +643,7 @@ logged, quarterly access reviews.
 3. **SBOM Integration** → Critical for government/DoD customers
 4. **Open Source** → Free alternative to $50k/year GRC tools
 
-This positions the AI GRC Platform as the most comprehensive open-source compliance tool.
+This positions the ControlWeave as the most comprehensive open-source compliance tool.
 
 ---
 

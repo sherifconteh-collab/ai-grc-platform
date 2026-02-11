@@ -1,4 +1,4 @@
-# 🎉 AI GRC Platform - Complete Foundation Package
+# 🎉 ControlWeave - Complete Foundation Package
 
 **Congratulations!** You now have a complete, production-ready database foundation for your open-source AI GRC platform.
 

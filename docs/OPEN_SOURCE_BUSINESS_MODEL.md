@@ -149,7 +149,7 @@ Keep the core open source, but charge for enterprise needs:
 │  • Custom API development                  │
 │                                            │
 │  White-Label Edition              $15k-50k │
-│  • Remove "AI GRC Platform" branding      │
+│  • Remove "ControlWeave" branding      │
 │  • Custom domain, logo, colors            │
 │                                            │
 │  On-Premise + Support             $50k-150k│

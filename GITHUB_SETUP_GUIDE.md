@@ -221,7 +221,7 @@ Your platform being "MCP-ready" = ahead of the curve.
 
 **3. Marketing Gold**
 ```
-"AI GRC Platform - Now with AI Agent Integration!"
+"ControlWeave - Now with AI Agent Integration!"
 - Post on Twitter/LinkedIn
 - Gets attention from AI community
 - Shows you're cutting-edge
@@ -423,7 +423,7 @@ Content: (gitignore content from above)
 
 ### 3. CONTRIBUTING.md
 ```markdown
-# Contributing to AI GRC Platform
+# Contributing to ControlWeave
 
 Thank you for your interest in contributing! 
 
@@ -738,7 +738,7 @@ Time: 5 seconds
 
 ### Title
 ```
-🚀 Launching: AI GRC Platform - Open Source Multi-Framework Compliance
+🚀 Launching: ControlWeave - Open Source Multi-Framework Compliance
 
 The world's first open source GRC platform with:
 - 6 major frameworks (NIST CSF, AI RMF, ISO 27001, SOC 2, 800-171, 800-53)

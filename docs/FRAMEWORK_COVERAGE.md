@@ -1,4 +1,4 @@
-# AI GRC Platform - Framework Coverage
+# ControlWeave - Framework Coverage
 
 ## Overview
 

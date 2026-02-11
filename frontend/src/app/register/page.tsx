@@ -45,7 +45,7 @@ export default function RegisterPage() {
       <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
-          <p className="text-gray-600 mt-2">Join AI GRC Platform</p>
+          <p className="text-gray-600 mt-2">Join ControlWeave</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

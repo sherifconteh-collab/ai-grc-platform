@@ -136,10 +136,21 @@ docker-compose.override.yml
 # Uploaded evidence files
 uploads/
 
-# Paid-tier files (live in ai-grc-platform-pro, overlaid locally)
+# ControlWeaver-Pro paid-tier files (live in ControlWeaver-Pro private repo)
+# These files are overlaid locally for development but must NOT be pushed to the public repo
 backend/migrations/003_feature_gating.sql
 backend/src/middleware/featureGate.js
-backend/src/routes/evidence.js
+backend/src/routes/sso.js
+backend/src/routes/integrations.js
+backend/src/services/sspGenerator.js
+backend/src/services/sbomAnalyzer.js
+backend/src/services/cmdb.js
+backend/src/services/aiPolicies.js
+frontend/src/app/dashboard/ssp/
+frontend/src/app/dashboard/sbom/
+frontend/src/app/dashboard/cmdb/
+frontend/src/app/dashboard/reports/
+frontend/src/components/ProBadge.tsx
 
 # Local development
 .local/

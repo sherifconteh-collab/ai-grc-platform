@@ -2,7 +2,7 @@
 
 ## 🔐 Protecting the Repository from Malicious Contributions
 
-This document outlines security measures to protect the AI GRC Platform from malicious code and maintain code integrity.
+This document outlines security measures to protect the ControlWeave from malicious code and maintain code integrity.
 
 ---
 

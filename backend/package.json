@@ -1,7 +1,7 @@
 {
-  "name": "ai-grc-platform-backend",
+  "name": "controlweave-backend",
   "version": "1.0.0",
-  "description": "Backend API for AI GRC Platform",
+  "description": "Backend API for ControlWeave - Open Source GRC Platform",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -12,7 +12,9 @@
     "grc",
     "compliance",
     "nist",
-    "iso27001"
+    "iso27001",
+    "controlweave",
+    "governance"
   ],
   "author": "Conteh Consulting LLC",
   "license": "MIT",

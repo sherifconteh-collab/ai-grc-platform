@@ -1,5 +1,5 @@
 #!/bin/bash
-# Master Database Initialization Script for AI GRC Platform
+# Master Database Initialization Script for ControlWeave
 # This script creates the complete multi-framework GRC database
 
 set -e  # Exit on error
@@ -10,7 +10,7 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 
 echo "=========================================="
-echo "AI GRC Platform Database Initialization"
+echo "ControlWeave Database Initialization"
 echo "=========================================="
 echo ""
 echo "Database: $DB_NAME"

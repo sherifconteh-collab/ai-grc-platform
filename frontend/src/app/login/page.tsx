@@ -13,21 +13,15 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔵 LOGIN FORM: handleSubmit called');
-    console.log('🔵 LOGIN FORM: email=', email, 'password length=', password.length);
     setError('');
     setLoading(true);
 
     try {
-      console.log('🔵 LOGIN FORM: Calling login function...');
       await login(email, password);
-      console.log('🔵 LOGIN FORM: Login successful!');
     } catch (err: any) {
-      console.log('🔴 LOGIN FORM: Login error:', err);
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
-      console.log('🔵 LOGIN FORM: handleSubmit complete');
     }
   };
 
@@ -35,7 +29,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-800">
       <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">AI GRC Platform</h1>
+          <h1 className="text-3xl font-bold text-gray-900">ControlWeave</h1>
           <p className="text-gray-600 mt-2">Intelligent Compliance Management</p>
         </div>
 
@@ -79,7 +73,6 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            onClick={() => console.log('🔴 BUTTON CLICKED!')}
             className="w-full bg-purple-600 text-white py-3 rounded-md font-semibold hover:bg-purple-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in...' : 'Sign In'}
@@ -97,7 +90,7 @@ export default function LoginPage() {
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <p className="text-sm text-gray-500 text-center">
-            Open-source compliance platform
+            Open-source compliance platform - Community Edition
           </p>
         </div>
       </div>

@@ -1,4 +1,4 @@
-// AI GRC Platform - Backend API Server
+// ControlWeave - Backend API Server
 // Simple Express server to query the database and serve a basic UI
 
 import 'dotenv/config';
@@ -360,7 +360,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI GRC Platform</title>
+    <title>ControlWeave</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -494,7 +494,7 @@ app.get('/', (req, res) => {
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 AI GRC Platform</h1>
+            <h1>🚀 ControlWeave</h1>
             <p class="subtitle">Multi-Framework Compliance Management with AI Governance</p>
         </div>
 
@@ -599,7 +599,7 @@ app.get('/', (req, res) => {
 // ==========================================
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 AI GRC Platform API running on http://localhost:${PORT}`);
+  console.log(`\n🚀 ControlWeave API running on http://localhost:${PORT}`);
   console.log(`📊 Dashboard: http://localhost:${PORT}`);
   console.log(`🔌 API: http://localhost:${PORT}/api/frameworks`);
   console.log(`\nPress Ctrl+C to stop\n`);

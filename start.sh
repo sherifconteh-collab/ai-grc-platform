@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# AI GRC Platform - Quick Start Script
+# ControlWeave - Quick Start Script
 # This script sets up the database and starts the application
 
-echo "🚀 AI GRC Platform - Quick Start"
+echo "🚀 ControlWeave - Quick Start"
 echo "================================"
 echo ""
 

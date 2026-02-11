@@ -1,8 +1,8 @@
-# 🚀 AI GRC Platform - Quick Start Guide
+# 🚀 ControlWeave - Quick Start Guide
 
 ## ✅ What's Working Right Now
 
-Your AI GRC Platform backend is **FULLY FUNCTIONAL** with:
+Your ControlWeave backend is **FULLY FUNCTIONAL** with:
 
 - ✅ **8 Compliance Frameworks** with 567 total controls
   - NIST CSF 2.0 (75 controls)

@@ -21,7 +21,7 @@ export default function Sidebar() {
     <div className="flex flex-col w-64 bg-gray-900 min-h-screen">
       {/* Logo */}
       <div className="flex items-center justify-center h-16 bg-gray-800 border-b border-gray-700">
-        <h1 className="text-xl font-bold text-white">AI GRC Platform</h1>
+        <h1 className="text-xl font-bold text-white">ControlWeave</h1>
       </div>
 
       {/* User Info */}

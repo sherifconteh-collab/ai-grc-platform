@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI GRC Platform - Intelligent Compliance Management",
-  description: "Open-source GRC platform with auto-crosswalk compliance mapping across NIST, ISO 27001, SOC 2, and more",
+  title: "ControlWeave - Intelligent Compliance Management",
+  description: "Open-source GRC platform with auto-crosswalk compliance mapping across NIST, ISO 27001, SOC 2, and more. Community Edition.",
 };
 
 export default function RootLayout({

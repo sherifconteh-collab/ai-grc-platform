@@ -1,6 +1,6 @@
-# Contributing to AI GRC Platform
+# Contributing to ControlWeave
 
-Thank you for your interest in contributing to the AI GRC Platform! We welcome contributions from the community and are excited to work with you.
+Thank you for your interest in contributing to the ControlWeave! We welcome contributions from the community and are excited to work with you.
 
 ## 🤝 How to Contribute
 
@@ -233,4 +233,4 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
-Thank you for contributing to AI GRC Platform! 🚀
+Thank you for contributing to ControlWeave! 🚀

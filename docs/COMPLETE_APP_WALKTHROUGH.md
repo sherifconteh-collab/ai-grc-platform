@@ -1,4 +1,4 @@
-# AI GRC Platform - Complete Application Walkthrough
+# ControlWeave - Complete Application Walkthrough
 **Visual Guide - Optimized for iPad/Mobile Viewing**
 
 ---
