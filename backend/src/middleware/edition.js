@@ -16,9 +16,9 @@
  * - Returning clear error messages about edition limitations
  */
 
-const EDITION = (process.env.EDITION || 'pro').toLowerCase();
-const IS_COMMUNITY = EDITION === 'community';
-const IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
+let EDITION = (process.env.EDITION || 'pro').toLowerCase();
+let IS_COMMUNITY = EDITION === 'community';
+let IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
 
 /**
  * Feature tier requirements mapping
@@ -155,8 +155,11 @@ function validateEdition() {
   const valid = ['community', 'pro', 'enterprise'];
   if (!valid.includes(EDITION)) {
     console.warn(`[SECURITY WARNING] Invalid EDITION value: "${EDITION}". Must be one of: ${valid.join(', ')}. Defaulting to 'community' for security.`);
-    // Force to community as fail-safe
+    // Force to community as fail-safe and update module-level vars
     process.env.EDITION = 'community';
+    EDITION = 'community';
+    IS_COMMUNITY = true;
+    IS_PRO = false;
     return false;
   }
   console.log(`[Edition] Running in ${EDITION.toUpperCase()} edition`);

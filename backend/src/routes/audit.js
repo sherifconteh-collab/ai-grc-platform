@@ -282,6 +282,18 @@ router.get('/stats', requirePermission('audit.read'), async (req, res) => {
 // GET /audit/splunk/live
 router.get('/splunk/live', requirePermission('audit.read'), async (req, res) => {
   try {
+    if (!splunk) {
+      return res.json({
+        success: true,
+        data: {
+          configured: false,
+          message: 'Splunk integration is not available in this deployment.',
+          results: [],
+          result_count: 0
+        }
+      });
+    }
+
     const orgId = req.user.organization_id;
     const settings = await splunk.getOrgSplunkSettings(orgId);
     const configured = Boolean(settings.baseUrl && settings.apiToken);

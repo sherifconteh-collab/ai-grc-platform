@@ -461,12 +461,27 @@ We welcome contributions! This is an open-source project designed to help organi
 
 MIT License — see [LICENSE](./LICENSE) file for details
 
+## 💎 Want Premium Features?
+
+This community edition gives you a fully functional GRC platform. If you need enterprise-grade capabilities, visit **[ControlWeave.com](https://controlweave.com)** for premium tiers that include:
+
+- 🏢 **CMDB** — Full configuration management database with asset lifecycle tracking
+- 🔍 **Vulnerability Management** — Automated scanning and remediation workflows
+- 🕵️ **Threat Intelligence** — Real-time threat feeds and risk correlation
+- 🤝 **Vendor Risk Management (TPRM)** — Third-party risk assessments and monitoring
+- 🔗 **Enterprise Integrations** — Splunk, SIEM, SSO/SAML, and more
+- 📊 **Advanced Reporting** — Custom dashboards, executive reports, and analytics
+- 🏗️ **Multi-tenant Management** — Platform administration across organizations
+- 🎯 **Unlimited Frameworks** — No limits on simultaneously active frameworks
+
+👉 **[Get started at ControlWeave.com](https://controlweave.com/pricing)**
+
 ## 🙋 Support
 
 - **Issues**: [GitHub Issues](https://github.com/sherifconteh-collab/ai-grc-platform/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/sherifconteh-collab/ai-grc-platform/discussions)
 - **Email**: Contehconsulting@gmail.com
-- **Upstream**: [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) — full product with premium tiers
+- **Premium Features**: [ControlWeave.com](https://controlweave.com) — CMDB, Vendor Risk, Threat Intel, and more
 
 ## 🌟 Why This Exists
 
@@ -495,8 +510,8 @@ This project aims to provide an **open, transparent, affordable** alternative th
 ## 🔗 Links
 
 - **Community Repository**: [ai-grc-platform](https://github.com/sherifconteh-collab/ai-grc-platform) *(you are here)*
-- **Upstream Product**: [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave)
-- Website: [Coming Soon]
+- **Premium Product**: [ControlWeave.com](https://controlweave.com) — CMDB, Vendor Risk, Threat Intel, and more
+- **Upstream Source**: [ControlWeave on GitHub](https://github.com/sherifconteh-collab/ControlWeave)
 - Documentation: See [docs/](./docs/) folder
 
 ---

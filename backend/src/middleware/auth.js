@@ -52,8 +52,14 @@ async function rbacTablesExist() {
        LIMIT 0`
     );
     _rbacTablesExist = true;
-  } catch {
-    _rbacTablesExist = false;
+  } catch (err) {
+    // Only cache "false" when tables definitively do not exist (Postgres 42P01).
+    if (err && err.code === '42P01') {
+      _rbacTablesExist = false;
+      return _rbacTablesExist;
+    }
+    // For other errors (e.g., connectivity, permissions), don't cache so we retry next time.
+    return false;
   }
   return _rbacTablesExist;
 }
