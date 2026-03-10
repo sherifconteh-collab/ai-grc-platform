@@ -406,6 +406,7 @@ ai-grc-platform/
 - [OpenAPI Specification](./docs/openapi.yaml)
 - [Quick Start Guide](./QUICKSTART.md)
 - [API Testing Guide](./QUICK_START.md)
+- [Release Notes](./RELEASE_NOTES.md)
 - [Phase 2 Roadmap](./PHASE_2_ROADMAP.md)
 - [Project Status](./PROJECT_STATUS.md)
 - [Contributing Guide](./CONTRIBUTING.md)
