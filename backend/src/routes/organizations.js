@@ -6,7 +6,9 @@ const ExcelJS = require('exceljs');
 const multer = require('multer');
 const path = require('path');
 const { Readable } = require('stream');
-const llm = require('../services/llmService');
+// Optional premium service — not available in community edition
+let llm;
+try { llm = require('../services/llmService'); } catch (_) { llm = null; }
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, isUuid } = require('../middleware/validate');
 const { getFrameworkLimit, normalizeTier, shouldEnforceAiLimitForByok } = require('../config/tierPolicy');

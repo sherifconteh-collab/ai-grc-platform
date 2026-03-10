@@ -5,7 +5,10 @@ const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
-const { invalidateAICache } = require('../services/llmService');
+// Optional premium service — not available in community edition
+let llmServiceModule;
+try { llmServiceModule = require('../services/llmService'); } catch (_) { llmServiceModule = {}; }
+const { invalidateAICache = () => {} } = llmServiceModule;
 
 router.use(authenticate);
 

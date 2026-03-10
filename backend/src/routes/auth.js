@@ -9,12 +9,21 @@ const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
+// Optional premium service — not available in community edition
+let subscriptionServiceModule;
+try { subscriptionServiceModule = require('../services/subscriptionService'); } catch (_) { subscriptionServiceModule = {}; }
 const {
-  getTrialSeedData,
-  expireOrganizationTrialIfNeeded
-} = require('../services/subscriptionService');
+  getTrialSeedData = () => ({ tier: 'free', billingStatus: 'active', trialSourceTier: 'free', trialDays: 14, trialStatus: 'active' }),
+  expireOrganizationTrialIfNeeded = async () => false
+} = subscriptionServiceModule;
 const { sendPasswordResetEmail } = require('../services/emailService');
-const { getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService');
+// Optional premium service — not available in community edition
+let geolocationServiceModule;
+try { geolocationServiceModule = require('../services/geolocationService'); } catch (_) { geolocationServiceModule = {}; }
+const {
+  getGeolocationFromRequest = () => null,
+  extractIpFromRequest = (req) => req?.ip || null
+} = geolocationServiceModule;
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');

@@ -3,7 +3,9 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
-const splunk = require('../services/splunkService');
+// Optional premium service — not available in community edition
+let splunk;
+try { splunk = require('../services/splunkService'); } catch (_) { splunk = null; }
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 

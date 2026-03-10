@@ -16,7 +16,9 @@ const pool = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const PDFDocument = require('pdfkit');
-const llm = require('../services/llmService');
+// Optional premium service — not available in community edition
+let llm;
+try { llm = require('../services/llmService'); } catch (_) { llm = null; }
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
 

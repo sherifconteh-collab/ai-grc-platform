@@ -9,7 +9,10 @@
  */
 
 const { createAuditLog } = require('../services/auditService');
-const { extractIpFromRequest } = require('../services/geolocationService');
+// Optional premium service — not available in community edition
+let geolocationServiceModule;
+try { geolocationServiceModule = require('../services/geolocationService'); } catch (_) { geolocationServiceModule = {}; }
+const { extractIpFromRequest = (req) => req?.ip || null } = geolocationServiceModule;
 
 /**
  * Create an audit log middleware for a specific event type
