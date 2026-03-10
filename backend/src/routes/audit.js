@@ -9,6 +9,12 @@ try { splunk = require('../services/splunkService'); } catch (_) { splunk = null
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
+const auditReadLimiter = createRateLimiter({
+  label: 'audit-log-read',
+  windowMs: 60 * 1000,
+  max: 120
+});
+
 const auditWriteLimiter = createRateLimiter({
   label: 'audit-log-write',
   windowMs: 60 * 1000,
@@ -18,7 +24,7 @@ const auditWriteLimiter = createRateLimiter({
 router.use(authenticate);
 
 // GET /audit/logs
-router.get('/logs', requirePermission('audit.read'), async (req, res) => {
+router.get('/logs', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const {
@@ -233,7 +239,7 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
 });
 
 // GET /audit/stats
-router.get('/stats', requirePermission('audit.read'), async (req, res) => {
+router.get('/stats', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { startDate, endDate } = req.query;
@@ -280,7 +286,7 @@ router.get('/stats', requirePermission('audit.read'), async (req, res) => {
 });
 
 // GET /audit/splunk/live
-router.get('/splunk/live', requirePermission('audit.read'), async (req, res) => {
+router.get('/splunk/live', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
   try {
     if (!splunk) {
       return res.json({
@@ -348,7 +354,7 @@ router.get('/splunk/live', requirePermission('audit.read'), async (req, res) => 
 });
 
 // GET /audit/event-types
-router.get('/event-types', requirePermission('audit.read'), async (req, res) => {
+router.get('/event-types', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT DISTINCT event_type FROM audit_logs WHERE organization_id = $1 ORDER BY event_type',
@@ -363,7 +369,7 @@ router.get('/event-types', requirePermission('audit.read'), async (req, res) => 
 });
 
 // GET /audit/user/:userId
-router.get('/user/:userId', requirePermission('audit.read'), async (req, res) => {
+router.get('/user/:userId', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT al.id, al.event_type, al.resource_type, al.details, al.created_at, al.success
