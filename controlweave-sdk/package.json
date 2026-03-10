@@ -1,0 +1,8 @@
+{
+  "name": "@controlweave/external-ai-logger",
+  "version": "1.0.0",
+  "description": "SDK for logging external AI decisions into ControlWeave",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "license": "MIT"
+}

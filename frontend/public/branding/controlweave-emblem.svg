@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">ControlWeave CW emblem</title>
+  <desc id="desc">Purple woven circular emblem with white CW initials</desc>
+
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="45%" r="70%">
+      <stop offset="0%" stop-color="#3d1e87"/>
+      <stop offset="55%" stop-color="#5c2ac0"/>
+      <stop offset="100%" stop-color="#8c57f3"/>
+    </radialGradient>
+    <linearGradient id="rimGradient" x1="8%" y1="8%" x2="92%" y2="92%">
+      <stop offset="0%" stop-color="#f38cff"/>
+      <stop offset="45%" stop-color="#9b7dff"/>
+      <stop offset="100%" stop-color="#64b4ff"/>
+    </linearGradient>
+    <linearGradient id="bandA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd4ff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#7c61ff" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="bandB" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c6d0ff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#7d4df7" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="letterFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8f5ff"/>
+      <stop offset="100%" stop-color="#e3dcff"/>
+    </linearGradient>
+    <clipPath id="innerClip">
+      <circle cx="256" cy="256" r="176"/>
+    </clipPath>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="letterShadow" x="-30%" y="-30%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#2b1268" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <circle cx="256" cy="256" r="212" fill="#120932"/>
+  <circle cx="256" cy="256" r="204" fill="url(#bgGlow)"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="url(#rimGradient)" stroke-width="8"/>
+
+  <g clip-path="url(#innerClip)" opacity="0.98">
+    <rect x="32" y="130" width="448" height="36" rx="18" fill="url(#bandA)" transform="rotate(-18 256 256)"/>
+    <rect x="32" y="178" width="448" height="36" rx="18" fill="url(#bandB)" transform="rotate(-18 256 256)"/>
+    <rect x="32" y="226" width="448" height="36" rx="18" fill="url(#bandA)" transform="rotate(-18 256 256)"/>
+    <rect x="32" y="274" width="448" height="36" rx="18" fill="url(#bandB)" transform="rotate(-18 256 256)"/>
+    <rect x="32" y="322" width="448" height="36" rx="18" fill="url(#bandA)" transform="rotate(-18 256 256)"/>
+
+    <rect x="130" y="32" width="36" height="448" rx="18" fill="url(#bandB)" transform="rotate(18 256 256)"/>
+    <rect x="178" y="32" width="36" height="448" rx="18" fill="url(#bandA)" transform="rotate(18 256 256)"/>
+    <rect x="226" y="32" width="36" height="448" rx="18" fill="url(#bandB)" transform="rotate(18 256 256)"/>
+    <rect x="274" y="32" width="36" height="448" rx="18" fill="url(#bandA)" transform="rotate(18 256 256)"/>
+    <rect x="322" y="32" width="36" height="448" rx="18" fill="url(#bandB)" transform="rotate(18 256 256)"/>
+  </g>
+
+  <g opacity="0.9" filter="url(#softGlow)">
+    <circle cx="128" cy="160" r="4" fill="#ffffff"/>
+    <circle cx="164" cy="118" r="3" fill="#d6c7ff"/>
+    <circle cx="338" cy="116" r="5" fill="#ffffff"/>
+    <circle cx="384" cy="160" r="4" fill="#d6c7ff"/>
+    <circle cx="138" cy="350" r="3.5" fill="#efe7ff"/>
+    <circle cx="372" cy="350" r="4.5" fill="#f8f4ff"/>
+    <circle cx="238" cy="374" r="3.8" fill="#ffffff"/>
+    <circle cx="302" cy="390" r="3.5" fill="#d6c7ff"/>
+    <circle cx="214" cy="202" r="4.2" fill="#dff0ff"/>
+    <circle cx="300" cy="210" r="3.8" fill="#f3ecff"/>
+  </g>
+
+  <g filter="url(#letterShadow)">
+    <text
+      x="256"
+      y="272"
+      fill="url(#letterFill)"
+      font-family="'Segoe UI', 'Arial Black', Arial, sans-serif"
+      font-size="232"
+      font-weight="800"
+      letter-spacing="-22"
+      text-anchor="middle"
+      dominant-baseline="middle"
+    >CW</text>
+    <text
+      x="256"
+      y="272"
+      fill="none"
+      stroke="#ffffff"
+      stroke-opacity="0.42"
+      stroke-width="5"
+      font-family="'Segoe UI', 'Arial Black', Arial, sans-serif"
+      font-size="232"
+      font-weight="800"
+      letter-spacing="-22"
+      text-anchor="middle"
+      dominant-baseline="middle"
+    >CW</text>
+  </g>
+
+  <circle cx="256" cy="256" r="212" fill="none" stroke="#efe4ff" stroke-opacity="0.36" stroke-width="2"/>
+</svg>

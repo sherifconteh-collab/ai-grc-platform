@@ -1,4 +1,4 @@
-import pool from '../config/database.js';
+const pool = require('../config/database');
 
 /**
  * Role Service - Handles role initialization and management
@@ -63,7 +63,7 @@ const DEFAULT_ROLES = {
  * @param {string} organizationId - The organization UUID
  * @param {string} adminUserId - The admin user UUID who should get the Admin role
  */
-export const initializeOrganizationRoles = async (organizationId, adminUserId) => {
+const initializeOrganizationRoles = async (organizationId, adminUserId) => {
   const client = await pool.connect();
 
   try {
@@ -130,7 +130,7 @@ export const initializeOrganizationRoles = async (organizationId, adminUserId) =
  * @param {string} organizationId - The organization UUID
  * @param {string} assignedBy - The user who is assigning the role
  */
-export const assignRoleToUser = async (userId, roleName, organizationId, assignedBy) => {
+const assignRoleToUser = async (userId, roleName, organizationId, assignedBy) => {
   const roleResult = await pool.query(`
     SELECT id FROM roles
     WHERE name = $1 AND organization_id = $2
@@ -152,7 +152,7 @@ export const assignRoleToUser = async (userId, roleName, organizationId, assigne
  * @param {string} userId - The user UUID
  * @param {string} organizationId - The organization UUID
  */
-export const getUserRoles = async (userId, organizationId) => {
+const getUserRoles = async (userId, organizationId) => {
   const result = await pool.query(`
     SELECT
       r.id,
@@ -172,7 +172,7 @@ export const getUserRoles = async (userId, organizationId) => {
  * @param {string} userId - The user UUID
  * @param {string} organizationId - The organization UUID
  */
-export const getUserPermissions = async (userId, organizationId) => {
+const getUserPermissions = async (userId, organizationId) => {
   const result = await pool.query(`
     SELECT DISTINCT p.name
     FROM user_roles ur
@@ -185,7 +185,7 @@ export const getUserPermissions = async (userId, organizationId) => {
   return result.rows.map(r => r.name);
 };
 
-export default {
+module.exports = {
   initializeOrganizationRoles,
   assignRoleToUser,
   getUserRoles,

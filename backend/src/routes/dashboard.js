@@ -3,9 +3,9 @@
  * Provides compliance metrics, statistics, and activity feeds
  */
 
-import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
-import pool from '../config/database.js';
+const express = require('express');
+const { authenticate } = require('../middleware/auth');
+const pool = require('../config/database');
 
 const router = express.Router();
 
@@ -13,7 +13,7 @@ const router = express.Router();
  * GET /api/v1/dashboard/stats
  * Get overall compliance statistics for the organization
  */
-router.get('/stats', authenticateToken, async (req, res) => {
+router.get('/stats', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
 
@@ -130,7 +130,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
  * GET /api/v1/dashboard/priority-actions
  * Get high-priority controls that need attention
  */
-router.get('/priority-actions', authenticateToken, async (req, res) => {
+router.get('/priority-actions', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const { limit = 10 } = req.query;
@@ -206,7 +206,7 @@ router.get('/priority-actions', authenticateToken, async (req, res) => {
  * GET /api/v1/dashboard/recent-activity
  * Get recent activity feed for the organization
  */
-router.get('/recent-activity', authenticateToken, async (req, res) => {
+router.get('/recent-activity', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const { limit = 20 } = req.query;
@@ -274,7 +274,7 @@ router.get('/recent-activity', authenticateToken, async (req, res) => {
  * GET /api/v1/dashboard/compliance-trend
  * Get compliance percentage trend over time
  */
-router.get('/compliance-trend', authenticateToken, async (req, res) => {
+router.get('/compliance-trend', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const { days = 30 } = req.query;
@@ -346,7 +346,7 @@ router.get('/compliance-trend', authenticateToken, async (req, res) => {
  * GET /api/v1/dashboard/crosswalk-impact
  * Get statistics on crosswalk satisfaction impact
  */
-router.get('/crosswalk-impact', authenticateToken, async (req, res) => {
+router.get('/crosswalk-impact', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
 
@@ -394,4 +394,4 @@ router.get('/crosswalk-impact', authenticateToken, async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /onboarding
+Disallow: /billing/
+Disallow: /login
+Disallow: /register
+Disallow: /reset-password
+Disallow: /invite
+
+Sitemap: https://controlweave.com/sitemap.xml
