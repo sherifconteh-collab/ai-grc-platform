@@ -86,7 +86,7 @@ app.use(express.json({
   limit: '2mb',
   verify: (req, _res, buf) => {
     // Capture raw body for webhook signature verification
-    if (req.url && req.url.includes('/openclaw')) {
+    if (req.url && req.url.includes('/openclaw/webhook')) {
       req.rawBody = buf;
     }
   }

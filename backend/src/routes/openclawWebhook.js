@@ -18,6 +18,9 @@ function verifySignature(req, res, next) {
   }
 
   // Use raw body bytes for HMAC verification (avoids JSON serialization inconsistencies)
+  if (!req.rawBody) {
+    log('warn', 'openclaw.missing_raw_body', { message: 'Raw body not available; HMAC verification may be unreliable' });
+  }
   const body = req.rawBody || Buffer.from(JSON.stringify(req.body));
   const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
 
