@@ -82,7 +82,15 @@ app.use((req, res, next) => {
 });
 app.use(attachRequestContext);
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({
+  limit: '2mb',
+  verify: (req, _res, buf) => {
+    // Capture raw body for webhook signature verification
+    if (req.url && req.url.includes('/openclaw')) {
+      req.rawBody = buf;
+    }
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(performanceTracker);
 app.use(requestLogger);

@@ -17,7 +17,8 @@ function verifySignature(req, res, next) {
     return res.status(401).json({ success: false, error: 'Missing signature' });
   }
 
-  const body = JSON.stringify(req.body);
+  // Use raw body bytes for HMAC verification (avoids JSON serialization inconsistencies)
+  const body = req.rawBody || Buffer.from(JSON.stringify(req.body));
   const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
 
   if (signature.length !== expected.length ||
