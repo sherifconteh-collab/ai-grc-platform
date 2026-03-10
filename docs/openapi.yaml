@@ -1,0 +1,785 @@
+openapi: 3.0.3
+info:
+  title: ControlWeave API
+  description: GRC platform API for managing compliance frameworks, controls, evidence, and audit logs.
+  version: 2.1.0
+  contact:
+    name: ControlWeave Support
+    url: https://controlweave.com
+
+servers:
+  - url: /
+    description: Default server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/auth/login:
+    post:
+      summary: Login
+      operationId: login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Logged in successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/organizations/{orgId}/controls:
+    get:
+      summary: List controls for an organization
+      operationId: listOrgControls
+      tags: [Controls]
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: frameworkId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Control list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgControlsResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/organizations/{orgId}/frameworks:
+    post:
+      summary: Replace selected frameworks for an organization
+      operationId: setOrgFrameworks
+      tags: [Frameworks]
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetFrameworksRequest'
+      responses:
+        '200':
+          description: Updated frameworks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkListResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/audit/logs:
+    get:
+      summary: List audit logs
+      operationId: listAuditLogs
+      tags: [Audit]
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: eventType
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogsResponse'
+
+  /api/v1/audit/event-types:
+    get:
+      summary: List distinct audit event types
+      operationId: listAuditEventTypes
+      tags: [Audit]
+      responses:
+        '200':
+          description: Event types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventTypesResponse'
+
+  /api/v1/roles/permissions/all:
+    get:
+      summary: List all permissions grouped by resource
+      operationId: listAllPermissions
+      tags: [Roles]
+      responses:
+        '200':
+          description: Grouped permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionsGroupedResponse'
+
+  /api/v1/settings/llm:
+    get:
+      summary: Get LLM provider settings for the organization
+      operationId: getLlmSettings
+      tags: [Settings]
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLlmSettingsResponse'
+    put:
+      summary: Save LLM provider settings for the organization
+      operationId: updateLlmSettings
+      tags: [Settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLlmSettingsRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/settings/llm/test:
+    post:
+      summary: Validate an LLM API key
+      operationId: testLlmKey
+      tags: [Settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestLlmKeyRequest'
+      responses:
+        '200':
+          description: Key is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/integrations/splunk:
+    get:
+      summary: Get Splunk connector settings for the organization
+      operationId: getSplunkSettings
+      tags: [Integrations]
+      responses:
+        '200':
+          description: Splunk connector settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSplunkSettingsResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      summary: Save Splunk connector settings
+      operationId: updateSplunkSettings
+      tags: [Integrations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSplunkSettingsRequest'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetSplunkSettingsResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      summary: Remove Splunk connector settings
+      operationId: deleteSplunkSettings
+      tags: [Integrations]
+      responses:
+        '200':
+          description: Settings removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/integrations/splunk/test:
+    post:
+      summary: Validate Splunk connector credentials
+      operationId: testSplunkConnection
+      tags: [Integrations]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSplunkSettingsRequest'
+      responses:
+        '200':
+          description: Connection successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessageResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/integrations/splunk/import-evidence:
+    post:
+      summary: Run a Splunk search and import results into evidence
+      operationId: splunkImportEvidence
+      tags: [Integrations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SplunkImportEvidenceRequest'
+      responses:
+        '201':
+          description: Evidence imported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SplunkImportEvidenceResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/evidence/{id}/integrity-check:
+    get:
+      summary: Verify evidence file integrity using SHA-256
+      operationId: checkEvidenceIntegrity
+      tags: [Evidence]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Integrity check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceIntegrityResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: string
+        correlationId:
+          type: string
+
+    SuccessMessageResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    HealthResponse:
+      type: object
+      required: [status, database]
+      properties:
+        status:
+          type: string
+        database:
+          type: string
+        requestId:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            tokens:
+              type: object
+              required: [accessToken, refreshToken]
+              properties:
+                accessToken:
+                  type: string
+                refreshToken:
+                  type: string
+
+    User:
+      type: object
+      required: [id, email, role, organization_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+        organization_id:
+          type: string
+          format: uuid
+
+    OrgControl:
+      type: object
+      required: [id, control_id, title, framework_code, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        control_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        framework_code:
+          type: string
+        status:
+          type: string
+
+    OrgControlsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          required: [controls]
+          properties:
+            controls:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrgControl'
+
+    SetFrameworksRequest:
+      type: object
+      required: [frameworkIds]
+      properties:
+        frameworkIds:
+          type: array
+          items:
+            type: string
+
+    Framework:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        control_count:
+          type: string
+
+    FrameworkListResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Framework'
+
+    AuditLog:
+      type: object
+      required: [id, event_type, success, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        user_email:
+          type: string
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        success:
+          type: boolean
+        failure_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    AuditLogsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          required: [logs]
+          properties:
+            logs:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLog'
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+
+    AuditEventTypesResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          required: [eventTypes]
+          properties:
+            eventTypes:
+              type: array
+              items:
+                type: string
+
+    Permission:
+      type: object
+      required: [id, name, action, resource]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        action:
+          type: string
+        resource:
+          type: string
+
+    PermissionsGroupedResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Permission'
+
+    GetLlmSettingsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          required: [hasAnthropicKey, hasOpenAIKey, hasGeminiKey, hasGrokKey, defaultProvider, settings]
+          properties:
+            hasAnthropicKey:
+              type: boolean
+            hasOpenAIKey:
+              type: boolean
+            hasGeminiKey:
+              type: boolean
+            hasGrokKey:
+              type: boolean
+            defaultProvider:
+              type: string
+              enum: [claude, openai, gemini, grok]
+            defaultModel:
+              type: string
+              nullable: true
+            settings:
+              type: object
+              additionalProperties:
+                type: object
+
+    UpdateLlmSettingsRequest:
+      type: object
+      properties:
+        anthropic_api_key:
+          type: string
+          nullable: true
+        openai_api_key:
+          type: string
+          nullable: true
+        gemini_api_key:
+          type: string
+          nullable: true
+        xai_api_key:
+          type: string
+          nullable: true
+        default_provider:
+          type: string
+          enum: [claude, openai, gemini, grok]
+        default_model:
+          type: string
+          nullable: true
+
+    TestLlmKeyRequest:
+      type: object
+      required: [provider, apiKey]
+      properties:
+        provider:
+          type: string
+          enum: [claude, openai, gemini, grok]
+        apiKey:
+          type: string
+
+    SplunkSettings:
+      type: object
+      required: [configured]
+      properties:
+        configured:
+          type: boolean
+        base_url:
+          type: string
+          nullable: true
+        default_index:
+          type: string
+          nullable: true
+        token_masked:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    GetSplunkSettingsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/SplunkSettings'
+
+    UpdateSplunkSettingsRequest:
+      type: object
+      properties:
+        base_url:
+          type: string
+          nullable: true
+        api_token:
+          type: string
+          nullable: true
+        default_index:
+          type: string
+          nullable: true
+
+    SplunkImportEvidenceRequest:
+      type: object
+      required: [search]
+      properties:
+        search:
+          type: string
+        earliest_time:
+          type: string
+          nullable: true
+        latest_time:
+          type: string
+          nullable: true
+        max_events:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        tags:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        control_ids:
+          type: array
+          items:
+            type: string
+
+    SplunkImportEvidenceResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            evidence_id:
+              type: string
+              format: uuid
+            file_name:
+              type: string
+            file_size:
+              type: integer
+            result_count:
+              type: integer
+            sid:
+              type: string
+            linked_controls:
+              type: integer
+
+    EvidenceIntegrityResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          required: [id, file_name, matches, expected_hash, current_hash]
+          properties:
+            id:
+              type: string
+              format: uuid
+            file_name:
+              type: string
+            matches:
+              type: boolean
+            expected_hash:
+              type: string
+            current_hash:
+              type: string
+            previous_verified_at:
+              type: string
+              format: date-time
+              nullable: true

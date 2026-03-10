@@ -1,200 +1,218 @@
-import express from 'express';
-import pool from '../config/database.js';
-import { authenticateToken } from '../middleware/auth.js';
-import { requirePermission, getUserPermissions } from '../middleware/rbac.js';
-
+// @tier: free
+const express = require('express');
 const router = express.Router();
+const pool = require('../config/database');
+const { authenticate, requirePermission, requireAnyPermission } = require('../middleware/auth');
+const { validateBody, requireFields, isUuid } = require('../middleware/validate');
+const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
 
-/**
- * GET /api/v1/roles
- * Get all roles for the organization
- */
-router.get('/', authenticateToken, requirePermission('users.read'), async (req, res) => {
+router.use(authenticate);
+
+// GET /roles
+router.get('/', requirePermission('roles.manage'), async (req, res) => {
   try {
-    const organizationId = req.user.organizationId;
+    const orgId = req.user.organization_id;
 
     const result = await pool.query(`
-      SELECT
-        r.id,
-        r.name,
-        r.description,
-        r.is_system_role,
-        r.created_at,
-        (SELECT COUNT(*) FROM user_roles WHERE role_id = r.id) as user_count,
-        ARRAY_AGG(
-          json_build_object(
-            'id', p.id,
-            'name', p.name,
-            'resource', p.resource,
-            'action', p.action,
-            'description', p.description
-          ) ORDER BY p.resource, p.action
-        ) FILTER (WHERE p.id IS NOT NULL) as permissions
+      SELECT r.id, r.name, r.description, r.is_system_role, r.created_at,
+             COALESCE(ARRAY_AGG(DISTINCT p.name) FILTER (WHERE p.id IS NOT NULL), '{}') as permissions,
+             COUNT(DISTINCT p.id)::int as permission_count,
+             COUNT(DISTINCT ru.id)::int as user_count
       FROM roles r
       LEFT JOIN role_permissions rp ON rp.role_id = r.id
       LEFT JOIN permissions p ON p.id = rp.permission_id
-      WHERE r.organization_id = $1 OR r.is_system_role = TRUE
+      LEFT JOIN user_roles ur ON ur.role_id = r.id
+      LEFT JOIN users ru ON ru.id = ur.user_id AND ru.organization_id = $1
+      WHERE r.organization_id = $1 OR r.is_system_role = true
       GROUP BY r.id
       ORDER BY r.is_system_role DESC, r.name
-    `, [organizationId]);
+    `, [orgId]);
 
-    res.json({
-      success: true,
-      data: result.rows
-    });
+    res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Get roles error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch roles'
-    });
+    console.error('Roles error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load roles' });
   }
 });
 
-/**
- * POST /api/v1/roles
- * Create a custom role
- */
-router.post('/', authenticateToken, requirePermission('users.assign_roles'), async (req, res) => {
+// POST /roles
+router.post('/', requirePermission('roles.manage'), validateBody((body) => {
+  const errors = requireFields(body, ['name']);
+  if (body.permissions && !Array.isArray(body.permissions)) {
+    errors.push('permissions must be an array');
+  }
+  return errors;
+}), async (req, res) => {
   try {
-    const { name, description, permissionIds } = req.body;
-    const organizationId = req.user.organizationId;
+    const { name, description, permissions } = req.body;
 
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        error: 'Role name is required'
-      });
-    }
-
-    // Start transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Create role
-      const roleResult = await client.query(`
-        INSERT INTO roles (organization_id, name, description, is_system_role)
-        VALUES ($1, $2, $3, FALSE)
-        RETURNING *
-      `, [organizationId, name, description]);
+      const roleResult = await client.query(
+        'INSERT INTO roles (organization_id, name, description) VALUES ($1, $2, $3) RETURNING *',
+        [req.user.organization_id, name, description || null]
+      );
+      const role = roleResult.rows[0];
 
-      const roleId = roleResult.rows[0].id;
-
-      // Assign permissions
-      if (permissionIds && permissionIds.length > 0) {
-        const permissionValues = permissionIds.map((permId, i) =>
-          `($1, $${i + 2})`
-        ).join(', ');
-
-        await client.query(`
-          INSERT INTO role_permissions (role_id, permission_id)
-          VALUES ${permissionValues}
-        `, [roleId, ...permissionIds]);
+      if (permissions && permissions.length > 0) {
+        await client.query(
+          `INSERT INTO role_permissions (role_id, permission_id)
+           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2)
+           ON CONFLICT DO NOTHING`,
+          [role.id, permissions]
+        );
       }
 
-      // Log action
-      await client.query(`
-        INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [req.user.id, 'create_role', 'role', roleId, req.ip, req.headers['user-agent']]);
-
       await client.query('COMMIT');
-
-      res.json({
-        success: true,
-        data: roleResult.rows[0]
-      });
-    } catch (error) {
+      res.status(201).json({ success: true, data: role });
+    } catch (err) {
       await client.query('ROLLBACK');
-      throw error;
+      throw err;
     } finally {
       client.release();
     }
   } catch (error) {
     console.error('Create role error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create role'
-    });
+    res.status(500).json({ success: false, error: 'Failed to create role' });
   }
 });
 
-/**
- * PUT /api/v1/roles/:roleId
- * Update a custom role
- */
-router.put('/:roleId', authenticateToken, requirePermission('users.assign_roles'), async (req, res) => {
+// PUT /roles/:roleId
+router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) => {
+  const errors = [];
+  if (body.permissions && !Array.isArray(body.permissions)) {
+    errors.push('permissions must be an array');
+  }
+  return errors;
+}), async (req, res) => {
   try {
-    const { roleId } = req.params;
-    const { name, description, permissionIds } = req.body;
-    const organizationId = req.user.organizationId;
-
-    // Check if role exists and belongs to organization
-    const roleCheck = await pool.query(
-      'SELECT is_system_role FROM roles WHERE id = $1 AND organization_id = $2',
-      [roleId, organizationId]
-    );
-
-    if (roleCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Role not found'
-      });
-    }
-
-    if (roleCheck.rows[0].is_system_role) {
-      return res.status(403).json({
-        success: false,
-        error: 'Cannot modify system roles'
-      });
-    }
+    const { name, description, permissions } = req.body;
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Update role
-      if (name || description) {
-        await client.query(`
-          UPDATE roles
-          SET
-            name = COALESCE($1, name),
-            description = COALESCE($2, description),
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = $3
-        `, [name, description, roleId]);
+      const result = await client.query(`
+        UPDATE roles SET name = COALESCE($1, name), description = COALESCE($2, description)
+        WHERE id = $3 AND organization_id = $4 AND is_system_role = false RETURNING *
+      `, [name, description, req.params.roleId, req.user.organization_id]);
+
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ success: false, error: 'Role not found' });
       }
 
-      // Update permissions
-      if (permissionIds) {
-        // Remove old permissions
-        await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
-
-        // Add new permissions
-        if (permissionIds.length > 0) {
-          const permissionValues = permissionIds.map((permId, i) =>
-            `($1, $${i + 2})`
-          ).join(', ');
-
-          await client.query(`
-            INSERT INTO role_permissions (role_id, permission_id)
-            VALUES ${permissionValues}
-          `, [roleId, ...permissionIds]);
-        }
+      if (permissions) {
+        await client.query('DELETE FROM role_permissions WHERE role_id = $1', [req.params.roleId]);
+        await client.query(
+          `INSERT INTO role_permissions (role_id, permission_id)
+           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2)`,
+          [req.params.roleId, permissions]
+        );
       }
-
-      // Log action
-      await client.query(`
-        INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `, [req.user.id, 'update_role', 'role', roleId, req.ip, req.headers['user-agent']]);
 
       await client.query('COMMIT');
+      res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Update role error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update role' });
+  }
+});
 
-      res.json({
+// DELETE /roles/:roleId
+router.delete('/:roleId', requirePermission('roles.manage'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM roles WHERE id = $1 AND organization_id = $2 AND is_system_role = false RETURNING id',
+      [req.params.roleId, req.user.organization_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Role not found or cannot be deleted' });
+    }
+
+    res.json({ success: true, message: 'Role deleted' });
+  } catch (error) {
+    console.error('Delete role error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete role' });
+  }
+});
+
+// GET /roles/permissions/all
+router.get('/permissions/all', requirePermission('roles.manage'), async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM permissions ORDER BY resource, action');
+    const grouped = result.rows.reduce((acc, permission) => {
+      if (!acc[permission.resource]) {
+        acc[permission.resource] = [];
+      }
+
+      acc[permission.resource].push({
+        id: permission.id,
+        name: permission.name,
+        description: permission.description,
+        action: permission.action,
+        resource: permission.resource
+      });
+      return acc;
+    }, {});
+
+    res.json({ success: true, data: grouped });
+  } catch (error) {
+    console.error('Permissions error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load permissions' });
+  }
+});
+
+// GET /roles/:roleId
+router.get('/:roleId', requirePermission('roles.manage'), async (req, res) => {
+  try {
+    const { roleId } = req.params;
+    const orgId = req.user.organization_id;
+
+    const result = await pool.query(`
+      SELECT r.id, r.name, r.description, r.is_system_role, r.created_at,
+             COALESCE(ARRAY_AGG(DISTINCT p.name) FILTER (WHERE p.id IS NOT NULL), '{}') as permissions,
+             COUNT(DISTINCT p.id)::int as permission_count
+      FROM roles r
+      LEFT JOIN role_permissions rp ON rp.role_id = r.id
+      LEFT JOIN permissions p ON p.id = rp.permission_id
+      WHERE r.id = $1 AND (r.organization_id = $2 OR r.is_system_role = true)
+      GROUP BY r.id
+    `, [roleId, orgId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Role not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Get role error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load role' });
+  }
+});
+
+// POST /roles/bootstrap-auditor-subroles
+router.post('/bootstrap-auditor-subroles', requirePermission('roles.manage'), async (req, res) => {
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const generatedRoles = await ensureAuditorSubroles(client, req.user.organization_id);
+      await client.query('COMMIT');
+      res.status(201).json({
         success: true,
-        message: 'Role updated successfully'
+        data: {
+          generated_roles: generatedRoles
+        }
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -203,228 +221,105 @@ router.put('/:roleId', authenticateToken, requirePermission('users.assign_roles'
       client.release();
     }
   } catch (error) {
-    console.error('Update role error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update role'
-    });
+    console.error('Bootstrap auditor subroles error:', error);
+    const statusCode = Number(error.statusCode) || 500;
+    res.status(statusCode).json({ success: false, error: 'Failed to bootstrap auditor subroles' });
   }
 });
 
-/**
- * DELETE /api/v1/roles/:roleId
- * Delete a custom role
- */
-router.delete('/:roleId', authenticateToken, requirePermission('users.assign_roles'), async (req, res) => {
-  try {
-    const { roleId } = req.params;
-    const organizationId = req.user.organizationId;
-
-    // Check if role exists and is not a system role
-    const roleCheck = await pool.query(
-      'SELECT is_system_role FROM roles WHERE id = $1 AND organization_id = $2',
-      [roleId, organizationId]
-    );
-
-    if (roleCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Role not found'
-      });
-    }
-
-    if (roleCheck.rows[0].is_system_role) {
-      return res.status(403).json({
-        success: false,
-        error: 'Cannot delete system roles'
-      });
-    }
-
-    // Check if role is assigned to any users
-    const userCount = await pool.query(
-      'SELECT COUNT(*) FROM user_roles WHERE role_id = $1',
-      [roleId]
-    );
-
-    if (parseInt(userCount.rows[0].count) > 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Cannot delete role that is assigned to users'
-      });
-    }
-
-    // Delete role (cascade will handle role_permissions)
-    await pool.query('DELETE FROM roles WHERE id = $1', [roleId]);
-
-    // Log action
-    await pool.query(`
-      INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [req.user.id, 'delete_role', 'role', roleId, req.ip, req.headers['user-agent']]);
-
-    res.json({
-      success: true,
-      message: 'Role deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete role error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to delete role'
-    });
+// POST /roles/assign
+router.post('/assign', requirePermission('roles.manage'), validateBody((body) => {
+  const errors = requireFields(body, ['userId', 'roleIds']);
+  if (body.userId && !isUuid(body.userId)) {
+    errors.push('userId must be a valid UUID');
   }
-});
-
-/**
- * GET /api/v1/roles/permissions
- * Get all available permissions
- */
-router.get('/permissions/all', authenticateToken, requirePermission('users.read'), async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        id,
-        name,
-        resource,
-        action,
-        description
-      FROM permissions
-      ORDER BY resource, action
-    `);
-
-    // Group by resource
-    const grouped = result.rows.reduce((acc, perm) => {
-      if (!acc[perm.resource]) {
-        acc[perm.resource] = [];
-      }
-      acc[perm.resource].push(perm);
-      return acc;
-    }, {});
-
-    res.json({
-      success: true,
-      data: {
-        all: result.rows,
-        grouped
-      }
-    });
-  } catch (error) {
-    console.error('Get permissions error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch permissions'
-    });
+  if (body.roleIds && !Array.isArray(body.roleIds)) {
+    errors.push('roleIds must be an array');
   }
-});
-
-/**
- * POST /api/v1/roles/assign
- * Assign role(s) to a user
- */
-router.post('/assign', authenticateToken, requirePermission('users.assign_roles'), async (req, res) => {
+  if (Array.isArray(body.roleIds) && body.roleIds.some((id) => !isUuid(id))) {
+    errors.push('roleIds must contain valid UUID values');
+  }
+  return errors;
+}), async (req, res) => {
   try {
     const { userId, roleIds } = req.body;
-    const organizationId = req.user.organizationId;
+    const uniqueRoleIds = Array.from(new Set(roleIds));
 
-    if (!userId || !roleIds || roleIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID and role IDs are required'
-      });
+    if (!uniqueRoleIds.length) {
+      return res.status(400).json({ success: false, error: 'roleIds must contain at least one role' });
     }
 
-    // Verify user belongs to organization
-    const userCheck = await pool.query(
+    const userResult = await pool.query(
       'SELECT id FROM users WHERE id = $1 AND organization_id = $2',
-      [userId, organizationId]
+      [userId, req.user.organization_id]
     );
 
-    if (userCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found in your organization'
-      });
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found in your organization' });
     }
 
-    // Assign roles
-    const values = roleIds.map((roleId, i) =>
-      `($1, $${i + 2}, $${roleIds.length + 2})`
-    ).join(', ');
+    const validRoles = await pool.query(
+      `SELECT id
+       FROM roles
+       WHERE id = ANY($1::uuid[])
+         AND (organization_id = $2 OR is_system_role = true)`,
+      [uniqueRoleIds, req.user.organization_id]
+    );
 
-    await pool.query(`
-      INSERT INTO user_roles (user_id, role_id, assigned_by)
-      VALUES ${values}
-      ON CONFLICT (user_id, role_id) DO NOTHING
-    `, [userId, ...roleIds, req.user.id]);
+    if (validRoles.rows.length !== uniqueRoleIds.length) {
+      return res.status(400).json({ success: false, error: 'One or more roles are invalid for this organization' });
+    }
 
-    // Log action
-    await pool.query(`
-      INSERT INTO auth_audit_log (user_id, action, resource_type, resource_id, ip_address, user_agent, details)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [
-      req.user.id,
-      'assign_roles',
-      'user',
-      userId,
-      req.ip,
-      req.headers['user-agent'],
-      JSON.stringify({ roleIds })
-    ]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM user_roles WHERE user_id = $1', [userId]);
 
-    res.json({
-      success: true,
-      message: 'Roles assigned successfully'
-    });
+      for (const roleId of uniqueRoleIds) {
+        await client.query(
+          'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [userId, roleId]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    res.json({ success: true, message: 'Roles assigned' });
   } catch (error) {
     console.error('Assign roles error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to assign roles'
-    });
+    res.status(500).json({ success: false, error: 'Failed to assign roles' });
   }
 });
 
-/**
- * GET /api/v1/roles/user/:userId
- * Get roles for a specific user
- */
-router.get('/user/:userId', authenticateToken, requirePermission('users.read'), async (req, res) => {
+// GET /roles/user/:userId
+router.get('/user/:userId', requireAnyPermission(['roles.manage', 'users.read']), async (req, res) => {
   try {
-    const { userId } = req.params;
-    const organizationId = req.user.organizationId;
+    const permissions = req.user.permissions || [];
+    const isPrivileged = permissions.includes('*') || permissions.includes('roles.manage') || permissions.includes('users.read');
+    if (!isPrivileged && req.user.id !== req.params.userId) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
 
     const result = await pool.query(`
-      SELECT
-        r.id,
-        r.name,
-        r.description,
-        r.is_system_role,
-        ur.assigned_at,
-        (SELECT full_name FROM users WHERE id = ur.assigned_by) as assigned_by_name
+      SELECT r.id, r.name, r.description, r.is_system_role
       FROM user_roles ur
       JOIN roles r ON r.id = ur.role_id
-      WHERE ur.user_id = $1
-      AND (r.organization_id = $2 OR r.is_system_role = TRUE)
-      ORDER BY r.is_system_role DESC, r.name
-    `, [userId, organizationId]);
+      JOIN users u ON u.id = ur.user_id
+      WHERE ur.user_id = $1 AND u.organization_id = $2
+      ORDER BY r.name
+    `, [req.params.userId, req.user.organization_id]);
 
-    // Get all permissions for this user
-    const permissions = await getUserPermissions(userId, organizationId);
-
-    res.json({
-      success: true,
-      data: {
-        roles: result.rows,
-        permissions
-      }
-    });
+    res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Get user roles error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch user roles'
-    });
+    console.error('User roles error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load user roles' });
   }
 });
 
-export default router;
+module.exports = router;

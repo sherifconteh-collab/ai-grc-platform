@@ -1,152 +1,52 @@
-# Environment variables (NEVER COMMIT THESE!)
+# Environment variables (IMPORTANT: Never commit!)
 .env
 .env.local
-.env.development
-.env.production
-.env.test
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-postgres-data/
-pgdata/
-*.sql.backup
-
-# Node.js
+# Dependencies
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.npm/
-.yarn/
+# Commented out to allow package-lock.json for security audits
+# package-lock.json
+yarn.lock
+
+# Production builds
 dist/
 build/
 .next/
+.next-build*/
+.next-devcache*/
 out/
+*.tsbuildinfo
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
-.venv
-pip-log.txt
-pip-delete-this-directory.txt
-.python-version
-
-# IDE and Editors
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.project
-.classpath
-.settings/
-*.sublime-workspace
-*.sublime-project
-
-# OS Files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
 
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage and Testing
-coverage/
-.nyc_output/
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-*.cover
-.hypothesis/
-
-# Build artifacts
-*.o
-*.a
-*.exe
-*.out
-*.app
-
-# Secrets and credentials (CRITICAL - NEVER COMMIT!)
-secrets.json
-credentials.json
-*.key
-*.pem
-*.cert
-*.crt
-serviceAccount.json
-firebase-adminsdk.json
-.envrc
-
-# Backup files
-*.bak
-*.backup
-*.old
-*.orig
 
 # Temporary files
 tmp/
 temp/
 *.tmp
 
-# Documentation builds
-docs/_build/
-site/
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
-# Docker
-.dockerignore
-docker-compose.override.yml
-
-# Terraform
-*.tfstate
-*.tfstate.*
-.terraform/
-
-# Cloud provider credentials
-.aws/
-.gcloud/
-.azure/
-
-# Uploaded evidence files
-uploads/
-
-# Paid-tier files (live in ai-grc-platform-pro, overlaid locally)
-backend/migrations/003_feature_gating.sql
-backend/src/middleware/featureGate.js
-backend/src/routes/evidence.js
-
-# Local development
-.local/
-local-data/
-
-# Test/development temporary files
-login_response.json
-add-frameworks.json
-add-priority-column.js
-fix-org-frameworks-table.js
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

@@ -1,21 +1,27 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { APP_NAME, APP_SUBTITLE, APP_TAGLINE } from "@/lib/branding";
+import PwaServiceWorker from "@/components/PwaServiceWorker";
+import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Use system fonts as fallback - more reliable for CI/CD builds
+// and reduces external dependencies
+const fontVariables = "";
 
 export const metadata: Metadata = {
-  title: "AI GRC Platform - Intelligent Compliance Management",
-  description: "Open-source GRC platform with auto-crosswalk compliance mapping across NIST, ISO 27001, SOC 2, and more",
+  title: `${APP_NAME}, ${APP_TAGLINE}`,
+  description: APP_SUBTITLE,
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/branding/controlweave-emblem.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/branding/controlweave-emblem.svg", type: "image/svg+xml" }],
+    shortcut: ["/branding/controlweave-emblem.svg"],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
 };
 
 export default function RootLayout({
@@ -25,10 +31,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${fontVariables} antialiased font-sans`}>
         <AuthProvider>
+          <PwaServiceWorker />
+          <PwaInstallPrompt />
           {children}
         </AuthProvider>
       </body>

@@ -1,35 +1,40 @@
 {
-  "name": "frontend",
-  "version": "0.1.0",
+  "name": "controlweave-frontend",
+  "version": "2.1.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "node -e \"const fs=require('fs');if(fs.existsSync('server.js')){require('./server.js')}else{const c=require('child_process');const cmd=process.platform==='win32'?'npx.cmd':'npx';const p=c.spawn(cmd,['next','start'],{stdio:'inherit'});p.on('exit',code=>process.exit(code??1));}\"",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "generate:api-types": "openapi-typescript ../docs/openapi.yaml -o src/lib/generated/api-types.ts",
+    "postinstall": "node scripts/postinstall-ajv-compat.js && node scripts/patch-eslint-ajv.js"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.2.2",
-    "@tanstack/react-query": "^5.90.20",
-    "axios": "^1.13.4",
+    "@simplewebauthn/browser": "^13.2.2",
+    "axios": "^1.7.0",
     "date-fns": "^4.1.0",
-    "lucide-react": "^0.563.0",
-    "next": "16.1.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-hook-form": "^7.71.1",
-    "recharts": "^3.7.0",
-    "zod": "^4.3.6",
-    "zustand": "^5.0.10"
+    "lucide-react": "^0.475.0",
+    "next": "^16.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.0",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^25",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.6",
+    "openapi-typescript": "^7.10.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "minimatch": "^10.2.3"
   }
 }

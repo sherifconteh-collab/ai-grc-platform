@@ -1,597 +1,593 @@
-/**
- * Control Management API Routes
- * Handles framework controls, implementations, and crosswalk mappings
- * KEY FEATURE: Auto-crosswalk when similarity >= 90%
- */
-
-import express from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth.js';
-import pool from '../config/database.js';
-import { logDataModified, logDataAccess } from '../utils/auditLogger.js';
-
+// @tier: free
+const express = require('express');
 const router = express.Router();
+const pool = require('../config/database');
+const { authenticate, requirePermission } = require('../middleware/auth');
+const { validateBody, requireFields, isUuid } = require('../middleware/validate');
+const { getConfigValue } = require('../services/dynamicConfigService');
+const { enqueueWebhookEvent } = require('../services/webhookService');
 
-/**
- * GET /api/v1/controls
- * List all controls with filters
- */
-router.get('/', authenticateToken, async (req, res) => {
+const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
+
+router.use(authenticate);
+
+// GET /controls/:id
+router.get('/:id', requirePermission('controls.read'), async (req, res) => {
   try {
-    const {
-      frameworkCode,
-      priority,
-      status,
-      search,
-      limit = 50,
-      offset = 0
-    } = req.query;
-
-    let query = `
-      SELECT
-        fc.id,
-        fc.control_id,
-        fc.title,
-        fc.description,
-        fc.control_type,
-        fc.priority,
-        f.code as framework_code,
-        f.name as framework_name,
-        ff.code as function_code,
-        ff.name as function_name,
-        cat.code as category_code,
-        cat.name as category_name,
-        ci.status as implementation_status,
-        ci.implementation_details,
-        ci.implemented_at,
-        ci.assigned_to
+    const result = await pool.query(`
+      SELECT fc.id, fc.control_id,
+             COALESCE(occ.title, fc.title) as title,
+             COALESCE(occ.description, fc.description) as description,
+             fc.control_type, fc.priority,
+             f.id as framework_id, f.name as framework_name, f.code as framework_code,
+             COALESCE(ci.status, 'not_started') as implementation_status,
+             ci.implementation_notes, ci.evidence_location, ci.assigned_to, ci.notes, ci.implementation_date,
+             u.first_name || ' ' || u.last_name as assigned_to_name, u.email as assigned_to_email
       FROM framework_controls fc
       JOIN frameworks f ON f.id = fc.framework_id
-      LEFT JOIN framework_functions ff ON ff.id = fc.function_id
-      LEFT JOIN framework_categories cat ON cat.id = fc.category_id
-      LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
-      WHERE 1=1
-    `;
+      LEFT JOIN organization_control_content_overrides occ
+        ON occ.organization_id = $2
+       AND occ.framework_control_id = fc.id
+      LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $2
+      LEFT JOIN users u ON u.id = ci.assigned_to
+      WHERE fc.id = $1
+    `, [req.params.id, req.user.organization_id]);
 
-    const params = [req.user.organizationId];
-    let paramIndex = 2;
-
-    if (frameworkCode) {
-      query += ` AND f.code = $${paramIndex}`;
-      params.push(frameworkCode);
-      paramIndex++;
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Control not found' });
     }
 
-    if (priority) {
-      query += ` AND fc.priority = $${paramIndex}`;
-      params.push(priority);
-      paramIndex++;
-    }
-
-    if (status) {
-      query += ` AND ci.status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
-    }
-
-    if (search) {
-      query += ` AND (fc.control_id ILIKE $${paramIndex} OR fc.title ILIKE $${paramIndex} OR fc.description ILIKE $${paramIndex})`;
-      params.push(`%${search}%`);
-      paramIndex++;
-    }
-
-    query += ` ORDER BY f.code, fc.display_order LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(parseInt(limit), parseInt(offset));
-
-    const result = await pool.query(query, params);
-
-    const controls = result.rows.map(row => ({
-      id: row.id,
-      controlId: row.control_id,
-      title: row.title,
-      description: row.description,
-      controlType: row.control_type,
-      priority: row.priority,
-      framework: {
-        code: row.framework_code,
-        name: row.framework_name
-      },
-      function: row.function_code ? {
-        code: row.function_code,
-        name: row.function_name
-      } : null,
-      category: row.category_code ? {
-        code: row.category_code,
-        name: row.category_name
-      } : null,
-      implementation: {
-        status: row.implementation_status || 'not_started',
-        details: row.implementation_details,
-        implementedAt: row.implemented_at,
-        assignedTo: row.assigned_to
-      }
-    }));
-
-    res.json({
-      success: true,
-      data: {
-        controls,
-        pagination: {
-          limit: parseInt(limit),
-          offset: parseInt(offset),
-          total: controls.length
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('List controls error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to list controls'
-    });
-  }
-});
-
-/**
- * GET /api/v1/controls/:controlId
- * Get single control details with crosswalk mappings
- */
-router.get('/:controlId', authenticateToken, async (req, res) => {
-  try {
-    const { controlId } = req.params;
-
-    // Get control details
-    const controlResult = await pool.query(
-      `SELECT
-        fc.id,
-        fc.control_id,
-        fc.title,
-        fc.description,
-        fc.control_type,
-        fc.priority,
-        fc.implementation_guidance,
-        fc.assessment_procedures,
-        fc."references",
-        f.id as framework_id,
-        f.code as framework_code,
-        f.name as framework_name,
-        f.full_name as framework_full_name,
-        ff.code as function_code,
-        ff.name as function_name,
-        cat.code as category_code,
-        cat.name as category_name,
-        ci.status as implementation_status,
-        ci.implementation_details,
-        ci.evidence_url,
-        ci.implemented_at,
-        ci.assigned_to,
-        ci.notes
-      FROM framework_controls fc
-      JOIN frameworks f ON f.id = fc.framework_id
-      LEFT JOIN framework_functions ff ON ff.id = fc.function_id
-      LEFT JOIN framework_categories cat ON cat.id = fc.category_id
-      LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
-      WHERE fc.id = $2`,
-      [req.user.organizationId, controlId]
-    );
-
-    if (controlResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Control not found'
-      });
-    }
-
-    const control = controlResult.rows[0];
-
-    // Get crosswalk mappings
-    const mappingsResult = await pool.query(
-      `SELECT
-        cm.id as mapping_id,
-        cm.similarity_score,
-        cm.mapping_type,
-        cm.mapping_rationale,
-        fc2.id as mapped_control_id,
-        fc2.control_id as mapped_control_code,
-        fc2.title as mapped_control_title,
-        fc2.description as mapped_control_description,
-        fc2.priority as mapped_control_priority,
-        f2.code as mapped_framework_code,
-        f2.name as mapped_framework_name,
-        ci2.status as mapped_implementation_status
-      FROM control_mappings cm
-      JOIN framework_controls fc2 ON (
-        CASE
-          WHEN cm.source_control_id = $1 THEN fc2.id = cm.target_control_id
-          WHEN cm.target_control_id = $1 THEN fc2.id = cm.source_control_id
-        END
-      )
-      JOIN frameworks f2 ON f2.id = fc2.framework_id
-      LEFT JOIN control_implementations ci2 ON ci2.control_id = fc2.id AND ci2.organization_id = $2
-      WHERE cm.source_control_id = $1 OR cm.target_control_id = $1
-      ORDER BY cm.similarity_score DESC, f2.name`,
-      [controlId, req.user.organizationId]
-    );
-
-    const crosswalkMappings = mappingsResult.rows.map(row => ({
-      mappingId: row.mapping_id,
-      similarityScore: row.similarity_score,
-      mappingType: row.mapping_type,
-      rationale: row.mapping_rationale,
-      mappedControl: {
-        id: row.mapped_control_id,
-        controlId: row.mapped_control_code,
-        title: row.mapped_control_title,
-        description: row.mapped_control_description,
-        priority: row.mapped_control_priority,
-        framework: {
-          code: row.mapped_framework_code,
-          name: row.mapped_framework_name
-        },
-        implementationStatus: row.mapped_implementation_status || 'not_started'
-      }
-    }));
-
-    // Log access
-    await logDataAccess(
-      req.user.id,
-      req.user.email,
-      'control',
-      controlId,
-      'view',
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({
-      success: true,
-      data: {
-        control: {
-          id: control.id,
-          controlId: control.control_id,
-          title: control.title,
-          description: control.description,
-          controlType: control.control_type,
-          priority: control.priority,
-          implementationGuidance: control.implementation_guidance,
-          assessmentProcedures: control.assessment_procedures,
-          references: control.references,
-          framework: {
-            id: control.framework_id,
-            code: control.framework_code,
-            name: control.framework_name,
-            fullName: control.framework_full_name
-          },
-          function: control.function_code ? {
-            code: control.function_code,
-            name: control.function_name
-          } : null,
-          category: control.category_code ? {
-            code: control.category_code,
-            name: control.category_name
-          } : null,
-          implementation: {
-            status: control.implementation_status || 'not_started',
-            details: control.implementation_details,
-            evidenceUrl: control.evidence_url,
-            implementedAt: control.implemented_at,
-            assignedTo: control.assigned_to,
-            notes: control.notes
-          }
-        },
-        crosswalkMappings: {
-          total: crosswalkMappings.length,
-          highConfidence: crosswalkMappings.filter(m => m.similarityScore >= 90).length,
-          mediumConfidence: crosswalkMappings.filter(m => m.similarityScore >= 70 && m.similarityScore < 90).length,
-          lowConfidence: crosswalkMappings.filter(m => m.similarityScore < 70).length,
-          mappings: crosswalkMappings
-        }
-      }
-    });
-
+    res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Get control error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get control details'
-    });
+    res.status(500).json({ success: false, error: 'Failed to load control' });
   }
 });
 
-/**
- * PUT /api/v1/controls/:controlId/implementation
- * Update control implementation status
- * KEY FEATURE: Auto-updates mapped controls with similarity >= 90%
- */
-router.put('/:controlId/implementation', authenticateToken, async (req, res) => {
-  const client = await pool.connect();
-
+// PUT /controls/:id/implementation
+router.put('/:id/implementation', requirePermission('controls.write'), validateBody((body) => {
+  const errors = requireFields(body, ['status']);
+  const allowedStatuses = ['not_started', 'in_progress', 'implemented', 'needs_review', 'satisfied_via_crosswalk', 'verified', 'not_applicable'];
+  if (body.status && !allowedStatuses.includes(body.status)) {
+    errors.push(`status must be one of: ${allowedStatuses.join(', ')}`);
+  }
+  if (body.assignedTo && !isUuid(body.assignedTo)) {
+    errors.push('assignedTo must be a valid UUID');
+  }
+  return errors;
+}), async (req, res) => {
   try {
-    const { controlId } = req.params;
+    const controlId = req.params.id;
+    const orgId = req.user.organization_id;
     const {
       status,
       implementationDetails,
       evidenceUrl,
       assignedTo,
-      notes
+      notes,
+      propagateEvidence,
+      poam_justification,
+      framework_specific_type,
+      framework_specific_data
     } = req.body;
 
-    if (!status) {
+    // Get current implementation status to detect changes
+    const existingResult = await pool.query(
+      `SELECT status FROM control_implementations WHERE control_id = $1 AND organization_id = $2 LIMIT 1`,
+      [controlId, orgId]
+    );
+    const previousStatus = existingResult.rows.length > 0 ? existingResult.rows[0].status : 'not_started';
+
+    // Check if this is a transition from non-compliant to compliant
+    const nonCompliantStatuses = ['not_started', 'in_progress', 'needs_review'];
+    const compliantStatuses = ['implemented', 'satisfied_via_crosswalk', 'verified'];
+    const isComplianceChange = nonCompliantStatuses.includes(previousStatus) && compliantStatuses.includes(status);
+
+    // If transitioning to compliant without POA&M justification, require it
+    if (isComplianceChange && !poam_justification) {
       return res.status(400).json({
         success: false,
-        error: 'Status is required'
+        error: 'When marking a control as compliant, you must provide poam_justification explaining the remediation',
+        requires_poam_submission: true
       });
     }
 
-    const validStatuses = ['not_started', 'in_progress', 'implemented', 'not_applicable'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: `Status must be one of: ${validStatuses.join(', ')}`
-      });
-    }
+    // Upsert implementation
+    const result = await pool.query(`
+      INSERT INTO control_implementations (control_id, organization_id, status, implementation_notes, evidence_location, assigned_to, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (control_id, organization_id) DO UPDATE SET
+        status = EXCLUDED.status,
+        implementation_notes = COALESCE(EXCLUDED.implementation_notes, control_implementations.implementation_notes),
+        evidence_location = COALESCE(EXCLUDED.evidence_location, control_implementations.evidence_location),
+        assigned_to = COALESCE(EXCLUDED.assigned_to, control_implementations.assigned_to),
+        notes = COALESCE(EXCLUDED.notes, control_implementations.notes),
+        implementation_date = CASE WHEN EXCLUDED.status = 'implemented' THEN CURRENT_DATE ELSE control_implementations.implementation_date END
+      RETURNING *
+    `, [controlId, orgId, status, implementationDetails || null, evidenceUrl || null, assignedTo || null, notes || null]);
 
-    await client.query('BEGIN');
-
-    // Check if control exists
-    const controlCheck = await client.query(
-      `SELECT fc.id, fc.control_id, fc.title, f.code as framework_code, f.name as framework_name
-       FROM framework_controls fc
-       JOIN frameworks f ON f.id = fc.framework_id
-       WHERE fc.id = $1`,
+    // Get control details for POA&M creation
+    const controlResult = await pool.query(
+      `SELECT fc.control_id, fc.title FROM framework_controls fc WHERE fc.id = $1 LIMIT 1`,
       [controlId]
     );
+    const control = controlResult.rows[0];
 
-    if (controlCheck.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        success: false,
-        error: 'Control not found'
-      });
+    // If transitioning to compliant, create or link POA&M
+    let poamItem = null;
+    if (isComplianceChange && poam_justification) {
+      // Check if a POA&M already exists for this control
+      const existingPoamResult = await pool.query(
+        `SELECT id FROM poam_items 
+         WHERE organization_id = $1 AND control_id = $2 AND status IN ('open', 'in_progress', 'pending_review')
+         ORDER BY created_at DESC LIMIT 1`,
+        [orgId, controlId]
+      );
+
+      if (existingPoamResult.rows.length > 0) {
+        // Update existing POA&M
+        const poamId = existingPoamResult.rows[0].id;
+        const updatedPoam = await pool.query(
+          `UPDATE poam_items
+           SET status = 'pending_auditor_review',
+               remediation_plan = COALESCE(remediation_plan, $3),
+               closure_notes = $4,
+               updated_at = NOW()
+           WHERE id = $1 AND organization_id = $2
+           RETURNING *`,
+          [poamId, orgId, poam_justification, `Control ${control?.control_id} marked as ${status}`]
+        );
+        poamItem = updatedPoam.rows[0];
+
+        // Add update record
+        await pool.query(
+          `INSERT INTO poam_item_updates (
+             organization_id, poam_item_id, update_type, note, previous_status, new_status, changed_by
+           )
+           VALUES ($1, $2, 'status_change', $3, 'in_progress', 'pending_auditor_review', $4)`,
+          [orgId, poamId, `Control remediated: ${poam_justification}`, req.user.id]
+        );
+      } else {
+        // Create new POA&M
+        const newPoam = await pool.query(
+          `INSERT INTO poam_items (
+             organization_id, title, description, source_type, control_id,
+             status, priority, remediation_plan, closure_notes, created_by
+           )
+           VALUES ($1, $2, $3, 'control', $4, 'pending_auditor_review', 'medium', $5, $6, $7)
+           RETURNING *`,
+          [
+            orgId,
+            `Remediation: ${control?.control_id} - ${control?.title}`,
+            `Control transitioned from ${previousStatus} to ${status}`,
+            controlId,
+            poam_justification,
+            `Control marked as ${status}`,
+            req.user.id
+          ]
+        );
+        poamItem = newPoam.rows[0];
+
+        // Add initial update record
+        await pool.query(
+          `INSERT INTO poam_item_updates (
+             organization_id, poam_item_id, update_type, note, new_status, changed_by
+           )
+           VALUES ($1, $2, 'status_change', $3, 'pending_auditor_review', $4)`,
+          [orgId, poamItem.id, 'POA&M created for control compliance change', req.user.id]
+        );
+      }
+
+      // Create approval request
+      await pool.query(
+        `INSERT INTO poam_approval_requests (
+           organization_id, poam_item_id, control_id, previous_control_status,
+           new_control_status, justification, submitted_by, framework_specific_type,
+           framework_specific_data
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          orgId,
+          poamItem.id,
+          controlId,
+          previousStatus,
+          status,
+          poam_justification,
+          req.user.id,
+          framework_specific_type || 'standard',
+          framework_specific_data || {}
+        ]
+      );
+
+      // Send notification to auditors
+      await enqueueWebhookEvent({
+        organizationId: orgId,
+        eventType: 'control.compliance_change',
+        payload: {
+          control_id: controlId,
+          control_code: control?.control_id,
+          previous_status: previousStatus,
+          new_status: status,
+          poam_id: poamItem.id
+        }
+      }).catch(() => {});
     }
 
-    const control = controlCheck.rows[0];
-
-    // Upsert control implementation
-    const implementResult = await client.query(
-      `INSERT INTO control_implementations
-        (control_id, organization_id, status, implementation_details, evidence_url, assigned_to, notes, implemented_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7,
-         CASE WHEN $3 = 'implemented' THEN NOW() ELSE NULL END,
-         NOW())
-       ON CONFLICT (control_id, organization_id)
-       DO UPDATE SET
-         status = $3,
-         implementation_details = $4,
-         evidence_url = $5,
-         assigned_to = $6,
-         notes = $7,
-         implemented_at = CASE WHEN $3 = 'implemented' AND control_implementations.status != 'implemented' THEN NOW() ELSE control_implementations.implemented_at END,
-         updated_at = NOW()
-       RETURNING id, status, implemented_at`,
-      [
-        controlId,
-        req.user.organizationId,
-        status,
-        implementationDetails,
-        evidenceUrl,
-        assignedTo,
-        notes
-      ]
-    );
-
-    const implementation = implementResult.rows[0];
-
-    // KEY FEATURE: Auto-crosswalk logic for implemented controls
-    const autoCrosswalkedControls = [];
-
+    // Auto-crosswalk: if implemented, find high-similarity mappings
+    let crosswalkedControls = [];
+    let propagatedEvidenceLinks = 0;
     if (status === 'implemented') {
-      // Find all mapped controls with similarity >= 90%
-      const mappingsResult = await client.query(
-        `SELECT
-          CASE
-            WHEN cm.source_control_id = $1 THEN cm.target_control_id
-            WHEN cm.target_control_id = $1 THEN cm.source_control_id
-          END as mapped_control_id,
+      const thresholdConfig = await getConfigValue(orgId, 'crosswalk', 'inheritance_min_similarity', { value: 90 });
+      const similarityThreshold = Number(
+        thresholdConfig && typeof thresholdConfig === 'object'
+          ? thresholdConfig.value
+          : thresholdConfig
+      ) || 90;
+
+      const evidencePropagationConfig = await getConfigValue(orgId, 'crosswalk', 'auto_propagate_evidence_exact', { value: false });
+      const shouldPropagateEvidence = typeof propagateEvidence === 'boolean'
+        ? propagateEvidence
+        : Boolean(
+          evidencePropagationConfig && typeof evidencePropagationConfig === 'object'
+            ? evidencePropagationConfig.value
+            : evidencePropagationConfig
+        );
+
+      const mappings = await pool.query(`
+        SELECT 
+          cm.id,
+          cm.source_control_id,
+          cm.target_control_id,
           cm.similarity_score,
+          cm.mapping_type,
+          CASE 
+            WHEN cm.source_control_id = $1 THEN cm.target_control_id
+            ELSE cm.source_control_id
+          END AS mapped_control_id,
           fc.control_id as mapped_control_code,
-          fc.title as mapped_control_title,
-          f.code as mapped_framework_code,
-          f.name as mapped_framework_name
+          fc.title as mapped_title,
+          f.name as framework_name,
+          f.code as framework_code
         FROM control_mappings cm
-        JOIN framework_controls fc ON fc.id = CASE
+        JOIN framework_controls fc ON fc.id = CASE 
           WHEN cm.source_control_id = $1 THEN cm.target_control_id
-          WHEN cm.target_control_id = $1 THEN cm.source_control_id
+          ELSE cm.source_control_id
         END
         JOIN frameworks f ON f.id = fc.framework_id
         WHERE (cm.source_control_id = $1 OR cm.target_control_id = $1)
-        AND cm.similarity_score >= 90`,
-        [controlId]
-      );
+          AND cm.similarity_score >= $2
+          AND (
+            COALESCE(LOWER(cm.mapping_type), '') = ANY($3::text[])
+            OR cm.similarity_score = 100
+          )
+          AND cm.source_control_id != cm.target_control_id
+      `, [controlId, similarityThreshold, STRICT_CROSSWALK_MAPPING_TYPES]);
 
-      // Auto-update mapped controls to "satisfied via crosswalk"
-      for (const mapping of mappingsResult.rows) {
-        // Check if organization has this framework selected
-        const frameworkCheck = await client.query(
-          `SELECT 1 FROM organization_frameworks of
-           JOIN framework_controls fc ON fc.framework_id = of.framework_id
-           WHERE of.organization_id = $1 AND fc.id = $2`,
-          [req.user.organizationId, mapping.mapped_control_id]
-        );
+      for (const mapping of mappings.rows) {
+        const mappedControlId = mapping.mapped_control_id;
 
-        if (frameworkCheck.rows.length > 0) {
-          // Check current status - only update if not already implemented or in progress
-          const currentStatus = await client.query(
-            `SELECT status FROM control_implementations
-             WHERE control_id = $1 AND organization_id = $2`,
-            [mapping.mapped_control_id, req.user.organizationId]
+        await pool.query(`
+          INSERT INTO control_implementations (control_id, organization_id, status, notes)
+          VALUES ($1, $2, 'satisfied_via_crosswalk', $3)
+          ON CONFLICT (control_id, organization_id) DO UPDATE SET
+            status = CASE WHEN control_implementations.status = 'not_started' THEN 'satisfied_via_crosswalk' ELSE control_implementations.status END,
+            notes = CASE WHEN control_implementations.status = 'not_started'
+              THEN COALESCE(control_implementations.notes || E'\n', '') || $3
+              ELSE control_implementations.notes END
+        `, [mappedControlId, orgId, `Auto-satisfied via crosswalk (${mapping.similarity_score}% ${mapping.mapping_type || 'mapped'} match)`]);
+
+        if (shouldPropagateEvidence) {
+          const propagated = await pool.query(
+            `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
+             SELECT DISTINCT ecl.evidence_id, $2::uuid, $3
+             FROM evidence_control_links ecl
+             JOIN evidence e ON e.id = ecl.evidence_id
+             WHERE ecl.control_id = $4::uuid
+               AND e.organization_id = $1
+             ON CONFLICT (evidence_id, control_id) DO NOTHING`,
+            [
+              orgId,
+              mappedControlId,
+              `Auto-propagated via strict crosswalk from control ${controlId}`,
+              controlId
+            ]
           );
-
-          const shouldUpdate = !currentStatus.rows.length ||
-            (currentStatus.rows[0].status !== 'implemented' && currentStatus.rows[0].status !== 'in_progress');
-
-          if (shouldUpdate) {
-            await client.query(
-              `INSERT INTO control_implementations
-                (control_id, organization_id, status, implementation_details, notes, implemented_at, updated_at)
-               VALUES ($1, $2, 'satisfied_via_crosswalk', $3, $4, NOW(), NOW())
-               ON CONFLICT (control_id, organization_id)
-               DO UPDATE SET
-                 status = 'satisfied_via_crosswalk',
-                 implementation_details = $3,
-                 notes = $4,
-                 implemented_at = NOW(),
-                 updated_at = NOW()`,
-              [
-                mapping.mapped_control_id,
-                req.user.organizationId,
-                `Auto-satisfied via crosswalk from ${control.framework_code} ${control.control_id}`,
-                `This control was automatically marked as satisfied because you implemented a similar control (${control.framework_code} ${control.control_id}: ${control.title}) with ${mapping.similarity_score}% similarity.`
-              ]
-            );
-
-            autoCrosswalkedControls.push({
-              controlId: mapping.mapped_control_code,
-              title: mapping.mapped_control_title,
-              framework: {
-                code: mapping.mapped_framework_code,
-                name: mapping.mapped_framework_name
-              },
-              similarityScore: mapping.similarity_score
-            });
-          }
+          propagatedEvidenceLinks += propagated.rowCount || 0;
         }
+
+        crosswalkedControls.push({
+          controlId: mapping.mapped_control_code,
+          title: mapping.mapped_title,
+          framework: mapping.framework_name,
+          similarity: mapping.similarity_score,
+          mappingType: mapping.mapping_type || null
+        });
       }
     }
 
-    await client.query('COMMIT');
-
-    // Log the implementation update
-    await logDataModified(
-      req.user.id,
-      req.user.email,
-      'control_implementation',
-      controlId,
-      'update_status',
-      req.ip,
-      req.get('user-agent'),
-      {
-        controlCode: control.control_id,
-        framework: control.framework_code,
-        newStatus: status,
-        autoCrosswalkedCount: autoCrosswalkedControls.length
-      }
+    // Log audit
+    await pool.query(
+      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
+       VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
+      [
+        orgId,
+        req.user.id,
+        controlId,
+        JSON.stringify({
+          previous_status: previousStatus,
+          new_status: status,
+          crosswalkedControls: crosswalkedControls.length,
+          propagatedEvidenceLinks,
+          poam_created: !!poamItem
+        })
+      ]
     );
 
     res.json({
       success: true,
       data: {
-        implementation: {
-          id: implementation.id,
-          status: implementation.status,
-          implementedAt: implementation.implemented_at
-        },
-        autoCrosswalked: {
-          enabled: status === 'implemented',
-          count: autoCrosswalkedControls.length,
-          controls: autoCrosswalkedControls
-        },
-        message: autoCrosswalkedControls.length > 0
-          ? `Control updated! By implementing this control, you've automatically satisfied ${autoCrosswalkedControls.length} other control(s) via crosswalk mapping.`
-          : 'Control implementation updated successfully'
+        implementation: result.rows[0],
+        crosswalkedControls,
+        propagatedEvidenceLinks,
+        poam_item: poamItem,
+        status_change_detected: previousStatus !== status,
+        requires_auditor_review: isComplianceChange
       }
     });
-
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Update control implementation error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update control implementation'
-    });
-  } finally {
-    client.release();
+    console.error('Update implementation error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update implementation' });
   }
 });
 
-/**
- * GET /api/v1/controls/:controlId/crosswalk
- * Get crosswalk mappings for a specific control
- */
-router.get('/:controlId/crosswalk', authenticateToken, async (req, res) => {
+// POST /controls/:id/inherit
+// Manually trigger inheritance to mapped controls with dynamic threshold support.
+router.post('/:id/inherit', requirePermission('controls.write'), async (req, res) => {
   try {
-    const { controlId } = req.params;
-    const { minSimilarity = 0 } = req.query;
+    const orgId = req.user.organization_id;
+    const sourceControlId = req.params.id;
+    const {
+      minSimilarity,
+      inheritedStatus,
+      includeAlreadyImplemented = false,
+      propagateEvidence,
+      dryRun = false
+    } = req.body || {};
 
-    const result = await pool.query(
+    const configThreshold = await getConfigValue(orgId, 'crosswalk', 'inheritance_min_similarity', { value: 90 });
+    const resolvedThreshold = Math.max(
+      1,
+      Math.min(
+        100,
+        Number(minSimilarity || (configThreshold && typeof configThreshold === 'object' ? configThreshold.value : configThreshold) || 90)
+      )
+    );
+
+    const sourceImpl = await pool.query(
+      `SELECT status
+       FROM control_implementations
+       WHERE organization_id = $1
+         AND control_id = $2
+       LIMIT 1`,
+      [orgId, sourceControlId]
+    );
+    const sourceStatus = sourceImpl.rows[0]?.status || 'in_progress';
+    const nextStatus = inheritedStatus || (sourceStatus === 'implemented' ? 'satisfied_via_crosswalk' : sourceStatus);
+    const evidencePropagationConfig = await getConfigValue(orgId, 'crosswalk', 'auto_propagate_evidence_exact', { value: false });
+    const shouldPropagateEvidence = typeof propagateEvidence === 'boolean'
+      ? propagateEvidence
+      : Boolean(
+        evidencePropagationConfig && typeof evidencePropagationConfig === 'object'
+          ? evidencePropagationConfig.value
+          : evidencePropagationConfig
+      );
+
+    const mappings = await pool.query(
       `SELECT
-        cm.id as mapping_id,
-        cm.similarity_score,
-        cm.mapping_type,
-        cm.mapping_rationale,
-        fc2.id as mapped_control_id,
-        fc2.control_id as mapped_control_code,
-        fc2.title as mapped_control_title,
-        fc2.description as mapped_control_description,
-        fc2.priority as mapped_control_priority,
-        f2.code as mapped_framework_code,
-        f2.name as mapped_framework_name,
-        ci2.status as mapped_implementation_status,
-        of.id as organization_has_framework
+         CASE
+           WHEN cm.source_control_id = $1 THEN cm.target_control_id
+           ELSE cm.source_control_id
+         END AS target_control_id,
+         cm.similarity_score,
+         cm.mapping_type,
+         fc.control_id AS target_control_code,
+         fc.title AS target_control_title
+       FROM control_mappings cm
+       JOIN framework_controls fc ON fc.id = (
+         CASE
+           WHEN cm.source_control_id = $1 THEN cm.target_control_id
+           ELSE cm.source_control_id
+         END
+       )
+       WHERE (cm.source_control_id = $1 OR cm.target_control_id = $1)
+         AND cm.similarity_score >= $2
+         AND (
+           COALESCE(LOWER(cm.mapping_type), '') = ANY($3::text[])
+           OR cm.similarity_score = 100
+         )
+         AND cm.source_control_id != cm.target_control_id
+       ORDER BY cm.similarity_score DESC`,
+      [sourceControlId, resolvedThreshold, STRICT_CROSSWALK_MAPPING_TYPES]
+    );
+
+    const processed = [];
+    let propagatedEvidenceLinks = 0;
+    for (const mapRow of mappings.rows) {
+      const current = await pool.query(
+        `SELECT status
+         FROM control_implementations
+         WHERE organization_id = $1 AND control_id = $2
+         LIMIT 1`,
+        [orgId, mapRow.target_control_id]
+      );
+      const currentStatus = current.rows[0]?.status || 'not_started';
+      const shouldSkip = !includeAlreadyImplemented && ['implemented', 'verified'].includes(currentStatus);
+      processed.push({
+        target_control_id: mapRow.target_control_id,
+        target_control_code: mapRow.target_control_code,
+        target_control_title: mapRow.target_control_title,
+        similarity_score: mapRow.similarity_score,
+        mapping_type: mapRow.mapping_type,
+        previous_status: currentStatus,
+        next_status: shouldSkip ? currentStatus : nextStatus,
+        skipped: shouldSkip
+      });
+
+      if (dryRun || shouldSkip) continue;
+
+      await pool.query(
+        `INSERT INTO control_implementations (control_id, organization_id, status, notes, implementation_date)
+         VALUES ($1, $2, $3::text, $4, CASE WHEN $3::text = 'implemented' THEN CURRENT_DATE ELSE NULL END)
+         ON CONFLICT (control_id, organization_id) DO UPDATE SET
+           status = EXCLUDED.status,
+           notes = CASE
+             WHEN COALESCE(control_implementations.notes, '') = '' THEN EXCLUDED.notes
+             ELSE control_implementations.notes || E'\n' || EXCLUDED.notes
+           END`,
+        [
+          mapRow.target_control_id,
+          orgId,
+          nextStatus,
+          `Inherited from mapped control ${sourceControlId} (${mapRow.similarity_score}% ${mapRow.mapping_type || 'mapped'} similarity).`
+        ]
+      );
+
+      if (shouldPropagateEvidence) {
+        const propagated = await pool.query(
+          `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
+           SELECT DISTINCT ecl.evidence_id, $2::uuid, $3
+           FROM evidence_control_links ecl
+           JOIN evidence e ON e.id = ecl.evidence_id
+           WHERE ecl.control_id = $4::uuid
+             AND e.organization_id = $1
+           ON CONFLICT (evidence_id, control_id) DO NOTHING`,
+          [
+            orgId,
+            mapRow.target_control_id,
+            `Inherited evidence via strict crosswalk from control ${sourceControlId}`,
+            sourceControlId
+          ]
+        );
+        propagatedEvidenceLinks += propagated.rowCount || 0;
+      }
+
+      await pool.query(
+        `INSERT INTO control_inheritance_events (
+           organization_id, source_control_id, target_control_id, source_status, inherited_status,
+           similarity_score, event_notes, triggered_by
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          orgId,
+          sourceControlId,
+          mapRow.target_control_id,
+          sourceStatus,
+          nextStatus,
+          mapRow.similarity_score,
+          'Manual inheritance trigger',
+          req.user.id
+        ]
+      );
+    }
+
+    if (!dryRun) {
+      await pool.query(
+        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
+         VALUES ($1, $2, 'control_inheritance_triggered', 'control', $3, $4::jsonb, true)`,
+        [
+          orgId,
+          req.user.id,
+          sourceControlId,
+          JSON.stringify({
+            threshold: resolvedThreshold,
+            inherited_status: nextStatus,
+            processed: processed.length,
+            updated: processed.filter((p) => !p.skipped).length,
+            propagatedEvidenceLinks
+          })
+        ]
+      );
+
+      await enqueueWebhookEvent({
+        organizationId: orgId,
+        eventType: 'control.inheritance.triggered',
+        payload: {
+          source_control_id: sourceControlId,
+          threshold: resolvedThreshold,
+          inherited_status: nextStatus,
+          updated: processed.filter((p) => !p.skipped).length
+        }
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      data: {
+        source_control_id: sourceControlId,
+        threshold: resolvedThreshold,
+        inherited_status: nextStatus,
+        dry_run: Boolean(dryRun),
+        propagatedEvidenceLinks,
+        processed
+      }
+    });
+  } catch (error) {
+    console.error('Control inherit error:', error);
+    res.status(500).json({ success: false, error: 'Failed to run control inheritance' });
+  }
+});
+
+// GET /controls/:id/mappings
+router.get('/:id/mappings', requirePermission('controls.read'), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        fc2.id, fc2.control_id, COALESCE(occ.title, fc2.title) as title,
+        f2.code as framework_code, f2.name as framework_name,
+        cm.similarity_score, cm.mapping_type, cm.notes,
+        COALESCE(ci.status, 'not_started') as implementation_status
       FROM control_mappings cm
       JOIN framework_controls fc2 ON (
-        CASE
-          WHEN cm.source_control_id = $1 THEN fc2.id = cm.target_control_id
-          WHEN cm.target_control_id = $1 THEN fc2.id = cm.source_control_id
-        END
+        CASE WHEN cm.source_control_id = $1 THEN fc2.id = cm.target_control_id
+             ELSE fc2.id = cm.source_control_id END
       )
       JOIN frameworks f2 ON f2.id = fc2.framework_id
-      LEFT JOIN control_implementations ci2 ON ci2.control_id = fc2.id AND ci2.organization_id = $2
-      LEFT JOIN organization_frameworks of ON of.framework_id = f2.id AND of.organization_id = $2
+      LEFT JOIN organization_control_content_overrides occ
+        ON occ.organization_id = $2
+       AND occ.framework_control_id = fc2.id
+      LEFT JOIN control_implementations ci ON ci.control_id = fc2.id AND ci.organization_id = $2
       WHERE (cm.source_control_id = $1 OR cm.target_control_id = $1)
-      AND cm.similarity_score >= $3
-      ORDER BY cm.similarity_score DESC, f2.name`,
-      [controlId, req.user.organizationId, parseInt(minSimilarity)]
-    );
+        AND fc2.id != $1
+      ORDER BY cm.similarity_score DESC
+    `, [req.params.id, req.user.organization_id]);
 
-    const mappings = result.rows.map(row => ({
-      mappingId: row.mapping_id,
-      similarityScore: row.similarity_score,
-      mappingType: row.mapping_type,
-      rationale: row.mapping_rationale,
-      autoSatisfyEligible: row.similarity_score >= 90,
-      organizationHasFramework: !!row.organization_has_framework,
-      mappedControl: {
-        id: row.mapped_control_id,
-        controlId: row.mapped_control_code,
-        title: row.mapped_control_title,
-        description: row.mapped_control_description,
-        priority: row.mapped_control_priority,
-        framework: {
-          code: row.mapped_framework_code,
-          name: row.mapped_framework_name
-        },
-        implementationStatus: row.mapped_implementation_status || 'not_started'
-      }
-    }));
-
-    res.json({
-      success: true,
-      data: {
-        controlId,
-        totalMappings: mappings.length,
-        autoSatisfyEligibleCount: mappings.filter(m => m.autoSatisfyEligible && m.organizationHasFramework).length,
-        mappings
-      }
-    });
-
+    res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Get crosswalk mappings error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get crosswalk mappings'
-    });
+    console.error('Get mappings error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load mappings' });
   }
 });
 
-export default router;
+// GET /controls/:id/history
+router.get('/:id/history', requirePermission('controls.read'), async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT al.id, al.event_type, al.details, al.created_at,
+             u.first_name || ' ' || u.last_name as changed_by
+      FROM audit_logs al
+      LEFT JOIN users u ON u.id = al.user_id
+      WHERE al.resource_id = $1
+        AND al.resource_type = 'control'
+        AND al.organization_id = $2
+      ORDER BY al.created_at DESC
+      LIMIT 50
+    `, [req.params.id, req.user.organization_id]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Control history error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load control history' });
+  }
+});
+
+module.exports = router;
