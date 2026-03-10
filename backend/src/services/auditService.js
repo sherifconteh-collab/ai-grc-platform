@@ -13,7 +13,9 @@
  */
 
 const pool = require('../config/database');
-const siemService = require('./siemService');
+// siemService is optional — premium SIEM integration
+let siemService;
+try { siemService = require('./siemService'); } catch (_) { siemService = null; }
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
 
 /**

@@ -11,7 +11,9 @@
  */
 
 const pool = require('../config/database');
-const llm = require('./llmService');
+// llmService is optional — AI features degrade gracefully when absent
+let llm;
+try { llm = require('./llmService'); } catch (_) { llm = null; }
 
 /**
  * Generate smart remediation plan for a control gap

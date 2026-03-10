@@ -11,7 +11,14 @@
  */
 
 const pool = require('../config/database');
-const llm = require('./llmService');
+
+// llmService is optional — premium AI features degrade gracefully when absent
+let llm;
+try {
+  llm = require('./llmService');
+} catch (_) {
+  llm = null;
+}
 
 // Configuration
 const AI_RELEVANCE_THRESHOLD = 0.5; // Minimum confidence score for suggestions

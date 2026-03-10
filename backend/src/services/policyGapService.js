@@ -1,6 +1,8 @@
 // @tier: free
 const pool = require('../config/database');
-const { getLLMService } = require('./llmService');
+// llmService is optional — AI features degrade gracefully when absent
+let getLLMService;
+try { ({ getLLMService } = require('./llmService')); } catch (_) { getLLMService = () => null; }
 const { extractFamilyCode, NIST_CONTROL_FAMILIES } = require('./policyService');
 
 /**
