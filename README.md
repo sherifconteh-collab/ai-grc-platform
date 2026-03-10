@@ -2,7 +2,7 @@
 
 **Open-source multi-framework Governance, Risk, and Compliance platform with deep AI system governance support**
 
-> 🔗 **Upstream**: This repository is the community mirror of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features from ControlWeave are synced here so the open-source community always has access to the latest capabilities.
+> 🔗 **Upstream**: This repository is the community edition of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features are periodically synced here. The code is fully MIT-licensed and self-contained — no dependency on the upstream repo is required. Premium tiers (CMDB, Vendor Risk, Threat Intelligence, etc.) are available at [controlweave.com](https://controlweave.com).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
@@ -67,7 +67,7 @@ npm run dev   # Starts on port 3000
 - **NIST CSF 2.0** — Cybersecurity Framework 2.0 (106 controls across 6 functions)
 - **NIST AI RMF** — AI Risk Management Framework (97+ controls across 4 functions)
 - **NIST SP 800-171** — Protecting CUI (110 security requirements across 14 families)
-- **NIST SP 800-53 Rev 5** — Security and Privacy Controls (1,007 controls with Low/Moderate/High baseline overlays)
+- **NIST SP 800-53 Rev 5** — Security and Privacy Controls (1,000+ controls with Low/Moderate/High baseline overlays)
 - **ISO 27001:2022** — Information Security Management (93 controls)
 - **SOC 2** — Trust Service Criteria (64+ controls)
 
@@ -103,7 +103,7 @@ npm run dev   # Starts on port 3000
 
 ### 🤖 AI Platform (BYOK — Bring Your Own Key)
 
-The platform ships with a **built-in AI layer** that any user can activate with their own API key. Free community users receive **10 AI requests per month**.
+The platform ships with a **built-in AI layer** that any user can activate with their own API key. Self-hosted deployments have no usage limits. The hosted ControlWeave service applies tier-based rate limits (e.g., 10 AI requests/month on the free tier).
 
 - **AI Copilot** — org-aware conversational assistant with 25+ analysis capabilities:
   - Gap analysis comparing current implementation against target baselines
@@ -403,7 +403,7 @@ ai-grc-platform/
 - [Framework Coverage](./docs/FRAMEWORK_COVERAGE.md)
 - [Open Source Business Model](./docs/OPEN_SOURCE_BUSINESS_MODEL.md)
 - [GitHub Repository Guide](./docs/GITHUB_REPOSITORY_GUIDE.md)
-- [OpenAPI Specification](./docs/openapi.yaml) *(available in ControlWeave)*
+- [OpenAPI Specification](./docs/openapi.yaml)
 - [Quick Start Guide](./QUICKSTART.md)
 - [API Testing Guide](./QUICK_START.md)
 - [Phase 2 Roadmap](./PHASE_2_ROADMAP.md)
