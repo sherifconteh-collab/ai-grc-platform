@@ -6,6 +6,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
+[![Release](https://img.shields.io/badge/Release-v2.2.0-green.svg)](./RELEASE_NOTES.md)
+[![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ## 🎯 What is This?
 
@@ -283,6 +285,45 @@ const suggestions = await mcp.query({
 });
 ```
 
+## 📦 ControlWeave External AI Logger SDK
+
+The `controlweave-sdk` package lets external systems log AI decisions directly into ControlWeave for governance tracking and audit trails.
+
+```bash
+npm install @controlweave/external-ai-logger
+```
+
+```javascript
+const { ControlWeaveLogger } = require('@controlweave/external-ai-logger');
+
+const logger = new ControlWeaveLogger({
+  apiKey: process.env.CONTROLWEAVE_API_KEY,
+  baseUrl: 'https://your-controlweave-host/api/v1'
+});
+
+// Log a single AI decision
+await logger.logDecision({
+  feature: 'incident_triage',
+  input_data: { alertId: 'A-123' },
+  output_data: { priority: 'high' },
+  external_provider: 'openai',
+  external_model: 'gpt-4.1',
+  external_decision_id: 'ext-789',
+  risk_level: 'medium'
+});
+
+// Log multiple decisions in bulk
+await logger.logBatch([decision1, decision2]);
+```
+
+SDK features:
+- **BYOK-compatible** — Uses your API key generated in *Settings → Platform Admin*
+- **TypeScript types** — Full `index.d.ts` type definitions included
+- **Batch logging** — Log multiple AI decisions in a single call
+- **Available for Enterprise and Utilities tiers** — External SDK ingestion requires org tier eligibility
+
+See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup instructions.
+
 ## 🏗️ Architecture
 
 ```
@@ -298,7 +339,7 @@ ai-grc-platform/
 │   │   ├── config/          # Database and security configuration
 │   │   └── utils/           # Logging, encryption, TOTP, AI security
 │   ├── migrations/          # Database migrations
-│   └── scripts/             # Seed data, migration runners, utilities
+│   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
 │   │   ├── app/             # Next.js pages (dashboard, frameworks, controls,
@@ -306,6 +347,7 @@ ai-grc-platform/
 │   │   ├── components/      # Sidebar, DashboardLayout, AICopilot
 │   │   └── lib/             # API client, access control, branding, billing
 │   └── public/              # Static assets, branding, PWA manifest
+├── controlweave-sdk/        # External AI Logger SDK (@controlweave/external-ai-logger)
 ├── db/
 │   ├── schema.sql           # Complete database schema
 │   └── seeds/               # Framework control data (8 seed files)
@@ -449,14 +491,14 @@ ai-grc-platform/
 
 We welcome contributions! This is an open-source project designed to help organizations manage compliance effectively. See [CONTRIBUTING.md](./CONTRIBUTING.md) for full guidelines.
 
-### Areas We Need Help
-- Additional framework implementations
-- Frontend improvements and new dashboard views
-- API enhancements
-- Documentation and tutorials
-- Testing and QA
-- Control mapping between frameworks
-- Internationalization
+### Quick Ways to Contribute
+
+- 🐛 **Report bugs** — [Open an issue](https://github.com/sherifconteh-collab/ai-grc-platform/issues/new?template=bug_report.md)
+- 💡 **Suggest features** — [Start a discussion](https://github.com/sherifconteh-collab/ai-grc-platform/discussions)
+- 📝 **Improve docs** — Fix typos, add examples, clarify setup steps
+- 🧪 **Add tests** — Coverage is always welcome
+- 🌐 **Add frameworks** — GDPR, PCI DSS 4.0, CIS Controls v8, and more are on the roadmap
+- 🔌 **Extend the SDK** — Contribute to the `controlweave-sdk` for new integrations
 
 ## 📜 License
 
@@ -506,6 +548,10 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Features**: 25+ analysis capabilities
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **Tables**: 25+ database tables
+- **API Routes**: 27 route modules
+- **Services**: 17 service modules
+- **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
+- **Security**: 14-day trial, all 12 audit findings remediated in v2.2.0
 - **Development Status**: Beta
 
 ## 🔗 Links
@@ -513,6 +559,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Community Repository**: [ai-grc-platform](https://github.com/sherifconteh-collab/ai-grc-platform) *(you are here)*
 - **Premium Product**: [ControlWeave.com](https://controlweave.com) — CMDB, Vendor Risk, Threat Intel, and more
 - **Upstream Source**: [ControlWeave on GitHub](https://github.com/sherifconteh-collab/ControlWeave)
+- **Release Notes**: [RELEASE_NOTES.md](./RELEASE_NOTES.md)
 - Documentation: See [docs/](./docs/) folder
 
 ---
