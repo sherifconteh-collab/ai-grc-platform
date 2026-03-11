@@ -48,3 +48,19 @@ updates:
       - "github-actions"
     commit-message:
       prefix: "chore(ci)"
+
+  # ControlWeave SDK
+  - package-ecosystem: "npm"
+    directory: "/controlweave-sdk"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "sherifconteh-collab"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(sdk)"
+      include: "scope"
