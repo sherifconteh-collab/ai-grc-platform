@@ -1,5 +1,72 @@
 # Release Notes
 
+## v2.2.0 — Security Hardening & CI/CD (March 2026)
+
+**Minor release** syncing security remediations, CI/CD improvements, and bug fixes from the upstream [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) platform.
+
+---
+
+### 🔒 Security Hardening (12-Finding Audit Remediation)
+
+A full security audit was completed across the platform. All 12 findings have been remediated in this release:
+
+- **Permission escalation** — Enforced `assessments.write` / `settings.write` permissions on 10 organization mutation routes
+- **Open redirect** — Validated billing `returnUrl` against an allowlist before redirecting
+- **Multer DoS** — Added file size (50 MB) and file count (10) limits on upload endpoints
+- **RAG error leakage** — Sanitized internal error messages in AI responses before returning to client
+- **Billing webhook disclosure** — Masked internal error details in webhook handler responses
+- **Billing rate limiting** — Added per-IP throttling on payment and billing endpoints
+- **ILIKE wildcard injection** — Escaped `%` and `_` characters in user-supplied SQL LIKE patterns
+- **Portal session returnUrl** — Restricted return URLs to configured `FRONTEND_URL` only
+- **Threat intelligence filtering** — Sanitized output before returning threat data to client
+- **Frontend `alert()` calls** — Replaced all `alert()` calls with inline error messages
+- **Reasoning memory cache** — Capped unbounded memory growth in reasoning cache
+- **Multi-agent timeout** — Enforced configurable execution deadline for multi-agent operations
+- **Model router stats** — Capped stats object size to prevent unbounded memory growth
+
+---
+
+### 🚀 CI/CD & Release Management
+
+- **Branch naming enforcement** — GitHub Actions enforces `<type>/GRC<issue-number>/<short-desc>` convention on all PRs and pushes (excludes `main`, `staging`, `release/*`)
+- **Release workflow** — Tag-triggered GitHub Release creation from `CHANGELOG.md` / release notes
+- **CodeQL v4 upgrade** — Dedicated CodeQL scanning workflow updated to v4
+- **Gitleaks configuration** — Improved secrets detection with false positive handling
+- **Container security scan** — Fixed container security pipeline failures
+- **IP hygiene CI** — Automated checks for hardcoded IPs in marketing copy
+
+---
+
+### 🐛 Bug Fixes
+
+- **Production build failure** — Fixed `useSearchParams()` missing `Suspense` boundary in `register/page.tsx`
+- **Demo login credentials** — Updated to comply with the 12-character minimum password policy
+- **Authentication middleware** — Resilient to missing `feature_overrides` column and non-fatal trial check failures
+- **Railway deployment** — Corrected builders, `startCommand`, PORT configuration, and standalone runtime compatibility
+- **Docker frontend build** — Correctly bake `NEXT_PUBLIC_API_URL` via `.env.production`
+- **Pagination offset** — Fixed duplicate record bug on page 2+ of paginated endpoints
+- **Professional tier framework limit** — Corrected display to reflect actual tier limits (was incorrectly showing "unlimited")
+- **Sidebar rail** — Fixed full-height layout with internal scroll on all screen sizes
+- **Aria-current logic** — Fixed Breadcrumbs and date parsing in framework navigation
+- **Vulnerability suppression** — Removed hardcoded MEDIUM severity filter so accepted items at any severity are hidden
+- **EU AI Act page** — Renamed `articles` variable to `articleRequirements` for clarity
+- **SOC 2 metadata** — Restored missing `keywords` property in `soc-2/page.tsx`
+
+---
+
+### 🔧 Improvements
+
+- Trial period updated from 7 to **14 days** across all references
+- Pricing tiers restructured: **Starter / Professional / Enterprise / Utilities**
+- Professional tier framework limit bumped to **20 simultaneously active frameworks**
+- `console.error` replaced with structured logger across all backend routes
+- Auth `/me` endpoint now returns `framework_codes` array for client-side feature gating
+- Sidebar reorganized with framework-gated entries (RMF Lifecycle, Auditor Workspace)
+- Multi-layer edition security to prevent community bypass of Pro features
+- Pruned stale remote branches for repository hygiene
+
+---
+
 ## v2.1.0 — Community Edition Sync (March 2026)
 
 **Major release** syncing the open-source community edition with the upstream [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) platform. This release adds 100+ new files across backend routes, services, middleware, migrations, and scripts — significantly expanding platform capabilities.
