@@ -2,7 +2,7 @@
 
 <!-- Explain what this PR does and why -->
 
-Fixes #<!-- issue number, or remove this line if not applicable -->
+Fixes #123 <!-- issue number, or remove this line if not applicable -->
 
 ## Type of Change
 

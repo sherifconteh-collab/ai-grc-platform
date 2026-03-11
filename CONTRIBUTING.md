@@ -59,7 +59,7 @@ npm install
 npm start
 
 # Frontend: verify the UI builds and renders correctly
-cd frontend
+cd ../frontend
 npm install
 npm run build
 npm run dev
@@ -166,8 +166,8 @@ npm install
 npm run seed        # Seed frameworks and assessment procedures
 npm start           # API starts on http://localhost:3001
 
-# 4. Set up the frontend (new terminal)
-cd frontend
+# 4. Set up the frontend (new terminal, from repo root)
+cd ai-grc-platform/frontend
 npm install
 npm run dev         # UI starts on http://localhost:3000
 ```

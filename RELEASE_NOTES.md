@@ -2,7 +2,7 @@
 
 ## v2.2.0 — Security Hardening & CI/CD (March 2026)
 
-**Patch release** syncing security remediations, CI/CD improvements, and bug fixes from the upstream [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) platform.
+**Minor release** syncing security remediations, CI/CD improvements, and bug fixes from the upstream [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) platform.
 
 ---
 
@@ -28,7 +28,7 @@ A full security audit was completed across the platform. All 12 findings have be
 
 ### 🚀 CI/CD & Release Management
 
-- **Branch naming enforcement** — GitHub Actions enforces `<type>/CW-<number>/<short-desc>` convention on all PRs and pushes (excludes `main`, `staging`, `release/*`)
+- **Branch naming enforcement** — GitHub Actions enforces `<type>/GRC<issue-number>/<short-desc>` convention on all PRs and pushes (excludes `main`, `staging`, `release/*`)
 - **Release workflow** — Tag-triggered GitHub Release creation from `CHANGELOG.md` / release notes
 - **CodeQL v4 upgrade** — Dedicated CodeQL scanning workflow updated to v4
 - **Gitleaks configuration** — Improved secrets detection with false positive handling
