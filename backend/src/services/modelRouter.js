@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Multi-Model Router
  * Automatic provider/model selection based on task complexity, cost, and availability.

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 function defaultKeyGenerator(req) {
   return req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
 }

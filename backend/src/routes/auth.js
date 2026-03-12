@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -9,21 +9,13 @@ const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-// Optional premium service — not available in community edition
-let subscriptionServiceModule;
-try { subscriptionServiceModule = require('../services/subscriptionService'); } catch (_) { subscriptionServiceModule = {}; }
 const {
-  getTrialSeedData = () => ({ tier: 'free', billingStatus: 'active', trialSourceTier: 'free', trialDays: 14, trialStatus: 'active' }),
-  expireOrganizationTrialIfNeeded = async () => false
-} = subscriptionServiceModule;
+  getTrialSeedData,
+  expireOrganizationTrialIfNeeded,
+  ensureOrgFrameworks
+} = require('../services/subscriptionService');
 const { sendPasswordResetEmail } = require('../services/emailService');
-// Optional premium service — not available in community edition
-let geolocationServiceModule;
-try { geolocationServiceModule = require('../services/geolocationService'); } catch (_) { geolocationServiceModule = {}; }
-const {
-  getGeolocationFromRequest = () => null,
-  extractIpFromRequest = (req) => req?.ip || null
-} = geolocationServiceModule;
+const { getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService');
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
@@ -555,6 +547,10 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
         authenticationMethod: 'password'
       }).catch(err => console.error('Audit log error:', err));
 
+      // Ensure all seeded frameworks the org is entitled to are adopted.
+      // Fire-and-forget — does not block the registration response.
+      ensureOrgFrameworks(org.id, org.tier);
+
       res.status(201).json({
         success: true,
         data: {
@@ -750,6 +746,12 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
       success: true,
       authenticationMethod: 'password'
     }).catch(err => console.error('Audit log error:', err));
+
+    // Ensure all seeded frameworks the org is entitled to are adopted.
+    // Fire-and-forget — does not block the login response.
+    if (user.organization_id && user.organization_tier) {
+      ensureOrgFrameworks(user.organization_id, user.organization_tier);
+    }
 
     res.json({
       success: true,

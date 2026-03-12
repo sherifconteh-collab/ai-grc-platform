@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use strict';
 
 const { Server } = require('socket.io');

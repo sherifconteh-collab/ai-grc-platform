@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 function serializeError(err) {
   if (!err) return null;
   return {

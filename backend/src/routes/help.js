@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const path = require('path');
@@ -135,7 +135,7 @@ const ARTICLE_CATALOG = [
   {
     slug: 'tier-comparison',
     title: 'Tier Comparison',
-    description: 'Full feature-by-feature comparison across Free, Starter, Professional, and Enterprise tiers.',
+    description: 'Full feature-by-feature comparison across Community, Pro, Enterprise, and Gov Cloud tiers.',
     icon: '📊',
     category: 'Reference',
     file: 'TIER_COMPARISON.md',
@@ -173,8 +173,8 @@ router.get('/', helpRateLimiter, (req, res) => {
     icon,
     category,
     locked: userTier < minTier,
-    minTierRequired: Object.entries({ free: 0, starter: 1, professional: 2, enterprise: 3, utilities: 3 })
-      .find(([, v]) => v === minTier)?.[0] || 'free'
+    minTierRequired: Object.entries({ community: 0, pro: 1, enterprise: 2, govcloud: 3 })
+      .find(([, v]) => v === minTier)?.[0] || 'community'
   }));
 
   // Group by category preserving declaration order
@@ -205,8 +205,8 @@ router.get('/:slug', helpRateLimiter, (req, res) => {
     return res.status(403).json({
       success: false,
       error: 'This article requires a higher subscription tier.',
-      minTierRequired: Object.entries({ free: 0, starter: 1, professional: 2, enterprise: 3 })
-        .find(([, v]) => v === article.minTier)?.[0] || 'free'
+      minTierRequired: Object.entries({ community: 0, pro: 1, enterprise: 2, govcloud: 3 })
+        .find(([, v]) => v === article.minTier)?.[0] || 'community'
     });
   }
 
@@ -259,7 +259,7 @@ Welcome! This guide walks you through your first steps with ControlWeave.
 ### 2. Select Compliance Frameworks
 - Go to **Frameworks** in the sidebar
 - Choose the frameworks your organization needs (e.g. NIST CSF 2.0, ISO 27001, SOC 2)
-- Free tier supports up to 2 frameworks
+- Community tier supports up to 2 frameworks
 
 ### 3. Review Your Controls
 - Navigate to **Controls** to see all controls from your selected frameworks
@@ -333,7 +333,7 @@ Select, activate, and manage compliance frameworks.
 - Navigate to **Frameworks** in the sidebar
 - Browse available frameworks by category (Cybersecurity, Privacy, Financial, AI Governance)
 - Click **Activate** to add a framework to your organization
-- Free tier: up to 2 frameworks | Starter: 5 | Professional+: unlimited
+- Community tier: up to 2 frameworks | Pro+: unlimited
 
 ## Supported Frameworks
 - **NIST CSF 2.0** — Cybersecurity Framework with 6 core functions
@@ -448,7 +448,7 @@ Run structured AI-powered analyses for compliance insights.
 - **Crosswalk Optimizer** — Find opportunities to reduce duplicate compliance work
 - **Evidence Mapper** — Map evidence artifacts to control requirements
 
-## Parallel AI Analysis (Professional+)
+## Parallel AI Analysis (Pro+)
 Run multiple analyses simultaneously in a single click:
 - **Full Assessment** — Gap analysis + forecast + risk heatmap + audit readiness
 - **Risk Assessment** — Risk heatmap + gap analysis
@@ -485,52 +485,53 @@ Supported formats:
 - Plans include priority, estimated effort, and control mappings
 
 ## Requirements
-- Vulnerability features require Starter tier or higher
+- Vulnerability features require Pro tier or higher
 - AI remediation plans use your configured AI provider`,
 
   'tier-comparison': `# 📊 Tier Comparison
 
 Feature-by-feature comparison across all ControlWeave tiers.
 
-## Free Tier
+## Community Tier (Free / AGPL)
 - Up to 2 compliance frameworks
 - 10 AI requests per month
 - Core dashboard, controls, and assessments
 - AI Copilot with basic context
 - Community support
+- Full source code access
 
-## Starter Tier
-- Up to 5 frameworks
-- 50 AI requests per month
-- CMDB with up to 50 assets
+## Pro Tier ($499/mo)
+- Unlimited frameworks
+- Unlimited AI requests per month
+- Full CMDB with unlimited assets
 - Vulnerability management
 - Evidence management and reporting
 - Auto-evidence collection (Splunk; connectors coming soon)
 - AI-powered evidence suggestions with approve/reject workflow
-- Email support
+- SSO (SAML / OIDC)
+- 48-hour support SLA
 
-## Professional Tier
-- Unlimited frameworks
-- Unlimited AI requests per month
-- Full CMDB with unlimited assets
+## Enterprise Tier ($3,500–$12,000/mo)
+- Everything in Pro
+- AI impact assessment (ISO 42005)
+- Auditor workspace
 - Knowledge Base (RAG) for AI enrichment
 - Advanced AI analysis features
 - Parallel multi-agent AI analysis
+- TPRM module
+- Custom SLAs
+- Dedicated CSM
 - Priority support
 
-## Enterprise Tier
-- Everything in Professional
-- SSO/SAML integration
-- Custom integrations and webhooks
-- Dedicated support
-- SLA guarantees
-
-## Utilities Tier
+## Gov Cloud Tier (Custom)
 - Everything in Enterprise
-- FINRA / SEC / SR 11-7 compliance frameworks
+- FedRAMP / FISMA / StateRAMP compliance
+- IL4 / IL5 data sovereignty
+- ITAR-compliant hosting
+- Dedicated infrastructure
+- SLA-backed uptime guarantee
 - Financial Services AI Governance workspace
-- Model inventory and risk tiering
-- Regulatory monitoring for financial AI`,
+- FINRA / SEC / SR 11-7 compliance frameworks`,
 
   'user-guide': `# 📚 Complete User Guide
 
@@ -559,7 +560,7 @@ ControlWeave's AI can scan your connected integrations (e.g., Splunk), analyze l
 
 Token-efficient: AI evidence scans use a lightweight prompt that sends only the data needed for control mapping — no unnecessary overhead on your API credits.
 
-Available for **Starter+** tiers. API: \`POST /api/v1/pending-evidence/scan\`
+Available for **Pro+** tiers. API: \`POST /api/v1/pending-evidence/scan\`
 
 ## Assets (CMDB)
 Track hardware, software, AI agents, and service accounts. Link assets to controls for complete traceability.
@@ -573,10 +574,10 @@ Generate compliance reports, export data, and share progress with stakeholders.
 ## AI Features
 - **AI Copilot** — Conversational GRC assistant
 - **AI Analysis** — Gap analysis, crosswalk optimizer, compliance forecast, audit readiness, risk heatmap, vendor risk, evidence suggestions, and more
-- **AI Evidence Suggestions** — Scan integrations and suggest evidence mapped to controls (Starter+)
+- **AI Evidence Suggestions** — Scan integrations and suggest evidence mapped to controls (Pro+)
 - **AI Monitoring** — Track AI usage, decisions, and bias reviews
-- **AI Governance** — Third-party AI vendor risk, model risk, supply chain tracking (Professional+)
-- **Knowledge Base** — Organization document search with RAG (Professional+)
+- **AI Governance** — Third-party AI vendor risk, model risk, supply chain tracking (Enterprise+)
+- **Knowledge Base** — Organization document search with RAG (Enterprise+)
 
 All AI features use a token-efficient modular prompt system — each feature receives only the reference context it needs, reducing token usage by 50–80%.
 
@@ -589,7 +590,7 @@ Configure users, roles, integrations, AI providers, and notifications.
 - **Threat Intelligence** — CVE tracking, CISA KEV, and threat feeds
 
 ## Financial Services Compliance
-Utilities-tier workspace for financial institutions: Reg BI alignment, SR 11-7 model inventory, FINRA supervisory audit trail, and SEC explainability narratives.
+Gov Cloud-tier workspace for financial institutions: Reg BI alignment, SR 11-7 model inventory, FINRA supervisory audit trail, and SEC explainability narratives.
 
 ## Report an Issue
 Use the **Report Issue** link in the sidebar or the **Issues** tab in the Help Center to submit bugs, feature requests, or problems. Reports are automatically forwarded to our development team for review.`,
@@ -599,7 +600,7 @@ Use the **Report Issue** link in the sidebar or the **Issues** tab in the Help C
 Specialized compliance tools for financial institutions using AI in advisory, trading, and client-facing operations.
 
 ## Access
-The Financial Services Compliance Workspace is available on the **Utilities** tier. Navigate to **Financial Compliance** in the sidebar or **Assets → Financial Compliance Workspace** in the CMDB.
+The Financial Services Compliance Workspace is available on the **Gov Cloud** tier. Navigate to **Financial Compliance** in the sidebar or **Assets → Financial Compliance Workspace** in the CMDB.
 
 ## Reg BI Alignment
 Track best-interest obligation alignment for AI-powered recommendations:
@@ -677,7 +678,7 @@ Schedule automated evidence collection from integrated sources on a recurring ba
 Evidence is collected as a JSON file containing the search/query results and metadata (rule name, timestamp, source, category). Files are stored in your evidence library and can be linked to controls. For scheduled rules, the next run is computed automatically after each collection.
 
 ## Requirements
-- Auto-Evidence Collection requires Starter tier or higher
+- Auto-Evidence Collection requires Pro tier or higher
 - Each source must be configured in **Settings → Integrations** before use
 - Splunk requires base URL and API token
 - Cloud sources (Sentinel, CloudTrail) require appropriate API credentials

@@ -8,16 +8,15 @@ export const VALID_PAID_BILLING_STATES = new Set([
   'active_paid',
   'comped',
   'canceling',
+  'license',
 ]);
 
 /**
  * Valid billing plan lookup keys accepted by Stripe checkout.
  */
 export const VALID_BILLING_PLANS = new Set([
-  'starter_monthly', 'starter_annual',
-  'professional_monthly', 'professional_annual',
+  'pro_monthly', 'pro_annual',
   'enterprise_monthly', 'enterprise_annual',
-  'utilities_monthly', 'utilities_annual',
 ]);
 
 interface BillingUser {
@@ -37,11 +36,11 @@ export function requiresBillingResolution(user: BillingUser | null | undefined):
   if (!user) return false;
   if (user.isPlatformAdmin) return false;
 
-  const tier = String(user.organizationTier || 'free').toLowerCase();
-  const billingStatus = String(user.billingStatus || 'free').toLowerCase();
+  const tier = String(user.organizationTier || 'community').toLowerCase();
+  const billingStatus = String(user.billingStatus || 'community').toLowerCase();
 
-  // Free tier — no payment needed
-  if (tier === 'free') return false;
+  // Community tier — no payment needed
+  if (tier === 'community') return false;
 
   // Already in a valid paid state
   if (VALID_PAID_BILLING_STATES.has(billingStatus)) return false;

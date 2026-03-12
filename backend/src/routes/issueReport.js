@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
@@ -35,7 +35,7 @@ router.post('/report', issueReportLimiter, async (req, res) => {
     const userId = req.user.id;
     const userName = req.user.name || req.user.email || 'Unknown';
     const orgName = req.user.organization_name || 'Unknown Org';
-    const tier = req.user.organization_tier || req.user.effectiveTier || 'free';
+    const tier = req.user.organization_tier || req.user.effectiveTier || 'community';
 
     const {
       title,

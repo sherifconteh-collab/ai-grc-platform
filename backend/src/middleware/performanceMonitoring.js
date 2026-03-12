@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Performance Monitoring Middleware
  * Tracks request performance metrics for Railway deployment monitoring

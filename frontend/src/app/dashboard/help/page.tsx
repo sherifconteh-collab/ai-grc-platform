@@ -210,7 +210,7 @@ export default function HelpPage() {
       )
     : categories;
 
-  const currentTierLabel = TIER_LABELS[user?.effectiveTier || user?.organizationTier || 'free'] || 'Free';
+  const currentTierLabel = TIER_LABELS[user?.effectiveTier || user?.organizationTier || 'community'] || 'Community';
 
   return (
     <DashboardLayout>

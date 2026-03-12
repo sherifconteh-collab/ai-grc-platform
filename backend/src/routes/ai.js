@@ -1,11 +1,9 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-// Optional premium service — not available in community edition
-let llm;
-try { llm = require('../services/llmService'); } catch (_) { llm = null; }
+const llm = require('../services/llmService');
 const auditService = require('../services/auditService');
 const pool = require('../config/database');
 const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
@@ -1027,11 +1025,8 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
 
 // ======================== MULTI-AGENT SWARM ========================
 
-// Optional premium services — not available in community edition
-let orchestrator;
-try { orchestrator = require('../services/multiAgentOrchestrator'); } catch (_) { orchestrator = null; }
-let reasoningMemory;
-try { reasoningMemory = require('../services/reasoningMemory'); } catch (_) { reasoningMemory = null; }
+const orchestrator = require('../services/multiAgentOrchestrator');
+const reasoningMemory = require('../services/reasoningMemory');
 
 // GET /ai/swarm/configs — list available swarm configurations
 router.get('/swarm/configs', async (req, res) => {
@@ -1110,7 +1105,7 @@ router.post('/swarm/execute', checkAIUsage, async (req, res) => {
 // ======================== REASONING MEMORY (ReasoningBank) ========================
 
 // GET /ai/reasoning-memory/stats — get memory stats for this org
-router.get('/reasoning-memory/stats', requireTier('professional'), async (req, res) => {
+router.get('/reasoning-memory/stats', requireTier('enterprise'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(`
@@ -1140,7 +1135,7 @@ router.get('/reasoning-memory/stats', requireTier('professional'), async (req, r
 });
 
 // GET /ai/reasoning-memory/entries — list recent reasoning memory entries
-router.get('/reasoning-memory/entries', requireTier('professional'), async (req, res) => {
+router.get('/reasoning-memory/entries', requireTier('enterprise'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
@@ -1170,7 +1165,7 @@ router.get('/reasoning-memory/entries', requireTier('professional'), async (req,
 });
 
 // DELETE /ai/reasoning-memory — clear all reasoning memory for this org
-router.delete('/reasoning-memory', requireTier('professional'), async (req, res) => {
+router.delete('/reasoning-memory', requireTier('enterprise'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(

@@ -1,4 +1,4 @@
-// @tier: free  (TOTP is available to all tiers)
+// @tier: community  (TOTP/2FA is available to all tiers)
 'use strict';
 
 /**

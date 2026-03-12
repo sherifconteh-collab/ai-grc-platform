@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Risk Scoring Service - Phase 6: AI-Powered Analysis
  * 

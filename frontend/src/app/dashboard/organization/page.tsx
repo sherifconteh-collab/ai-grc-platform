@@ -62,8 +62,8 @@ const RMF_FRAMEWORK_CODES = ['nist_800_53', 'nist_800_171'];
 
 function getFrameworkLimit(tier: string): number {
   switch (tier) {
-    case 'free': return 2;
-    case 'starter': return 5;
+    case 'community': return 2;
+    case 'pro': return -1;
     default: return -1;
   }
 }
@@ -472,7 +472,7 @@ export default function OrganizationProfilePage() {
                                     </span>
                                   </div>
                                   <p className="text-slate-500 mt-1 line-clamp-1">{child.description}</p>
-                                  <p className="text-slate-400 mt-0.5">{child.controlCount} controls · Tier: {child.tierRequired || 'free'}</p>
+                                  <p className="text-slate-400 mt-0.5">{child.controlCount} controls · Tier: {child.tierRequired || 'community'}</p>
                                 </button>
                               );
                             })}
@@ -520,7 +520,7 @@ export default function OrganizationProfilePage() {
                       <p className="text-xs text-slate-600 mt-2 line-clamp-2">{framework.description}</p>
                       <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
                         <span>{framework.controlCount} controls</span>
-                        <span>Tier: {framework.tierRequired || 'free'}</span>
+                        <span>Tier: {framework.tierRequired || 'community'}</span>
                       </div>
                     </button>
                   );

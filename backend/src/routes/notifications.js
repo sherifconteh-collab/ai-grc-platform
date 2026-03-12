@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use strict';
 
 const express = require('express');
@@ -6,14 +6,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields } = require('../middleware/validate');
-// Optional premium service — not available in community edition
-let realtimeEventModule;
-try { realtimeEventModule = require('../services/realtimeEventService'); } catch (_) { realtimeEventModule = {}; }
-const {
-  notificationNew = () => {},
-  notificationRead = () => {},
-  notificationReadAll = () => {}
-} = realtimeEventModule;
+const { notificationNew, notificationRead, notificationReadAll } = require('../services/realtimeEventService');
 
 router.use(authenticate);
 

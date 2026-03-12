@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Assessment Procedures Routes
  *
@@ -16,9 +16,7 @@ const pool = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const PDFDocument = require('pdfkit');
-// Optional premium service — not available in community edition
-let llm;
-try { llm = require('../services/llmService'); } catch (_) { llm = null; }
+const llm = require('../services/llmService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
 

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const AUDITOR_SUBROLE_TEMPLATES = [
   {
     name: 'auditor_lead',

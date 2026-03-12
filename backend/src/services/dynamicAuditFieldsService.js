@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use strict';
 
 /**
@@ -11,14 +11,7 @@
  */
 
 const pool = require('../config/database');
-
-// llmService is optional — premium AI features degrade gracefully when absent
-let llm;
-try {
-  llm = require('./llmService');
-} catch (_) {
-  llm = null;
-}
+const llm = require('./llmService');
 
 // Configuration
 const AI_RELEVANCE_THRESHOLD = 0.5; // Minimum confidence score for suggestions

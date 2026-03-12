@@ -1,8 +1,6 @@
-// @tier: free
+// @tier: community
 const pool = require('../config/database');
-// llmService is optional — AI features degrade gracefully when absent
-let getLLMService;
-try { ({ getLLMService } = require('./llmService')); } catch (_) { getLLMService = () => null; }
+const { getLLMService } = require('./llmService');
 
 /**
  * NIST 800-53 Control Families - Used as the structural template for policies
