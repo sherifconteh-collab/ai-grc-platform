@@ -136,8 +136,7 @@ docs/
 ├── CROSSWALK_GUIDE.md ✅
 ├── DATABASE_ARCHITECTURE.md ✅
 ├── HOW_CROSSWALKS_WORK.md ✅
-├── COMPLETE_APP_WALKTHROUGH.md ✅
-└── OPEN_SOURCE_BUSINESS_MODEL.md ✅
+└── COMPLETE_APP_WALKTHROUGH.md ✅
 
 Status: ✅ All ready
 ```
@@ -170,7 +169,6 @@ ai-grc-platform/
 │   ├── DATABASE_ARCHITECTURE.md ✅
 │   ├── HOW_CROSSWALKS_WORK.md ✅
 │   ├── COMPLETE_APP_WALKTHROUGH.md ✅
-│   ├── OPEN_SOURCE_BUSINESS_MODEL.md ✅
 │   ├── INSTALLATION.md ⚠️ (create)
 │   └── API.md ⏳ (create when you build API)
 │

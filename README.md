@@ -444,7 +444,6 @@ controlweave/
 - [Database Architecture](./docs/DATABASE_ARCHITECTURE.md)
 - [Framework Coverage](./docs/FRAMEWORK_COVERAGE.md)
 - [MCP Setup Guide](./docs/MCP_SETUP.md)
-- [Open Source Business Model](./docs/OPEN_SOURCE_BUSINESS_MODEL.md)
 - [GitHub Repository Guide](./docs/GITHUB_REPOSITORY_GUIDE.md)
 - [OpenAPI Specification](./docs/openapi.yaml)
 - [Quick Start Guide](./QUICKSTART.md)

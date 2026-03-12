@@ -13,7 +13,14 @@
  */
 
 const pool = require('../config/database');
-const siemService = require('./siemService');
+
+// Optional SIEM service: fall back to no-op if unavailable
+let siemService;
+try {
+  siemService = require('./siemService');
+} catch (e) {
+  siemService = { forwardEvent: async () => ({}) };
+}
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
 
 /**

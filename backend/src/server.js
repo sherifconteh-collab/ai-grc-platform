@@ -348,7 +348,7 @@ async function ensurePlatformAdmin() {
     const mode = result.rows[0].inserted ? 'created' : 'updated';
     log('info', 'platform.admin.provisioned', { email, status: mode, org: orgName });
     if (generated) {
-      log('info', 'platform.admin.generated_password', { email, password });
+      log('info', 'platform.admin.credentials_generated', { email, note: 'Password was auto-generated. Retrieve via secure channel.' });
     }
   } catch (err) {
     await client.query('ROLLBACK');

@@ -6,7 +6,16 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields } = require('../middleware/validate');
-const { notificationNew, notificationRead, notificationReadAll } = require('../services/realtimeEventService');
+
+// Optional realtime event service: fall back to no-ops if unavailable
+let notificationNew, notificationRead, notificationReadAll;
+try {
+  ({ notificationNew, notificationRead, notificationReadAll } = require('../services/realtimeEventService'));
+} catch (e) {
+  notificationNew = () => {};
+  notificationRead = () => {};
+  notificationReadAll = () => {};
+}
 
 router.use(authenticate);
 
