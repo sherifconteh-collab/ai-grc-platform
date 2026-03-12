@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const pool = require('../config/database');
 
 /**

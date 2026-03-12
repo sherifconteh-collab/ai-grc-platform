@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Separation of Duties (SOD) middleware helpers.
  *

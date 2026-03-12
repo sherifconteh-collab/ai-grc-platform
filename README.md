@@ -1,17 +1,17 @@
-# AI GRC Platform — Community Edition
+# ControlWeave — Community Edition
 
-**Open-source multi-framework Governance, Risk, and Compliance platform with deep AI system governance support**
+**Open-source AI-powered GRC platform with multi-framework compliance management, crosswalk intelligence, and BYOK AI analysis**
 
 > 🔗 **Upstream**: This repository is the community edition of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features are periodically synced here. The code is fully MIT-licensed and self-contained — no dependency on the upstream repo is required. Premium tiers (CMDB, Vendor Risk, Threat Intelligence, etc.) are available at [controlweave.com](https://controlweave.com).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/badge/Release-v2.2.0-green.svg)](./RELEASE_NOTES.md)
+[![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 12+ frameworks with 500+ controls. Built to be:
 
 - **Multi-Framework**: Supports 25+ major frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support
@@ -241,8 +241,8 @@ Full RMF lifecycle management without leaving the platform:
 
 ### Comparison:
 
-| Feature | This Platform | Vanta/Drata | Hyperproof | OneTrust |
-|---------|---------------|-------------|------------|----------|
+| Feature | ControlWeave | Vanta/Drata | Hyperproof | OneTrust |
+|---------|--------------|-------------|------------|----------|
 | Cost | **Free** | $30K–200K/yr | $50K–150K/yr | $100K+/yr |
 | Open Source | ✅ | ❌ | ❌ | ❌ |
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
@@ -327,7 +327,7 @@ See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup 
 ## 🏗️ Architecture
 
 ```
-ai-grc-platform/
+controlweave/
 ├── backend/
 │   ├── src/
 │   │   ├── routes/          # REST API endpoints (auth, controls, frameworks,
@@ -443,7 +443,7 @@ ai-grc-platform/
 - [How Crosswalks Work](./docs/HOW_CROSSWALKS_WORK.md)
 - [Database Architecture](./docs/DATABASE_ARCHITECTURE.md)
 - [Framework Coverage](./docs/FRAMEWORK_COVERAGE.md)
-- [Open Source Business Model](./docs/OPEN_SOURCE_BUSINESS_MODEL.md)
+- [MCP Setup Guide](./docs/MCP_SETUP.md)
 - [GitHub Repository Guide](./docs/GITHUB_REPOSITORY_GUIDE.md)
 - [OpenAPI Specification](./docs/openapi.yaml)
 - [Quick Start Guide](./QUICKSTART.md)
@@ -540,6 +540,8 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - Integrate with their existing tools via API, MCP, or webhooks
 - Use AI to accelerate compliance work (BYOK)
 
+**From Policy to Proof** — Making compliance accessible to everyone.
+
 ## 📈 Stats
 
 - **Frameworks**: 25+ supported
@@ -552,7 +554,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Services**: 17 service modules
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Security**: 14-day trial, all 12 audit findings remediated in v2.2.0
-- **Development Status**: Beta
+- **Development Status**: Active — synced with [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) upstream
 
 ## 🔗 Links
 
@@ -566,4 +568,4 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 **Built with ❤️ by Conteh Consulting**
 
-*From Policy to Proof — Making compliance accessible to everyone*
+*ControlWeave — From Policy to Proof*

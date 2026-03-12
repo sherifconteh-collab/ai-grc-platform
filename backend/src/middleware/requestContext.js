@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const { randomUUID } = require('crypto');
 
 function attachRequestContext(req, res, next) {

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
@@ -57,11 +57,12 @@ router.post('/', requirePermission('roles.manage'), validateBody((body) => {
       const role = roleResult.rows[0];
 
       if (permissions && permissions.length > 0) {
+        const uniquePerms = [...new Set(permissions)];
         await client.query(
           `INSERT INTO role_permissions (role_id, permission_id)
-           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2)
+           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
            ON CONFLICT DO NOTHING`,
-          [role.id, permissions]
+          [role.id, uniquePerms]
         );
       }
 
@@ -106,11 +107,15 @@ router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) =>
 
       if (permissions) {
         await client.query('DELETE FROM role_permissions WHERE role_id = $1', [req.params.roleId]);
-        await client.query(
-          `INSERT INTO role_permissions (role_id, permission_id)
-           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2)`,
-          [req.params.roleId, permissions]
-        );
+        const uniquePerms = [...new Set(permissions)];
+        if (uniquePerms.length > 0) {
+          await client.query(
+            `INSERT INTO role_permissions (role_id, permission_id)
+             SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
+             ON CONFLICT DO NOTHING`,
+            [req.params.roleId, uniquePerms]
+          );
+        }
       }
 
       await client.query('COMMIT');

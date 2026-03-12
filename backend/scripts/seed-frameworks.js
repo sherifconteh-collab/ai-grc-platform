@@ -20,7 +20,7 @@ const frameworks = [
   // === FREE TIER: Core Cybersecurity ===
   {
     code: 'nist_csf_2.0', name: 'NIST Cybersecurity Framework 2.0', version: '2.0',
-    category: 'Cybersecurity', tier_required: 'free',
+    category: 'Cybersecurity', tier_required: 'community',
     description: 'Comprehensive cybersecurity risk management framework with 6 core functions aligned to system lifecycle (NIST 800-160).',
     controls: [
       // GOVERN
@@ -90,7 +90,7 @@ const frameworks = [
   },
   {
     code: 'nist_800_53', name: 'NIST SP 800-53 Rev 5', version: 'Rev 5',
-    category: 'Cybersecurity', tier_required: 'free',
+    category: 'Cybersecurity', tier_required: 'community',
     description: 'Security and privacy controls for information systems. Controls mapped to NIST 800-160 system lifecycle stages.',
     controls: [
       // Access Control
@@ -163,7 +163,7 @@ const frameworks = [
   },
   {
     code: 'iso_27001', name: 'ISO/IEC 27001:2022', version: '2022',
-    category: 'Information Security', tier_required: 'free',
+    category: 'Information Security', tier_required: 'community',
     framework_group: 'iso_27000',
     description: 'Information security management system (ISMS) standard with Annex A controls.',
     controls: [
@@ -210,7 +210,7 @@ const frameworks = [
   },
   {
     code: 'soc2', name: 'SOC 2 Type II', version: '2022',
-    category: 'Audit', tier_required: 'free',
+    category: 'Audit', tier_required: 'community',
     description: 'Trust Service Criteria for service organizations. Mapped to NIST 800-160 trustworthiness objectives.',
     controls: [
       { control_id: 'CC1.1', title: 'COSO Principle 1 - Integrity and Ethical Values', description: 'The entity demonstrates a commitment to integrity and ethical values.', priority: '1', control_type: 'organizational' },
@@ -246,7 +246,7 @@ const frameworks = [
   // === STARTER TIER ===
   {
     code: 'nist_800_171', name: 'NIST SP 800-171 Rev 3', version: 'Rev 3',
-    category: 'CUI Protection', tier_required: 'starter',
+    category: 'CUI Protection', tier_required: 'pro',
     description: 'Protecting Controlled Unclassified Information (CUI) in non-federal systems.',
     controls: [
       { control_id: '03.01.01', title: 'Account Management', description: 'Manage system accounts including defining account types, establishing conditions, and monitoring usage.', priority: '1', control_type: 'technical' },
@@ -277,7 +277,7 @@ const frameworks = [
   },
   {
     code: 'cmmc_2.0', name: 'CMMC 2.0 (Level 2)', version: '2.0',
-    category: 'CUI Protection', tier_required: 'starter',
+    category: 'CUI Protection', tier_required: 'pro',
     description: 'Cybersecurity Maturity Model Certification Level 2 — 110 practices aligned with NIST SP 800-171 for DoD contractor CUI protection.', // ip-hygiene:ignore
     controls: [
       // Domain: Access Control (AC)
@@ -348,7 +348,7 @@ const frameworks = [
   },
   {
     code: 'nist_privacy', name: 'NIST Privacy Framework', version: '1.0',
-    category: 'Privacy', tier_required: 'utilities',
+    category: 'Privacy', tier_required: 'govcloud',
     description: 'Privacy risk management framework integrated with NIST 800-160 lifecycle.',
     controls: [
       { control_id: 'ID-P.01', title: 'Inventory and Mapping - Data Processing Inventory', description: 'Develop and maintain a data processing inventory covering all personal data activities.', priority: '1', control_type: 'technical' },
@@ -366,7 +366,7 @@ const frameworks = [
   },
   {
     code: 'fiscam', name: 'FISCAM', version: '2023',
-    category: 'Financial Audit', tier_required: 'starter',
+    category: 'Financial Audit', tier_required: 'pro',
     description: 'Federal Information System Controls Audit Manual for financial statement audits.',
     controls: [
       { control_id: 'SM-1', title: 'Security Management - Program', description: 'Establish an information security program that aligns with organizational mission and objectives.', priority: '1', control_type: 'strategic' },
@@ -385,7 +385,7 @@ const frameworks = [
   },
   {
     code: 'nist_ai_rmf', name: 'NIST AI Risk Management Framework', version: '1.0',
-    category: 'AI Governance', tier_required: 'free',
+    category: 'AI Governance', tier_required: 'community',
     description: 'AI risk management aligned with NIST 800-160 trustworthiness properties.',
     controls: [
       { control_id: 'GOVERN-1', title: 'AI Risk Management Policies', description: 'Policies reflecting risk management are defined, understood, and enforced for AI systems.', priority: '1', control_type: 'policy' },
@@ -412,7 +412,7 @@ const frameworks = [
   // === PROFESSIONAL TIER ===
   {
     code: 'gdpr', name: 'GDPR', version: '2016/679',
-    category: 'Privacy', tier_required: 'utilities',
+    category: 'Privacy', tier_required: 'govcloud',
     description: 'EU General Data Protection Regulation requirements.',
     controls: [
       { control_id: 'GDPR-5', title: 'Principles of Processing', description: 'Personal data shall be processed lawfully, fairly, and transparently in relation to the data subject.', priority: '1', control_type: 'policy' },
@@ -500,7 +500,7 @@ const frameworks = [
   },
   {
     code: 'ffiec', name: 'FFIEC IT Examination Handbook', version: '2024',
-    category: 'Financial', tier_required: 'professional',
+    category: 'Financial', tier_required: 'enterprise',
     description: 'Federal Financial Institutions Examination Council IT standards.',
     controls: [
       { control_id: 'FFIEC-AUD-1', title: 'Audit Program', description: 'Establish an IT audit program that provides independent assurance of IT risk management.', priority: '1', control_type: 'organizational' },
@@ -519,7 +519,7 @@ const frameworks = [
   },
   {
     code: 'nerc_cip', name: 'NERC CIP', version: '2024',
-    category: 'Critical Infrastructure', tier_required: 'utilities',
+    category: 'Critical Infrastructure', tier_required: 'govcloud',
     description: 'North American Electric Reliability Corporation Critical Infrastructure Protection.',
     controls: [
       { control_id: 'CIP-002-6', title: 'BES Cyber System Categorization', description: 'Identify and categorize BES Cyber Systems by their impact on the reliable operation of the BES.', priority: '1', control_type: 'strategic' },
@@ -540,7 +540,7 @@ const frameworks = [
   // === UTILITIES TIER — FINANCIAL SERVICES AI GOVERNANCE PACK ===
   {
     code: 'finra_supervisory_ai', name: 'FINRA Supervisory Controls for AI (Notice 24-09)', version: '2024',
-    category: 'Financial Services AI Governance', tier_required: 'utilities',
+    category: 'Financial Services AI Governance', tier_required: 'govcloud',
     description: 'FINRA Regulatory Notice 24-09 supervisory obligations for AI-generated communications, robo-advisory outputs, and algorithmic trading surveillance.',
     controls: [
       { control_id: 'FINRA-SUP-1', title: 'AI Supervisory Framework', description: 'Establish a supervisory framework for the oversight and governance of AI-driven activities.', priority: '1', control_type: 'policy' },
@@ -557,7 +557,7 @@ const frameworks = [
   },
   {
     code: 'sec_markets_ai_risk', name: 'SEC AI Risk Management for RIAs & Broker-Dealers', version: '2024',
-    category: 'Financial Services AI Governance', tier_required: 'utilities',
+    category: 'Financial Services AI Governance', tier_required: 'govcloud',
     description: 'SEC guidance on conflicts-of-interest, fiduciary duty, and explainability requirements for AI-driven investment advice and automated compliance programmes.',
     controls: [
       { control_id: 'SEC-AI-1', title: 'Conflicts of Interest Disclosure', description: 'Identify and disclose conflicts of interest arising from the use of AI in investment advice.', priority: '1', control_type: 'organizational' },
@@ -574,7 +574,7 @@ const frameworks = [
   },
   {
     code: 'sr_11_7', name: 'SR 11-7 Model Risk Management', version: '2011-Rev2024',
-    category: 'Financial Services AI Governance', tier_required: 'utilities',
+    category: 'Financial Services AI Governance', tier_required: 'govcloud',
     description: 'Federal Reserve / OCC Supervisory Guidance SR 11-7 on Model Risk Management covering model development, validation, governance, and ongoing monitoring for AI-driven decision-making.',
     controls: [
       { control_id: 'SR117-I-1', title: 'Model Inventory', description: 'Maintain a comprehensive inventory of all models used across the organization.', priority: '1', control_type: 'organizational' },
@@ -597,7 +597,7 @@ const frameworks = [
   // === ENTERPRISE TIER ===
   {
     code: 'eu_ai_act', name: 'EU AI Act', version: '2024',
-    category: 'AI Governance', tier_required: 'utilities',
+    category: 'AI Governance', tier_required: 'govcloud',
     description: 'European Union Artificial Intelligence Act. Full lifecycle governance per NIST 800-160.',
     controls: [
       { control_id: 'AIA-Art6', title: 'Classification Rules for High-Risk AI', description: 'Classify AI systems as high-risk based on their intended purpose and potential impact.', priority: '1', control_type: 'strategic' },
@@ -765,7 +765,7 @@ const frameworks = [
   },
   {
     code: 'iso_31000', name: 'ISO 31000:2018', version: '2018',
-    category: 'Risk Management', tier_required: 'professional',
+    category: 'Risk Management', tier_required: 'enterprise',
     framework_group: 'iso_27000',
     description: 'Risk management principles and guidelines. Provides a framework for managing risk across all organizational activities.', // ip-hygiene:ignore
     controls: [
@@ -811,7 +811,7 @@ const frameworks = [
   // === UTILITIES TIER (Enterprise Add-On): State & Regional Regulatory Packs ===
   {
     code: 'ccpa_cpra', name: 'CCPA / CPRA', version: '2023',
-    category: 'Privacy', tier_required: 'utilities',
+    category: 'Privacy', tier_required: 'govcloud',
     description: 'California Consumer Privacy Act and California Privacy Rights Act. Consumer data rights, opt-out requirements, and privacy risk assessments for California operations.',
     controls: [
       { control_id: 'CCPA-1', title: 'Right to Know / Access', description: 'Consumers have the right to know what personal information is collected and how it is used.', priority: '1', control_type: 'policy' },
@@ -832,7 +832,7 @@ const frameworks = [
   },
   {
     code: 'state_ai_governance', name: 'US State AI Governance Laws', version: '2025',
-    category: 'AI Governance', tier_required: 'utilities',
+    category: 'AI Governance', tier_required: 'govcloud',
     description: 'Comprehensive coverage of enacted US state AI laws across 12+ jurisdictions: Colorado SB 205, Illinois AI Video Interview Act, NYC Local Law 144, California SB 942/AB 2013/AB 2885/AB 1008, Texas TRAIGA, Virginia HB 2048, Connecticut SB 2, Tennessee ELVIS Act, Utah SB 149, Washington SB 5838, Maryland HB 1281, and New York State AI legislation. Controls are crosswalked to NIST AI RMF so evidence collected once satisfies multiple jurisdictions.',
     controls: [
       // Colorado SB 205
@@ -899,7 +899,7 @@ const frameworks = [
   },
   {
     code: 'international_ai_governance', name: 'International AI Governance Laws', version: '2025',
-    category: 'AI Governance', tier_required: 'utilities',
+    category: 'AI Governance', tier_required: 'govcloud',
     description: 'Comprehensive coverage of enacted international AI governance laws across 10+ jurisdictions: EU AI Act (Regulation 2024/1689), UK AI Regulation Approach, Canada AIDA (Bill C-27), Brazil LGPD AI Provisions, Singapore PDPA + AI Governance Framework 2.0, Japan APPI + AI Strategy, South Korea AI Basic Act, China Generative AI Regulation + Algorithm Recommendation Regulation, Australia Privacy Act AI Ethics Framework, and India DPDP Act 2023. Controls are crosswalked to NIST AI RMF and EU AI Act so evidence satisfies multiple jurisdictions.',
     controls: [
       // European Union — AI Act (Regulation 2024/1689) enhanced
@@ -1077,14 +1077,14 @@ async function seed() {
     const orgResult = await pool.query('SELECT id, tier FROM organizations LIMIT 1');
     if (orgResult.rows.length > 0) {
       const org = orgResult.rows[0];
-      const freeFrameworks = await pool.query("SELECT id FROM frameworks WHERE tier_required = 'free'");
-      for (const fw of freeFrameworks.rows) {
+      const communityFrameworks = await pool.query("SELECT id FROM frameworks WHERE tier_required = 'community'");
+      for (const fw of communityFrameworks.rows) {
         await pool.query(
           `INSERT INTO organization_frameworks (organization_id, framework_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
           [org.id, fw.id]
         );
       }
-      console.log(`\nAuto-subscribed org (${org.tier} tier) to ${freeFrameworks.rows.length} free frameworks`);
+      console.log(`\nAuto-subscribed org (${org.tier} tier) to ${communityFrameworks.rows.length} free frameworks`);
     }
 
   } catch (err) {

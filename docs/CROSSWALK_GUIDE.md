@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AI GRC Platform includes comprehensive **cross-framework control mappings** (also called "crosswalks") that show relationships between controls across all 6 major frameworks. This is one of the platform's most powerful features.
+The ControlWeave includes comprehensive **cross-framework control mappings** (also called "crosswalks") that show relationships between controls across all 6 major frameworks. This is one of the platform's most powerful features.
 
 ## What Are Crosswalks?
 

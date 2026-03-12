@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Smart Remediation Service - Phase 6: AI-Powered Analysis
  * 
@@ -11,9 +11,14 @@
  */
 
 const pool = require('../config/database');
-// llmService is optional — AI features degrade gracefully when absent
-let llm;
-try { llm = require('./llmService'); } catch (_) { llm = null; }
+
+// Optional LLM service: AI remediation features disabled if unavailable
+let llm = null;
+try {
+  llm = require('./llmService');
+} catch (e) {
+  // LLM service not available; smart remediation features will be disabled
+}
 
 /**
  * Generate smart remediation plan for a control gap

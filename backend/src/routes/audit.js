@@ -1,19 +1,18 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
-// Optional premium service — not available in community edition
+
+// Optional Splunk service: fall back to no-op proxy if unavailable
 let splunk;
-try { splunk = require('../services/splunkService'); } catch (_) { splunk = null; }
+try {
+  splunk = require('../services/splunkService');
+} catch (err) {
+  splunk = new Proxy({}, { get() { return () => {}; } });
+}
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
-
-const auditReadLimiter = createRateLimiter({
-  label: 'audit-log-read',
-  windowMs: 60 * 1000,
-  max: 120
-});
 
 const auditWriteLimiter = createRateLimiter({
   label: 'audit-log-write',
@@ -24,7 +23,7 @@ const auditWriteLimiter = createRateLimiter({
 router.use(authenticate);
 
 // GET /audit/logs
-router.get('/logs', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
+router.get('/logs', requirePermission('audit.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const {
@@ -239,7 +238,7 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
 });
 
 // GET /audit/stats
-router.get('/stats', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
+router.get('/stats', requirePermission('audit.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { startDate, endDate } = req.query;
@@ -286,20 +285,8 @@ router.get('/stats', auditReadLimiter, requirePermission('audit.read'), async (r
 });
 
 // GET /audit/splunk/live
-router.get('/splunk/live', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
+router.get('/splunk/live', requirePermission('audit.read'), async (req, res) => {
   try {
-    if (!splunk) {
-      return res.json({
-        success: true,
-        data: {
-          configured: false,
-          message: 'Splunk integration is not available in this deployment.',
-          results: [],
-          result_count: 0
-        }
-      });
-    }
-
     const orgId = req.user.organization_id;
     const settings = await splunk.getOrgSplunkSettings(orgId);
     const configured = Boolean(settings.baseUrl && settings.apiToken);
@@ -354,7 +341,7 @@ router.get('/splunk/live', auditReadLimiter, requirePermission('audit.read'), as
 });
 
 // GET /audit/event-types
-router.get('/event-types', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
+router.get('/event-types', requirePermission('audit.read'), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT DISTINCT event_type FROM audit_logs WHERE organization_id = $1 ORDER BY event_type',
@@ -369,7 +356,7 @@ router.get('/event-types', auditReadLimiter, requirePermission('audit.read'), as
 });
 
 // GET /audit/user/:userId
-router.get('/user/:userId', auditReadLimiter, requirePermission('audit.read'), async (req, res) => {
+router.get('/user/:userId', requirePermission('audit.read'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT al.id, al.event_type, al.resource_type, al.details, al.created_at, al.success

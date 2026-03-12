@@ -1,12 +1,11 @@
-// @tier: free
-export type OrganizationTier = 'free' | 'starter' | 'professional' | 'enterprise' | 'utilities';
+// @tier: community
+export type OrganizationTier = 'community' | 'pro' | 'enterprise' | 'govcloud';
 
 export const TIER_LEVELS: Record<string, number> = {
-  free: 0,
-  starter: 1,
-  professional: 2,
-  enterprise: 3,
-  utilities: 3,
+  community: 0,
+  pro: 1,
+  enterprise: 2,
+  govcloud: 3,
 };
 
 export interface AccessUser {
@@ -36,7 +35,7 @@ export function normalizeTier(tier?: string | null): OrganizationTier {
   if (value in TIER_LEVELS) {
     return value as OrganizationTier;
   }
-  return 'free';
+  return 'community';
 }
 
 export function hasPermission(user: AccessUser | null | undefined, permission: string): boolean {
@@ -98,7 +97,11 @@ export function isPlatformAdmin(user: AccessUser | null | undefined): boolean {
   return Boolean(user?.isPlatformAdmin);
 }
 
-const DEMO_EMAIL_DOMAINS = ['free.com', 'starter.com', 'professional.com', 'enterprise.com', 'utilities.com'];
+const DEMO_EMAIL_DOMAINS = [
+  'community.com', 'pro.com', 'enterprise.com', 'govcloud.com',
+  // Backward compat: old tier domains still in some demo databases
+  'free.com', 'starter.com', 'professional.com', 'utilities.com'
+];
 
 export function isDemoEmail(email: string | null | undefined): boolean {
   if (!email) return false;

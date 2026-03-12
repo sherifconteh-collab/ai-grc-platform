@@ -64,7 +64,7 @@ git status
 
 ### Step 4: Create Initial Commit
 ```bash
-git commit -m "Initial commit: AI GRC Platform with 8 frameworks and auto-crosswalk
+git commit -m "Initial commit: ControlWeave with 8 frameworks and auto-crosswalk
 
 - 8 compliance frameworks (NIST CSF, AI RMF, 800-53, 800-171, ISO 27001, SOC 2, FISCAM, FFIEC)
 - 567 total controls with 80 cross-framework mappings
@@ -171,7 +171,7 @@ Once pushed, share on:
 - Reddit: r/cybersecurity, r/netsec, r/GRC
 - LinkedIn (tag #GRC #Compliance #Cybersecurity)
 - Twitter/X with #GRC #OpenSource
-- Hacker News (Show HN: AI GRC Platform...)
+- Hacker News (Show HN: ControlWeave...)
 
 ### Create a Demo Video
 Record a quick demo showing:

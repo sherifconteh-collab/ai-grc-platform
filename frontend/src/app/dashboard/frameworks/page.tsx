@@ -10,8 +10,8 @@ import { hasPermission, normalizeTier } from '@/lib/access';
 
 function getFrameworkLimit(tier: string): number {
   switch (tier) {
-    case 'free': return 2;
-    case 'starter': return 5;
+    case 'community': return 2;
+    case 'pro': return -1;
     default: return -1;
   }
 }

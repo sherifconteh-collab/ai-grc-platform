@@ -1,11 +1,11 @@
-// @tier: free  (TOTP/2FA is available to all subscription tiers)
+// @tier: community  (TOTP/2FA is available to all subscription tiers)
 'use strict';
 
 /**
  * TOTP Two-Factor Authentication Routes
  *
- * Available to ALL tiers (Free, Starter, Professional, Enterprise, Utilities).
- * Passkey authentication remains gated at Professional+ — TOTP fills the gap
+ * Available to ALL tiers (Community, Pro, Enterprise, Gov Cloud).
+ * Passkey authentication remains gated at Enterprise+ — TOTP fills the gap
  * for users on lower tiers who want stronger account security.
  *
  * Endpoints:

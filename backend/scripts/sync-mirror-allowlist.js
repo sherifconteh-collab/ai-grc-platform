@@ -41,7 +41,7 @@ const DRY_RUN        = process.argv.includes('--dry-run');
 // ─── Paid-tier signals ────────────────────────────────────────────────────────
 
 /** requireTier() values that signal a paid gate. */
-const PAID_TIERS = ['starter', 'professional', 'enterprise', 'utilities'];
+const PAID_TIERS = ['pro', 'enterprise', 'govcloud'];
 
 /**
  * require() calls that pull in a known paid-tier service.
@@ -76,7 +76,7 @@ const SAFE_SCRIPT_RE =
 // ─── Annotation reader (primary classification source) ────────────────────────
 
 /** Valid tier values recognised by this script. */
-const VALID_TIERS = new Set(['free', 'starter', 'professional', 'enterprise', 'utilities', 'platform', 'exclude']);
+const VALID_TIERS = new Set(['community', 'pro', 'enterprise', 'govcloud', 'platform', 'exclude']);
 
 /**
  * Read the  // @tier: <value>  annotation from the first 10 lines of a file.
@@ -102,8 +102,8 @@ function withAnnotation(heuristicFn) {
   return (name, src) => {
     const { tier, annotated } = readTierAnnotation(src);
     if (annotated) {
-      return tier === 'free'
-        ? { tier: 'free',  reason: `@tier annotation: free`,           annotated: true }
+      return tier === 'community'
+        ? { tier: 'community',  reason: `@tier annotation: community`,           annotated: true }
         : { tier: 'paid',  reason: `@tier annotation: ${tier}`,        annotated: true };
     }
     // Fallback: heuristic — and flag that the file should get an annotation
@@ -225,7 +225,7 @@ function classifyDashboardPage(dirName, src) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function free(reason) { return { tier: 'free', reason }; }
+function free(reason) { return { tier: 'community', reason }; }
 function paid(reason) { return { tier: 'paid', reason }; }
 function readSrc(p)   { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
 
@@ -452,7 +452,7 @@ function main() {
     ...scanFrontendDashboardPages(knownSets),
   ];
 
-  const freeItems       = found.filter(i => i.tier === 'free');
+  const freeItems       = found.filter(i => i.tier === 'community');
   const paidItems       = found.filter(i => i.tier === 'paid');
   const unannotated     = found.filter(i => !i.annotated);
 

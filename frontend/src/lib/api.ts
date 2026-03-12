@@ -568,6 +568,9 @@ export const evidenceAPI = {
   upload: (formData: FormData) =>
     api.post('/evidence/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: UPLOAD_TIMEOUT }),
 
+  bulkUpload: (formData: FormData) =>
+    api.post('/evidence/bulk-upload', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: UPLOAD_TIMEOUT }),
+
   getById: (id: string) => api.get(`/evidence/${id}`),
 
   download: (id: string) => api.get(`/evidence/${id}/download`, { responseType: 'blob' }),

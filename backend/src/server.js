@@ -51,7 +51,8 @@ const apiRateLimiter = createRateLimiter({
       || p.startsWith('/auth/register')
       || p.startsWith('/auth/refresh')
       || p.startsWith('/webhooks')
-      || p.startsWith('/openclaw');
+      || p.startsWith('/openclaw')
+      || p.startsWith('/external-ai');
   }
 });
 
@@ -82,15 +83,11 @@ app.use((req, res, next) => {
 });
 app.use(attachRequestContext);
 
-app.use(express.json({
-  limit: '2mb',
-  verify: (req, _res, buf) => {
-    // Capture raw body for webhook signature verification
-    if (req.url && req.url.includes('/openclaw/webhook')) {
-      req.rawBody = buf;
-    }
-  }
-}));
+// Stripe webhook needs raw body for signature verification
+// Must be registered before express.json() middleware
+app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
+
+app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(performanceTracker);
 app.use(requestLogger);
@@ -104,10 +101,10 @@ app.use('/api/v1', apiRateLimiter);
 // Validate edition at startup
 validateEdition();
 
-// Root endpoint
+// Health check
 app.get('/', (req, res) => {
   res.json({
-    name: 'AI GRC Platform (Community Edition)',
+    name: 'ControlWeave API',
     status: 'online',
     version: 'v1',
     health: '/health',
@@ -161,7 +158,8 @@ app.get('/health', async (req, res) => {
     if (redisStatus.required && redisStatus.status !== 'connected') {
       health.status = 'degraded';
     }
-
+    
+    // Add Railway environment info if available
     if (process.env.RAILWAY_ENVIRONMENT_NAME) {
       health.railway = {
         environment: process.env.RAILWAY_ENVIRONMENT_NAME,
@@ -174,6 +172,8 @@ app.get('/health', async (req, res) => {
   } catch (error) {
     const redisStatus = getRedisAdapterStatus();
 
+    // Return 200 with degraded status so Railway health check treats the
+    // container as alive even when the database is temporarily unavailable.
     res.json({
       status: 'degraded',
       timestamp: new Date().toISOString(),
@@ -198,9 +198,7 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Community-edition routes
-// ---------------------------------------------------------------------------
+// Import routes
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const frameworksRoutes = require('./routes/frameworks');
@@ -237,7 +235,7 @@ app.use('/api/v1/organizations', organizationsRoutes);
 app.use('/api/v1/controls', controlsRoutes);
 app.use('/api/v1/implementations', implementationsRoutes);
 app.use('/api/v1/audit', auditRoutes);
-app.use('/api/v1/audit', auditFieldsRoutes);
+app.use('/api/v1/audit', auditFieldsRoutes); // Dynamic fields management under same base path
 app.use('/api/v1/roles', rolesRoutes);
 app.use('/api/v1/users', usersRoutes);
 app.use('/api/v1/ai', aiRoutes);
@@ -254,7 +252,7 @@ app.use('/api/v1/ops', opsRoutes);
 app.use('/api/v1/performance', performanceRoutes);
 app.use('/api/v1/policies', policiesRoutes);
 app.use('/api/v1/help', helpRoutes);
-app.use('/api/v1/issue-report', issueReportRoutes);
+app.use('/api/v1/issues', issueReportRoutes);
 app.use('/api/v1/auth/totp', totpRoutes);
 app.use('/api/v1/openclaw/webhook', openclawWebhookRoutes);
 
@@ -283,37 +281,100 @@ app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Route not found', correlationId: req.requestId });
 });
 
-// ensurePlatformAdmin – premium feature, no-op in community edition
-// async function ensurePlatformAdmin() { /* premium feature */ }
+// Auto-provision platform admin on startup if env vars are set
+// Set PLATFORM_ADMIN_EMAIL (+ optionally PLATFORM_ADMIN_PASSWORD,
+// PLATFORM_ADMIN_FIRST_NAME, PLATFORM_ADMIN_LAST_NAME, PLATFORM_ADMIN_ORG)
+// in Railway Variables and the account is created/updated on every deploy.
+async function ensurePlatformAdmin() {
+  const email = String(process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
+  if (!email) return; // env var not set — skip silently
 
-// Auto-seed assessment procedures if the table is empty
-async function ensureAssessmentProcedures() {
-  let count;
+  const { randomBytes } = require('crypto');
+  const bcrypt = require('bcryptjs');
+  const firstName = String(process.env.PLATFORM_ADMIN_FIRST_NAME || 'Platform').trim();
+  const lastName  = String(process.env.PLATFORM_ADMIN_LAST_NAME  || 'Admin').trim();
+  const orgName   = String(process.env.PLATFORM_ADMIN_ORG        || 'ControlWeave Platform').trim();
+  let   password  = String(process.env.PLATFORM_ADMIN_PASSWORD   || '').trim();
+  const generated = !password;
+  if (generated) password = `CW-${randomBytes(9).toString('base64url')}!1`;
+
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
-    try {
-      const { rows } = await client.query('SELECT COUNT(*) AS count FROM assessment_procedures');
-      count = parseInt(rows[0].count, 10);
-    } finally {
-      client.release();
+    await client.query('BEGIN');
+
+    let orgId;
+    const existingOrg = await client.query(
+      'SELECT id FROM organizations WHERE name = $1 LIMIT 1', [orgName]
+    );
+    if (existingOrg.rows.length > 0) {
+      orgId = existingOrg.rows[0].id;
+    } else {
+      const orgRes = await client.query(
+        `INSERT INTO organizations (name, tier, billing_status)
+         VALUES ($1, 'enterprise', 'active_paid') RETURNING id`,
+        [orgName]
+      );
+      orgId = orgRes.rows[0].id;
+    }
+
+    const hash = await bcrypt.hash(password, 12);
+    const result = await client.query(
+      `INSERT INTO users
+         (organization_id, email, password_hash, first_name, last_name, role, is_active, is_platform_admin)
+       VALUES ($1,$2,$3,$4,$5,'admin',true,true)
+       ON CONFLICT (email) DO UPDATE SET
+         organization_id=EXCLUDED.organization_id, password_hash=EXCLUDED.password_hash,
+         first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name,
+         role='admin', is_active=true, is_platform_admin=true
+       RETURNING id, email, (xmax=0) AS inserted`,
+      [orgId, email, hash, firstName, lastName]
+    );
+    const userId = result.rows[0].id;
+
+    // Mark onboarding complete so platform admin goes straight to dashboard
+    await client.query(
+      `INSERT INTO organization_profiles
+         (organization_id, onboarding_completed, onboarding_completed_at, created_by, updated_by)
+       VALUES ($1, true, NOW(), $2, $2)
+       ON CONFLICT (organization_id) DO UPDATE SET
+         onboarding_completed     = true,
+         onboarding_completed_at  = COALESCE(organization_profiles.onboarding_completed_at, NOW()),
+         updated_by               = EXCLUDED.updated_by`,
+      [orgId, userId]
+    );
+
+    await client.query('COMMIT');
+
+    const mode = result.rows[0].inserted ? 'created' : 'updated';
+    log('info', 'platform.admin.provisioned', { email, status: mode, org: orgName });
+    if (generated) {
+      log('info', 'platform.admin.credentials_generated', { email, note: 'Password was auto-generated. Retrieve via secure channel.' });
     }
   } catch (err) {
-    log('info', 'assessment.procedures.check', { status: 'table_missing', error: err.message });
-    return;
+    await client.query('ROLLBACK');
+    log('error', 'platform.admin.provision_failed', { email, error: err.message });
+  } finally {
+    client.release();
+  }
+}
+
+// Auto-seed assessment procedures if the table is empty (global/framework-level data, not per-org)
+async function ensureAssessmentProcedures() {
+  const client = await pool.connect();
+  let count;
+  try {
+    const { rows } = await client.query('SELECT COUNT(*) AS count FROM assessment_procedures');
+    count = parseInt(rows[0].count, 10);
+  } finally {
+    client.release();
   }
   if (count > 0) {
     log('info', 'assessment.procedures.check', { status: 'exists', count });
     return;
   }
   log('info', 'assessment.procedures.seeding', { status: 'starting' });
-  const scriptPath = path.join(__dirname, '../scripts/seed-assessment-procedures-rich-all.js');
-  try {
-    require('fs').accessSync(scriptPath);
-  } catch {
-    log('info', 'assessment.procedures.seeding', { status: 'skipped', reason: 'seed script not found' });
-    return;
-  }
   const { spawn } = require('child_process');
+  const scriptPath = path.join(__dirname, '../scripts/seed-assessment-procedures-rich-all.js');
   const child = spawn(process.execPath, [scriptPath], { env: process.env, stdio: 'inherit' });
   await new Promise((resolve, reject) => {
     child.on('close', (code) => code === 0 ? resolve() : reject(new Error(`Seed exited with code ${code}`)));
@@ -329,13 +390,17 @@ const server = app.listen(PORT, HOST, () => {
     host: HOST,
     port: Number(PORT),
     health: `http://localhost:${PORT}/health`,
-    environment: process.env.NODE_ENV || 'development',
-    edition: 'community'
+    environment: process.env.NODE_ENV || 'development'
   });
 
   // Initialize WebSocket server after HTTP server is ready
   const { initializeWebSocket } = require('./services/websocketService');
   initializeWebSocket(server);
+
+  // Auto-provision platform admin if env vars are present
+  ensurePlatformAdmin().catch((err) =>
+    log('error', 'platform.admin.startup_error', { error: err.message })
+  );
 
   // Auto-seed assessment procedures if table is empty
   ensureAssessmentProcedures().catch((err) =>

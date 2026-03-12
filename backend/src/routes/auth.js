@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -9,21 +9,30 @@ const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-// Optional premium service — not available in community edition
-let subscriptionServiceModule;
-try { subscriptionServiceModule = require('../services/subscriptionService'); } catch (_) { subscriptionServiceModule = {}; }
-const {
-  getTrialSeedData = () => ({ tier: 'free', billingStatus: 'active', trialSourceTier: 'free', trialDays: 14, trialStatus: 'active' }),
-  expireOrganizationTrialIfNeeded = async () => false
-} = subscriptionServiceModule;
+
+// Optional services: fall back to safe no-ops if modules are unavailable
+let getTrialSeedData, expireOrganizationTrialIfNeeded, ensureOrgFrameworks;
+try {
+  ({ getTrialSeedData, expireOrganizationTrialIfNeeded, ensureOrgFrameworks } = require('../services/subscriptionService'));
+} catch (e) {
+  getTrialSeedData = () => ({});
+  expireOrganizationTrialIfNeeded = async () => ({});
+  ensureOrgFrameworks = async () => {};
+}
 const { sendPasswordResetEmail } = require('../services/emailService');
-// Optional premium service — not available in community edition
-let geolocationServiceModule;
-try { geolocationServiceModule = require('../services/geolocationService'); } catch (_) { geolocationServiceModule = {}; }
-const {
-  getGeolocationFromRequest = () => null,
-  extractIpFromRequest = (req) => req?.ip || null
-} = geolocationServiceModule;
+
+let getGeolocationFromRequest, extractIpFromRequest;
+try {
+  ({ getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService'));
+} catch (e) {
+  getGeolocationFromRequest = () => ({});
+  extractIpFromRequest = function (req) {
+    if (!req) return null;
+    const xff = req.headers && req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.length > 0) return xff.split(',')[0].trim();
+    return req.ip || (req.socket && req.socket.remoteAddress) || null;
+  };
+}
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
@@ -555,6 +564,12 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
         authenticationMethod: 'password'
       }).catch(err => console.error('Audit log error:', err));
 
+      // Ensure all seeded frameworks the org is entitled to are adopted.
+      // Fire-and-forget — does not block the registration response.
+      ensureOrgFrameworks(org.id, org.tier).catch(err => {
+        console.error('ensureOrgFrameworks error for org', org.id, err);
+      });
+
       res.status(201).json({
         success: true,
         data: {
@@ -750,6 +765,14 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
       success: true,
       authenticationMethod: 'password'
     }).catch(err => console.error('Audit log error:', err));
+
+    // Ensure all seeded frameworks the org is entitled to are adopted.
+    // Fire-and-forget — does not block the login response.
+    if (user.organization_id && user.organization_tier) {
+      ensureOrgFrameworks(user.organization_id, user.organization_tier).catch(err => {
+        console.error('ensureOrgFrameworks error for org', user.organization_id, err);
+      });
+    }
 
     res.json({
       success: true,

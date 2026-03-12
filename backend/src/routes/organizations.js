@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
@@ -6,9 +6,14 @@ const ExcelJS = require('exceljs');
 const multer = require('multer');
 const path = require('path');
 const { Readable } = require('stream');
-// Optional premium service — not available in community edition
-let llm;
-try { llm = require('../services/llmService'); } catch (_) { llm = null; }
+
+// Optional LLM service: AI features degrade gracefully if unavailable
+let llm = null;
+try {
+  llm = require('../services/llmService');
+} catch (e) {
+  // LLM service not available; AI-powered features will be disabled
+}
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, isUuid } = require('../middleware/validate');
 const { getFrameworkLimit, normalizeTier, shouldEnforceAiLimitForByok } = require('../config/tierPolicy');

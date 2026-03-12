@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const fs = require('fs');
 const path = require('path');
 const { createHash } = require('crypto');
@@ -112,9 +112,12 @@ async function runJob(jobRow) {
 }
 
 async function runScheduledEvidenceCollection({ organizationId }) {
-  // splunkService is optional — premium integration
   let splunkService;
-  try { splunkService = require('./splunkService'); } catch (_) { splunkService = null; }
+  try {
+    splunkService = require('./splunkService');
+  } catch (e) {
+    return { triggered: 0, failed: 0, error: 'Splunk integration service unavailable' };
+  }
 
   const uploadsDir = path.join(__dirname, '../../uploads');
   if (!fs.existsSync(uploadsDir)) {

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use strict';
 
 /**
@@ -12,12 +12,12 @@
 
 const pool = require('../config/database');
 
-// llmService is optional — premium AI features degrade gracefully when absent
-let llm;
+// Optional LLM service: AI field suggestions disabled if unavailable
+let llm = null;
 try {
   llm = require('./llmService');
-} catch (_) {
-  llm = null;
+} catch (e) {
+  // LLM service not available; AI-suggested fields will be disabled
 }
 
 // Configuration

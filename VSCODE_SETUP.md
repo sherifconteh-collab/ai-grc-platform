@@ -127,7 +127,7 @@ npm run dev
 
 **You should see:**
 ```
-🚀 AI GRC Platform API running on http://localhost:3001
+🚀 ControlWeave API running on http://localhost:3001
 ✅ Database connected successfully
 ```
 
@@ -353,7 +353,7 @@ npm run build                            # Build for production
 
 ## You're Running! 🚀
 
-Your AI GRC Platform is now:
+Your ControlWeave is now:
 ✅ Database loaded with 528 controls
 ✅ API server running
 ✅ Accessible in browser

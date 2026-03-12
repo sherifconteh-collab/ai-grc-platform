@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Edition Enforcement Middleware
  * 
@@ -25,33 +25,34 @@ let IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
  * These features are NOT available in community edition
  */
 const PRO_FEATURES = Object.freeze({
-  // Starter tier features
-  'cmdb': 'starter',
-  'assets': 'starter',
-  'vulnerabilities': 'starter',
-  'environments': 'starter',
-  'evidence': 'starter',
-  'reports': 'starter',
-  'regulatoryNews': 'starter',
-  'splunk': 'starter',
+  // Pro tier features ($499/mo)
+  'cmdb': 'pro',
+  'assets': 'pro',
+  'vulnerabilities': 'pro',
+  'environments': 'pro',
+  'evidence': 'pro',
+  'reports': 'pro',
+  'regulatoryNews': 'pro',
+  'splunk': 'pro',
+  'sso': 'pro',          // SSO is included in Pro per updated tier structure
   
-  // Professional tier features
-  'sbom': 'professional',
-  'aibom': 'professional',
-  'serviceAccounts': 'professional',
-  'threatIntel': 'professional',
-  'dataSovereignty': 'professional',
-  'siem': 'professional',
-  'sso': 'professional',
-  'realtime': 'professional',
-  'tprm': 'professional',
-  
-  // Enterprise tier features
+  // Enterprise tier features ($3,500–$12,000/mo)
+  'sbom': 'enterprise',
+  'aibom': 'enterprise',
+  'serviceAccounts': 'enterprise',
+  'threatIntel': 'enterprise',
+  'dataSovereignty': 'enterprise',
+  'siem': 'enterprise',
+  'realtime': 'enterprise',
+  'tprm': 'enterprise',
   'vendorSecurity': 'enterprise',
   'externalAi': 'enterprise',
+  'cemcp': 'enterprise', // Code Execution MCP security
   
-  // Advanced features
-  'cemcp': 'professional', // Code Execution MCP security
+  // Gov Cloud features (custom contract)
+  'stateAiLaws': 'govcloud',
+  'internationalAiLaws': 'govcloud',
+
   'billing': 'pro' // Stripe billing
 });
 
@@ -148,20 +149,86 @@ function blockProFeaturesInCommunity(req, res, next) {
 }
 
 /**
+ * Maps license tiers to server editions.
+ * Gov Cloud licenses grant Enterprise edition access.
+ */
+const LICENSE_TIER_TO_EDITION = Object.freeze({
+  pro: 'pro',
+  enterprise: 'enterprise',
+  govcloud: 'enterprise'
+});
+
+/**
+ * Upgrade the in-process edition at runtime.
+ *
+ * Called at startup when a perpetual license is found in env, and also
+ * at runtime when a license key is activated via POST /billing/activate-license.
+ * Updates the module-level variables AND process.env so that all middleware
+ * and feature checks immediately reflect the new edition.
+ *
+ * @param {string} newEdition - 'community' | 'pro' | 'enterprise'
+ * @returns {boolean} true if the edition actually changed
+ */
+function upgradeEdition(newEdition) {
+  const valid = ['community', 'pro', 'enterprise'];
+  if (!newEdition || typeof newEdition !== 'string') return false;
+  const normalized = newEdition.trim().toLowerCase();
+  if (!valid.includes(normalized)) return false;
+
+  const oldEdition = EDITION;
+  EDITION = normalized;
+  IS_COMMUNITY = EDITION === 'community';
+  IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
+  process.env.EDITION = EDITION;
+
+  // Update module.exports so future require() calls see current values.
+  // Note: callers that already destructured (const { IS_COMMUNITY } = require(...))
+  // will still hold stale references — middleware functions use the module-level
+  // let variables directly, which is the intended runtime path.
+  module.exports.EDITION = EDITION;
+  module.exports.IS_COMMUNITY = IS_COMMUNITY;
+  module.exports.IS_PRO = IS_PRO;
+
+  if (oldEdition !== EDITION) {
+    console.log(`[Edition] Upgraded from ${oldEdition.toUpperCase()} to ${EDITION.toUpperCase()}`);
+    return true;
+  }
+  return false;
+}
+
+/**
  * Validation: Ensure EDITION env var is set correctly
- * Call this at server startup
+ * Call this at server startup.
+ *
+ * Also checks for a perpetual LICENSE_KEY — if present and valid,
+ * the license tier overrides the EDITION env var so perpetual
+ * customers get full access without a subscription.
  */
 function validateEdition() {
   const valid = ['community', 'pro', 'enterprise'];
   if (!valid.includes(EDITION)) {
     console.warn(`[SECURITY WARNING] Invalid EDITION value: "${EDITION}". Must be one of: ${valid.join(', ')}. Defaulting to 'community' for security.`);
-    // Force to community as fail-safe and update module-level vars
-    process.env.EDITION = 'community';
-    EDITION = 'community';
-    IS_COMMUNITY = true;
-    IS_PRO = false;
+    upgradeEdition('community');
     return false;
   }
+
+  // Check for perpetual license key
+  try {
+    const { loadLicenseFromEnv } = require('../services/licenseService');
+    const license = loadLicenseFromEnv();
+    if (license && license.valid) {
+      console.log(`[Edition] Perpetual license detected — licensee: ${license.licensee}, tier: ${license.tier}, seats: ${license.seats === -1 ? 'unlimited' : license.seats}`);
+      // Upgrade edition to match license tier
+      const effectiveEdition = LICENSE_TIER_TO_EDITION[license.tier] || 'pro';
+      if (valid.indexOf(effectiveEdition) > valid.indexOf(EDITION)) {
+        upgradeEdition(effectiveEdition);
+      }
+    }
+  } catch (err) {
+    // licenseService not critical — log and continue
+    console.warn(`[Edition] License check skipped: ${err.message}`);
+  }
+
   console.log(`[Edition] Running in ${EDITION.toUpperCase()} edition`);
   return true;
 }
@@ -173,6 +240,8 @@ module.exports = {
   attachEditionInfo,
   blockProFeaturesInCommunity,
   validateEdition,
+  upgradeEdition,
+  LICENSE_TIER_TO_EDITION,
   EDITION,
   IS_COMMUNITY,
   IS_PRO,

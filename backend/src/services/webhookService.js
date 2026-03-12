@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const crypto = require('crypto');
 const net = require('net');
 const pool = require('../config/database');

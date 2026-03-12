@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use strict';
 
 /**
@@ -9,10 +9,19 @@
  */
 
 const { createAuditLog } = require('../services/auditService');
-// Optional premium service — not available in community edition
-let geolocationServiceModule;
-try { geolocationServiceModule = require('../services/geolocationService'); } catch (_) { geolocationServiceModule = {}; }
-const { extractIpFromRequest = (req) => req?.ip || null } = geolocationServiceModule;
+
+// Optional geolocation service: fall back to basic IP extraction if unavailable
+let extractIpFromRequest;
+try {
+  ({ extractIpFromRequest } = require('../services/geolocationService'));
+} catch (e) {
+  extractIpFromRequest = function (req) {
+    if (!req) return null;
+    const xff = req.headers && req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.length > 0) return xff.split(',')[0].trim();
+    return req.ip || (req.socket && req.socket.remoteAddress) || null;
+  };
+}
 
 /**
  * Create an audit log middleware for a specific event type

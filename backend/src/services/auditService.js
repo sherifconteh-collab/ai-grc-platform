@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use strict';
 
 /**
@@ -13,9 +13,14 @@
  */
 
 const pool = require('../config/database');
-// siemService is optional — premium SIEM integration
+
+// Optional SIEM service: fall back to no-op if unavailable
 let siemService;
-try { siemService = require('./siemService'); } catch (_) { siemService = null; }
+try {
+  siemService = require('./siemService');
+} catch (e) {
+  siemService = { forwardEvent: async () => ({}) };
+}
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
 
 /**

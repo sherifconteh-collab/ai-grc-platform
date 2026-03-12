@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
 import BrandLogo from '@/components/BrandLogo';
 
-type TierKey = 'free' | 'starter' | 'professional' | 'enterprise' | 'utilities';
+type TierKey = 'community' | 'pro' | 'enterprise' | 'govcloud';
 type BillingCadence = 'monthly' | 'annual';
 
 const TIER_OPTIONS: Array<{
@@ -16,14 +16,13 @@ const TIER_OPTIONS: Array<{
   description: string;
   frameworkLimit: number;
 }> = [
-  { key: 'free', label: 'Free', description: 'Up to 2 frameworks. Great for evaluation.', frameworkLimit: 2 },
-  { key: 'starter', label: 'Starter', description: 'Up to 5 frameworks. Ideal for small teams.', frameworkLimit: 5 },
-  { key: 'professional', label: 'Professional', description: 'Unlimited frameworks. Full AI and CMDB access.', frameworkLimit: -1 },
+  { key: 'community', label: 'Community (Free)', description: 'Self-hosted, up to 2 frameworks. AGPL v3.', frameworkLimit: 2 },
+  { key: 'pro', label: 'Pro ($499/mo)', description: 'Hosted SaaS. Unlimited frameworks, SSO, 48h SLA.', frameworkLimit: -1 },
   { key: 'enterprise', label: 'Enterprise', description: 'Unlimited frameworks. Advanced AI governance and impact assessment.', frameworkLimit: -1 },
-  { key: 'utilities', label: 'Utilities', description: 'All privacy, regional, and state-level regulatory frameworks with AI-powered regulatory monitoring.', frameworkLimit: -1 },
+  { key: 'govcloud', label: 'Gov Cloud (Custom)', description: 'FedRAMP-ready, IL4/IL5, ITAR-compliant. Custom contract.', frameworkLimit: -1 },
 ];
 
-const TIER_ORDER: Record<TierKey, number> = { free: 0, starter: 1, professional: 2, enterprise: 3, utilities: 4 };
+const TIER_ORDER: Record<TierKey, number> = { community: 0, pro: 1, enterprise: 2, govcloud: 3 };
 
 interface FrameworkOption {
   code: string;
@@ -43,46 +42,46 @@ const FRAMEWORK_GROUP_METADATA: Record<string, { label: string; description: str
 };
 
 const FRAMEWORK_OPTIONS: FrameworkOption[] = [
-  { code: 'nist_csf_2.0', label: 'NIST Cybersecurity Framework 2.0', description: 'Comprehensive cybersecurity risk management framework with 6 core functions aligned to the system lifecycle.', controlCount: 43, tierRequired: 'free' },
-  { code: 'nist_800_53', label: 'NIST SP 800-53 Rev 5', description: 'Federal-grade security and privacy control catalog. Requires RMF workflow and information type selection.', controlCount: 47, tierRequired: 'free' },
-  { code: 'iso_27001', label: 'ISO/IEC 27001:2022', description: 'Information security management system (ISMS) standard with Annex A controls.', controlCount: 39, tierRequired: 'free', group: 'iso_27000' }, // ip-hygiene:ignore
-  { code: 'soc2', label: 'SOC 2 Type II', description: 'Trust Service Criteria for service organizations. Mapped to trustworthiness objectives.', controlCount: 26, tierRequired: 'free' }, // ip-hygiene:ignore
-  { code: 'nist_ai_rmf', label: 'NIST AI Risk Management Framework', description: 'AI risk management aligned with trustworthiness properties for responsible AI deployment.', controlCount: 18, tierRequired: 'free' },
-  { code: 'nist_800_171', label: 'NIST SP 800-171 Rev 3', description: 'Protecting Controlled Unclassified Information (CUI) in non-federal systems. Required for DoD supply-chain programs.', controlCount: 23, tierRequired: 'starter' },
-  { code: 'cmmc_2.0', label: 'CMMC 2.0 (Level 2)', description: 'Cybersecurity Maturity Model Certification — 110 practices for DoD contractor CUI protection.', controlCount: 50, tierRequired: 'starter' }, // ip-hygiene:ignore
-  { code: 'nist_privacy', label: 'NIST Privacy Framework', description: 'Privacy risk management framework integrated with system lifecycle stages.', controlCount: 11, tierRequired: 'utilities' },
-  { code: 'fiscam', label: 'FISCAM', description: 'Federal Information System Controls Audit Manual for financial statement audits.', controlCount: 12, tierRequired: 'starter' },
-  { code: 'gdpr', label: 'GDPR', description: 'EU General Data Protection Regulation requirements for data privacy and protection.', controlCount: 16, tierRequired: 'utilities' },
+  { code: 'nist_csf_2.0', label: 'NIST Cybersecurity Framework 2.0', description: 'Comprehensive cybersecurity risk management framework with 6 core functions aligned to the system lifecycle.', controlCount: 43, tierRequired: 'community' },
+  { code: 'nist_800_53', label: 'NIST SP 800-53 Rev 5', description: 'Federal-grade security and privacy control catalog. Requires RMF workflow and information type selection.', controlCount: 47, tierRequired: 'community' },
+  { code: 'iso_27001', label: 'ISO/IEC 27001:2022', description: 'Information security management system (ISMS) standard with Annex A controls.', controlCount: 39, tierRequired: 'community', group: 'iso_27000' }, // ip-hygiene:ignore
+  { code: 'soc2', label: 'SOC 2 Type II', description: 'Trust Service Criteria for service organizations. Mapped to trustworthiness objectives.', controlCount: 26, tierRequired: 'community' }, // ip-hygiene:ignore
+  { code: 'nist_ai_rmf', label: 'NIST AI Risk Management Framework', description: 'AI risk management aligned with trustworthiness properties for responsible AI deployment.', controlCount: 18, tierRequired: 'community' },
+  { code: 'nist_800_171', label: 'NIST SP 800-171 Rev 3', description: 'Protecting Controlled Unclassified Information (CUI) in non-federal systems. Required for DoD supply-chain programs.', controlCount: 23, tierRequired: 'pro' },
+  { code: 'cmmc_2.0', label: 'CMMC 2.0 (Level 2)', description: 'Cybersecurity Maturity Model Certification — 110 practices for DoD contractor CUI protection.', controlCount: 50, tierRequired: 'pro' }, // ip-hygiene:ignore
+  { code: 'nist_privacy', label: 'NIST Privacy Framework', description: 'Privacy risk management framework integrated with system lifecycle stages.', controlCount: 11, tierRequired: 'govcloud' },
+  { code: 'fiscam', label: 'FISCAM', description: 'Federal Information System Controls Audit Manual for financial statement audits.', controlCount: 12, tierRequired: 'pro' },
+  { code: 'gdpr', label: 'GDPR', description: 'EU General Data Protection Regulation requirements for data privacy and protection.', controlCount: 16, tierRequired: 'govcloud' },
   { code: 'hipaa', label: 'HIPAA Security Rule', description: 'Health Insurance Portability and Accountability Act security requirements for protected health information.', controlCount: 17, tierRequired: 'enterprise' }, // ip-hygiene:ignore
   { code: 'hitech', label: 'HITECH Act', description: 'Health Information Technology for Economic and Clinical Health Act — breach notification, enforcement, business associate requirements, and EHR security extending HIPAA.', controlCount: 28, tierRequired: 'enterprise' }, // ip-hygiene:ignore
-  { code: 'ffiec', label: 'FFIEC IT Examination Handbook', description: 'Federal Financial Institutions Examination Council IT standards for banking and finance.', controlCount: 12, tierRequired: 'professional' },
-  { code: 'nerc_cip', label: 'NERC CIP', description: 'North American Electric Reliability Corporation Critical Infrastructure Protection standards.', controlCount: 12, tierRequired: 'utilities' },
-  { code: 'owasp_llm_top10', label: 'OWASP LLM Top 10 (2025)', description: 'Critical security risks for Large Language Model deployments including prompt injection and data poisoning.', controlCount: 10, tierRequired: 'professional', group: 'owasp_ai' },
-  { code: 'owasp_agentic_top10', label: 'OWASP Agentic AI Top 10 (2026)', description: 'Security risks for agentic and autonomous AI applications that act independently and chain actions.', controlCount: 10, tierRequired: 'professional', group: 'owasp_ai' },
-  { code: 'eu_ai_act', label: 'EU AI Act', description: 'European Union Artificial Intelligence Act. Full lifecycle governance for AI systems.', controlCount: 15, tierRequired: 'utilities' },
+  { code: 'ffiec', label: 'FFIEC IT Examination Handbook', description: 'Federal Financial Institutions Examination Council IT standards for banking and finance.', controlCount: 12, tierRequired: 'enterprise' },
+  { code: 'nerc_cip', label: 'NERC CIP', description: 'North American Electric Reliability Corporation Critical Infrastructure Protection standards.', controlCount: 12, tierRequired: 'govcloud' },
+  { code: 'owasp_llm_top10', label: 'OWASP LLM Top 10 (2025)', description: 'Critical security risks for Large Language Model deployments including prompt injection and data poisoning.', controlCount: 10, tierRequired: 'enterprise', group: 'owasp_ai' },
+  { code: 'owasp_agentic_top10', label: 'OWASP Agentic AI Top 10 (2026)', description: 'Security risks for agentic and autonomous AI applications that act independently and chain actions.', controlCount: 10, tierRequired: 'enterprise', group: 'owasp_ai' },
+  { code: 'eu_ai_act', label: 'EU AI Act', description: 'European Union Artificial Intelligence Act. Full lifecycle governance for AI systems.', controlCount: 15, tierRequired: 'govcloud' },
   { code: 'iso_42001', label: 'ISO/IEC 42001:2023', description: 'AI Management System standard. Lifecycle-aligned governance for AI organizations.', controlCount: 16, tierRequired: 'enterprise', group: 'iso_ai' }, // ip-hygiene:ignore
   { code: 'iso_42005', label: 'ISO/IEC 42005:2025', description: 'AI system impact assessment guidance. Plan, document, and monitor AI impact assessments.', controlCount: 10, tierRequired: 'enterprise', group: 'iso_ai' }, // ip-hygiene:ignore
   { code: 'iso_23894', label: 'ISO/IEC 23894:2023', description: 'AI risk management guidance aligned with ISO 31000.', controlCount: 13, tierRequired: 'enterprise', group: 'iso_ai' }, // ip-hygiene:ignore
   { code: 'iso_38507', label: 'ISO/IEC 38507:2022', description: 'Corporate governance of AI systems.', controlCount: 10, tierRequired: 'enterprise', group: 'iso_ai' }, // ip-hygiene:ignore
-  { code: 'iso_22989', label: 'ISO/IEC 22989:2022', description: 'AI concepts, terminology, and reference architecture.', controlCount: 10, tierRequired: 'professional', group: 'iso_ai' }, // ip-hygiene:ignore
-  { code: 'iso_23053', label: 'ISO/IEC 23053:2022', description: 'Framework for AI systems using machine learning.', controlCount: 12, tierRequired: 'professional', group: 'iso_ai' }, // ip-hygiene:ignore
-  { code: 'iso_5259', label: 'ISO/IEC 5259 Series', description: 'Data quality for analytics and machine learning.', controlCount: 12, tierRequired: 'professional', group: 'iso_ai' }, // ip-hygiene:ignore
-  { code: 'iso_tr_24027', label: 'ISO/IEC TR 24027:2021', description: 'Bias in AI and AI-assisted decision making.', controlCount: 12, tierRequired: 'professional', group: 'iso_ai' },
-  { code: 'iso_tr_24028', label: 'ISO/IEC TR 24028:2020', description: 'Trustworthiness in AI systems.', controlCount: 13, tierRequired: 'professional', group: 'iso_ai' },
-  { code: 'iso_tr_24368', label: 'ISO/IEC TR 24368:2022', description: 'Ethical and societal concerns in AI.', controlCount: 13, tierRequired: 'professional', group: 'iso_ai' },
+  { code: 'iso_22989', label: 'ISO/IEC 22989:2022', description: 'AI concepts, terminology, and reference architecture.', controlCount: 10, tierRequired: 'enterprise', group: 'iso_ai' }, // ip-hygiene:ignore
+  { code: 'iso_23053', label: 'ISO/IEC 23053:2022', description: 'Framework for AI systems using machine learning.', controlCount: 12, tierRequired: 'enterprise', group: 'iso_ai' }, // ip-hygiene:ignore
+  { code: 'iso_5259', label: 'ISO/IEC 5259 Series', description: 'Data quality for analytics and machine learning.', controlCount: 12, tierRequired: 'enterprise', group: 'iso_ai' }, // ip-hygiene:ignore
+  { code: 'iso_tr_24027', label: 'ISO/IEC TR 24027:2021', description: 'Bias in AI and AI-assisted decision making.', controlCount: 12, tierRequired: 'enterprise', group: 'iso_ai' },
+  { code: 'iso_tr_24028', label: 'ISO/IEC TR 24028:2020', description: 'Trustworthiness in AI systems.', controlCount: 13, tierRequired: 'enterprise', group: 'iso_ai' },
+  { code: 'iso_tr_24368', label: 'ISO/IEC TR 24368:2022', description: 'Ethical and societal concerns in AI.', controlCount: 13, tierRequired: 'enterprise', group: 'iso_ai' },
   { code: 'iso_27002', label: 'ISO/IEC 27002:2022', description: 'Security controls guidance — companion to ISO 27001.', controlCount: 15, tierRequired: 'enterprise', group: 'iso_27000' }, // ip-hygiene:ignore
   { code: 'iso_27005', label: 'ISO/IEC 27005:2022', description: 'Information security risk management methodology.', controlCount: 12, tierRequired: 'enterprise', group: 'iso_27000' }, // ip-hygiene:ignore
   { code: 'iso_27017', label: 'ISO/IEC 27017:2015', description: 'Cloud security controls based on ISO 27002.', controlCount: 12, tierRequired: 'enterprise', group: 'iso_27000' }, // ip-hygiene:ignore
   { code: 'iso_27018', label: 'ISO/IEC 27018:2019', description: 'PII protection in public cloud environments.', controlCount: 11, tierRequired: 'enterprise', group: 'iso_27000' }, // ip-hygiene:ignore
   { code: 'iso_27701', label: 'ISO/IEC 27701:2019', description: 'Privacy information management system extending ISO 27001.', controlCount: 14, tierRequired: 'enterprise', group: 'iso_27000' }, // ip-hygiene:ignore
-  { code: 'iso_31000', label: 'ISO 31000:2018', description: 'Risk management principles and guidelines.', controlCount: 11, tierRequired: 'professional', group: 'iso_27000' },
+  { code: 'iso_31000', label: 'ISO 31000:2018', description: 'Risk management principles and guidelines.', controlCount: 11, tierRequired: 'enterprise', group: 'iso_27000' },
   { code: 'nist_800_207', label: 'NIST SP 800-207 Zero Trust Architecture', description: 'Zero Trust Architecture reference model and design principles for modern network security.', controlCount: 18, tierRequired: 'enterprise' },
-  { code: 'ccpa_cpra', label: 'CCPA / CPRA', description: 'California Consumer Privacy Act and California Privacy Rights Act. Consumer data rights, opt-out requirements, and privacy risk assessments for California operations.', controlCount: 14, tierRequired: 'utilities' },
-  { code: 'state_ai_governance', label: 'State AI Governance Laws', description: 'Consolidated state-level AI regulations including Colorado AI Act, Illinois AI Video Interview Act, and emerging state AI transparency and impact assessment laws.', controlCount: 12, tierRequired: 'utilities' },
+  { code: 'ccpa_cpra', label: 'CCPA / CPRA', description: 'California Consumer Privacy Act and California Privacy Rights Act. Consumer data rights, opt-out requirements, and privacy risk assessments for California operations.', controlCount: 14, tierRequired: 'govcloud' },
+  { code: 'state_ai_governance', label: 'State AI Governance Laws', description: 'Consolidated state-level AI regulations including Colorado AI Act, Illinois AI Video Interview Act, and emerging state AI transparency and impact assessment laws.', controlCount: 12, tierRequired: 'govcloud' },
   // Backend: scripts/seed-cyber-ai-profile.js
-  { code: 'nist_ir_8596_sec', label: 'NIST IR 8596 — Secure (SEC)', description: 'CSF 2.0 Cyber AI Profile: Secure AI System Components. Covers GV/ID/PR/DE/RS/RC for AI asset protection.', controlCount: 25, tierRequired: 'professional', group: 'csf_2_profiles' },
-  { code: 'nist_ir_8596_def', label: 'NIST IR 8596 — Defend (DEF)', description: 'CSF 2.0 Cyber AI Profile: AI-Enabled Cyber Defense. Covers AI-augmented detection and response.', controlCount: 17, tierRequired: 'professional', group: 'csf_2_profiles' },
-  { code: 'nist_ir_8596_thw', label: 'NIST IR 8596 — Thwart (THW)', description: 'CSF 2.0 Cyber AI Profile: Thwart AI-Enabled Attacks. Covers countering adversarial AI threats.', controlCount: 20, tierRequired: 'professional', group: 'csf_2_profiles' },
+  { code: 'nist_ir_8596_sec', label: 'NIST IR 8596 — Secure (SEC)', description: 'CSF 2.0 Cyber AI Profile: Secure AI System Components. Covers GV/ID/PR/DE/RS/RC for AI asset protection.', controlCount: 25, tierRequired: 'enterprise', group: 'csf_2_profiles' },
+  { code: 'nist_ir_8596_def', label: 'NIST IR 8596 — Defend (DEF)', description: 'CSF 2.0 Cyber AI Profile: AI-Enabled Cyber Defense. Covers AI-augmented detection and response.', controlCount: 17, tierRequired: 'enterprise', group: 'csf_2_profiles' },
+  { code: 'nist_ir_8596_thw', label: 'NIST IR 8596 — Thwart (THW)', description: 'CSF 2.0 Cyber AI Profile: Thwart AI-Enabled Attacks. Covers countering adversarial AI threats.', controlCount: 20, tierRequired: 'enterprise', group: 'csf_2_profiles' },
 ];
 
 const NIST_800_53_DETAIL_OPTIONS = [
@@ -139,7 +138,7 @@ function RegisterPageInner() {
   const [email, setEmail] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [initialRole, setInitialRole] = useState<'admin' | 'auditor' | 'user'>('admin');
-  const [selectedTier, setSelectedTier] = useState<TierKey>('free');
+  const [selectedTier, setSelectedTier] = useState<TierKey>('community');
   const [billingCadence, setBillingCadence] = useState<BillingCadence>('monthly');
   const [frameworkCodes, setFrameworkCodes] = useState<string[]>([]);
   const [informationTypes, setInformationTypes] = useState<string[]>([]);
@@ -158,14 +157,14 @@ function RegisterPageInner() {
   const requiresNist800171Details = frameworkCodes.includes('nist_800_171');
 
   const hasUtilitiesFrameworks = frameworkCodes.some((code) =>
-    FRAMEWORK_OPTIONS.some((fw) => fw.code === code && fw.tierRequired === 'utilities')
+    FRAMEWORK_OPTIONS.some((fw) => fw.code === code && fw.tierRequired === 'govcloud')
   );
 
   const availableFrameworks = FRAMEWORK_OPTIONS.filter(
-    (fw) => TIER_ORDER[fw.tierRequired] <= TIER_ORDER[selectedTier]
+    (fw) => (TIER_ORDER as Record<string, number>)[fw.tierRequired] <= (TIER_ORDER as Record<string, number>)[selectedTier]
   );
   const lockedFrameworks = FRAMEWORK_OPTIONS.filter(
-    (fw) => TIER_ORDER[fw.tierRequired] > TIER_ORDER[selectedTier]
+    (fw) => (TIER_ORDER as Record<string, number>)[fw.tierRequired] > (TIER_ORDER as Record<string, number>)[selectedTier]
   );
 
   useEffect(() => {
@@ -181,11 +180,11 @@ function RegisterPageInner() {
     let tierFromQuery: TierKey | null = null;
     let cadenceFromQuery: BillingCadence | null = null;
 
-    if (['free', 'starter', 'professional', 'enterprise', 'utilities'].includes(rawPlan)) {
+    if (['community', 'pro', 'enterprise', 'govcloud'].includes(rawPlan)) {
       tierFromQuery = rawPlan as TierKey;
     } else {
       const [tierPart, cadencePart] = rawPlan.split('_');
-      if (['starter', 'professional', 'enterprise', 'utilities'].includes(tierPart)) {
+      if (['community', 'pro', 'enterprise', 'govcloud'].includes(tierPart)) {
         tierFromQuery = tierPart as TierKey;
       }
       if (cadencePart === 'monthly' || cadencePart === 'annual') {
@@ -208,7 +207,7 @@ function RegisterPageInner() {
   useEffect(() => {
     setFrameworkCodes((current) =>
       current.filter((code) =>
-        FRAMEWORK_OPTIONS.some((fw) => fw.code === code && TIER_ORDER[fw.tierRequired] <= TIER_ORDER[selectedTier])
+        FRAMEWORK_OPTIONS.some((fw) => fw.code === code && (TIER_ORDER as Record<string, number>)[fw.tierRequired] <= (TIER_ORDER as Record<string, number>)[selectedTier])
       )
     );
   }, [selectedTier]);
@@ -273,7 +272,7 @@ function RegisterPageInner() {
     setLoading(true);
 
     try {
-      if (organizationIsRequired && selectedTier !== 'free') {
+      if (organizationIsRequired && selectedTier !== 'community') {
         localStorage.setItem('pendingPlan', `${selectedTier}_${billingCadence}`);
       } else {
         localStorage.removeItem('pendingPlan');
@@ -419,7 +418,7 @@ function RegisterPageInner() {
                   Your trial starts on the selected tier. You can change tiers anytime in Settings.
                 </p>
 
-                {selectedTier !== 'free' && (
+                {selectedTier !== 'community' && (
                   <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Billing Cycle

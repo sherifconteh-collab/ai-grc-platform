@@ -1,14 +1,18 @@
-// @tier: free
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
-// Optional premium service — not available in community edition
-let llmServiceModule;
-try { llmServiceModule = require('../services/llmService'); } catch (_) { llmServiceModule = {}; }
-const { invalidateAICache = () => {} } = llmServiceModule;
+
+// Optional LLM service: degrade gracefully if unavailable
+let invalidateAICache;
+try {
+  ({ invalidateAICache } = require('../services/llmService'));
+} catch (e) {
+  invalidateAICache = () => {};
+}
 
 router.use(authenticate);
 
