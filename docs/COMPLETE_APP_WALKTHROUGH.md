@@ -1,4 +1,4 @@
-# AI GRC Platform - Complete Application Walkthrough
+# ControlWeave - Complete Application Walkthrough
 **Visual Guide - Optimized for iPad/Mobile Viewing**
 
 ---
@@ -20,7 +20,7 @@ You've built a **multi-framework Governance, Risk & Compliance platform** that h
 ### STEP 1: Organization Setup
 ```
 ┌─────────────────────────────────────────┐
-│         WELCOME TO AI GRC PLATFORM      │
+│         WELCOME TO CONTROLWEAVE      │
 ├─────────────────────────────────────────┤
 │                                         │
 │  Get started by creating your           │
@@ -98,7 +98,7 @@ VALUES
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│  AI GRC PLATFORM                    Acme Corp    [Profile ▼] [Logout]  │
+│  CONTROLWEAVE                    Acme Corp    [Profile ▼] [Logout]  │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  📊 COMPLIANCE OVERVIEW                                                │
@@ -679,7 +679,7 @@ The interface adapts for iPad:
 
 ```
 ┌─────────────────────────────┐
-│  AI GRC       [≡ Menu]      │
+│  ControlWeave  [≡ Menu]      │
 ├─────────────────────────────┤
 │                             │
 │  📊 Compliance: 24%         │

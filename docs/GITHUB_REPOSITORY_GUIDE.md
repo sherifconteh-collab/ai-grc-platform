@@ -77,7 +77,7 @@ ai-grc-platform/
 
 **What to add/update**:
 ```markdown
-# AI GRC Platform
+# ControlWeave
 
 > Open-source multi-framework Governance, Risk & Compliance platform with deep AI governance and intelligent control mapping
 
@@ -235,7 +235,7 @@ temp/
 ### 4. CONTRIBUTING.md
 
 ```markdown
-# Contributing to AI GRC Platform
+# Contributing to ControlWeave
 
 Thank you for your interest in contributing! 🎉
 
@@ -481,7 +481,7 @@ if (!claudeEnabled) {
 ai-grc-platform/
 ├── mcp-server/
 │   ├── README.md
-│   │   # AI GRC Platform - MCP Server
+│   │   # ControlWeave - MCP Server
 │   │   
 │   │   Use Claude Code to interact with your GRC data:
 │   │   - Query controls across frameworks
