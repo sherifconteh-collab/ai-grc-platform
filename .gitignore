@@ -18,6 +18,11 @@ yarn.lock
 dist/
 build/
 .next/
+
+# Electron desktop build artifacts
+electron/dist/
+electron/build/icon.png
+electron/build/icon.ico
 .next-build*/
 .next-devcache*/
 out/

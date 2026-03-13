@@ -1,0 +1,226 @@
+name: Build & Release Desktop App
+
+# Trigger this workflow when a GitHub Release is published **or** manually.
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      upload_artifact:
+        description: 'Upload installer as a workflow artifact (for testing)?'
+        required: false
+        default: 'true'
+
+# Default: read-only token.  The upload job needs write access to attach assets
+# to the Release, so that job overrides permissions explicitly.
+permissions:
+  contents: read
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Build Windows installer (.exe)
+  # ────────────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Windows Installer (.exe)
+    runs-on: windows-latest
+
+    permissions:
+      contents: write   # needed to upload release assets
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── Backend ─────────────────────────────────────────────────────────────
+      - name: Install backend dependencies
+        run: npm ci --prefer-offline
+        working-directory: backend
+
+      # ── Frontend ─────────────────────────────────────────────────────────────
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline
+        working-directory: frontend
+
+      - name: Build Next.js frontend (standalone)
+        run: npm run build
+        working-directory: frontend
+        env:
+          # Point rewrites at the local backend so the standalone bundle is
+          # self-contained (no external service dependency at build time).
+          BACKEND_ORIGIN: http://localhost:3001
+          NEXT_TELEMETRY_DISABLED: 1
+
+      # ── Electron ─────────────────────────────────────────────────────────────
+      - name: Install Electron dependencies
+        run: npm ci --prefer-offline
+        working-directory: electron
+
+      - name: Generate placeholder icons (if not present)
+        run: node scripts/generate-icons.js
+        working-directory: electron
+
+      - name: Build Windows installer
+        run: npm run dist:win
+        working-directory: electron
+        env:
+          # electron-builder uses GH_TOKEN to publish directly to GitHub Releases
+          # when the workflow is triggered by a release event.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Publish ──────────────────────────────────────────────────────────────
+      - name: Upload installer to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/dist/*.exe
+            electron/dist/*.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer as workflow artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_artifact == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: controlweave-windows-installer
+          path: |
+            electron/dist/*.exe
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Build macOS DMG
+  # ────────────────────────────────────────────────────────────────────────────
+  build-macos:
+    name: macOS Installer (.dmg)
+    runs-on: macos-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        run: npm ci --prefer-offline
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline
+        working-directory: frontend
+
+      - name: Build Next.js frontend (standalone)
+        run: npm run build
+        working-directory: frontend
+        env:
+          BACKEND_ORIGIN: http://localhost:3001
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Install Electron dependencies
+        run: npm ci --prefer-offline
+        working-directory: electron
+
+      - name: Generate placeholder icons (if not present)
+        run: node scripts/generate-icons.js
+        working-directory: electron
+
+      - name: Build macOS installer
+        run: npm run dist:mac
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload DMG to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/dist/*.dmg
+            electron/dist/*.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload DMG as workflow artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_artifact == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: controlweave-macos-installer
+          path: |
+            electron/dist/*.dmg
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Build Linux AppImage
+  # ────────────────────────────────────────────────────────────────────────────
+  build-linux:
+    name: Linux AppImage
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        run: npm ci --prefer-offline
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline
+        working-directory: frontend
+
+      - name: Build Next.js frontend (standalone)
+        run: npm run build
+        working-directory: frontend
+        env:
+          BACKEND_ORIGIN: http://localhost:3001
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Install Electron dependencies
+        run: npm ci --prefer-offline
+        working-directory: electron
+
+      - name: Generate placeholder icons (if not present)
+        run: node scripts/generate-icons.js
+        working-directory: electron
+
+      - name: Build Linux AppImage
+        run: npm run dist:linux
+        working-directory: electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload AppImage to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            electron/dist/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload AppImage as workflow artifact
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_artifact == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: controlweave-linux-appimage
+          path: |
+            electron/dist/*.AppImage
+          retention-days: 14
