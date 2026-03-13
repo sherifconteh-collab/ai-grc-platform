@@ -99,6 +99,353 @@ jobs:
             echo "✅ No suspicious patterns detected"
           fi
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # NIST SP 800-160 Vol. 1 — Systems Security Engineering
+  # Each job is labelled with the primary control family it satisfies.
+  # ──────────────────────────────────────────────────────────────────────────
+
+  nist-800-160-cryptographic-controls:
+    name: "NIST 800-160 SC-13: Cryptographic Controls"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check for weak or broken cryptographic algorithms
+        run: |
+          echo "🔐 NIST 800-160 SC-13 — Cryptographic Controls"
+          FAIL=0
+
+          # MD5 is cryptographically broken for any security-sensitive use
+          if grep -rn "createHash('md5')\|createHash(\"md5\")" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules; then
+            echo "❌ MD5 detected — prohibited for security-sensitive hashing (NIST 800-160 SC-13)"
+            FAIL=1
+          fi
+
+          # SHA-1 is deprecated; TOTP is the only RFC-mandated exception (RFC 6238 requires HMAC-SHA1)
+          if grep -rn "createHash('sha1')\|createHash(\"sha1\")" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules \
+               | grep -v "totp\.js"; then
+            echo "❌ SHA-1 detected outside TOTP — use SHA-256 or stronger (NIST 800-160 SC-13)"
+            FAIL=1
+          fi
+
+          # DES / Triple-DES are broken symmetric ciphers
+          if grep -rn "createCipheriv\|createDecipheriv" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules \
+               | grep -iE "'des|\"des|des-ede|3des"; then
+            echo "❌ DES/3DES detected — use AES-256-GCM (NIST 800-160 SC-13)"
+            FAIL=1
+          fi
+
+          # RC4 stream cipher is cryptographically broken
+          if grep -rn "rc4\|arcfour" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules -i; then
+            echo "❌ RC4 detected — prohibited (NIST 800-160 SC-13)"
+            FAIL=1
+          fi
+
+          # ECB mode is deterministic and reveals plaintext patterns
+          if grep -rn "createCipheriv\|createDecipheriv" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules \
+               | grep -iE "'aes-.*-ecb|\"aes-.*-ecb|-ecb'|-ecb\""; then
+            echo "❌ AES-ECB mode detected — use AES-256-GCM with random IV (NIST 800-160 SC-13)"
+            FAIL=1
+          fi
+
+          # Math.random() is NOT cryptographically secure; block it near token/key/secret contexts
+          if grep -rn "Math\.random()" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules \
+               | grep -iE "token|secret|key|password|nonce|salt|otp|session"; then
+            echo "❌ Math.random() used near security-sensitive identifier — use crypto.randomBytes() (NIST 800-160 SC-13)"
+            FAIL=1
+          fi
+
+          [ $FAIL -eq 0 ] && echo "✅ Cryptographic controls check passed"
+          exit $FAIL
+
+  nist-800-160-input-validation:
+    name: "NIST 800-160 SI-10: Information Input Validation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check for SQL injection and missing input validation
+        run: |
+          echo "🛡️  NIST 800-160 SI-10 — Input Validation"
+          FAIL=0
+
+          # Detect SQL built via string concatenation with user-controlled data
+          # Pattern: pool.query(`...` + req.  OR  pool.query("..." + req.
+          if grep -rn "pool\.query\|db\.query" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules \
+               | grep -E "\+\s*req\.(body|params|query)\b|req\.(body|params|query)\.[a-zA-Z_]+\s*\+"; then
+            echo "❌ Possible SQL injection — user input concatenated into a query string (NIST 800-160 SI-10)"
+            FAIL=1
+          fi
+
+          # Routes with write operations should import validateBody or sanitizeInput
+          echo "Checking route validation coverage..."
+          SKIP_ROUTES="openclawWebhook.js help.js ops.js"
+          for f in backend/src/routes/*.js; do
+            name=$(basename "$f")
+            echo "$SKIP_ROUTES" | grep -qw "$name" && continue
+            if grep -qE "router\.(post|put|patch)" "$f"; then
+              if ! grep -qE "validateBody|sanitizeInput" "$f"; then
+                echo "⚠️  WARNING: $name has write routes but no validateBody/sanitizeInput (NIST 800-160 SI-10)"
+              fi
+            fi
+          done
+
+          [ $FAIL -eq 0 ] && echo "✅ Input validation check passed"
+          exit $FAIL
+
+  nist-800-160-least-privilege:
+    name: "NIST 800-160 AC-6: Least Privilege"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify authentication and authorization middleware coverage
+        run: |
+          echo "🔑 NIST 800-160 AC-6 — Least Privilege"
+          FAIL=0
+
+          # Routes that intentionally bypass auth (login, webhooks, health, public ops)
+          SKIP_ROUTES="auth.js openclawWebhook.js help.js ops.js"
+
+          echo "Checking auth middleware coverage per route file..."
+          for f in backend/src/routes/*.js; do
+            name=$(basename "$f")
+            echo "$SKIP_ROUTES" | grep -qw "$name" && continue
+            if ! grep -qE "authenticate|requirePermission|requireRole|requireAnyPermission|requireAllPermissions" "$f"; then
+              echo "⚠️  WARNING: $name registers routes but has no auth/permission middleware (NIST 800-160 AC-6)"
+            fi
+          done
+
+          # Wildcard '*' permission grants must be restricted to the 'admin' role block only
+          WILDCARD_LINES=$(grep -n "'\\*'\|\"\\*\"" backend/src/middleware/auth.js | grep -v "admin:")
+          if [ -n "$WILDCARD_LINES" ]; then
+            echo "⚠️  WARNING: Wildcard permission '*' found outside admin role block — review carefully:"
+            echo "$WILDCARD_LINES"
+          fi
+
+          [ $FAIL -eq 0 ] && echo "✅ Least privilege check passed"
+          exit $FAIL
+
+  nist-800-160-audit-logging:
+    name: "NIST 800-160 AU-2: Audit Events"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify audit logging infrastructure and coverage
+        run: |
+          echo "📋 NIST 800-160 AU-2 — Audit Events"
+          FAIL=0
+
+          # Core audit infrastructure must exist
+          if [ ! -f "backend/src/middleware/auditLog.js" ]; then
+            echo "❌ Audit log middleware missing: backend/src/middleware/auditLog.js (NIST 800-160 AU-2)"
+            FAIL=1
+          else
+            echo "✅ backend/src/middleware/auditLog.js present"
+          fi
+
+          if [ ! -f "backend/src/services/auditService.js" ]; then
+            echo "❌ Audit service missing: backend/src/services/auditService.js (NIST 800-160 AU-2)"
+            FAIL=1
+          else
+            echo "✅ backend/src/services/auditService.js present"
+          fi
+
+          # Report state-changing routes (POST/PUT/PATCH/DELETE) without audit middleware
+          # These are informational warnings (not hard failures) to guide future improvements
+          READ_ONLY_ROUTES="help.js ops.js dashboard.js dashboardBuilder.js performance.js controlHealth.js"
+          echo ""
+          echo "Checking audit logging coverage per route file..."
+          for f in backend/src/routes/*.js; do
+            name=$(basename "$f")
+            echo "$READ_ONLY_ROUTES" | grep -qw "$name" && continue
+            if grep -qE "router\.(post|put|patch|delete)" "$f"; then
+              if grep -qE "auditLog|createAuditLog" "$f"; then
+                echo "✅ $name — audit logging present"
+              else
+                echo "⚠️  NOTICE: $name has state-changing routes without auditLog middleware (NIST 800-160 AU-2)"
+              fi
+            fi
+          done
+
+          exit $FAIL
+
+  nist-800-160-error-handling:
+    name: "NIST 800-160 SI-11: Error Handling"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check that error internals are not exposed in HTTP responses
+        run: |
+          echo "⚠️  NIST 800-160 SI-11 — Error Handling"
+          FAIL=0
+
+          # Stack traces in JSON responses leak system internals to clients
+          if grep -rn "res\.json\|res\.send\|res\.status" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules \
+               | grep "error\.stack\|err\.stack"; then
+            echo "❌ Raw error stack included in HTTP response — system internals must not be exposed (NIST 800-160 SI-11)"
+            FAIL=1
+          fi
+
+          # Raw PostgreSQL error detail fields expose schema information
+          if grep -rn "res\.json\|res\.send\|res\.status" \
+               --include="*.js" --include="*.ts" . --exclude-dir=node_modules \
+               | grep -E "err\.detail|err\.query|error\.detail|error\.query"; then
+            echo "❌ Raw database error detail exposed in HTTP response (NIST 800-160 SI-11)"
+            FAIL=1
+          fi
+
+          [ $FAIL -eq 0 ] && echo "✅ Error handling check passed — no internal details exposed"
+          exit $FAIL
+
+  nist-800-160-security-headers:
+    name: "NIST 800-160 SC-8: Security Headers"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify HTTP security headers are configured in server
+        run: |
+          echo "🔒 NIST 800-160 SC-8 — Security Headers"
+          FAIL=0
+          SERVER="backend/src/server.js"
+
+          check_header() {
+            local token="$1"
+            local label="$2"
+            local control="$3"
+            if grep -q "$token" "$SERVER"; then
+              echo "✅ $label"
+            else
+              echo "❌ Missing: $label ($control)"
+              FAIL=1
+            fi
+          }
+
+          check_header "X-Content-Type-Options"    "X-Content-Type-Options"        "NIST 800-160 SC-8"
+          check_header "X-Frame-Options"           "X-Frame-Options"               "NIST 800-160 SC-8"
+          check_header "Content-Security-Policy"   "Content-Security-Policy (CSP)" "NIST 800-160 SC-8"
+          check_header "Strict-Transport-Security" "Strict-Transport-Security (HSTS)" "NIST 800-160 SC-8 / SC-17"
+          check_header "x-powered-by"              "X-Powered-By disabled"         "NIST 800-160 SC-8"
+
+          exit $FAIL
+
+  nist-800-160-dos-protection:
+    name: "NIST 800-160 SC-5: Denial-of-Service Protection"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify rate limiting is applied to sensitive endpoints
+        run: |
+          echo "🚦 NIST 800-160 SC-5 — Denial-of-Service Protection"
+          FAIL=0
+          SERVER="backend/src/server.js"
+          RATE_MW="backend/src/middleware/rateLimit.js"
+
+          if [ ! -f "$RATE_MW" ]; then
+            echo "❌ Rate-limit middleware not found: $RATE_MW (NIST 800-160 SC-5)"
+            FAIL=1
+          else
+            echo "✅ Rate-limit middleware present"
+          fi
+
+          # Auth endpoints must have dedicated rate limiters
+          for endpoint in "auth/login" "auth/register" "auth/refresh"; do
+            if ! grep -q "$endpoint" "$SERVER"; then
+              echo "⚠️  WARNING: $endpoint route not found in $SERVER — verify rate limiting applies (NIST 800-160 SC-5)"
+            elif grep -q "$endpoint" "$SERVER" && ! grep -B5 -A5 "$endpoint" "$SERVER" | grep -qi "rateLimit\|Limiter"; then
+              echo "❌ $endpoint is not protected by a rate limiter (NIST 800-160 SC-5)"
+              FAIL=1
+            else
+              echo "✅ $endpoint — rate limiting applied"
+            fi
+          done
+
+          # Global API rate limiter must exist
+          if grep -qE "apiRateLimiter|createRateLimiter" "$SERVER"; then
+            echo "✅ Global API rate limiter configured"
+          else
+            echo "❌ No global API rate limiter found in $SERVER (NIST 800-160 SC-5)"
+            FAIL=1
+          fi
+
+          # Request body size limit must be set to prevent payload-based DoS
+          if grep -q "limit:" "$SERVER" || grep -q "limit(" "$SERVER"; then
+            echo "✅ Request body size limit configured"
+          else
+            echo "❌ No request body size limit found — add express.json({ limit: '...' }) (NIST 800-160 SC-5)"
+            FAIL=1
+          fi
+
+          exit $FAIL
+
+  nist-800-160-supply-chain:
+    name: "NIST 800-160 SA-12: Supply Chain Protection"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Verify supply chain integrity controls
+        run: |
+          echo "🔗 NIST 800-160 SA-12 — Supply Chain Protection"
+          FAIL=0
+
+          # package-lock.json must be committed and kept in sync (enables reproducible installs)
+          for lockfile in backend/package-lock.json frontend/package-lock.json; do
+            if [ -f "$lockfile" ]; then
+              echo "✅ $lockfile present"
+            else
+              echo "❌ $lockfile missing — commit the lockfile for reproducible builds (NIST 800-160 SA-12)"
+              FAIL=1
+            fi
+          done
+
+          # .npmrc must not disable package integrity verification
+          for npmrc in backend/.npmrc frontend/.npmrc .npmrc; do
+            if [ -f "$npmrc" ] && grep -q "no-integrity\|ignore-scripts.*false" "$npmrc"; then
+              echo "❌ $npmrc disables integrity checking — remove 'no-integrity' (NIST 800-160 SA-12)"
+              FAIL=1
+            fi
+          done
+
+          # Wildcard (*) version ranges in dependencies allow uncontrolled updates
+          for pkg in backend/package.json frontend/package.json; do
+            if grep -E '"[a-z@][^"]*":\s*"\*"' "$pkg"; then
+              echo "❌ Wildcard (*) version found in $pkg — pin to a specific version (NIST 800-160 SA-12)"
+              FAIL=1
+            fi
+          done
+
+          # Run audit against only production dependencies (dev deps are a lower risk)
+          echo ""
+          echo "Running production-only dependency audit..."
+          (cd backend && npm ci --ignore-scripts && npm audit --omit=dev --audit-level=high) || {
+            echo "❌ High/critical vulnerability in backend production dependencies (NIST 800-160 SA-12)"
+            FAIL=1
+          }
+          (cd frontend && npm ci --ignore-scripts && npm audit --omit=dev --audit-level=high) || {
+            echo "❌ High/critical vulnerability in frontend production dependencies (NIST 800-160 SA-12)"
+            FAIL=1
+          }
+
+          exit $FAIL
+
   license-check:
     name: Check Dependency Licenses
     runs-on: ubuntu-latest

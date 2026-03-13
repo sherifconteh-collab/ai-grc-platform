@@ -9,7 +9,7 @@
 [![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-<!-- LAST_UPDATED: never -->
+<!-- LAST_UPDATED: not yet updated -->
 
 ## 🎯 What is This?
 
