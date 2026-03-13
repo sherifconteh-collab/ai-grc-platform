@@ -384,8 +384,6 @@ Before your first pull request can be merged you must sign the **Contributor Lic
 - Signing is automated: our CLA bot (powered by [`.github/workflows/cla.yml`](./.github/workflows/cla.yml)) will post a comment on your PR asking you to sign. Reply with the exact phrase shown in that comment and the bot marks you as signed.
 - Signing is a **one-time** requirement — subsequent PRs are merged without any extra steps.
 
-> ℹ️ The `cla.yml` workflow file lives at `.github/workflows/cla.yml` in this repository.
-
 ## 📄 License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).

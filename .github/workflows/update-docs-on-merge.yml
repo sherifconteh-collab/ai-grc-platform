@@ -1,37 +1,66 @@
 name: Update Docs on PR Merge
 
+# Trigger on push to main rather than pull_request closed.
+# This ensures:
+#  1. The GITHUB_TOKEN always has write access (even for PRs merged from forks).
+#  2. We reliably identify the merged PR via the GitHub API using the push SHA.
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: write      # required to commit and push doc updates back to main
+  pull-requests: read  # required to query PR metadata via the GitHub API
 
 jobs:
   update-docs:
     name: Auto-update README and Release Notes
-    # Only run when the PR was actually merged (not just closed/abandoned)
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Use GITHUB_TOKEN so the commit is attributed to github-actions[bot]
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
-          # Full history so the push doesn't fast-forward over concurrent merges
           fetch-depth: 0
 
+      - name: Look up merged PR metadata
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find the PR that was merged by this push (the commit SHA is the merge commit).
+            const sha = context.sha;
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              commit_sha: sha,
+            });
+
+            const merged = prs.find(pr => pr.merged_at !== null);
+            if (!merged) {
+              core.setOutput('skip', 'true');
+              console.log('No merged PR found for this push — skipping doc updates.');
+              return;
+            }
+
+            core.setOutput('skip',   'false');
+            core.setOutput('number', String(merged.number));
+            core.setOutput('title',  merged.title);
+            core.setOutput('author', merged.user.login);
+            core.setOutput('url',    merged.html_url);
+            core.setOutput('labels', merged.labels.map(l => l.name).join(', '));
+            console.log(`Found PR #${merged.number}: ${merged.title}`);
+
       - name: Update RELEASE_NOTES.md
+        if: steps.pr.outputs.skip != 'true'
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_TITLE:  ${{ steps.pr.outputs.title }}
+          PR_AUTHOR: ${{ steps.pr.outputs.author }}
+          PR_LABELS: ${{ steps.pr.outputs.labels }}
+          PR_URL:    ${{ steps.pr.outputs.url }}
         run: |
           python3 - <<'PYEOF'
           import os, re
@@ -63,16 +92,33 @@ jobs:
           with open("RELEASE_NOTES.md", "r") as f:
               content = f.read()
 
+          # ── Idempotency guard ──────────────────────────────────────────────
+          # If this PR number already appears in the [Unreleased] block
+          # (e.g. workflow was manually re-run), skip to prevent duplicates.
           unreleased_header = "## [Unreleased]"
+          if unreleased_header in content:
+              unreleased_pos = content.index(unreleased_header)
+              next_match = re.search(r"\n## \[", content[unreleased_pos + len(unreleased_header):])
+              unreleased_end = (
+                  unreleased_pos + len(unreleased_header) + next_match.start()
+                  if next_match else len(content)
+              )
+              unreleased_block = content[unreleased_pos:unreleased_end]
+              if f"(#{pr_number})" in unreleased_block or f"[#{pr_number}]" in unreleased_block:
+                  print(f"PR #{pr_number} already present in [Unreleased] — skipping insertion.")
+                  exit(0)
+
           if unreleased_header not in content:
               # No [Unreleased] block at all — prepend one after the file preamble (first ---)
-              block = f"\n{unreleased_header}\n\n> Changes staged but not yet released to production.\n\n### {section}\n\n{entry}\n"
+              block = (
+                  f"\n{unreleased_header}\n\n"
+                  f"> Changes staged but not yet released to production.\n\n"
+                  f"### {section}\n\n{entry}\n"
+              )
               content = re.sub(r"(---\n)", r"\1" + block, content, count=1)
           else:
               section_header = f"### {section}"
-              # Find the [Unreleased] block
               unreleased_pos = content.index(unreleased_header)
-              # Look for next ## heading after [Unreleased] to define its boundary
               next_release_match = re.search(r"\n## \[", content[unreleased_pos + len(unreleased_header):])
               if next_release_match:
                   unreleased_end = unreleased_pos + len(unreleased_header) + next_release_match.start()
@@ -82,7 +128,7 @@ jobs:
               unreleased_block = content[unreleased_pos:unreleased_end]
 
               if section_header in unreleased_block:
-                  # Append entry right after the existing section header
+                  # Append entry right after the existing section header line
                   insert_after = section_header + "\n"
                   replacement  = insert_after + entry + "\n"
                   new_block = unreleased_block.replace(insert_after, replacement, 1)
@@ -100,10 +146,10 @@ jobs:
           PYEOF
 
       - name: Update README.md last-updated marker
+        if: steps.pr.outputs.skip != 'true'
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_TITLE:  ${{ steps.pr.outputs.title }}
         run: |
           python3 - <<'PYEOF'
           import os, re
@@ -127,8 +173,9 @@ jobs:
           PYEOF
 
       - name: Scan codebase for undocumented features
+        if: steps.pr.outputs.skip != 'true'
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           python3 - <<'PYEOF'
           import os, re, glob
@@ -138,7 +185,6 @@ jobs:
 
           # ── 1. Backend routes ────────────────────────────────────────────────
           route_files = glob.glob("backend/src/routes/*.js")
-          # Human-readable module names derived from file names
           ROUTE_ALIASES = {
               "ai":                 "AI / LLM",
               "assessments":        "Assessments",
@@ -173,16 +219,13 @@ jobs:
           for path in sorted(route_files):
               key = os.path.basename(path).replace(".js", "").lower()
               label = ROUTE_ALIASES.get(key, key.title())
-              # Check both the key and the human label
               if key not in readme and label.lower() not in readme:
                   undocumented_routes.append((label, path))
 
           # ── 2. Frontend pages ────────────────────────────────────────────────
-          # Use only the recursive pattern; it already matches single-level dirs
           page_dirs = glob.glob("frontend/src/app/**/page.tsx", recursive=True)
           undocumented_pages = []
           for path in sorted(page_dirs):
-              # e.g. frontend/src/app/dashboard/page.tsx → "dashboard"
               parts = path.replace("frontend/src/app/", "").split("/")
               page_name = parts[0] if parts else ""
               if page_name in ("", "page.tsx"):
@@ -195,7 +238,6 @@ jobs:
           undocumented_migrations = []
           for path in sorted(migration_files):
               base = os.path.basename(path)
-              # Extract a short label from the migration filename (e.g. 085_rmf_packages)
               label = base.replace(".sql", "").split("_", 1)[-1].replace("_", " ") if "_" in base else base
               if label.lower() not in readme and label.lower() not in release_notes:
                   undocumented_migrations.append((label, path))
@@ -236,22 +278,44 @@ jobs:
               f.write("---\n")
               f.write(f"_Scan triggered by PR #{pr_number}_\n")
 
-          # Also print to console
           total = len(undocumented_routes) + len(undocumented_pages) + len(undocumented_migrations)
           print(f"Documentation gap scan complete — {total} undocumented item(s) found.")
           PYEOF
 
       - name: Commit and push doc updates
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add RELEASE_NOTES.md README.md
 
-          # Only commit when there are actual changes
+          # Skip commit if nothing changed
           if git diff --cached --quiet; then
             echo "No changes to commit."
-          else
-            git commit -m "docs: auto-update release notes and readme for PR #${{ github.event.pull_request.number }} [skip ci]"
-            git push
+            exit 0
           fi
+
+          git commit -m "docs: auto-update release notes and readme for PR #${PR_NUMBER} [skip ci]"
+
+          # Push with a pull-rebase retry loop to handle concurrent merges
+          # landing on main between our checkout and our push.
+          MAX_RETRIES=3
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "✅ Push succeeded on attempt $i"
+              exit 0
+            fi
+            echo "⚠️  Push failed (attempt $i/${MAX_RETRIES}) — rebasing on origin/main and retrying..."
+            git fetch origin main
+            git rebase origin/main || {
+              echo "❌ Rebase conflict — aborting."
+              git rebase --abort
+              exit 1
+            }
+          done
+
+          echo "❌ Push failed after ${MAX_RETRIES} attempts."
+          exit 1

@@ -10,8 +10,7 @@ on:
     types: [published]
 
 permissions:
-  contents: write   # needed to upload release assets
-  id-token: write   # needed for sigstore/OIDC attestation (future use)
+  contents: read   # default read-only for generate jobs; write is granted per-job below
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
@@ -405,6 +404,8 @@ jobs:
     needs: [generate-sbom, generate-aibom]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to upload assets to the GitHub Release
 
     steps:
       - name: Download SBOM artifacts
