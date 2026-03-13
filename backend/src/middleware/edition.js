@@ -21,6 +21,12 @@ let IS_COMMUNITY = EDITION === 'community';
 let IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
 
 /**
+ * The edition value at process start, before any runtime license upgrades.
+ * Used by license removal to revert to the correct pre-license edition.
+ */
+const BOOT_EDITION = EDITION;
+
+/**
  * Feature tier requirements mapping
  * These features are NOT available in community edition
  */
@@ -242,6 +248,7 @@ module.exports = {
   validateEdition,
   upgradeEdition,
   LICENSE_TIER_TO_EDITION,
+  BOOT_EDITION,
   EDITION,
   IS_COMMUNITY,
   IS_PRO,

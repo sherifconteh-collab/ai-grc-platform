@@ -1652,4 +1652,11 @@ export const plot4aiAPI = {
   getStats: () => api.get('/plot4ai/stats'),
 };
 
+// License API — activate/deactivate ControlWeave license keys
+export const licenseAPI = {
+  getStatus: () => api.get('/license'),
+  activate: (licenseKey: string) => api.post('/license/activate', { licenseKey }),
+  remove: () => api.delete('/license'),
+};
+
 export default api;

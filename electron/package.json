@@ -26,6 +26,9 @@
       "preload.js",
       "build/**"
     ],
+    "asarUnpack": [
+      "**/node_modules/@embedded-postgres/**"
+    ],
     "extraResources": [
       {
         "from": "../backend",
@@ -91,6 +94,9 @@
       "icon": "build/icon.png",
       "category": "Office"
     }
+  },
+  "dependencies": {
+    "embedded-postgres": "17.9.0-beta.16"
   },
   "devDependencies": {
     "electron": "41.0.2",
