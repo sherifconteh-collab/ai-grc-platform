@@ -28,7 +28,7 @@ const FRONTEND_PORT = 3000;
 // Port for the embedded PostgreSQL instance.  Use 5433 to avoid clashing with
 // any system-wide PostgreSQL that might be running on the default 5432.
 const EMBEDDED_PG_PORT = 5433;
-const STARTUP_TIMEOUT_MS = 30_000; // 30 s to let servers start
+const STARTUP_TIMEOUT_MS = 60_000; // 60 s — embedded PG init + migrations need headroom on slower machines
 const POLL_INTERVAL_MS = 500;
 
 // When packaged, electron bundles node alongside the app.  process.execPath is

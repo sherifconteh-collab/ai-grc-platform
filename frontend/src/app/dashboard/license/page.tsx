@@ -51,7 +51,7 @@ function TierBadge({ tier }: { tier: string }) {
 }
 
 export default function LicensePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<LicenseStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -85,8 +85,14 @@ export default function LicensePage() {
   };
 
   useEffect(() => {
+    // Wait for auth to finish loading and confirm user is admin before fetching
+    if (authLoading) return;
+    if (!user || user.role !== 'admin') {
+      setLoading(false);
+      return;
+    }
     loadStatus();
-  }, []);
+  }, [authLoading, user]);
 
   const handleActivate = async (e: { preventDefault: () => void }) => {
     e.preventDefault();

@@ -34,12 +34,20 @@ const VALID_TIERS = Object.freeze(['pro', 'enterprise', 'govcloud']);
 let _activeLicense = null;
 
 /**
- * Returns the signing secret.  In production this must be set via the
- * LICENSE_SECRET environment variable; the fallback is intentionally weak so
- * that self-generated test keys never validate on a real deployment.
+ * Returns the signing secret.  In production this MUST be set via the
+ * LICENSE_SECRET environment variable.  The hard-coded fallback is only
+ * allowed when NODE_ENV is 'development' or 'test' so that forgetting to
+ * configure the secret in a real deployment causes license validation to
+ * fail closed (no forged keys accepted).
  */
 function getSecret() {
-  return process.env.LICENSE_SECRET || 'controlweave-ce-license-v1-dev';
+  if (process.env.LICENSE_SECRET) return process.env.LICENSE_SECRET;
+  const env = (process.env.NODE_ENV || '').toLowerCase();
+  if (env === 'development' || env === 'test') {
+    return 'controlweave-ce-license-v1-dev';
+  }
+  // Fail closed: return a random secret so no hard-coded key can match
+  return crypto.randomBytes(32).toString('hex');
 }
 
 /**
@@ -112,11 +120,17 @@ function parseLicenseKey(key) {
     return { valid: false, error: 'License key has expired' };
   }
 
+  // Validate seats: must be an integer >= -1
+  const seatsNum = Number(seats);
+  if (seats == null || !Number.isInteger(seatsNum) || seatsNum < -1) {
+    return { valid: false, error: 'Invalid or missing seats value in license key' };
+  }
+
   return {
     valid: true,
     licensee: String(licensee || 'Unknown'),
     tier: String(tier),
-    seats: Number(seats) >= -1 ? Number(seats) : -1,
+    seats: seatsNum,
     issuedAt: iat != null ? Number(iat) : null,
     expiresAt: exp != null ? Number(exp) : null,
   };
