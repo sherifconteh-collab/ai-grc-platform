@@ -24,6 +24,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "updater.js",
       "build/**"
     ],
     "asarUnpack": [
@@ -93,9 +94,15 @@
       ],
       "icon": "build/icon.png",
       "category": "Office"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "sherifconteh-collab",
+      "repo": "ai-grc-platform"
     }
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "embedded-postgres": "17.9.0-beta.16"
   },
   "devDependencies": {
