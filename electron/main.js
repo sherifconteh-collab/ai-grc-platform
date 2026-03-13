@@ -4,10 +4,11 @@
  * ControlWeave Desktop — Electron Main Process
  *
  * Responsibilities:
- *  1. Spawn the Node.js backend server (Express, port 3001)
- *  2. Spawn the Next.js frontend server (port 3000)
- *  3. Wait for both servers to be ready, then open a BrowserWindow
- *  4. Gracefully shut down child processes on quit
+ *  1. Start an embedded PostgreSQL server (no external DB required)
+ *  2. Spawn the Node.js backend server (Express, port 3001)
+ *  3. Spawn the Next.js frontend server (port 3000)
+ *  4. Wait for both servers to be ready, then open a BrowserWindow
+ *  5. Gracefully shut down child processes and PostgreSQL on quit
  */
 
 const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
@@ -15,12 +16,17 @@ const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
+const crypto = require('crypto');
+const EmbeddedPostgres = require('embedded-postgres');
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Config
 // ──────────────────────────────────────────────────────────────────────────────
 const BACKEND_PORT = 3001;
 const FRONTEND_PORT = 3000;
+// Port for the embedded PostgreSQL instance.  Use 5433 to avoid clashing with
+// any system-wide PostgreSQL that might be running on the default 5432.
+const EMBEDDED_PG_PORT = 5433;
 const STARTUP_TIMEOUT_MS = 30_000; // 30 s to let servers start
 const POLL_INTERVAL_MS = 500;
 
@@ -40,6 +46,8 @@ const RESOURCES_ROOT = app.isPackaged
 let mainWindow = null;
 let backendProcess = null;
 let frontendProcess = null;
+let pgInstance = null;     // EmbeddedPostgres instance
+let isQuitting = false;    // guard against double-quit loop during async cleanup
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -124,6 +132,80 @@ function spawnNode(scriptPath, cwd, env = {}) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Embedded PostgreSQL
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Load stored DB credentials from disk, or generate and persist fresh ones.
+ * Credentials are kept in a JSON file inside app.getPath('userData') so they
+ * survive app restarts without being stored in environment variables.
+ */
+function loadOrCreateCredentials() {
+  const credFile = path.join(app.getPath('userData'), 'db-credentials.json');
+
+  if (fs.existsSync(credFile)) {
+    try {
+      return JSON.parse(fs.readFileSync(credFile, 'utf8'));
+    } catch (_) {
+      // File was corrupt — fall through to regenerate
+    }
+  }
+
+  const creds = {
+    user: 'postgres',
+    // 16 random bytes = 32 hex chars; 128 bits of entropy — more than enough
+    // for a local-only loopback database connection.
+    password: crypto.randomBytes(16).toString('hex'),
+  };
+
+  // mode 0o600: owner read/write only — credentials are sensitive
+  fs.writeFileSync(credFile, JSON.stringify(creds, null, 2), { mode: 0o600 });
+  return creds;
+}
+
+/**
+ * Start the embedded PostgreSQL instance, initialise it on first run, and
+ * ensure the 'controlweave' application database exists.
+ *
+ * @returns {Promise<string>} The DATABASE_URL to inject into the backend process.
+ */
+async function startEmbeddedPostgres() {
+  const dataDir = path.join(app.getPath('userData'), 'pgdata');
+  const creds = loadOrCreateCredentials();
+
+  pgInstance = new EmbeddedPostgres({
+    databaseDir: dataDir,
+    user: creds.user,
+    password: creds.password,
+    port: EMBEDDED_PG_PORT,
+    persistent: true,         // keep data between app restarts
+  });
+
+  // initialise() is a no-op when the data directory already exists
+  await pgInstance.initialise();
+  await pgInstance.start();
+
+  // Ensure the application database exists (first-run setup)
+  const client = pgInstance.getPgClient();
+  await client.connect();
+  try {
+    const res = await client.query(
+      "SELECT 1 FROM pg_database WHERE datname = 'controlweave'"
+    );
+    if (res.rows.length === 0) {
+      await client.query('CREATE DATABASE controlweave');
+      console.log('Created application database: controlweave');
+    }
+  } finally {
+    await client.end();
+  }
+
+  // URL-encode the password in case it contains special characters
+  const encodedPassword = encodeURIComponent(creds.password);
+  return `postgresql://${creds.user}:${encodedPassword}@127.0.0.1:${EMBEDDED_PG_PORT}/controlweave`;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Server startup
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -147,11 +229,14 @@ function startServer(label, dirPath, scriptRelPath, port, extraEnv = {}) {
   return { proc, ready: waitForServer(port) };
 }
 
-function startBackend() {
+function startBackend(databaseUrl) {
   const backendDir = path.join(RESOURCES_ROOT, 'backend');
   const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {
     // Allow the frontend origin so CORS is satisfied
     CORS_ORIGIN: `http://localhost:${FRONTEND_PORT}`,
+    // Inject the embedded-postgres connection string so the backend never
+    // needs an external DATABASE_URL in the environment or .env file.
+    DATABASE_URL: databaseUrl,
   });
   backendProcess = proc;
   return ready;
@@ -270,8 +355,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-app-version', () => app.getVersion());
 
   try {
+    console.log('Starting embedded PostgreSQL…');
+    const databaseUrl = await startEmbeddedPostgres();
+    console.log(`Embedded PostgreSQL ready on port ${EMBEDDED_PG_PORT}`);
+
     console.log('Starting backend server…');
-    await startBackend();
+    await startBackend(databaseUrl);
     console.log(`Backend ready on port ${BACKEND_PORT}`);
 
     console.log('Starting frontend server…');
@@ -288,9 +377,8 @@ app.whenReady().then(async () => {
         err.message,
         '',
         'Please ensure:',
-        '  • PostgreSQL is running and accessible',
-        '  • The DATABASE_URL environment variable is set (or a .env file exists)',
-        '  • No other application is using ports 3000 or 3001',
+        '  • No other application is using ports 3000, 3001, or 5433',
+        '  • You have write permission to the application data folder',
       ].join('\n')
     );
     app.quit();
@@ -305,7 +393,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-function killChildren() {
+function killChildProcesses() {
   [backendProcess, frontendProcess].forEach((child) => {
     if (child && !child.killed) {
       try {
@@ -317,5 +405,27 @@ function killChildren() {
   });
 }
 
-app.on('before-quit', killChildren);
-process.on('exit', killChildren);
+// before-quit fires before the app exits.  We prevent the default quit,
+// perform async cleanup (stop embedded PG), then re-trigger app.quit().
+// The isQuitting flag prevents infinite recursion.
+app.on('before-quit', async (event) => {
+  if (isQuitting) return;
+  isQuitting = true;
+  event.preventDefault();
+
+  killChildProcesses();
+
+  if (pgInstance) {
+    try {
+      await pgInstance.stop();
+    } catch (_) {
+      // ignore — we are shutting down regardless
+    }
+    pgInstance = null;
+  }
+
+  app.quit(); // re-trigger; isQuitting is now true so this path is skipped
+});
+
+// Synchronous best-effort cleanup for process.exit (no async possible here).
+process.on('exit', killChildProcesses);

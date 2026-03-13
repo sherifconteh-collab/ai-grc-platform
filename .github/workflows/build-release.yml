@@ -57,7 +57,9 @@ jobs:
 
       # ── Electron ─────────────────────────────────────────────────────────────
       - name: Install Electron dependencies
-        run: npm ci --prefer-offline
+        # Do not use --prefer-offline: embedded-postgres downloads platform-specific
+        # PostgreSQL binaries (~100 MB) that will not be in the npm cache.
+        run: npm ci
         working-directory: electron
 
       - name: Generate placeholder icons (if not present)
@@ -127,7 +129,9 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
 
       - name: Install Electron dependencies
-        run: npm ci --prefer-offline
+        # Do not use --prefer-offline: embedded-postgres downloads platform-specific
+        # PostgreSQL binaries (~100 MB) that will not be in the npm cache.
+        run: npm ci
         working-directory: electron
 
       - name: Generate placeholder icons (if not present)
@@ -194,7 +198,9 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
 
       - name: Install Electron dependencies
-        run: npm ci --prefer-offline
+        # Do not use --prefer-offline: embedded-postgres downloads platform-specific
+        # PostgreSQL binaries (~100 MB) that will not be in the npm cache.
+        run: npm ci
         working-directory: electron
 
       - name: Generate placeholder icons (if not present)

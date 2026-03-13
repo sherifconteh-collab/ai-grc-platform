@@ -25,6 +25,7 @@ out/
 
 # Electron desktop build artifacts
 electron/dist/
+electron/node_modules/
 electron/build/icon.png
 electron/build/icon.ico
 
