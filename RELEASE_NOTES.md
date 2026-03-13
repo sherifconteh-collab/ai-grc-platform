@@ -97,6 +97,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 > 💡 **Getting started:** See `.github/workflows/` for the full pipeline definitions.
 ### Changed
+- feat: bundle PostgreSQL + auto-migrate in Electron desktop installer ([#43](https://github.com/sherifconteh-collab/ai-grc-platform/pull/43)) — @Copilot
 - feat: package app as downloadable desktop installer (Electron) ([#41](https://github.com/sherifconteh-collab/ai-grc-platform/pull/41)) — @Copilot
 - CI: auto-update docs on merge, NIST 800-160 security gates, SBOM/AIBOM generation ([#39](https://github.com/sherifconteh-collab/ai-grc-platform/pull/39)) — @Copilot
 - RMF step tracking is now observational only (not a deployment gate), consistent with NIST SP 800-37 philosophy

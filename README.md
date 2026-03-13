@@ -9,7 +9,7 @@
 [![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-<!-- LAST_UPDATED: 2026-03-13 | PR #41: feat: package app as downloadable desktop installer (Electron) -->
+<!-- LAST_UPDATED: 2026-03-13 | PR #43: feat: bundle PostgreSQL + auto-migrate in Electron desktop installer -->
 
 ## 🎯 What is This?
 
