@@ -19,7 +19,10 @@ try {
         claude: noProvider, openai: noProvider, gemini: noProvider,
         grok: noProvider, groq: noProvider, ollama: noProvider
       });
-      if (prop === 'withAITrackingContext') return async (fn) => ({ result: await fn(), tracking: null });
+      if (prop === 'withAITrackingContext') return async (fn) => {
+        try { return { result: await fn(), tracking: null }; }
+        catch { return { result: null, tracking: null }; }
+      };
       return async () => null;
     }
   });
