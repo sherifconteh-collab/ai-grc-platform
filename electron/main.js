@@ -53,7 +53,8 @@ function waitForServer(port, timeoutMs = STARTUP_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
 
     function attempt() {
-      const req = http.get({ host: '127.0.0.1', port, path: '/' }, () => {
+      const req = http.get({ host: '127.0.0.1', port, path: '/' }, (res) => {
+        res.resume(); // drain the response body to release the socket
         resolve();
       });
       req.setTimeout(1000);
@@ -84,7 +85,13 @@ function waitForServer(port, timeoutMs = STARTUP_TIMEOUT_MS) {
 function spawnNode(scriptPath, cwd, env = {}) {
   const child = spawn(NODE_BINARY, [scriptPath], {
     cwd,
-    env: { ...process.env, ...env },
+    env: {
+      ...process.env,
+      // Required so process.execPath (the Electron binary) behaves as a plain
+      // Node.js runtime instead of launching another Electron window.
+      ELECTRON_RUN_AS_NODE: '1',
+      ...env,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -168,9 +175,18 @@ function createWindow() {
   });
 
   // Open external links in the system browser instead of a new Electron window.
+  // Only allow http: and https: schemes to prevent opening dangerous local
+  // file:, javascript:, or other URI schemes from a compromised renderer.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://localhost')) return { action: 'allow' };
-    shell.openExternal(url);
+    try {
+      const { protocol } = new URL(url);
+      if (protocol === 'http:' || protocol === 'https:') {
+        shell.openExternal(url);
+      }
+    } catch (_) {
+      // ignore malformed URLs
+    }
     return { action: 'deny' };
   });
 

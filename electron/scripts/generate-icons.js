@@ -22,36 +22,39 @@ const BUILD_DIR = path.join(__dirname, '..', 'build');
 const PNG_1X1_WHITE_B64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==';
 
-// Minimal valid .ico (1×1 px, 32-bit)
-// ICO file header + directory + 1×1 BMP image data
+// Minimal valid .ico (1×1 px, 32-bit BGRA, with correct AND mask)
+// Structure: ICONDIR (6) + ICONDIRENTRY (16) + BITMAPINFOHEADER (40)
+//            + XOR pixel data (4) + AND mask row (4) = 70 bytes total
 const ICO_BYTES = Buffer.from([
-  // ICO header
-  0x00, 0x00, // reserved
-  0x01, 0x00, // type: 1 = ICO
-  0x01, 0x00, // image count: 1
-  // ICONDIRENTRY
-  0x01,       // width  = 1
-  0x01,       // height = 1
-  0x00,       // color count (0 = true color)
-  0x00,       // reserved
-  0x01, 0x00, // planes
-  0x20, 0x00, // bits per pixel = 32
-  0x28, 0x00, 0x00, 0x00, // size of image data = 40 bytes (BITMAPINFOHEADER only)
-  0x16, 0x00, 0x00, 0x00, // offset of image data = 22 (6 header + 16 entry)
-  // BITMAPINFOHEADER
-  0x28, 0x00, 0x00, 0x00, // header size = 40
-  0x01, 0x00, 0x00, 0x00, // width  = 1
-  0x02, 0x00, 0x00, 0x00, // height = 2 (doubled for ICO: image + mask)
-  0x01, 0x00,             // color planes = 1
-  0x20, 0x00,             // bits per pixel = 32
-  0x00, 0x00, 0x00, 0x00, // compression = none
-  0x00, 0x00, 0x00, 0x00, // image size (0 = uncompressed)
-  0x00, 0x00, 0x00, 0x00, // x pixels per meter
-  0x00, 0x00, 0x00, 0x00, // y pixels per meter
-  0x00, 0x00, 0x00, 0x00, // colors in table
-  0x00, 0x00, 0x00, 0x00, // important colors
-  // Pixel data: 1 RGBA pixel (white, fully opaque)
+  // ICONDIR header (6 bytes)
+  0x00, 0x00,             // reserved = 0
+  0x01, 0x00,             // type: 1 = ICO
+  0x01, 0x00,             // image count: 1
+  // ICONDIRENTRY (16 bytes)
+  0x01,                   // width  = 1 px
+  0x01,                   // height = 1 px
+  0x00,                   // colorCount = 0 (true color)
+  0x00,                   // reserved
+  0x01, 0x00,             // planes = 1
+  0x20, 0x00,             // bitCount = 32
+  0x30, 0x00, 0x00, 0x00, // bytesInRes = 48 (40 header + 4 pixel + 4 mask)
+  0x16, 0x00, 0x00, 0x00, // imageOffset = 22 (6 header + 16 entry)
+  // BITMAPINFOHEADER (40 bytes)
+  0x28, 0x00, 0x00, 0x00, // biSize = 40
+  0x01, 0x00, 0x00, 0x00, // biWidth = 1
+  0x02, 0x00, 0x00, 0x00, // biHeight = 2 (height × 2 per ICO spec: XOR + AND)
+  0x01, 0x00,             // biPlanes = 1
+  0x20, 0x00,             // biBitCount = 32
+  0x00, 0x00, 0x00, 0x00, // biCompression = BI_RGB (none)
+  0x08, 0x00, 0x00, 0x00, // biSizeImage = 8 (4 pixel + 4 mask)
+  0x00, 0x00, 0x00, 0x00, // biXPelsPerMeter
+  0x00, 0x00, 0x00, 0x00, // biYPelsPerMeter
+  0x00, 0x00, 0x00, 0x00, // biClrUsed
+  0x00, 0x00, 0x00, 0x00, // biClrImportant
+  // XOR pixel data: 1 pixel BGRA (white, fully opaque) — 4 bytes
   0xFF, 0xFF, 0xFF, 0xFF,
+  // AND mask: 1 row padded to DWORD boundary (0 = opaque) — 4 bytes
+  0x00, 0x00, 0x00, 0x00,
 ]);
 
 function ensureIcon(filename, data) {

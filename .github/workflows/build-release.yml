@@ -1,6 +1,6 @@
 name: Build & Release Desktop App
 
-# Trigger this workflow when a GitHub Release is published **or** manually.
+# Trigger this workflow when a GitHub Release is created **or** manually.
 on:
   release:
     types: [created]
