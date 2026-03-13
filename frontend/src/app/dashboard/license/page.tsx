@@ -19,6 +19,15 @@ interface LicenseStatus {
 }
 
 function formatDate(unix: number | null | undefined): string {
+  if (!unix) return 'Unknown';
+  return new Date(unix * 1000).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function formatExpiry(unix: number | null | undefined): string {
   if (!unix) return 'Never (perpetual)';
   return new Date(unix * 1000).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -197,7 +206,7 @@ export default function LicensePage() {
                   <div className="text-gray-900">{formatDate(status.issuedAt)}</div>
 
                   <div className="text-gray-500 font-medium">Expires</div>
-                  <div className="text-gray-900">{formatDate(status.expiresAt)}</div>
+                  <div className="text-gray-900">{formatExpiry(status.expiresAt)}</div>
 
                   <div className="text-gray-500 font-medium">Source</div>
                   <div className="text-gray-600 capitalize">{status.source}</div>

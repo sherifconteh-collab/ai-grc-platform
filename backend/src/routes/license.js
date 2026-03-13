@@ -28,6 +28,7 @@ const {
   upgradeEdition,
   getEditionInfo,
   LICENSE_TIER_TO_EDITION,
+  BOOT_EDITION,
 } = require('../middleware/edition');
 
 // Rate limiter for all license endpoints to prevent abuse
@@ -56,11 +57,22 @@ router.use(requireRole(['admin']));
  */
 router.get('/', async (req, res) => {
   try {
-    // Check env-var license first, then in-memory cache, then DB
-    let license = getActiveLicense();
-    let source = loadLicenseFromEnv() ? 'env' : 'database';
-    if (!license || !license.valid) {
-      license = await loadLicenseFromDb();
+    // Determine license source accurately:
+    // 1. Env-var license (set at process start via LICENSE_KEY)
+    // 2. In-memory cache (set when a license was activated via API)
+    // 3. DB fallback (lazy-loaded below)
+    let license = null;
+    let source = 'database';
+
+    const envLicense = loadLicenseFromEnv();
+    if (envLicense && envLicense.valid) {
+      license = envLicense;
+      source = 'env';
+    } else {
+      license = getActiveLicense();
+      if (!license || !license.valid) {
+        license = await loadLicenseFromDb();
+      }
     }
 
     const edition = getEditionInfo();
@@ -181,14 +193,14 @@ router.delete('/', licenseActionLimiter, async (req, res) => {
     // Clear the in-memory cache
     clearActiveLicense();
 
-    // Revert to the original EDITION env-var value (default: 'community')
-    const originalEdition = (process.env.EDITION || 'community').toLowerCase();
-    upgradeEdition(originalEdition);
+    // Revert to the boot-time edition (the EDITION env-var value captured at startup,
+    // before any runtime license upgrades mutated process.env.EDITION).
+    upgradeEdition(BOOT_EDITION);
 
     log('info', 'license.removed', {
       userId: req.user?.id,
       wasStored: removed,
-      revertedTo: originalEdition,
+      revertedTo: BOOT_EDITION,
     });
 
     const edition = getEditionInfo();
