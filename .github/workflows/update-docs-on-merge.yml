@@ -1,0 +1,126 @@
+name: Update Docs on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-docs:
+    name: Auto-update README and Release Notes
+    # Only run when the PR was actually merged (not just closed/abandoned)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Use GITHUB_TOKEN so the commit is attributed to github-actions[bot]
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          # Full history so the push doesn't fast-forward over concurrent merges
+          fetch-depth: 0
+
+      - name: Update RELEASE_NOTES.md
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re
+
+          pr_number = os.environ["PR_NUMBER"]
+          pr_title  = os.environ["PR_TITLE"]
+          pr_author = os.environ["PR_AUTHOR"]
+          pr_labels = os.environ.get("PR_LABELS", "").lower()
+          pr_url    = os.environ["PR_URL"]
+
+          # Determine change-type section from labels
+          if any(k in pr_labels for k in ("bug", "fix")):
+              section = "Fixed"
+          elif any(k in pr_labels for k in ("security",)):
+              section = "Security"
+          elif any(k in pr_labels for k in ("deprecat",)):
+              section = "Deprecated"
+          elif any(k in pr_labels for k in ("remov", "delet")):
+              section = "Removed"
+          elif any(k in pr_labels for k in ("doc", "readme", "release-note")):
+              section = "Documentation"
+          elif any(k in pr_labels for k in ("feature", "enhancement", "new")):
+              section = "Added"
+          else:
+              section = "Changed"
+
+          entry = f"- {pr_title} ([#{pr_number}]({pr_url})) — @{pr_author}"
+
+          with open("RELEASE_NOTES.md", "r") as f:
+              content = f.read()
+
+          unreleased_header = "## [Unreleased]"
+          if unreleased_header not in content:
+              # No [Unreleased] block at all — prepend one after the file preamble (first ---)
+              block = f"\n{unreleased_header}\n\n> Changes staged but not yet released to production.\n\n### {section}\n\n{entry}\n"
+              content = re.sub(r"(---\n)", r"\1" + block, content, count=1)
+          else:
+              section_header = f"### {section}"
+              # Find the [Unreleased] block
+              unreleased_pos = content.index(unreleased_header)
+              # Look for next ## heading after [Unreleased] to define its boundary
+              next_release_match = re.search(r"\n## \[", content[unreleased_pos + len(unreleased_header):])
+              if next_release_match:
+                  unreleased_end = unreleased_pos + len(unreleased_header) + next_release_match.start()
+              else:
+                  unreleased_end = len(content)
+
+              unreleased_block = content[unreleased_pos:unreleased_end]
+
+              if section_header in unreleased_block:
+                  # Append entry right after the existing section header
+                  insert_after = section_header + "\n"
+                  replacement  = insert_after + entry + "\n"
+                  new_block = unreleased_block.replace(insert_after, replacement, 1)
+              else:
+                  # Add a new subsection at the end of the [Unreleased] block
+                  new_section = f"\n### {section}\n\n{entry}\n"
+                  new_block = unreleased_block.rstrip("\n") + "\n" + new_section
+
+              content = content[:unreleased_pos] + new_block + content[unreleased_end:]
+
+          with open("RELEASE_NOTES.md", "w") as f:
+              f.write(content)
+
+          print(f"RELEASE_NOTES.md updated: [{section}] {entry}")
+          PYEOF
+
+      - name: Update README.md last-updated marker
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          DATE=$(date -u +"%Y-%m-%d")
+          # Replace the <!-- LAST_UPDATED: ... --> marker with fresh info
+          sed -i "s|<!-- LAST_UPDATED:.*-->|<!-- LAST_UPDATED: ${DATE} \| PR #${PR_NUMBER}: ${PR_TITLE} -->|" README.md
+          echo "README.md last-updated marker refreshed → ${DATE}"
+
+      - name: Commit and push doc updates
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add RELEASE_NOTES.md README.md
+
+          # Only commit when there are actual changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "docs: auto-update release notes and readme for PR #${{ github.event.pull_request.number }} [skip ci]"
+            git push
+          fi

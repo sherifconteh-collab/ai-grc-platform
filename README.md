@@ -9,6 +9,8 @@
 [![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
+<!-- LAST_UPDATED: never -->
+
 ## 🎯 What is This?
 
 A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 12+ frameworks with 500+ controls. Built to be:
