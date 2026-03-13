@@ -20,7 +20,13 @@ if (useConnectionString) {
   poolOptions.connectionString = process.env.DATABASE_URL;
 } else {
   poolOptions.host = process.env.DB_HOST;
-  poolOptions.port = process.env.DB_PORT;
+  const dbPort = process.env.DB_PORT;
+  if (dbPort !== undefined && dbPort !== '') {
+    const parsedPort = parseInt(dbPort, 10);
+    if (!Number.isNaN(parsedPort)) {
+      poolOptions.port = parsedPort;
+    }
+  }
   poolOptions.database = process.env.DB_NAME;
   poolOptions.user = process.env.DB_USER;
   poolOptions.password = process.env.DB_PASSWORD;
