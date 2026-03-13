@@ -131,6 +131,39 @@ function spawnNode(scriptPath, cwd, env = {}) {
   return child;
 }
 
+/**
+ * Run a Node.js script to completion and return a Promise that resolves when
+ * the script exits with code 0, or rejects when it exits with a non-zero code.
+ * Unlike spawnNode(), this is intended for one-shot scripts (e.g. migrations)
+ * rather than long-running servers.
+ */
+function runNodeScriptToCompletion(scriptPath, cwd, env = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(NODE_BINARY, [scriptPath], {
+      cwd,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        ...env,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const label = path.basename(scriptPath, '.js');
+    child.stdout.on('data', (d) => process.stdout.write(`[${label}] ${d}`));
+    child.stderr.on('data', (d) => process.stderr.write(`[${label}] ${d}`));
+
+    child.on('error', (err) => reject(err));
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${label} exited with code ${code}`));
+      }
+    });
+  });
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Embedded PostgreSQL
 // ──────────────────────────────────────────────────────────────────────────────
@@ -210,6 +243,24 @@ async function startEmbeddedPostgres() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Run all pending database migrations against the embedded PostgreSQL instance.
+ * Uses backend/scripts/migrate-all.js which is idempotent — already-applied
+ * migrations are skipped, so this is safe to call on every app launch.
+ */
+async function runMigrations(backendDir, databaseUrl) {
+  const migrateScript = path.join(backendDir, 'scripts', 'migrate-all.js');
+
+  if (!fs.existsSync(migrateScript)) {
+    throw new Error(`Migration script not found: ${migrateScript}`);
+  }
+
+  await runNodeScriptToCompletion(migrateScript, backendDir, {
+    NODE_ENV: 'production',
+    DATABASE_URL: databaseUrl,
+  });
+}
+
+/**
  * Common logic for spawning a bundled server and waiting for it to be ready.
  * Returns the child process so the caller can track it for graceful shutdown.
  */
@@ -229,8 +280,7 @@ function startServer(label, dirPath, scriptRelPath, port, extraEnv = {}) {
   return { proc, ready: waitForServer(port) };
 }
 
-function startBackend(databaseUrl) {
-  const backendDir = path.join(RESOURCES_ROOT, 'backend');
+function startBackend(backendDir, databaseUrl) {
   const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {
     // Allow the frontend origin so CORS is satisfied
     CORS_ORIGIN: `http://localhost:${FRONTEND_PORT}`,
@@ -359,8 +409,14 @@ app.whenReady().then(async () => {
     const databaseUrl = await startEmbeddedPostgres();
     console.log(`Embedded PostgreSQL ready on port ${EMBEDDED_PG_PORT}`);
 
+    const backendDir = path.join(RESOURCES_ROOT, 'backend');
+
+    console.log('Running database migrations…');
+    await runMigrations(backendDir, databaseUrl);
+    console.log('Database migrations complete');
+
     console.log('Starting backend server…');
-    await startBackend(databaseUrl);
+    await startBackend(backendDir, databaseUrl);
     console.log(`Backend ready on port ${BACKEND_PORT}`);
 
     console.log('Starting frontend server…');
