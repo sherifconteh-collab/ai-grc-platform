@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 export interface ControlGroup<T> {
   controlId: string;
   items: T[];

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 // ip-hygiene:ignore-file
 const fs = require('fs');
 const path = require('path');

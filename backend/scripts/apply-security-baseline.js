@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 require('dotenv').config();
 const { Pool } = require('pg');
 

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const DEFAULT_API_BASE = '/api/v1'
 const LOCAL_API_BASE = 'http://localhost:3001/api/v1'
 

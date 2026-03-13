@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use client';
 
 import { useState, useCallback } from 'react';

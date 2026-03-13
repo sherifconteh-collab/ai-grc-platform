@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @tier: free
+// @tier: community
 /**
  * ControlWeave MCP Server
  *

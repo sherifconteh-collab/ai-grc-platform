@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 import axios from 'axios';
 import { getApiBaseUrl } from './apiBase';
 

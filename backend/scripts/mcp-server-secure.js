@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @tier: free
+// @tier: community
 /**
  * Secure MCP Server for ControlWeave
  * Implements OWASP best practices for MCP server development

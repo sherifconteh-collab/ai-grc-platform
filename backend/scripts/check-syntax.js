@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');

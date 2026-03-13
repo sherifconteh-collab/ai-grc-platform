@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 // ip-hygiene:ignore-file
 'use strict';
 
@@ -6,13 +6,13 @@
  * sync-mirror-allowlist.js
  *
  * Scans the codebase for files not yet classified in the public mirror
- * allowlist and auto-classifies each as free-tier or paid-tier.
+ * allowlist and auto-classifies each as community-tier or paid-tier.
  *
  * Classification uses a two-step approach:
  *   1. ANNOTATION (authoritative): reads  // @tier: <value>  from the first
  *      10 lines of every file.  Valid values:
- *        free        → add to active allowlist
- *        starter | professional | enterprise | utilities | platform | exclude
+ *        community   → add to active allowlist
+ *        pro | enterprise | govcloud | platform | exclude
  *                    → add to EXCLUDED comment block
  *   2. HEURISTICS (fallback): when no @tier annotation is present the script
  *      applies pattern-matching rules and emits a ::warning:: asking the
@@ -78,6 +78,9 @@ const SAFE_SCRIPT_RE =
 /** Valid tier values recognised by this script. */
 const VALID_TIERS = new Set(['community', 'pro', 'enterprise', 'govcloud', 'platform', 'exclude']);
 
+/** Backwards-compat mapping for old tier names → new tier names. */
+const TIER_ALIASES = { free: 'community', starter: 'pro', professional: 'enterprise', utilities: 'govcloud' };
+
 /**
  * Read the  // @tier: <value>  annotation from the first 10 lines of a file.
  * Returns { tier, annotated: true } when found, or { tier: null, annotated: false }.
@@ -87,7 +90,8 @@ function readTierAnnotation(src) {
   for (const line of lines) {
     const m = line.match(/^\s*\/\/\s*@tier:\s*(\S+)/);
     if (m) {
-      const tier = m[1].toLowerCase();
+      let tier = m[1].toLowerCase();
+      if (TIER_ALIASES[tier]) tier = TIER_ALIASES[tier];
       if (VALID_TIERS.has(tier)) return { tier, annotated: true };
     }
   }
@@ -148,7 +152,7 @@ function classifyService(name, src) {
 }
 
 function classifyMiddleware(name, src) {
-  // auth.js is annotated @tier: free but excluded from the mirror for a different
+  // auth.js is annotated @tier: community but excluded from the mirror for a different
   // reason (it contains the requireTier implementation itself).  The heuristic
   // marks it paid so that unannotated copies would be excluded by default;
   // the annotation on the actual file correctly overrides this when present.
@@ -192,7 +196,7 @@ const BILLING_UI_RE =
   /\b(?:billingStatus|stripeCustomer|subscriptionTier|trialEnds|cancelAccount|DEMO_ACCOUNT)\b/i;
 
 function classifyFrontendLib(name, src) {
-  if (/assets|cmdb/i.test(name)) return paid('CMDB / asset management — Starter+');
+  if (/assets|cmdb/i.test(name)) return paid('CMDB / asset management — Pro+');
   if (hasPaidRequire(src))       return paid('imports paid-tier service');
   return free('core frontend utility');
 }
@@ -204,7 +208,7 @@ function classifyFrontendLib(name, src) {
 function classifyDashboardPage(dirName, src) {
   // Hard page guard: early return/redirect based on paid tier
   const paidGuardRe =
-    /hasTierAtLeast\s*\([^,]+,\s*['"](?:starter|professional|enterprise|utilities)['"]\s*\)/;
+    /hasTierAtLeast\s*\([^,]+,\s*['"](?:pro|enterprise|govcloud)['"]\s*\)/;
   const earlyExitRe =
     /(?:router\.push|redirect\s*\(|return\s+null\s*;|<Forbidden|Access\s*Denied|Upgrade\s*Required)/;
   if (paidGuardRe.test(src) && earlyExitRe.test(src)) {
@@ -461,7 +465,7 @@ function main() {
     return;
   }
 
-  console.log(`Allowlist sync: ${freeItems.length} new free-tier, ${paidItems.length} new paid-tier items found.\n`);
+  console.log(`Allowlist sync: ${freeItems.length} new community-tier, ${paidItems.length} new paid-tier items found.\n`);
 
   if (paidItems.length > 0) {
     console.log('New PAID-tier files detected (documenting in excluded block):');
@@ -476,10 +480,10 @@ function main() {
   }
 
   if (freeItems.length > 0) {
-    console.log('New FREE-tier files detected (adding to active allowlist):');
+    console.log('New COMMUNITY-tier files detected (adding to active allowlist):');
     for (const item of freeItems) {
       const tag = item.annotated ? '[annotated]' : '[heuristic]';
-      console.log(`  [free] ${tag} ${item.relPath}  —  ${item.reason}`);
+      console.log(`  [community] ${tag} ${item.relPath}  —  ${item.reason}`);
       if (!DRY_RUN) {
         text = insertActive(text, item.section, item.relPath);
       }
