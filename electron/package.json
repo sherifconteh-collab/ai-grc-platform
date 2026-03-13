@@ -1,0 +1,99 @@
+{
+  "name": "controlweave-desktop",
+  "version": "2.1.0",
+  "description": "ControlWeave AI GRC Platform — Desktop Edition",
+  "author": "ControlWeave <contehconsulting@gmail.com>",
+  "license": "MIT",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "dist:all": "electron-builder --win --mac --linux"
+  },
+  "build": {
+    "appId": "com.controlweave.desktop",
+    "productName": "ControlWeave",
+    "copyright": "Copyright © 2024-2026 ControlWeave",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "build/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!node_modules/.cache/**",
+          "!**/*.log",
+          "!.env*",
+          "!scripts/qa-*.js",
+          "!scripts/seed-*.js"
+        ]
+      },
+      {
+        "from": "../frontend/.next/standalone",
+        "to": "frontend-standalone"
+      },
+      {
+        "from": "../frontend/.next/static",
+        "to": "frontend-standalone/.next/static"
+      },
+      {
+        "from": "../frontend/public",
+        "to": "frontend-standalone/public"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ControlWeave",
+      "license": "../LICENSE",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
+    }
+  },
+  "devDependencies": {
+    "electron": "41.0.2",
+    "electron-builder": "26.8.1"
+  }
+}
