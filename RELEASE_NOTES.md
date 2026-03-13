@@ -97,6 +97,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 > 💡 **Getting started:** See `.github/workflows/` for the full pipeline definitions.
 ### Changed
+- CI: auto-update docs on merge, NIST 800-160 security gates, SBOM/AIBOM generation ([#39](https://github.com/sherifconteh-collab/ai-grc-platform/pull/39)) — @Copilot
 - RMF step tracking is now observational only (not a deployment gate), consistent with NIST SP 800-37 philosophy
 - Auth `/me` endpoint now returns `framework_codes` array for client-side feature gating
 - Trial period updated from 7 to 14 days across all references

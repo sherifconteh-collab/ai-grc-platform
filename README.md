@@ -9,7 +9,7 @@
 [![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-<!-- LAST_UPDATED: not yet updated -->
+<!-- LAST_UPDATED: 2026-03-13 | PR #39: CI: auto-update docs on merge, NIST 800-160 security gates, SBOM/AIBOM generation -->
 
 ## 🎯 What is This?
 
