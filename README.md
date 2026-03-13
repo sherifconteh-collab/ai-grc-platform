@@ -41,7 +41,27 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 - 📡 Webhook and notification system
 - 📄 Policy management with gap analysis
 
-## 🚀 Quick Start
+## 📥 Download
+
+Get the ControlWeave desktop app — everything you need is bundled in a single installer (including PostgreSQL). No external database or server setup required.
+
+| Platform | Installer | Architecture |
+|----------|-----------|--------------|
+| **Windows** | `.exe` (NSIS installer) | x64 |
+| **macOS** | `.dmg` | Intel & Apple Silicon |
+| **Linux** | `.AppImage` | x64 |
+
+**👉 [Download the latest release](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)**
+
+> **System requirements:** Windows 10+, macOS 10.13+, or Ubuntu 18.04+ (or equivalent) · 2 GB RAM · ~500 MB disk space
+>
+> After installing, launch ControlWeave and visit **http://localhost:3000/register** to create your first account.
+
+Looking for older versions? See [all releases](https://github.com/sherifconteh-collab/ai-grc-platform/releases).
+
+## 🚀 Quick Start (Development)
+
+> The steps below are for developers who want to run from source. If you just want to use ControlWeave, [download the installer](#-download) instead.
 
 ```bash
 # Clone the repository
