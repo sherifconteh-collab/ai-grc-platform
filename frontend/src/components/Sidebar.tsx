@@ -60,6 +60,7 @@ const navigationSections: NavigationSection[] = [
       { name: 'AI Analysis', href: '/dashboard/ai-analysis', icon: '✨', requiredPermissions: ['ai.use'], minTier: 'pro' },
       { name: 'AI Monitoring', href: '/dashboard/ai-monitoring', icon: '🤖', requiredPermissions: ['settings.manage'], minTier: 'pro' },
       { name: 'AI Governance', href: '/dashboard/ai-governance', icon: '🏛️', requiredPermissions: ['organizations.read'], minTier: 'enterprise' },
+      { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'], minTier: 'pro' },
       { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'], minTier: 'enterprise' },
       { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'], minTier: 'pro' },
     ],

@@ -1643,4 +1643,13 @@ export const rmfAPI = {
     api.post(`/rmf/packages/${id}/authorization`, data),
 };
 
+// PLOT4ai Threat Library API (Pro tier — AI Threat Modeling)
+export const plot4aiAPI = {
+  getThreats: (params?: { category?: number; aitype?: string; role?: string; phase?: string; search?: string }) =>
+    api.get('/plot4ai/threats', { params }),
+  getCategories: () => api.get('/plot4ai/categories'),
+  getFilters: () => api.get('/plot4ai/filters'),
+  getStats: () => api.get('/plot4ai/stats'),
+};
+
 export default api;

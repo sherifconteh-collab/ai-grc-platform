@@ -30,7 +30,8 @@ const EXCLUDED_FILES = new Set([
   'package-lock.json',
   'pnpm-lock.yaml',
   'yarn.lock',
-  'tsconfig.tsbuildinfo'
+  'tsconfig.tsbuildinfo',
+  'plot4ai-library.json'
 ]);
 
 const COMPETITOR_RULES = [

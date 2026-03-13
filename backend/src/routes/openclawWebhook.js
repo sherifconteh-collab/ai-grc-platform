@@ -17,7 +17,7 @@ function verifySignature(req, res, next) {
     return res.status(401).json({ success: false, error: 'Missing signature' });
   }
 
-  const body = req.rawBody || JSON.stringify(req.body);
+  const body = JSON.stringify(req.body);
   const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
 
   if (signature.length !== expected.length ||
@@ -46,10 +46,10 @@ router.post('/', (req, res) => {
   const { event_type, payload } = req.body || {};
 
   if (event_type && !VALID_EVENTS.includes(event_type)) {
-    log('warn', `[OpenClaw] Unknown event type: ${event_type}`);
+    log.warn(`[OpenClaw] Unknown event type: ${event_type}`);
   }
 
-  log('info', `[OpenClaw] Webhook event: ${event_type}`, {
+  log.info(`[OpenClaw] Webhook event: ${event_type}`, {
     event_type,
     payload_keys: payload ? Object.keys(payload) : [],
     timestamp: new Date().toISOString()

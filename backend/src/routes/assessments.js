@@ -16,14 +16,7 @@ const pool = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const PDFDocument = require('pdfkit');
-
-// Optional LLM service: AI-assisted assessment features disabled if unavailable
-let llm = null;
-try {
-  llm = require('../services/llmService');
-} catch (e) {
-  // LLM service not available; proceed without AI-assisted assessment features
-}
+const llm = require('../services/llmService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
 

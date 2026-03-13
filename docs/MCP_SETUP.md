@@ -9,7 +9,7 @@ ControlWeave includes an MCP server that exposes compliance data to AI assistant
 ## Starting the MCP Server
 
 ```bash
-cd backend
+cd controlweave/backend
 npm run mcp
 ```
 
