@@ -1,10 +1,38 @@
 # Contributor License Agreement (CLA)
 
-## ControlWeave Community Edition
+## Contributing to ControlWeave
 
-Thank you for your interest in contributing to ControlWeave Community Edition
-("the Project"), maintained by sherifconteh-collab. This Contributor License
-Agreement ("CLA") applies to any contribution you make to the Project.
+Thank you for your interest in contributing to ControlWeave! This document
+covers both the Contributor License Agreement and how to get started.
+
+## Getting Started
+
+1. **Fork the repository**
+2. **Create a feature branch** following our naming convention:
+
+   ```
+   feat/CW-<issue-number>/<short-description>
+   ```
+
+   Examples:
+   ```bash
+   feat/CW-42/add-gdpr-framework
+   fix/CW-15/pagination-offset-bug
+   docs/CW-7/improve-setup-guide
+   ```
+
+3. **Make your changes** following the guidelines in [CONTRIBUTING.md](./CONTRIBUTING.md)
+4. **Open a Pull Request** — the CLA bot will ask you to sign on your first PR
+
+For full development setup and coding standards, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Contributor License Agreement
+
+### ControlWeave Community Edition
+
+This Contributor License Agreement ("CLA") applies to any contribution you make
+to ControlWeave Community Edition ("the Project"), maintained by
+sherifconteh-collab.
 
 ### 1. Definitions
 
@@ -47,3 +75,7 @@ I have read the CLA Document and I hereby sign the CLA
 ```
 
 Your signature will be recorded automatically.
+
+## Contact
+
+For questions about this CLA or contributing, email **contehconsulting@gmail.com**.
