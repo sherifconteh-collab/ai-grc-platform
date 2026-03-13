@@ -80,6 +80,24 @@ function waitForServer(port, timeoutMs = STARTUP_TIMEOUT_MS) {
 }
 
 /**
+ * Open a URL in the system browser.
+ * Only http: and https: schemes are permitted to prevent a compromised renderer
+ * from opening file:, javascript:, or other dangerous URI schemes.
+ */
+function openSafeExternal(url) {
+  try {
+    const { protocol } = new URL(url);
+    if (protocol === 'http:' || protocol === 'https:') {
+      shell.openExternal(url).catch((err) => {
+        console.error(`Failed to open external URL: ${err.message}`);
+      });
+    }
+  } catch (_) {
+    // ignore malformed URLs
+  }
+}
+
+/**
  * Spawn a Node.js child process and pipe its stdio to the Electron console.
  */
 function spawnNode(scriptPath, cwd, env = {}) {
@@ -109,42 +127,45 @@ function spawnNode(scriptPath, cwd, env = {}) {
 // Server startup
 // ──────────────────────────────────────────────────────────────────────────────
 
-function startBackend() {
-  const backendDir = path.join(RESOURCES_ROOT, 'backend');
-  const serverScript = path.join(backendDir, 'src', 'server.js');
+/**
+ * Common logic for spawning a bundled server and waiting for it to be ready.
+ * Returns the child process so the caller can track it for graceful shutdown.
+ */
+function startServer(label, dirPath, scriptRelPath, port, extraEnv = {}) {
+  const serverScript = path.join(dirPath, scriptRelPath);
 
   if (!fs.existsSync(serverScript)) {
-    throw new Error(`Backend entry point not found: ${serverScript}`);
+    throw new Error(`${label} entry point not found: ${serverScript}`);
   }
 
-  backendProcess = spawnNode(serverScript, backendDir, {
+  const proc = spawnNode(serverScript, dirPath, {
     NODE_ENV: 'production',
-    PORT: String(BACKEND_PORT),
+    PORT: String(port),
+    ...extraEnv,
+  });
+
+  return { proc, ready: waitForServer(port) };
+}
+
+function startBackend() {
+  const backendDir = path.join(RESOURCES_ROOT, 'backend');
+  const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {
     // Allow the frontend origin so CORS is satisfied
     CORS_ORIGIN: `http://localhost:${FRONTEND_PORT}`,
   });
-
-  return waitForServer(BACKEND_PORT);
+  backendProcess = proc;
+  return ready;
 }
 
 function startFrontend() {
-  // Next.js standalone output is at frontend-standalone/server.js
   const frontendDir = path.join(RESOURCES_ROOT, 'frontend-standalone');
-  const serverScript = path.join(frontendDir, 'server.js');
-
-  if (!fs.existsSync(serverScript)) {
-    throw new Error(`Frontend entry point not found: ${serverScript}`);
-  }
-
-  frontendProcess = spawnNode(serverScript, frontendDir, {
-    NODE_ENV: 'production',
-    PORT: String(FRONTEND_PORT),
+  const { proc, ready } = startServer('Frontend', frontendDir, 'server.js', FRONTEND_PORT, {
     HOSTNAME: '127.0.0.1',
     // Tell the Next.js rewrite where the backend lives
     BACKEND_ORIGIN: `http://localhost:${BACKEND_PORT}`,
   });
-
-  return waitForServer(FRONTEND_PORT);
+  frontendProcess = proc;
+  return ready;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -175,18 +196,10 @@ function createWindow() {
   });
 
   // Open external links in the system browser instead of a new Electron window.
-  // Only allow http: and https: schemes to prevent opening dangerous local
-  // file:, javascript:, or other URI schemes from a compromised renderer.
+  // openSafeExternal() validates the scheme so only http:/https: URLs are opened.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://localhost')) return { action: 'allow' };
-    try {
-      const { protocol } = new URL(url);
-      if (protocol === 'http:' || protocol === 'https:') {
-        shell.openExternal(url);
-      }
-    } catch (_) {
-      // ignore malformed URLs
-    }
+    openSafeExternal(url);
     return { action: 'deny' };
   });
 
@@ -230,12 +243,12 @@ function buildMenu() {
       submenu: [
         {
           label: 'Documentation',
-          click: () => shell.openExternal('https://github.com/sherifconteh-collab/ai-grc-platform'),
+          click: () => openSafeExternal('https://github.com/sherifconteh-collab/ai-grc-platform'),
         },
         {
           label: 'Report Issue',
           click: () =>
-            shell.openExternal(
+            openSafeExternal(
               'https://github.com/sherifconteh-collab/ai-grc-platform/issues'
             ),
         },
