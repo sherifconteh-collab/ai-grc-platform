@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
 
+# Restrict the default GITHUB_TOKEN to read-only for all jobs.
+# Jobs that need write access (e.g. release upload) declare their own
+# narrower permissions blocks.
+permissions:
+  contents: read
+
 jobs:
   dependency-audit:
     name: Dependency Security Audit
@@ -417,9 +423,10 @@ jobs:
           done
 
           # .npmrc must not disable package integrity verification
+          # 'no-integrity=true' skips checksum validation of downloaded packages
           for npmrc in backend/.npmrc frontend/.npmrc .npmrc; do
-            if [ -f "$npmrc" ] && grep -q "no-integrity\|ignore-scripts.*false" "$npmrc"; then
-              echo "❌ $npmrc disables integrity checking — remove 'no-integrity' (NIST 800-160 SA-12)"
+            if [ -f "$npmrc" ] && grep -qE "^no-integrity\s*=\s*true" "$npmrc"; then
+              echo "❌ $npmrc disables package integrity checking (no-integrity=true) — remove it (NIST 800-160 SA-12)"
               FAIL=1
             fi
           done
@@ -432,14 +439,14 @@ jobs:
             fi
           done
 
-          # Run audit against only production dependencies (dev deps are a lower risk)
+          # Run audit against only production dependencies (lockfile must exist; no install needed)
           echo ""
           echo "Running production-only dependency audit..."
-          (cd backend && npm ci --ignore-scripts && npm audit --omit=dev --audit-level=high) || {
+          (cd backend && npm audit --omit=dev --audit-level=high) || {
             echo "❌ High/critical vulnerability in backend production dependencies (NIST 800-160 SA-12)"
             FAIL=1
           }
-          (cd frontend && npm ci --ignore-scripts && npm audit --omit=dev --audit-level=high) || {
+          (cd frontend && npm audit --omit=dev --audit-level=high) || {
             echo "❌ High/critical vulnerability in frontend production dependencies (NIST 800-160 SA-12)"
             FAIL=1
           }
