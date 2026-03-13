@@ -12,11 +12,11 @@
 
 const pool = require('../config/database');
 // Optional LLM service: AI remediation features disabled if unavailable
-let llm = null;
+let llm;
 try {
   llm = require('./llmService');
 } catch (e) {
-  // LLM service not available; smart remediation features will be disabled
+  llm = new Proxy({}, { get() { return async () => null; } });
 }
 
 /**

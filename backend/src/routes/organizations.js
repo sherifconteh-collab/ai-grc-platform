@@ -7,11 +7,23 @@ const multer = require('multer');
 const path = require('path');
 const { Readable } = require('stream');
 // Optional LLM service: AI features degrade gracefully if unavailable
-let llm = null;
+let llm;
 try {
   llm = require('../services/llmService');
 } catch (e) {
-  // LLM service not available; AI-powered features will be disabled
+  const noProvider = { available: false, models: [] };
+  llm = new Proxy({}, {
+    get(_, prop) {
+      if (prop === 'getUsageLimit') return () => 0;
+      if (prop === 'getUsageCount') return async () => 0;
+      if (prop === 'resolveApiKey') return async () => ({ source: 'none' });
+      if (prop === 'getProviderStatus') return () => ({
+        claude: noProvider, openai: noProvider, gemini: noProvider,
+        grok: noProvider, groq: noProvider, ollama: noProvider
+      });
+      return async () => null;
+    }
+  });
 }
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, isUuid } = require('../middleware/validate');

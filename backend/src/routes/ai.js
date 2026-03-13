@@ -4,11 +4,25 @@ const router = express.Router();
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 // Optional LLM service: AI routes degrade gracefully if unavailable
-let llm = null;
+let llm;
 try {
   llm = require('../services/llmService');
 } catch (e) {
-  // LLM service not available; AI features will be disabled
+  // LLM service not available; provide no-op proxy so route handlers never crash
+  const noProvider = { available: false, models: [] };
+  llm = new Proxy({}, {
+    get(_, prop) {
+      if (prop === 'getUsageLimit') return () => 0;
+      if (prop === 'getUsageCount') return async () => 0;
+      if (prop === 'resolveApiKey') return async () => ({ source: 'none' });
+      if (prop === 'getProviderStatus') return () => ({
+        claude: noProvider, openai: noProvider, gemini: noProvider,
+        grok: noProvider, groq: noProvider, ollama: noProvider
+      });
+      if (prop === 'withAITrackingContext') return async (fn) => ({ result: await fn(), tracking: null });
+      return async () => null;
+    }
+  });
 }
 const auditService = require('../services/auditService');
 const pool = require('../config/database');

@@ -12,11 +12,11 @@
 
 const pool = require('../config/database');
 // Optional LLM service: AI field suggestions disabled if unavailable
-let llm = null;
+let llm;
 try {
   llm = require('./llmService');
 } catch (e) {
-  // LLM service not available; AI-suggested fields will be disabled
+  llm = new Proxy({}, { get() { return async () => null; } });
 }
 
 // Configuration
