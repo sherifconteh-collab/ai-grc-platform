@@ -1,7 +1,7 @@
 // @tier: community
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { licenseAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,7 +73,7 @@ export default function LicensePage() {
     setTimeout(() => setToast(''), 4000);
   };
 
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     try {
       const res = await licenseAPI.getStatus();
       setStatus(res.data.data);
@@ -82,7 +82,7 @@ export default function LicensePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Wait for auth to finish loading and confirm user is admin before fetching
@@ -92,7 +92,7 @@ export default function LicensePage() {
       return;
     }
     loadStatus();
-  }, [authLoading, user]);
+  }, [authLoading, user, loadStatus]);
 
   const handleActivate = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
