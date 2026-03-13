@@ -16,7 +16,7 @@ let llm;
 try {
   llm = require('./llmService');
 } catch (e) {
-  llm = new Proxy({}, { get() { return async () => null; } });
+  llm = new Proxy({}, { get() { return async () => ''; } });
 }
 
 /**

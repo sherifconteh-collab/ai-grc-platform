@@ -23,6 +23,7 @@ try {
         try { return { result: await fn(), tracking: null }; }
         catch { return { result: null, tracking: null }; }
       };
+      if (prop === 'chatStream') return async function* () { /* empty async generator */ };
       return async () => null;
     }
   });
