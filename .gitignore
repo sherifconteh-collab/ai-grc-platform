@@ -18,16 +18,16 @@ yarn.lock
 dist/
 build/
 .next/
-.next-build*/
-.next-devcache*/
-out/
-*.tsbuildinfo
 
 # Electron desktop build artifacts
 electron/dist/
 electron/node_modules/
 electron/build/icon.png
 electron/build/icon.ico
+.next-build*/
+.next-devcache*/
+out/
+*.tsbuildinfo
 
 # IDE
 .vscode/
