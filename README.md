@@ -506,7 +506,7 @@ We welcome contributions! This is an open-source project designed to help organi
 
 MIT License — see [LICENSE](./LICENSE) file for details.
 
-By contributing, you agree to the [Contributor License Agreement](./CLA.md).
+By contributing, you agree to the [Contributor License Agreement](./CLA.md). Signing is automated — the CLA bot (see [`.github/workflows/cla.yml`](./.github/workflows/cla.yml)) will prompt you on your first PR.
 
 ## 💎 Want Premium Features?
 
