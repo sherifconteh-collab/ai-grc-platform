@@ -112,7 +112,12 @@ async function runJob(jobRow) {
 }
 
 async function runScheduledEvidenceCollection({ organizationId }) {
-  const splunkService = require('./splunkService');
+  let splunkService;
+  try {
+    splunkService = require('./splunkService');
+  } catch (e) {
+    return { triggered: 0, failed: 0, error: 'Splunk integration service unavailable' };
+  }
 
   const uploadsDir = path.join(__dirname, '../../uploads');
   if (!fs.existsSync(uploadsDir)) {

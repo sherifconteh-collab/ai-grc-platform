@@ -3,7 +3,13 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const llm = require('../services/llmService');
+// Optional LLM service: AI routes degrade gracefully if unavailable
+let llm = null;
+try {
+  llm = require('../services/llmService');
+} catch (e) {
+  // LLM service not available; AI features will be disabled
+}
 const auditService = require('../services/auditService');
 const pool = require('../config/database');
 const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
@@ -1039,8 +1045,17 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
 
 // ======================== MULTI-AGENT SWARM ========================
 
-const orchestrator = require('../services/multiAgentOrchestrator');
-const reasoningMemory = require('../services/reasoningMemory');
+let orchestrator, reasoningMemory;
+try {
+  orchestrator = require('../services/multiAgentOrchestrator');
+} catch (e) {
+  orchestrator = { getSwarmConfigs: () => [], getSwarmConfig: () => null, executeSwarm: async () => ({}), SWARM_CONFIGS: {} };
+}
+try {
+  reasoningMemory = require('../services/reasoningMemory');
+} catch (e) {
+  reasoningMemory = { invalidateCache: () => {} };
+}
 
 // GET /ai/swarm/configs — list available swarm configurations
 router.get('/swarm/configs', async (req, res) => {

@@ -9,13 +9,29 @@ const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-const {
-  getTrialSeedData,
-  expireOrganizationTrialIfNeeded,
-  ensureOrgFrameworks
-} = require('../services/subscriptionService');
+// Optional services: fall back to safe no-ops if modules are unavailable
+let getTrialSeedData, expireOrganizationTrialIfNeeded, ensureOrgFrameworks;
+try {
+  ({ getTrialSeedData, expireOrganizationTrialIfNeeded, ensureOrgFrameworks } = require('../services/subscriptionService'));
+} catch (e) {
+  getTrialSeedData = () => ({});
+  expireOrganizationTrialIfNeeded = async () => ({});
+  ensureOrgFrameworks = async () => {};
+}
 const { sendPasswordResetEmail } = require('../services/emailService');
-const { getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService');
+
+let getGeolocationFromRequest, extractIpFromRequest;
+try {
+  ({ getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService'));
+} catch (e) {
+  getGeolocationFromRequest = () => ({});
+  extractIpFromRequest = function (req) {
+    if (!req) return null;
+    const xff = req.headers && req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.length > 0) return xff.split(',')[0].trim();
+    return req.ip || (req.socket && req.socket.remoteAddress) || null;
+  };
+}
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');

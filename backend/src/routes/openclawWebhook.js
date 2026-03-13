@@ -46,10 +46,10 @@ router.post('/', (req, res) => {
   const { event_type, payload } = req.body || {};
 
   if (event_type && !VALID_EVENTS.includes(event_type)) {
-    log.warn(`[OpenClaw] Unknown event type: ${event_type}`);
+    log('warn', `[OpenClaw] Unknown event type: ${event_type}`);
   }
 
-  log.info(`[OpenClaw] Webhook event: ${event_type}`, {
+  log('info', `[OpenClaw] Webhook event: ${event_type}`, {
     event_type,
     payload_keys: payload ? Object.keys(payload) : [],
     timestamp: new Date().toISOString()

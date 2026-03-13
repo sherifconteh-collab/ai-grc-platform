@@ -3,7 +3,13 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
-const splunk = require('../services/splunkService');
+// Optional Splunk service: fall back to no-op proxy if unavailable
+let splunk;
+try {
+  splunk = require('../services/splunkService');
+} catch (err) {
+  splunk = new Proxy({}, { get() { return () => {}; } });
+}
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 

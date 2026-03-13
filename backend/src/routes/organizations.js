@@ -6,7 +6,13 @@ const ExcelJS = require('exceljs');
 const multer = require('multer');
 const path = require('path');
 const { Readable } = require('stream');
-const llm = require('../services/llmService');
+// Optional LLM service: AI features degrade gracefully if unavailable
+let llm = null;
+try {
+  llm = require('../services/llmService');
+} catch (e) {
+  // LLM service not available; AI-powered features will be disabled
+}
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, isUuid } = require('../middleware/validate');
 const { getFrameworkLimit, normalizeTier, shouldEnforceAiLimitForByok } = require('../config/tierPolicy');

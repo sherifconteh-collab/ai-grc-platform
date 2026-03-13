@@ -11,7 +11,13 @@
  */
 
 const pool = require('../config/database');
-const llm = require('./llmService');
+// Optional LLM service: AI remediation features disabled if unavailable
+let llm = null;
+try {
+  llm = require('./llmService');
+} catch (e) {
+  // LLM service not available; smart remediation features will be disabled
+}
 
 /**
  * Generate smart remediation plan for a control gap
