@@ -5,10 +5,11 @@
  *
  * Responsibilities:
  *  1. Start an embedded PostgreSQL server (no external DB required)
- *  2. Spawn the Node.js backend server (Express, port 3001)
- *  3. Spawn the Next.js frontend server (port 3000)
- *  4. Wait for both servers to be ready, then open a BrowserWindow
- *  5. Gracefully shut down child processes and PostgreSQL on quit
+ *  2. Run database migrations (idempotent, safe on every launch)
+ *  3. Spawn the Node.js backend server (Express, port 3001)
+ *  4. Spawn the Next.js frontend server (port 3000)
+ *  5. Wait for both servers to be ready, then open a BrowserWindow
+ *  6. Gracefully shut down child processes and PostgreSQL on quit
  */
 
 const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
