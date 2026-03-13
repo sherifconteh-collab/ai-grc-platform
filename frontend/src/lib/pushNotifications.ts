@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * Push notification utilities for browser notifications
  */

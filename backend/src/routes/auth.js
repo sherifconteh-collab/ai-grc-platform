@@ -9,7 +9,6 @@ const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-
 // Optional services: fall back to safe no-ops if modules are unavailable
 let getTrialSeedData, expireOrganizationTrialIfNeeded, ensureOrgFrameworks;
 try {

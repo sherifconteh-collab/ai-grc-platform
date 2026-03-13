@@ -107,8 +107,8 @@ router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) =>
 
       if (permissions) {
         await client.query('DELETE FROM role_permissions WHERE role_id = $1', [req.params.roleId]);
-        const uniquePerms = [...new Set(permissions)];
-        if (uniquePerms.length > 0) {
+        if (permissions.length > 0) {
+          const uniquePerms = [...new Set(permissions)];
           await client.query(
             `INSERT INTO role_permissions (role_id, permission_id)
              SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])

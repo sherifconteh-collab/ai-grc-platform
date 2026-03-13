@@ -3,13 +3,30 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-
 // Optional LLM service: AI routes degrade gracefully if unavailable
-let llm = null;
+let llm;
 try {
   llm = require('../services/llmService');
 } catch (e) {
-  // LLM service not available; AI features will be disabled
+  // LLM service not available; provide no-op proxy so route handlers never crash
+  const noProvider = { available: false, models: [] };
+  llm = new Proxy({}, {
+    get(_, prop) {
+      if (prop === 'getUsageLimit') return () => 0;
+      if (prop === 'getUsageCount') return async () => 0;
+      if (prop === 'resolveApiKey') return async () => ({ source: 'none' });
+      if (prop === 'getProviderStatus') return () => ({
+        claude: noProvider, openai: noProvider, gemini: noProvider,
+        grok: noProvider, groq: noProvider, ollama: noProvider
+      });
+      if (prop === 'withAITrackingContext') return async (fn) => {
+        try { return { result: await fn(), tracking: null }; }
+        catch { return { result: null, tracking: null }; }
+      };
+      if (prop === 'chatStream') return async function* () { /* empty async generator */ };
+      return async () => null;
+    }
+  });
 }
 const auditService = require('../services/auditService');
 const pool = require('../config/database');
@@ -270,7 +287,21 @@ router.get('/status', async (req, res) => {
           groq:    { available: status.groq.available, models: status.groq.models, hasOrgKey: !!orgGroqKey, hasPlatformKey: !!platformGroqKey },
           ollama:  { available: status.ollama.available, models: status.ollama.models, hasOrgKey: !!orgOllamaUrl, hasPlatformKey: !!platformOllamaUrl }
         },
-        usage: { used, limit: limit === -1 ? 'unlimited' : limit, remaining: limit === -1 ? 'unlimited' : Math.max(0, limit - used) },
+        usage: (() => {
+          // When BYOK bypass applies for this tier AND the org has at least one
+          // provider key configured, the 10-req/month community cap is not
+          // enforced at call time — reflect that accurately here so UI consumers
+          // don't show a misleading "10 / 10 used" bar for BYOK users.
+          const hasOrgKey = !!(orgClaudeKey || orgOpenAIKey || orgGeminiKey || orgGrokKey || orgGroqKey || orgOllamaUrl);
+          const byokUnlimited = !enforceByokLimits && hasOrgKey;
+          const effectiveUnlimited = limit === -1 || byokUnlimited;
+          return {
+            used,
+            limit: effectiveUnlimited ? 'unlimited' : limit,
+            remaining: effectiveUnlimited ? 'unlimited' : Math.max(0, limit - used),
+            byokUnlimited
+          };
+        })(),
         byokPolicy: {
           limitAppliesToByok: enforceByokLimits,
           mode: byokPolicy.mode,

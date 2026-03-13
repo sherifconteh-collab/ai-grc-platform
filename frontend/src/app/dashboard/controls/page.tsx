@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';

@@ -502,7 +502,9 @@ We welcome contributions! This is an open-source project designed to help organi
 
 ## 📜 License
 
-MIT License — see [LICENSE](./LICENSE) file for details
+MIT License — see [LICENSE](./LICENSE) file for details.
+
+By contributing, you agree to the [Contributor License Agreement](./CLA.md).
 
 ## 💎 Want Premium Features?
 

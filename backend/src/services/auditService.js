@@ -13,7 +13,6 @@
  */
 
 const pool = require('../config/database');
-
 // Optional SIEM service: fall back to no-op if unavailable
 let siemService;
 try {

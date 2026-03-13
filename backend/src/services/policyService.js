@@ -1,6 +1,5 @@
 // @tier: community
 const pool = require('../config/database');
-
 // Optional LLM service: policy generation features disabled if unavailable
 let getLLMService;
 try {

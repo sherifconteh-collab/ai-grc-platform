@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 /**
  * MCP Tool Registry — Dynamic tool definitions for ControlWeave MCP Server
  *

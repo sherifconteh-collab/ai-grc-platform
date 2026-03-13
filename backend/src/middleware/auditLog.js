@@ -9,7 +9,6 @@
  */
 
 const { createAuditLog } = require('../services/auditService');
-
 // Optional geolocation service: fall back to basic IP extraction if unavailable
 let extractIpFromRequest;
 try {

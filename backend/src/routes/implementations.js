@@ -5,7 +5,6 @@ const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
-
 // Optional LLM service: degrade gracefully if unavailable
 let invalidateAICache;
 try {

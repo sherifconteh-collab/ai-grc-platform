@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const pool = require('../src/config/database');
 const fs = require('fs');
 const path = require('path');

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 // ip-hygiene:ignore-file
 const fs = require('fs');
 const path = require('path');
@@ -30,7 +30,8 @@ const EXCLUDED_FILES = new Set([
   'package-lock.json',
   'pnpm-lock.yaml',
   'yarn.lock',
-  'tsconfig.tsbuildinfo'
+  'tsconfig.tsbuildinfo',
+  'plot4ai-library.json'
 ]);
 
 const COMPETITOR_RULES = [

@@ -1,4 +1,4 @@
-// @tier: free
+// @tier: community
 const { log } = require('../src/utils/logger')
 
 function checkRailwayConfig() {
