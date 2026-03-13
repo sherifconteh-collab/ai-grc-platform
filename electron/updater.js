@@ -14,6 +14,9 @@ const { ipcMain } = require('electron');
 
 let mainWindow = null;
 
+/** Delay before the first automatic update check (ms). */
+const STARTUP_UPDATE_CHECK_DELAY_MS = 10_000;
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
@@ -109,12 +112,12 @@ function initAutoUpdater(win) {
   });
 
   // ── Background check on startup ─────────────────────────────────────────
-  // Wait 10 seconds so the main window has fully loaded before checking.
+  // Wait so the main window has fully loaded before checking.
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {
       // Silently ignore — network may not be available at launch.
     });
-  }, 10_000);
+  }, STARTUP_UPDATE_CHECK_DELAY_MS);
 }
 
 module.exports = { initAutoUpdater };
