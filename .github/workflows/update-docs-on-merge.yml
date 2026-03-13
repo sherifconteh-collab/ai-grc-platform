@@ -1,0 +1,321 @@
+name: Update Docs on PR Merge
+
+# Trigger on push to main rather than pull_request closed.
+# This ensures:
+#  1. The GITHUB_TOKEN always has write access (even for PRs merged from forks).
+#  2. We reliably identify the merged PR via the GitHub API using the push SHA.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write      # required to commit and push doc updates back to main
+  pull-requests: read  # required to query PR metadata via the GitHub API
+
+jobs:
+  update-docs:
+    name: Auto-update README and Release Notes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Look up merged PR metadata
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find the PR that was merged by this push (the commit SHA is the merge commit).
+            const sha = context.sha;
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              commit_sha: sha,
+            });
+
+            const merged = prs.find(pr => pr.merged_at !== null);
+            if (!merged) {
+              core.setOutput('skip', 'true');
+              console.log('No merged PR found for this push — skipping doc updates.');
+              return;
+            }
+
+            core.setOutput('skip',   'false');
+            core.setOutput('number', String(merged.number));
+            core.setOutput('title',  merged.title);
+            core.setOutput('author', merged.user.login);
+            core.setOutput('url',    merged.html_url);
+            core.setOutput('labels', merged.labels.map(l => l.name).join(', '));
+            console.log(`Found PR #${merged.number}: ${merged.title}`);
+
+      - name: Update RELEASE_NOTES.md
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_TITLE:  ${{ steps.pr.outputs.title }}
+          PR_AUTHOR: ${{ steps.pr.outputs.author }}
+          PR_LABELS: ${{ steps.pr.outputs.labels }}
+          PR_URL:    ${{ steps.pr.outputs.url }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re
+
+          pr_number = os.environ["PR_NUMBER"]
+          pr_title  = os.environ["PR_TITLE"]
+          pr_author = os.environ["PR_AUTHOR"]
+          pr_labels = os.environ.get("PR_LABELS", "").lower()
+          pr_url    = os.environ["PR_URL"]
+
+          # Determine change-type section from labels
+          if any(k in pr_labels for k in ("bug", "fix")):
+              section = "Fixed"
+          elif any(k in pr_labels for k in ("security",)):
+              section = "Security"
+          elif any(k in pr_labels for k in ("deprecat",)):
+              section = "Deprecated"
+          elif any(k in pr_labels for k in ("remov", "delet")):
+              section = "Removed"
+          elif any(k in pr_labels for k in ("doc", "readme", "release-note")):
+              section = "Documentation"
+          elif any(k in pr_labels for k in ("feature", "enhancement", "new")):
+              section = "Added"
+          else:
+              section = "Changed"
+
+          entry = f"- {pr_title} ([#{pr_number}]({pr_url})) — @{pr_author}"
+
+          with open("RELEASE_NOTES.md", "r") as f:
+              content = f.read()
+
+          # ── Idempotency guard ──────────────────────────────────────────────
+          # If this PR number already appears in the [Unreleased] block
+          # (e.g. workflow was manually re-run), skip to prevent duplicates.
+          unreleased_header = "## [Unreleased]"
+          if unreleased_header in content:
+              unreleased_pos = content.index(unreleased_header)
+              next_match = re.search(r"\n## \[", content[unreleased_pos + len(unreleased_header):])
+              unreleased_end = (
+                  unreleased_pos + len(unreleased_header) + next_match.start()
+                  if next_match else len(content)
+              )
+              unreleased_block = content[unreleased_pos:unreleased_end]
+              if f"(#{pr_number})" in unreleased_block or f"[#{pr_number}]" in unreleased_block:
+                  print(f"PR #{pr_number} already present in [Unreleased] — skipping insertion.")
+                  exit(0)
+
+          if unreleased_header not in content:
+              # No [Unreleased] block at all — prepend one after the file preamble (first ---)
+              block = (
+                  f"\n{unreleased_header}\n\n"
+                  f"> Changes staged but not yet released to production.\n\n"
+                  f"### {section}\n\n{entry}\n"
+              )
+              content = re.sub(r"(---\n)", r"\1" + block, content, count=1)
+          else:
+              section_header = f"### {section}"
+              unreleased_pos = content.index(unreleased_header)
+              next_release_match = re.search(r"\n## \[", content[unreleased_pos + len(unreleased_header):])
+              if next_release_match:
+                  unreleased_end = unreleased_pos + len(unreleased_header) + next_release_match.start()
+              else:
+                  unreleased_end = len(content)
+
+              unreleased_block = content[unreleased_pos:unreleased_end]
+
+              if section_header in unreleased_block:
+                  # Append entry right after the existing section header line
+                  insert_after = section_header + "\n"
+                  replacement  = insert_after + entry + "\n"
+                  new_block = unreleased_block.replace(insert_after, replacement, 1)
+              else:
+                  # Add a new subsection at the end of the [Unreleased] block
+                  new_section = f"\n### {section}\n\n{entry}\n"
+                  new_block = unreleased_block.rstrip("\n") + "\n" + new_section
+
+              content = content[:unreleased_pos] + new_block + content[unreleased_end:]
+
+          with open("RELEASE_NOTES.md", "w") as f:
+              f.write(content)
+
+          print(f"RELEASE_NOTES.md updated: [{section}] {entry}")
+          PYEOF
+
+      - name: Update README.md last-updated marker
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_TITLE:  ${{ steps.pr.outputs.title }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re
+          from datetime import datetime, timezone
+
+          pr_number = os.environ["PR_NUMBER"]
+          pr_title  = os.environ["PR_TITLE"]
+
+          date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+          new_marker = f"<!-- LAST_UPDATED: {date_str} | PR #{pr_number}: {pr_title} -->"
+
+          with open("README.md", "r") as f:
+              content = f.read()
+
+          content = re.sub(r"<!-- LAST_UPDATED:.*?-->", new_marker, content)
+
+          with open("README.md", "w") as f:
+              f.write(content)
+
+          print(f"README.md last-updated marker refreshed → {date_str}")
+          PYEOF
+
+      - name: Scan codebase for undocumented features
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re, glob
+
+          readme = open("README.md").read().lower()
+          release_notes = open("RELEASE_NOTES.md").read().lower()
+
+          # ── 1. Backend routes ────────────────────────────────────────────────
+          route_files = glob.glob("backend/src/routes/*.js")
+          ROUTE_ALIASES = {
+              "ai":                 "AI / LLM",
+              "assessments":        "Assessments",
+              "audit":              "Audit",
+              "auditfields":        "Audit Fields",
+              "auditorworkspace":   "Auditor Workspace",
+              "auth":               "Authentication",
+              "controlhealth":      "Control Health",
+              "controls":           "Controls",
+              "dashboard":          "Dashboard",
+              "dashboardbuilder":   "Dashboard Builder",
+              "dynamicconfig":      "Dynamic Config",
+              "exceptions":         "Exceptions",
+              "frameworks":         "Frameworks",
+              "help":               "Help",
+              "implementations":    "Implementations",
+              "issuereport":        "Issue Report",
+              "notifications":      "Notifications",
+              "openclawwebhook":    "OpenCLAW Webhook",
+              "ops":                "Ops",
+              "organizations":      "Organizations",
+              "performance":        "Performance",
+              "poam":               "POA&M",
+              "policies":           "Policies",
+              "roles":              "Roles",
+              "totp":               "TOTP / 2FA",
+              "users":              "Users",
+              "webhooks":           "Webhooks",
+          }
+
+          undocumented_routes = []
+          for path in sorted(route_files):
+              key = os.path.basename(path).replace(".js", "").lower()
+              label = ROUTE_ALIASES.get(key, key.title())
+              if key not in readme and label.lower() not in readme:
+                  undocumented_routes.append((label, path))
+
+          # ── 2. Frontend pages ────────────────────────────────────────────────
+          page_dirs = glob.glob("frontend/src/app/**/page.tsx", recursive=True)
+          undocumented_pages = []
+          for path in sorted(page_dirs):
+              parts = path.replace("frontend/src/app/", "").split("/")
+              page_name = parts[0] if parts else ""
+              if page_name in ("", "page.tsx"):
+                  continue
+              if page_name not in readme and page_name not in release_notes:
+                  undocumented_pages.append((page_name, path))
+
+          # ── 3. DB migration files ────────────────────────────────────────────
+          migration_files = glob.glob("db/migrations/*.sql")
+          undocumented_migrations = []
+          for path in sorted(migration_files):
+              base = os.path.basename(path)
+              label = base.replace(".sql", "").split("_", 1)[-1].replace("_", " ") if "_" in base else base
+              if label.lower() not in readme and label.lower() not in release_notes:
+                  undocumented_migrations.append((label, path))
+
+          # ── 4. Write GitHub Actions job summary ──────────────────────────────
+          pr_number = os.environ.get("PR_NUMBER", "unknown")
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
+          with open(summary_path, "a") as f:
+              f.write("## 📋 Documentation Coverage Scan\n\n")
+
+              if not undocumented_routes and not undocumented_pages and not undocumented_migrations:
+                  f.write("✅ All scanned modules, pages, and migrations appear to be mentioned in README.md or RELEASE_NOTES.md.\n")
+              else:
+                  f.write("The following items were **not found** in README.md or RELEASE_NOTES.md. ")
+                  f.write("Consider documenting them in the next release entry.\n\n")
+
+                  if undocumented_routes:
+                      f.write("### 🔌 Backend API Modules\n\n")
+                      f.write("| Module | File |\n|--------|------|\n")
+                      for label, path in undocumented_routes:
+                          f.write(f"| {label} | `{path}` |\n")
+                      f.write("\n")
+
+                  if undocumented_pages:
+                      f.write("### 🖥️ Frontend Pages\n\n")
+                      f.write("| Page | File |\n|------|------|\n")
+                      for name, path in undocumented_pages:
+                          f.write(f"| {name} | `{path}` |\n")
+                      f.write("\n")
+
+                  if undocumented_migrations:
+                      f.write("### 🗄️ DB Migrations\n\n")
+                      f.write("| Migration | File |\n|-----------|------|\n")
+                      for label, path in undocumented_migrations:
+                          f.write(f"| {label} | `{path}` |\n")
+                      f.write("\n")
+
+              f.write("---\n")
+              f.write(f"_Scan triggered by PR #{pr_number}_\n")
+
+          total = len(undocumented_routes) + len(undocumented_pages) + len(undocumented_migrations)
+          print(f"Documentation gap scan complete — {total} undocumented item(s) found.")
+          PYEOF
+
+      - name: Commit and push doc updates
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add RELEASE_NOTES.md README.md
+
+          # Skip commit if nothing changed
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "docs: auto-update release notes and readme for PR #${PR_NUMBER} [skip ci]"
+
+          # Push with a pull-rebase retry loop to handle concurrent merges
+          # landing on main between our checkout and our push.
+          MAX_RETRIES=3
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "✅ Push succeeded on attempt $i"
+              exit 0
+            fi
+            echo "⚠️  Push failed (attempt $i/${MAX_RETRIES}) — rebasing on origin/main and retrying..."
+            git fetch origin main
+            git rebase origin/main || {
+              echo "❌ Rebase conflict — aborting."
+              git rebase --abort
+              exit 1
+            }
+          done
+
+          echo "❌ Push failed after ${MAX_RETRIES} attempts."
+          exit 1

@@ -1,0 +1,453 @@
+name: SBOM & AIBOM Generation
+
+# Triggers:
+#   • Every push to main (i.e. every PR merge) – uploads as workflow artifacts
+#   • Every published GitHub Release         – additionally attaches to the release
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read   # default read-only for generate jobs; write is granted per-job below
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 1 – Software Bill of Materials (CycloneDX JSON, npm deps)
+  # Satisfies NIST SP 800-160 SA-12 and NTIA minimum SBOM elements.
+  # ─────────────────────────────────────────────────────────────────────────
+  generate-sbom:
+    name: Generate SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CycloneDX npm tool
+        run: npm install -g @cyclonedx/cyclonedx-npm
+
+      - name: Install backend dependencies
+        run: cd backend && npm ci --ignore-scripts
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci --ignore-scripts
+
+      - name: Generate backend SBOM
+        run: |
+          mkdir -p sbom-output
+          cyclonedx-npm \
+            --package-lock-only \
+            --output-format JSON \
+            --output-file sbom-output/sbom-backend.cdx.json \
+            backend/package.json
+          echo "✅ Backend SBOM generated"
+
+      - name: Generate frontend SBOM
+        run: |
+          cyclonedx-npm \
+            --package-lock-only \
+            --output-format JSON \
+            --output-file sbom-output/sbom-frontend.cdx.json \
+            frontend/package.json
+          echo "✅ Frontend SBOM generated"
+
+      - name: Show SBOM component counts
+        run: |
+          python3 - <<'PYEOF'
+          import json, glob
+          for path in sorted(glob.glob("sbom-output/sbom-*.cdx.json")):
+              bom = json.load(open(path))
+              label = path.split("/")[-1].replace(".cdx.json", "")
+              comps = bom.get("components", [])
+              print(f"  {label}: {len(comps)} components")
+          PYEOF
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom-output/sbom-*.cdx.json
+          retention-days: 90
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 2 – AI Bill of Materials (CycloneDX JSON with ML model components)
+  # Documents every AI provider/model the platform can integrate with.
+  # Format: CycloneDX 1.6 with `machine-learning-model` component type and
+  # `modelCard` metadata per NIST AI RMF and EU AI Act documentation needs.
+  # ─────────────────────────────────────────────────────────────────────────
+  generate-aibom:
+    name: Generate AIBOM (CycloneDX + AI Model Inventory)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build AIBOM document
+        run: |
+          mkdir -p sbom-output
+          python3 - <<'PYEOF'
+          import json, uuid
+          from datetime import datetime, timezone
+
+          # ── Read project version from backend package.json ────────────────
+          pkg = json.load(open("backend/package.json"))
+          app_version = pkg.get("version", "0.0.0")
+          app_name    = "ControlWeave Community Edition"
+          timestamp   = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+          # ── AI providers supported by the platform ────────────────────────
+          # Source of truth: backend/src/config/tierPolicy.js getByokPolicy()
+          # and backend/src/routes/ai.js provider references.
+          AI_PROVIDERS = [
+              {
+                  "bom-ref":    "ai:anthropic-claude",
+                  "name":       "Claude",
+                  "supplier":   "Anthropic",
+                  "version":    "claude-3-5-sonnet, claude-3-opus, claude-3-haiku (BYOK, version set by operator)",
+                  "description": (
+                      "Anthropic Claude LLM accessed via @anthropic-ai/sdk (BYOK). "
+                      "Used for gap analysis, policy generation, compliance forecasting, "
+                      "and AI Copilot features."
+                  ),
+                  "website":    "https://anthropic.com",
+                  "sdk_dep":    "@anthropic-ai/sdk",
+                  "use_cases":  [
+                      "Compliance gap analysis",
+                      "Policy generation",
+                      "Compliance forecast",
+                      "Remediation playbook generation",
+                      "AI Copilot conversations",
+                      "Crosswalk optimization",
+                  ],
+                  "limitations": [
+                      "Requires operator-supplied Anthropic API key (BYOK)",
+                      "Subject to Anthropic usage policies and rate limits",
+                      "Model version controlled by operator configuration",
+                  ],
+              },
+              {
+                  "bom-ref":    "ai:openai-gpt",
+                  "name":       "GPT Models",
+                  "supplier":   "OpenAI",
+                  "version":    "gpt-4o, gpt-4-turbo, gpt-3.5-turbo (BYOK, version set by operator)",
+                  "description": (
+                      "OpenAI GPT models accessed via the `openai` npm package (BYOK). "
+                      "Used for all AI analysis features as an alternative provider."
+                  ),
+                  "website":    "https://openai.com",
+                  "sdk_dep":    "openai",
+                  "use_cases":  [
+                      "Compliance gap analysis",
+                      "Policy generation",
+                      "Compliance forecast",
+                      "Remediation playbook generation",
+                      "AI Copilot conversations",
+                  ],
+                  "limitations": [
+                      "Requires operator-supplied OpenAI API key (BYOK)",
+                      "Subject to OpenAI usage policies and rate limits",
+                      "Model version controlled by operator configuration",
+                  ],
+              },
+              {
+                  "bom-ref":    "ai:google-gemini",
+                  "name":       "Gemini",
+                  "supplier":   "Google",
+                  "version":    "gemini-1.5-pro, gemini-1.5-flash (BYOK, version set by operator)",
+                  "description": (
+                      "Google Gemini accessed via Google AI REST API (BYOK). "
+                      "Used as an alternative LLM provider for all AI analysis features."
+                  ),
+                  "website":    "https://ai.google.dev",
+                  "sdk_dep":    None,
+                  "use_cases":  [
+                      "Compliance gap analysis",
+                      "Policy generation",
+                      "Compliance forecast",
+                      "AI Copilot conversations",
+                  ],
+                  "limitations": [
+                      "Requires operator-supplied Google AI API key (BYOK)",
+                      "Subject to Google AI usage policies",
+                      "Model version controlled by operator configuration",
+                  ],
+              },
+              {
+                  "bom-ref":    "ai:xai-grok",
+                  "name":       "Grok",
+                  "supplier":   "xAI",
+                  "version":    "grok-2, grok-beta (BYOK, version set by operator)",
+                  "description": (
+                      "xAI Grok accessed via REST API (BYOK). "
+                      "Alternative LLM provider for AI analysis features."
+                  ),
+                  "website":    "https://x.ai",
+                  "sdk_dep":    None,
+                  "use_cases":  ["AI Copilot conversations", "Compliance gap analysis"],
+                  "limitations": [
+                      "Requires operator-supplied xAI API key (BYOK)",
+                      "Subject to xAI usage policies",
+                  ],
+              },
+              {
+                  "bom-ref":    "ai:groq-inference",
+                  "name":       "Groq (LLM Inference)",
+                  "supplier":   "Groq",
+                  "version":    "llama3-70b, mixtral-8x7b (BYOK, version set by operator)",
+                  "description": (
+                      "Groq LPU inference service accessed via REST API (BYOK). "
+                      "Provides high-speed inference for open-weight models as an alternative provider."
+                  ),
+                  "website":    "https://groq.com",
+                  "sdk_dep":    None,
+                  "use_cases":  ["AI Copilot conversations", "Compliance gap analysis"],
+                  "limitations": [
+                      "Requires operator-supplied Groq API key (BYOK)",
+                      "Subject to Groq usage policies",
+                      "Model availability depends on Groq's hosted catalogue",
+                  ],
+              },
+              {
+                  "bom-ref":    "ai:ollama-local",
+                  "name":       "Ollama (Self-hosted)",
+                  "supplier":   "Ollama (open-source)",
+                  "version":    "Any model supported by Ollama (operator-configured)",
+                  "description": (
+                      "Ollama local inference server accessed via REST API. "
+                      "Allows fully on-premises LLM deployment with no data leaving the operator network."
+                  ),
+                  "website":    "https://ollama.com",
+                  "sdk_dep":    None,
+                  "use_cases":  [
+                      "Air-gapped / on-premises AI analysis",
+                      "AI Copilot conversations",
+                      "Compliance gap analysis",
+                  ],
+                  "limitations": [
+                      "Requires operator to run a local Ollama server",
+                      "Performance depends on operator hardware",
+                      "No API key required — network access control is the operator's responsibility",
+                  ],
+              },
+          ]
+
+          # ── Platform SDK component ────────────────────────────────────────
+          SDK_COMPONENT = {
+              "type":        "library",
+              "bom-ref":    "sdk:controlweave-external-ai-logger",
+              "name":        "@controlweave/external-ai-logger",
+              "version":    "1.0.0",
+              "description": (
+                  "ControlWeave SDK for logging external AI decisions into the platform "
+                  "audit trail. Enables third-party AI systems to emit governance records."
+              ),
+              "licenses":   [{"license": {"id": "MIT"}}],
+              "externalReferences": [
+                  {"type": "vcs", "url": "https://github.com/sherifconteh-collab/ai-grc-platform"},
+              ],
+          }
+
+          # ── Build CycloneDX 1.6 components array ─────────────────────────
+          components = [SDK_COMPONENT]
+
+          for p in AI_PROVIDERS:
+              comp = {
+                  "type":        "machine-learning-model",
+                  "bom-ref":    p["bom-ref"],
+                  "name":        p["name"],
+                  "version":    p["version"],
+                  "description": p["description"],
+                  "supplier":   {"name": p["supplier"], "contact": []},
+                  "externalReferences": [
+                      {"type": "website", "url": p["website"]},
+                  ],
+                  "modelCard": {
+                      "modelParameters": {
+                          "task":                 "natural-language-processing",
+                          "architectureFamily":   "transformer",
+                          "inputs":  [{"format": "text"}],
+                          "outputs": [{"format": "text"}],
+                      },
+                      "considerations": {
+                          "useCases":    p["use_cases"],
+                          "limitations": p["limitations"],
+                          "ethicalConsiderations": [
+                              {
+                                  "name":        "Human oversight required",
+                                  "description": (
+                                      "AI-generated compliance analysis must be reviewed by "
+                                      "qualified GRC practitioners before use in formal assessments."
+                                  ),
+                              },
+                              {
+                                  "name":        "Data minimisation",
+                                  "description": (
+                                      "Only the minimum data required for analysis is sent to the "
+                                      "AI provider. Sensitive PII should be redacted before analysis."
+                                  ),
+                              },
+                          ],
+                          "fairnessAssessments": [],
+                      },
+                      "governance": {
+                          "owners": [
+                              {
+                                  "organization": {
+                                      "name": p["supplier"],
+                                      "url":  p["website"],
+                                  }
+                              }
+                          ],
+                          "custodians": [
+                              {
+                                  "organization": {
+                                      "name": "ControlWeave (operator)",
+                                      "url":  "https://controlweave.com",
+                                  }
+                              }
+                          ],
+                      },
+                  },
+              }
+              # Note which npm package provides the SDK integration (if any)
+              if p["sdk_dep"]:
+                  comp["externalReferences"].append({
+                      "type":    "distribution",
+                      "url":     f"https://www.npmjs.com/package/{p['sdk_dep']}",
+                      "comment": f"npm SDK used for integration: {p['sdk_dep']}",
+                  })
+              components.append(comp)
+
+          # ── Assemble the full AIBOM document ─────────────────────────────
+          aibom = {
+              "bomFormat":    "CycloneDX",
+              "specVersion":  "1.6",
+              "serialNumber": f"urn:uuid:{uuid.uuid4()}",
+              "version":      1,
+              "metadata": {
+                  "timestamp": timestamp,
+                  "tools": [
+                      {
+                          "vendor":  "ControlWeave",
+                          "name":    "aibom-generator",
+                          "version": "1.0.0",
+                      }
+                  ],
+                  "component": {
+                      "type":    "application",
+                      "name":    app_name,
+                      "version": app_version,
+                      "description": (
+                          "Open-source AI-powered GRC platform with multi-framework compliance "
+                          "management, crosswalk intelligence, and BYOK AI analysis. "
+                          "Community edition — MIT licensed."
+                      ),
+                      "licenses": [{"license": {"id": "MIT"}}],
+                      "externalReferences": [
+                          {
+                              "type": "vcs",
+                              "url":  "https://github.com/sherifconteh-collab/ai-grc-platform",
+                          },
+                          {
+                              "type":    "documentation",
+                              "url":     "https://github.com/sherifconteh-collab/ai-grc-platform/blob/main/RELEASE_NOTES.md",
+                              "comment": "Release notes",
+                          },
+                      ],
+                  },
+                  "properties": [
+                      {"name": "ControlWeave:edition",         "value": "community"},
+                      {"name": "ControlWeave:ai-integration",  "value": "BYOK (Bring Your Own Key)"},
+                      {"name": "ControlWeave:ai-providers",    "value": "anthropic,openai,gemini,grok,groq,ollama"},
+                      {"name": "ControlWeave:governance-framework", "value": "NIST AI RMF 1.0, EU AI Act, ISO 42001"},
+                  ],
+              },
+              "components":   components,
+              "dependencies": [
+                  {
+                      "ref":      f"app:{app_name.lower().replace(' ', '-')}",
+                      "dependsOn": [c["bom-ref"] for c in components],
+                  }
+              ],
+          }
+
+          out_path = "sbom-output/aibom.cdx.json"
+          with open(out_path, "w") as f:
+              json.dump(aibom, f, indent=2)
+
+          print(f"✅ AIBOM generated → {out_path}")
+          print(f"   Application : {app_name} v{app_version}")
+          print(f"   Components  : {len(components)} total ({len(AI_PROVIDERS)} AI models + 1 SDK)")
+          PYEOF
+
+      - name: Upload AIBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aibom-${{ github.sha }}
+          path: sbom-output/aibom.cdx.json
+          retention-days: 90
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 3 – Attach SBOM + AIBOM as GitHub Release assets
+  # Only runs when the workflow was triggered by a published release.
+  # ─────────────────────────────────────────────────────────────────────────
+  attach-to-release:
+    name: Attach SBOM & AIBOM to GitHub Release
+    needs: [generate-sbom, generate-aibom]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to upload assets to the GitHub Release
+
+    steps:
+      - name: Download SBOM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: release-assets
+
+      - name: Download AIBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aibom-${{ github.sha }}
+          path: release-assets
+
+      - name: Upload release assets
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs   = require('fs');
+            const path = require('path');
+
+            const releaseId = context.payload.release.id;
+            const files = fs.readdirSync('release-assets').filter(f => f.endsWith('.json'));
+
+            for (const file of files) {
+              const filePath = path.join('release-assets', file);
+              const data     = fs.readFileSync(filePath);
+
+              const label = file.replace('.cdx.json', '');
+              const assetName = `${label}-${{ github.event.release.tag_name }}.cdx.json`;
+
+              console.log(`Uploading ${assetName} (${data.length} bytes)...`);
+              await github.rest.repos.uploadReleaseAsset({
+                owner:       context.repo.owner,
+                repo:        context.repo.repo,
+                release_id:  releaseId,
+                name:        assetName,
+                data:        data,
+                headers: {
+                  'Content-Type':   'application/json',
+                  'Content-Length': data.length,
+                },
+              });
+              console.log(`✅ Uploaded ${assetName}`);
+            }

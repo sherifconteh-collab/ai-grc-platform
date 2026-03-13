@@ -376,6 +376,14 @@ See [SECURITY.md](./SECURITY.md) for our full security policy and responsible di
 
 All contributors are recognized in our release notes. Your contributions make this project better for everyone in the GRC community!
 
+## 📝 Contributor License Agreement (CLA)
+
+Before your first pull request can be merged you must sign the **Contributor License Agreement**.
+
+- The agreement text is in [CLA.md](./CLA.md).
+- Signing is automated: our CLA bot (powered by [`.github/workflows/cla.yml`](./.github/workflows/cla.yml)) will post a comment on your PR asking you to sign. Reply with the exact phrase shown in that comment and the bot marks you as signed.
+- Signing is a **one-time** requirement — subsequent PRs are merged without any extra steps.
+
 ## 📄 License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).

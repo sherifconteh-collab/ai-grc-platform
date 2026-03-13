@@ -9,6 +9,8 @@
 [![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
+<!-- LAST_UPDATED: not yet updated -->
+
 ## 🎯 What is This?
 
 A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 12+ frameworks with 500+ controls. Built to be:
@@ -504,7 +506,7 @@ We welcome contributions! This is an open-source project designed to help organi
 
 MIT License — see [LICENSE](./LICENSE) file for details.
 
-By contributing, you agree to the [Contributor License Agreement](./CLA.md).
+By contributing, you agree to the [Contributor License Agreement](./CLA.md). Signing is automated — the CLA bot (see [`.github/workflows/cla.yml`](./.github/workflows/cla.yml)) will prompt you on your first PR.
 
 ## 💎 Want Premium Features?
 
