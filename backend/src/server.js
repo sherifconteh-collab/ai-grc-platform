@@ -226,6 +226,7 @@ const helpRoutes = require('./routes/help');
 const issueReportRoutes = require('./routes/issueReport');
 const totpRoutes = require('./routes/totp');
 const openclawWebhookRoutes = require('./routes/openclawWebhook');
+const licenseRoutes = require('./routes/license');
 
 // Mount routes
 app.use('/api/v1/auth', authRoutes);
@@ -255,6 +256,7 @@ app.use('/api/v1/help', helpRoutes);
 app.use('/api/v1/issues', issueReportRoutes);
 app.use('/api/v1/auth/totp', totpRoutes);
 app.use('/api/v1/openclaw/webhook', openclawWebhookRoutes);
+app.use('/api/v1/license', licenseRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -383,6 +385,33 @@ async function ensureAssessmentProcedures() {
   log('info', 'assessment.procedures.seeded', { status: 'done' });
 }
 
+// If LICENSE_KEY env var is not set, try to load a stored license from the DB
+// and upgrade the edition accordingly.  This runs async after server startup.
+async function ensureLicenseFromDb() {
+  if (process.env.LICENSE_KEY) return; // env var takes priority
+  try {
+    const { loadLicenseFromDb, setActiveLicense } = require('./services/licenseService');
+    const { upgradeEdition, LICENSE_TIER_TO_EDITION, EDITION } = require('./middleware/edition');
+    const license = await loadLicenseFromDb();
+    if (license && license.valid) {
+      // Cache the license in-memory so the GET /license endpoint finds it
+      setActiveLicense(license);
+      const effectiveEdition = LICENSE_TIER_TO_EDITION[license.tier] || 'pro';
+      const valid = ['community', 'pro', 'enterprise'];
+      if (valid.indexOf(effectiveEdition) > valid.indexOf(EDITION)) {
+        upgradeEdition(effectiveEdition);
+        log('info', 'license.restored_from_db', {
+          licensee: license.licensee,
+          tier: license.tier,
+          edition: effectiveEdition,
+        });
+      }
+    }
+  } catch (err) {
+    log('warn', 'license.db_restore_skipped', { error: err.message });
+  }
+}
+
 // Start server
 const HOST = process.env.HOST || '0.0.0.0';
 const server = app.listen(PORT, HOST, () => {
@@ -405,6 +434,11 @@ const server = app.listen(PORT, HOST, () => {
   // Auto-seed assessment procedures if table is empty
   ensureAssessmentProcedures().catch((err) =>
     log('error', 'assessment.procedures.startup_error', { error: err.message })
+  );
+
+  // Restore license from DB if LICENSE_KEY env var is not set
+  ensureLicenseFromDb().catch((err) =>
+    log('error', 'license.startup_error', { error: err.message })
   );
 });
 
