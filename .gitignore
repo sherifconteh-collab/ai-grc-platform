@@ -23,6 +23,11 @@ build/
 out/
 *.tsbuildinfo
 
+# Electron desktop build artifacts
+electron/dist/
+electron/build/icon.png
+electron/build/icon.ico
+
 # IDE
 .vscode/
 .idea/
