@@ -7,15 +7,22 @@ import { useEffect, useState, useCallback } from 'react';
  *
  * When running inside Electron, `window.electronAPI` is available and exposes
  * IPC methods for checking, downloading, and installing updates from the
- * online ControlWeave GitHub Releases.  In a regular browser this component
- * renders nothing.
+ * online ControlWeave GitHub Releases.
+ *
+ * Flow:
+ *  1. App auto-checks GitHub Releases on startup (auto-download is ON).
+ *  2. If a new version is found, download starts immediately.
+ *  3. Banner shows progress bar during download.
+ *  4. When ready, a prominent green banner with "Restart & Update" appears.
+ *
+ * In a regular browser this component renders nothing.
  */
 
 type BannerState =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'available'; version: string }
-  | { kind: 'downloading'; percent: number }
+  | { kind: 'downloading'; percent: number; version?: string }
   | { kind: 'downloaded'; version: string }
   | { kind: 'error'; message: string };
 
@@ -33,7 +40,7 @@ export default function UpdateBanner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const api = window.electronAPI;
-    if (!api) return;              // not running in Electron — skip
+    if (!api) return;
 
     const unsubscribe = api.onUpdateStatus((data) => {
       switch (data.status) {
@@ -42,16 +49,22 @@ export default function UpdateBanner() {
           break;
         case 'available':
           setState({ kind: 'available', version: data.version ?? 'unknown' });
-          setDismissed(false);     // re-show if a new version appears
+          setDismissed(false);
           break;
         case 'not-available':
           setState({ kind: 'idle' });
           break;
         case 'downloading':
-          setState({ kind: 'downloading', percent: data.percent ?? 0 });
+          setState((prev) => ({
+            kind: 'downloading',
+            percent: data.percent ?? 0,
+            version: prev.kind === 'available' ? prev.version : undefined,
+          }));
+          setDismissed(false);
           break;
         case 'downloaded':
           setState({ kind: 'downloaded', version: data.version ?? 'unknown' });
+          setDismissed(false);
           break;
         case 'error':
           setState({ kind: 'error', message: data.message ?? 'Unknown error' });
@@ -76,59 +89,93 @@ export default function UpdateBanner() {
   }, []);
 
   // ── Nothing to show ─────────────────────────────────────────────────────
-  if (!isElectron) return null;           // not in Electron
+  if (!isElectron) return null;
   if (state.kind === 'idle') return null;
   if (state.kind === 'checking') return null;
   if (dismissed) return null;
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="relative z-50 w-full px-4 py-2.5 text-sm flex items-center justify-between gap-4"
-      style={bannerStyle(state.kind)}>
-
-      <span className="flex items-center gap-2">
+    <div
+      className="relative z-50 w-full px-5 py-3 text-sm flex items-center justify-between gap-4 shadow-md"
+      style={bannerStyle(state.kind)}
+    >
+      {/* Left: status message */}
+      <span className="flex items-center gap-2 font-medium">
         {state.kind === 'available' && (
-          <>🔔 A new version of ControlWeave is available: <strong>v{state.version}</strong></>
+          <>
+            <span className="text-lg">🔔</span>
+            A new version of ControlWeave is available: <strong>v{state.version}</strong>
+          </>
         )}
         {state.kind === 'downloading' && (
-          <>⬇️ Downloading update… {state.percent}%</>
+          <>
+            <span className="text-lg">⬇️</span>
+            Downloading update{state.version ? ` v${state.version}` : ''}&hellip; {state.percent}%
+          </>
         )}
         {state.kind === 'downloaded' && (
-          <>✅ Update to <strong>v{state.version}</strong> is ready to install</>
+          <>
+            <span className="text-lg">✅</span>
+            Update to <strong>v{state.version}</strong> is ready &mdash; restart to finish installing
+          </>
         )}
         {state.kind === 'error' && (
-          <>⚠️ Update check failed: {state.message}</>
+          <>
+            <span className="text-lg">⚠️</span>
+            Update check failed: {state.message}
+          </>
         )}
       </span>
 
-      <span className="flex items-center gap-2 shrink-0">
+      {/* Right: action buttons */}
+      <span className="flex items-center gap-3 shrink-0">
         {state.kind === 'available' && (
-          <button onClick={handleDownload}
-            className="px-3 py-1 rounded bg-white/90 text-purple-700 font-medium hover:bg-white transition">
-            Download Update
+          <button
+            onClick={handleDownload}
+            className="px-5 py-2 rounded-lg bg-white text-purple-700 font-semibold text-sm shadow hover:bg-purple-50 active:scale-95 transition-all cursor-pointer"
+          >
+            ⬇️ Download Now
           </button>
         )}
+
         {state.kind === 'downloading' && (
-          <span className="inline-block w-32 h-2 rounded-full bg-white/30 overflow-hidden">
-            <span className="block h-full bg-white rounded-full transition-all"
-              style={{ width: `${state.percent}%` }} />
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="inline-block w-40 h-2.5 rounded-full bg-white/30 overflow-hidden">
+              <span
+                className="block h-full bg-white rounded-full transition-all duration-300"
+                style={{ width: `${state.percent}%` }}
+              />
+            </span>
+            <span className="text-white/80 text-xs font-mono">{state.percent}%</span>
+          </div>
         )}
+
         {state.kind === 'downloaded' && (
-          <button onClick={handleInstall}
-            className="px-3 py-1 rounded bg-white/90 text-green-700 font-medium hover:bg-white transition">
-            Restart &amp; Install
+          <button
+            onClick={handleInstall}
+            className="px-6 py-2.5 rounded-lg bg-white text-green-700 font-bold text-sm shadow-lg hover:bg-green-50 active:scale-95 transition-all cursor-pointer animate-pulse"
+          >
+            🔄 Restart &amp; Update
           </button>
         )}
+
         {state.kind === 'error' && (
-          <button onClick={handleCheckAgain}
-            className="px-3 py-1 rounded bg-white/90 text-amber-700 font-medium hover:bg-white transition">
-            Retry
+          <button
+            onClick={handleCheckAgain}
+            className="px-5 py-2 rounded-lg bg-white text-amber-700 font-semibold text-sm shadow hover:bg-amber-50 active:scale-95 transition-all cursor-pointer"
+          >
+            🔁 Retry
           </button>
         )}
-        <button onClick={() => setDismissed(true)}
-          className="ml-1 opacity-70 hover:opacity-100 transition"
-          aria-label="Dismiss">✕</button>
+
+        <button
+          onClick={() => setDismissed(true)}
+          className="ml-1 p-1 rounded-full opacity-70 hover:opacity-100 hover:bg-white/20 transition"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
       </span>
     </div>
   );
@@ -138,10 +185,15 @@ export default function UpdateBanner() {
 function bannerStyle(kind: BannerState['kind']): React.CSSProperties {
   const base: React.CSSProperties = { color: '#fff' };
   switch (kind) {
-    case 'available':   return { ...base, background: '#7c3aed' };  // purple-600
-    case 'downloading': return { ...base, background: '#6d28d9' };  // purple-700
-    case 'downloaded':  return { ...base, background: '#059669' };  // emerald-600
-    case 'error':       return { ...base, background: '#d97706' };  // amber-600
-    default:            return base;
+    case 'available':
+      return { ...base, background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' };
+    case 'downloading':
+      return { ...base, background: 'linear-gradient(135deg, #6d28d9, #4c1d95)' };
+    case 'downloaded':
+      return { ...base, background: 'linear-gradient(135deg, #059669, #047857)' };
+    case 'error':
+      return { ...base, background: 'linear-gradient(135deg, #d97706, #b45309)' };
+    default:
+      return base;
   }
 }

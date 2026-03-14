@@ -19,7 +19,7 @@ const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
 const EmbeddedPostgres = require('embedded-postgres');
-const { initAutoUpdater } = require('./updater');
+const { initAutoUpdater, checkForUpdatesManual } = require('./updater');
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Config
@@ -380,10 +380,7 @@ function buildMenu() {
       submenu: [
         {
           label: 'Check for Updates…',
-          click: () => {
-            const { autoUpdater } = require('electron-updater');
-            autoUpdater.checkForUpdates().catch(() => {});
-          },
+          click: () => checkForUpdatesManual(),
         },
         { type: 'separator' },
         {

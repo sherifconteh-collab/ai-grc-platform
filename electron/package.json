@@ -40,7 +40,16 @@
           "!**/*.log",
           "!.env*",
           "!scripts/qa-*.js",
-          "!scripts/seed-*.js"
+          "!scripts/seed-demo-*.js",
+          "!scripts/seed-enterprise-*.js",
+          "!scripts/seed-free-*.js",
+          "!scripts/seed-starter-*.js",
+          "!scripts/seed-professional-*.js",
+          "!scripts/seed-utilities-*.js",
+          "!scripts/seed-cmdb-*.js",
+          "!scripts/seed-showcase-*.js",
+          "!scripts/seed-hf-*.js",
+          "!scripts/seed-cyber-*.js"
         ]
       },
       {

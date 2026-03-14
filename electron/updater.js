@@ -10,12 +10,16 @@
  */
 
 const { autoUpdater } = require('electron-updater');
-const { ipcMain } = require('electron');
+const { ipcMain, dialog } = require('electron');
 
 let mainWindow = null;
 
 /** Delay before the first automatic update check (ms). */
 const STARTUP_UPDATE_CHECK_DELAY_MS = 10_000;
+
+// Whether the current check was triggered explicitly by the user (menu click).
+// When true, we show native dialogs for "no update" and "error" feedback.
+let isManualCheck = false;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -44,7 +48,7 @@ function initAutoUpdater(win) {
   mainWindow = win;
 
   // ── Configuration ────────────────────────────────────────────────────────
-  autoUpdater.autoDownload = false;           // let the user decide
+  autoUpdater.autoDownload = true;            // download immediately when found
   autoUpdater.autoInstallOnAppQuit = true;    // install silently on next quit
   autoUpdater.logger = console;
 
@@ -63,6 +67,15 @@ function initAutoUpdater(win) {
 
   autoUpdater.on('update-not-available', (info) => {
     sendStatusToWindow({ status: 'not-available', version: info.version });
+    if (isManualCheck) {
+      isManualCheck = false;
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'No Updates Available',
+        message: `You're running the latest version (v${info.version}).`,
+        buttons: ['OK'],
+      });
+    }
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -81,6 +94,15 @@ function initAutoUpdater(win) {
 
   autoUpdater.on('error', (err) => {
     sendStatusToWindow({ status: 'error', message: err.message });
+    if (isManualCheck) {
+      isManualCheck = false;
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Update Check Failed',
+        message: `Could not check for updates.\n\n${err.message}`,
+        buttons: ['OK'],
+      });
+    }
   });
 
   // ── IPC handlers (renderer → main) ──────────────────────────────────────
@@ -120,4 +142,23 @@ function initAutoUpdater(win) {
   }, STARTUP_UPDATE_CHECK_DELAY_MS);
 }
 
-module.exports = { initAutoUpdater };
+/**
+ * Trigger a manual update check from the application menu.
+ * Shows native dialogs if no update is found or an error occurs.
+ */
+function checkForUpdatesManual() {
+  isManualCheck = true;
+  autoUpdater.checkForUpdates().catch((err) => {
+    isManualCheck = false;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Update Check Failed',
+        message: `Could not check for updates.\n\n${err.message}`,
+        buttons: ['OK'],
+      });
+    }
+  });
+}
+
+module.exports = { initAutoUpdater, checkForUpdatesManual };
