@@ -111,13 +111,13 @@ export default function UpdateBanner() {
         {state.kind === 'downloading' && (
           <>
             <span className="text-lg">⬇️</span>
-            Downloading update{state.version ? ` v${state.version}` : ''}&hellip; {state.percent}%
+            Downloading update{state.version ? ` v${state.version}` : ''}… {state.percent}%
           </>
         )}
         {state.kind === 'downloaded' && (
           <>
             <span className="text-lg">✅</span>
-            Update to <strong>v{state.version}</strong> is ready &mdash; restart to finish installing
+            Update to <strong>v{state.version}</strong> is ready — restart to finish installing
           </>
         )}
         {state.kind === 'error' && (
@@ -154,7 +154,7 @@ export default function UpdateBanner() {
         {state.kind === 'downloaded' && (
           <button
             onClick={handleInstall}
-            className="px-6 py-2.5 rounded-lg bg-white text-green-700 font-bold text-sm shadow-lg hover:bg-green-50 active:scale-95 transition-all cursor-pointer animate-pulse"
+            className="px-6 py-2.5 rounded-lg bg-white text-green-700 font-bold text-sm shadow-lg hover:bg-green-50 active:scale-95 transition-all cursor-pointer motion-safe:animate-pulse"
           >
             🔄 Restart &amp; Update
           </button>
