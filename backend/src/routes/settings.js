@@ -12,6 +12,8 @@ router.use(authenticate);
 
 const LLM_DOMAIN = 'llm_config';
 
+const LLM_TEST_TIMEOUT_MS = 15000; // intentionally shorter than provider defaults for quick UX feedback
+
 // GET /api/v1/settings/llm
 router.get('/llm', requirePermission('settings.manage'), async (req, res) => {
   try {
@@ -76,7 +78,7 @@ router.post('/llm/test', requirePermission('settings.manage'), async (req, res) 
         // Direct provider call with the supplied key (not from DB)
         await Promise.race([
           llm.callProvider(testProvider, key, effectiveModel, 'Respond with exactly one word: OK', testMessages),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), LLM_TEST_TIMEOUT_MS))
         ]);
         const latencyMs = Date.now() - startMs;
         return res.json({ success: true, data: { status: 'ok', provider, model: effectiveModel, latency_ms: latencyMs } });
