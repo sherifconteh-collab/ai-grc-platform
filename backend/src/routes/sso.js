@@ -38,14 +38,16 @@ router.put('/config', requirePermission('settings.manage'), async (req, res) => 
     const { provider, is_enabled, client_id, client_secret, metadata_url, login_url, logout_url, attribute_mapping } = req.body || {};
     const result = await pool.query(
       `INSERT INTO sso_configurations (organization_id, provider, is_enabled, client_id, client_secret, metadata_url, login_url, logout_url, attribute_mapping)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
        ON CONFLICT (organization_id) DO UPDATE
          SET provider=$2, is_enabled=$3, client_id=$4, client_secret=$5,
-             metadata_url=$6, login_url=$7, logout_url=$8, attribute_mapping=$9, updated_at=NOW()
+             metadata_url=$6, login_url=$7, logout_url=$8, attribute_mapping=$9::jsonb, updated_at=NOW()
        RETURNING id, provider, is_enabled, client_id, metadata_url, login_url, attribute_mapping, updated_at`,
       [orgId, provider || 'saml', is_enabled || false, client_id || null, client_secret || null,
        metadata_url || null, login_url || null, logout_url || null,
-       attribute_mapping ? JSON.stringify(attribute_mapping) : null]
+       attribute_mapping !== undefined && attribute_mapping !== null
+         ? JSON.stringify(attribute_mapping)
+         : null]
     );
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {

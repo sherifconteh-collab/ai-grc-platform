@@ -38,11 +38,13 @@ router.put('/llm', requirePermission('settings.manage'), async (req, res) => {
     const entries = req.body || {};
 
     for (const [key, value] of Object.entries(entries)) {
+      // Pass JS value directly; cast to ::jsonb so Postgres stores it as a JSON object, not a string
+      const jsonValue = typeof value === 'object' ? JSON.stringify(value) : JSON.stringify(value);
       await pool.query(
         `INSERT INTO dynamic_config_entries (organization_id, config_domain, config_key, config_value)
-         VALUES ($1,$2,$3,$4)
-         ON CONFLICT (organization_id, config_domain, config_key) DO UPDATE SET config_value=$4, updated_at=NOW()`,
-        [orgId, LLM_DOMAIN, key, typeof value === 'object' ? JSON.stringify(value) : value]
+         VALUES ($1,$2,$3,$4::jsonb)
+         ON CONFLICT (organization_id, config_domain, config_key) DO UPDATE SET config_value=$4::jsonb, updated_at=NOW()`,
+        [orgId, LLM_DOMAIN, key, jsonValue]
       );
     }
 

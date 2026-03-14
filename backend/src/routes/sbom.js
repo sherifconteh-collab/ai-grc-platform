@@ -145,9 +145,11 @@ router.post('/upload', requirePermission('controls.write'), upload.single('file'
     for (const c of components) {
       await pool.query(
         `INSERT INTO sbom_components (sbom_id, name, version, purl, license)
-         VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+         VALUES ($1,$2,$3,$4,$5)`,
         [sbomId, c.name, c.version, c.purl, c.license]
-      ).catch(() => {});
+      ).catch(err => {
+        console.warn(`SBOM component insert failed for "${c.name}": ${err.message}`);
+      });
     }
 
     res.status(201).json({

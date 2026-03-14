@@ -24,8 +24,9 @@ router.get('/overview', async (req, res) => {
   try {
     const orgs = await pool.query(`SELECT COUNT(*) FROM organizations`);
     const users = await pool.query(`SELECT COUNT(*) FROM users`);
+    // Use updated_at as a proxy for recent activity — no last_login_at column in community schema
     const activeUsers = await pool.query(
-      `SELECT COUNT(*) FROM users WHERE last_login_at > NOW() - INTERVAL '30 days'`
+      `SELECT COUNT(*) FROM users WHERE updated_at > NOW() - INTERVAL '30 days'`
     );
 
     res.json({
@@ -45,25 +46,16 @@ router.get('/overview', async (req, res) => {
 // GET /api/v1/platform-admin/organizations
 router.get('/organizations', async (req, res) => {
   try {
-    const { page = 1, limit = 20, region } = req.query;
+    const { page = 1, limit = 20 } = req.query;
     const pageNum = Math.max(1, parseInt(page) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
     const offset = (pageNum - 1) * limitNum;
 
-    let query;
-    let params;
-    if (region) {
-      query = `SELECT id, name, tier, created_at FROM organizations
-               WHERE region=$1
-               ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
-      params = [region, limitNum, offset];
-    } else {
-      query = `SELECT id, name, tier, created_at FROM organizations
-               ORDER BY created_at DESC LIMIT $1 OFFSET $2`;
-      params = [limitNum, offset];
-    }
-
-    const result = await pool.query(query, params);
+    const result = await pool.query(
+      `SELECT id, name, tier, created_at FROM organizations
+       ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limitNum, offset]
+    );
     const total = await pool.query(`SELECT COUNT(*) FROM organizations`);
     res.json({ success: true, data: result.rows, total: parseInt(total.rows[0].count), page: pageNum });
   } catch (err) {

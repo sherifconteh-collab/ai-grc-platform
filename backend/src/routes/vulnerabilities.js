@@ -47,9 +47,21 @@ router.get('/', requirePermission('controls.read'), async (req, res) => {
       params
     );
 
+    // Count with same filters for accurate pagination metadata
+    const countParams = [orgId];
+    const countFilters = [];
+    if (status) { countParams.push(status); countFilters.push(`v.status = $${countParams.length}`); }
+    if (severity) { countParams.push(severity); countFilters.push(`v.severity = $${countParams.length}`); }
+    if (source) { countParams.push(source); countFilters.push(`v.source = $${countParams.length}`); }
+    if (search) {
+      countParams.push(`%${search}%`);
+      countFilters.push(`(v.title ILIKE $${countParams.length} OR v.vuln_id ILIKE $${countParams.length})`);
+    }
+    const countWhere = countFilters.length > 0 ? ' AND ' + countFilters.join(' AND ') : '';
+
     const count = await pool.query(
-      `SELECT COUNT(*) FROM vulnerabilities WHERE organization_id=$1`,
-      [orgId]
+      `SELECT COUNT(*) FROM vulnerabilities v WHERE v.organization_id=$1 ${countWhere}`,
+      countParams
     );
 
     res.json({ success: true, data: result.rows, total: parseInt(count.rows[0].count) });
@@ -92,28 +104,48 @@ router.post('/import', requirePermission('controls.write'), upload.single('file'
 
     const imported = [];
     for (const item of items) {
-      const r = await pool.query(
-        `INSERT INTO vulnerabilities (
-           organization_id, title, description, vuln_id, severity, status, source,
-           cvss_score, affected_component, remediation
-         )
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         ON CONFLICT DO NOTHING
-         RETURNING id, title, vuln_id, severity`,
-        [
-          orgId,
-          item.title || item.name || 'Unnamed',
-          item.description || null,
-          item.cve_id || item.vuln_id || item.cve || null,
-          item.severity || 'medium',
-          item.status || 'open',
-          item.source || 'import',
-          item.cvss_score || null,
-          item.affected_component || null,
-          item.remediation || null
-        ]
-      );
-      if (r.rows.length > 0) imported.push(r.rows[0]);
+      const vulnId = item.cve_id || item.vuln_id || item.cve || null;
+      // Deduplicate by (organization_id, vuln_id) when vuln_id is present
+      if (vulnId) {
+        const r = await pool.query(
+          `INSERT INTO vulnerabilities (
+             organization_id, title, description, vuln_id, severity, status, source,
+             cvss_score, affected_component, remediation, created_by
+           )
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           ON CONFLICT (organization_id, vuln_id) DO UPDATE
+             SET title=EXCLUDED.title, severity=EXCLUDED.severity,
+                 cvss_score=COALESCE(EXCLUDED.cvss_score, vulnerabilities.cvss_score),
+                 updated_at=NOW()
+           RETURNING id, title, vuln_id, severity`,
+          [
+            orgId, item.title || item.name || 'Unnamed',
+            item.description || null, vulnId,
+            item.severity || 'medium', item.status || 'open', item.source || 'import',
+            item.cvss_score || null, item.affected_component || null,
+            item.remediation || null, req.user.id
+          ]
+        );
+        if (r.rows.length > 0) imported.push(r.rows[0]);
+      } else {
+        // No vuln_id — always insert (no deduplication possible)
+        const r = await pool.query(
+          `INSERT INTO vulnerabilities (
+             organization_id, title, description, vuln_id, severity, status, source,
+             cvss_score, affected_component, remediation, created_by
+           )
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           RETURNING id, title, vuln_id, severity`,
+          [
+            orgId, item.title || item.name || 'Unnamed',
+            item.description || null, null,
+            item.severity || 'medium', item.status || 'open', item.source || 'import',
+            item.cvss_score || null, item.affected_component || null,
+            item.remediation || null, req.user.id
+          ]
+        );
+        if (r.rows.length > 0) imported.push(r.rows[0]);
+      }
     }
 
     res.json({ success: true, data: { imported: imported.length, items: imported } });
