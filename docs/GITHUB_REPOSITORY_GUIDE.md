@@ -681,7 +681,7 @@ See [mcp-server/README.md](mcp-server/README.md) for full documentation.
 ## 🎯 Bottom Line
 
 **Upload to GitHub NOW:**
-1. ✅ LICENSE (MIT)
+1. ✅ LICENSE (AGPL-3.0)
 2. ✅ README.md (comprehensive)
 3. ✅ .gitignore (no secrets)
 4. ✅ All database files (schema + seeds)
