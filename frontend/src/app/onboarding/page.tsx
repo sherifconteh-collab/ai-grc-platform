@@ -554,16 +554,17 @@ export default function OnboardingPage() {
                   const renderedGroups = new Set<string>();
                   return availableFrameworks.map((fw) => {
                     if (fw.group) {
-                      if (renderedGroups.has(fw.group)) return null;
-                      renderedGroups.add(fw.group);
-                      const groupMeta = FRAMEWORK_GROUP_METADATA[fw.group];
-                      const groupMembers = availableFrameworks.filter((f) => f.group === fw.group);
+                      const groupKey = fw.group;
+                      if (renderedGroups.has(groupKey)) return null;
+                      renderedGroups.add(groupKey);
+                      const groupMeta = FRAMEWORK_GROUP_METADATA[groupKey];
+                      const groupMembers = availableFrameworks.filter((f) => f.group === groupKey);
                       const selectedCount = groupMembers.filter((f) => selectedFrameworkIds.includes(f.id)).length;
                       const totalControls = groupMembers.reduce((sum, f) => sum + f.controlCount, 0);
-                      const isExpanded = expandedGroups.has(fw.group);
+                      const isExpanded = expandedGroups.has(groupKey);
                       return (
                         <div
-                          key={`group-${fw.group}`}
+                          key={`group-${groupKey}`}
                           className={`rounded-lg border p-3 transition ${
                             selectedCount > 0 ? 'border-purple-600 bg-purple-50' : 'border-gray-200 bg-white'
                           }`}
@@ -573,8 +574,8 @@ export default function OnboardingPage() {
                             onClick={() =>
                               setExpandedGroups((prev) => {
                                 const next = new Set(prev);
-                                if (next.has(fw.group!)) next.delete(fw.group!);
-                                else next.add(fw.group!);
+                                if (next.has(groupKey)) next.delete(groupKey);
+                                else next.add(groupKey);
                                 return next;
                               })
                             }
@@ -583,7 +584,7 @@ export default function OnboardingPage() {
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-sm font-semibold text-gray-900">
-                                  {groupMeta?.label ?? fw.group}
+                                  {groupMeta?.label ?? groupKey}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
                                   {groupMembers.length} standards &middot; {totalControls} controls
