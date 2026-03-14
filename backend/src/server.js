@@ -360,6 +360,33 @@ async function ensurePlatformAdmin() {
   }
 }
 
+// Auto-seed frameworks and controls if the frameworks table is empty.
+// This ensures new installations have framework data available immediately
+// so the first user who registers can select frameworks during onboarding.
+async function ensureFrameworks() {
+  const client = await pool.connect();
+  let count;
+  try {
+    const { rows } = await client.query('SELECT COUNT(*) AS count FROM frameworks');
+    count = parseInt(rows[0].count, 10);
+  } finally {
+    client.release();
+  }
+  if (count > 0) {
+    log('info', 'frameworks.check', { status: 'exists', count });
+    return;
+  }
+  log('info', 'frameworks.seeding', { status: 'starting' });
+  const { spawn } = require('child_process');
+  const scriptPath = path.join(__dirname, '../scripts/seed-frameworks.js');
+  const child = spawn(process.execPath, [scriptPath], { env: process.env, stdio: 'inherit' });
+  await new Promise((resolve, reject) => {
+    child.on('close', (code) => code === 0 ? resolve() : reject(new Error(`Seed exited with code ${code}`)));
+    child.on('error', reject);
+  });
+  log('info', 'frameworks.seeded', { status: 'done' });
+}
+
 // Auto-seed assessment procedures if the table is empty (global/framework-level data, not per-org)
 async function ensureAssessmentProcedures() {
   const client = await pool.connect();
@@ -431,10 +458,17 @@ const server = app.listen(PORT, HOST, () => {
     log('error', 'platform.admin.startup_error', { error: err.message })
   );
 
-  // Auto-seed assessment procedures if table is empty
-  ensureAssessmentProcedures().catch((err) =>
-    log('error', 'assessment.procedures.startup_error', { error: err.message })
-  );
+  // Auto-seed frameworks if table is empty (must run before assessment procedures)
+  ensureFrameworks()
+    .then(() => {
+      // Auto-seed assessment procedures if table is empty
+      ensureAssessmentProcedures().catch((err) =>
+        log('error', 'assessment.procedures.startup_error', { error: err.message })
+      );
+    })
+    .catch((err) =>
+      log('error', 'frameworks.startup_error', { error: err.message })
+    );
 
   // Restore license from DB if LICENSE_KEY env var is not set
   ensureLicenseFromDb().catch((err) =>

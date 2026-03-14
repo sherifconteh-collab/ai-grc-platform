@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "start:prod": "NODE_ENV=production node src/server.js",
     "dev": "nodemon src/server.js",
+    "seed": "node scripts/seed-frameworks.js",
     "mcp": "node scripts/mcp-server-secure.js",
     "mcp:secure": "node scripts/mcp-server-secure.js",
     "mcp:login": "node scripts/mcp-auth-login.js",

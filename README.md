@@ -63,27 +63,50 @@ Looking for older versions? See [all releases](https://github.com/sherifconteh-c
 
 > The steps below are for developers who want to run from source. If you just want to use ControlWeave, [download the installer](#-download) instead.
 
-```bash
-# Clone the repository
-git clone https://github.com/sherifconteh-collab/ai-grc-platform.git
-cd ai-grc-platform
+### Prerequisites
 
-# Backend setup
+- **Node.js** 20+ — [download](https://nodejs.org)
+- **PostgreSQL** 14+ — [download](https://www.postgresql.org/download/) (or use `brew install postgresql` on macOS / `sudo apt install postgresql` on Ubuntu)
+
+### 1. Create the database
+
+```bash
+# Start PostgreSQL if it isn't running
+# macOS:  brew services start postgresql
+# Linux:  sudo systemctl start postgresql
+
+createdb controlweave        # create the application database
+```
+
+### 2. Backend
+
+```bash
 cd backend
 npm install
-# Create .env file (see backend/.env.example for configuration)
-npm run seed  # Seeds database with frameworks and controls
-npm start     # Starts on port 3001
 
-# Frontend setup (in new terminal)
+# Create your .env from the example and set DATABASE_URL
+cp .env.example .env
+# Edit .env — update the DATABASE_URL line:
+#   DATABASE_URL=postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/controlweave
+# On macOS/Linux you can often use your OS username with no password:
+#   DATABASE_URL=postgresql://localhost:5432/controlweave
+
+npm run migrate              # creates tables and schema
+npm start                    # starts API on port 3001
+# Frameworks and controls are auto-seeded on first launch
+```
+
+### 3. Frontend (in a new terminal)
+
+```bash
 cd frontend
 npm install
-npm run dev   # Starts on port 3000
+npm run dev                  # starts Next.js on port 3000
 ```
 
 **First login:** Visit http://localhost:3000/register to create your account!
 
-> 💡 For detailed setup including database configuration and environment variables, see [QUICKSTART.md](./QUICKSTART.md) and [QUICK_START.md](./QUICK_START.md).
+> 💡 For detailed setup including environment variables and advanced configuration, see [QUICKSTART.md](./QUICKSTART.md) and [QUICK_START.md](./QUICK_START.md).
 
 ## 📚 Supported Frameworks
 
