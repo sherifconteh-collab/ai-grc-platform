@@ -1,6 +1,11 @@
 // @tier: community
 const pool = require('../config/database');
-const { getLLMService } = require('./llmService');
+let getLLMService;
+try {
+  ({ getLLMService } = require('./llmService'));
+} catch (e) {
+  getLLMService = async () => null;
+}
 const { extractFamilyCode, NIST_CONTROL_FAMILIES } = require('./policyService');
 
 /**

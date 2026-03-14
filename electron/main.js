@@ -289,6 +289,15 @@ function startBackend(backendDir, databaseUrl) {
     // Inject the embedded-postgres connection string so the backend never
     // needs an external DATABASE_URL in the environment or .env file.
     DATABASE_URL: databaseUrl,
+    // Frontend URL for CORS and email links
+    FRONTEND_URL: `http://localhost:${FRONTEND_PORT}`,
+    // Auto-provision a platform admin on first desktop launch so the user
+    // can sign in immediately without running any CLI seed scripts.
+    PLATFORM_ADMIN_EMAIL: process.env.PLATFORM_ADMIN_EMAIL || 'admin@controlweave.local',
+    PLATFORM_ADMIN_PASSWORD: process.env.PLATFORM_ADMIN_PASSWORD || 'ControlWeave2026!',
+    PLATFORM_ADMIN_FIRST_NAME: process.env.PLATFORM_ADMIN_FIRST_NAME || 'Platform',
+    PLATFORM_ADMIN_LAST_NAME: process.env.PLATFORM_ADMIN_LAST_NAME || 'Admin',
+    PLATFORM_ADMIN_ORG: process.env.PLATFORM_ADMIN_ORG || 'ControlWeave Desktop',
   });
   backendProcess = proc;
   return ready;
