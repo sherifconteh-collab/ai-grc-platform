@@ -142,9 +142,9 @@ export default function LLMStatusPage() {
       for (const p of PROVIDERS) {
         const providerData = statusData.providers?.[p.key] || statusData[p.key] || {};
         statuses[p.key] = {
-          available: providerData.available ?? providerData.status === 'available' ?? false,
+          available: providerData.available ?? (providerData.status === 'available'),
           keyConfigured: providerData.key_configured ?? providerData.keyConfigured ??
-            (defaultsData.configured_providers || []).includes(p.key) ?? false,
+            (defaultsData.configured_providers || []).includes(p.key),
           models: providerData.models || p.models,
           latency: providerData.latency,
         };

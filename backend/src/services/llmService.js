@@ -83,7 +83,8 @@ function _getEncryptionKey() {
     const t1 = crypto.createHmac('sha256', prk).update(Buffer.concat([info, Buffer.from([1])])).digest();
     return t1;
   }
-  return crypto.createHash('sha256').update('controlweave-dev-key').digest();
+  log('error', 'No LLM_ENCRYPTION_KEY or JWT_SECRET set – cannot encrypt/decrypt API keys');
+  throw new Error('LLM encryption key not configured. Set LLM_ENCRYPTION_KEY or JWT_SECRET.');
 }
 
 function encryptKey(plaintext) {
@@ -195,9 +196,15 @@ async function resolveApiKey(provider, orgId) {
     []
   );
   if (platform && platform.setting_value) {
-    const pv = typeof platform.setting_value === 'string'
-      ? JSON.parse(platform.setting_value)
-      : platform.setting_value;
+    let pv;
+    try {
+      pv = typeof platform.setting_value === 'string'
+        ? JSON.parse(platform.setting_value)
+        : platform.setting_value;
+    } catch (_jsonErr) {
+      log('error', 'Failed to parse platform LLM defaults', { error: _jsonErr.message });
+      pv = {};
+    }
     const platformKey = pv[`${p}_api_key`] || pv[PROVIDER_ENV_VARS[p]];
     if (platformKey) return { key: platformKey, source: 'platform' };
   }
@@ -286,6 +293,7 @@ async function callOpenAI(apiKey, model, systemPrompt, messages) {
     model: model || PROVIDER_MODELS.openai[0],
     messages: allMessages,
   });
+  if (!resp.choices?.[0]?.message) throw new Error('Unexpected OpenAI response format');
   return resp.choices[0].message.content;
 }
 
@@ -299,9 +307,9 @@ async function callGemini(apiKey, model, systemPrompt, messages) {
   if (systemPrompt) {
     body.systemInstruction = { parts: [{ text: systemPrompt }] };
   }
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
   const resp = await axios.post(url, body, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     timeout: PROVIDER_TIMEOUT_MS.gemini,
   });
   const candidates = resp.data.candidates || [];
@@ -323,6 +331,7 @@ async function callGroq(apiKey, model, systemPrompt, messages) {
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     timeout: PROVIDER_TIMEOUT_MS.groq,
   });
+  if (!resp.data?.choices?.[0]?.message) throw new Error('Unexpected Groq response format');
   return resp.data.choices[0].message.content;
 }
 
@@ -338,6 +347,7 @@ async function callGrok(apiKey, model, systemPrompt, messages) {
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     timeout: PROVIDER_TIMEOUT_MS.grok,
   });
+  if (!resp.data?.choices?.[0]?.message) throw new Error('Unexpected Grok response format');
   return resp.data.choices[0].message.content;
 }
 
@@ -490,7 +500,13 @@ async function getPlatformApiKey(provider) {
     []
   );
   if (row && row.setting_value) {
-    const sv = typeof row.setting_value === 'string' ? JSON.parse(row.setting_value) : row.setting_value;
+    let sv;
+    try {
+      sv = typeof row.setting_value === 'string' ? JSON.parse(row.setting_value) : row.setting_value;
+    } catch (_jsonErr) {
+      log('error', 'Failed to parse platform LLM defaults in getPlatformApiKey', { error: _jsonErr.message });
+      sv = {};
+    }
     const k = sv[`${p}_api_key`];
     if (k) return k;
   }
@@ -888,6 +904,7 @@ module.exports = {
   // Internal utilities exposed for key management
   encryptKey,
   decryptKey,
+  callProvider,
 
   // Provider metadata
   PROVIDER_MODELS,

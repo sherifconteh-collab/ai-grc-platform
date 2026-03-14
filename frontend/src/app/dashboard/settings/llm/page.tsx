@@ -243,12 +243,14 @@ export default function LLMConfigurationPage() {
         apiKey: provider.isLocal ? (ps.ollamaUrl || DEFAULT_OLLAMA_URL) : ps.apiKey,
       };
       const res = await settingsAPI.testLLMKey(payload);
-      const data = res.data ?? {};
+      const body = res.data ?? {};
+      const inner = body.data ?? {};
+      const ok = body.success && inner.status === 'ok';
       updateProviderState(provider.key, {
         testResult: {
-          success: data.success ?? true,
-          latency: data.latency,
-          message: data.message ?? 'Connection successful',
+          success: ok,
+          latency: inner.latency_ms,
+          message: ok ? 'Connection successful' : (inner.error || 'Connection failed'),
         },
       });
     } catch (err: unknown) {

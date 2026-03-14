@@ -58,47 +58,37 @@ router.put('/llm', requirePermission('settings.manage'), async (req, res) => {
 // POST /api/v1/settings/llm/test
 router.post('/llm/test', requirePermission('settings.manage'), async (req, res) => {
   try {
-    const { provider, model, api_key, base_url } = req.body || {};
+    const { provider, model, api_key, apiKey, base_url } = req.body || {};
+    const key = api_key || apiKey; // accept both naming conventions
     if (!provider) {
       return res.status(400).json({ success: false, error: 'provider is required' });
     }
     // Attempt a real validation call to the LLM provider
     let llm;
     try { llm = require('../services/llmService'); } catch (_e) { llm = null; }
-    if (llm && api_key) {
+    if (llm && typeof llm.callProvider === 'function' && key) {
       const testProvider = provider.toLowerCase();
-      const testModel = model || undefined;
+      const PROVIDER_MODELS = llm.PROVIDER_MODELS || {};
+      const effectiveModel = model || (PROVIDER_MODELS[testProvider] ? PROVIDER_MODELS[testProvider][0] : null);
       const startMs = Date.now();
       try {
         const testMessages = [{ role: 'user', content: 'Respond with exactly: OK' }];
-        const PROVIDER_MODELS = llm.PROVIDER_MODELS || {};
-        const effectiveModel = testModel || (PROVIDER_MODELS[testProvider] ? PROVIDER_MODELS[testProvider][0] : null);
         // Direct provider call with the supplied key (not from DB)
-        const { callProvider } = llm;
-        if (typeof llm.chat === 'function') {
-          // Use a simple validation — just check the key format and try a minimal call
-          await Promise.race([
-            llm.chat({
-              provider: testProvider,
-              model: effectiveModel,
-              organizationId: req.user.organization_id,
-              messages: testMessages,
-              systemPrompt: 'Respond with exactly one word: OK'
-            }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
-          ]);
-        }
+        await Promise.race([
+          llm.callProvider(testProvider, key, effectiveModel, 'Respond with exactly one word: OK', testMessages),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
+        ]);
         const latencyMs = Date.now() - startMs;
         return res.json({ success: true, data: { status: 'ok', provider, model: effectiveModel, latency_ms: latencyMs } });
       } catch (testErr) {
         const latencyMs = Date.now() - startMs;
         const msg = testErr.message || 'Unknown error';
         return res.json({
-          success: true,
+          success: false,
           data: {
             status: msg.includes('timeout') ? 'timeout' : 'error',
             provider,
-            model: testModel || 'default',
+            model: effectiveModel || 'default',
             latency_ms: latencyMs,
             error: msg.slice(0, 200)
           }
