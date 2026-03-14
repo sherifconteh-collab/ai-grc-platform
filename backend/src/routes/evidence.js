@@ -6,9 +6,12 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { enqueueWebhookEvent } = require('../services/webhookService');
 const multer = require('multer');
 
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;   // 10 MB per file
+const MAX_TOTAL_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB aggregate for bulk-upload
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+  limits: { fileSize: MAX_FILE_SIZE_BYTES },
 });
 
 router.use(authenticate);
@@ -110,11 +113,17 @@ router.post('/upload', requirePermission('assessments.write'), upload.single('fi
 });
 
 // POST /api/v1/evidence/bulk-upload
-router.post('/bulk-upload', requirePermission('assessments.write'), upload.array('files', 20), async (req, res) => {
+router.post('/bulk-upload', requirePermission('assessments.write'), upload.array('files', 10), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, error: 'No files provided' });
+    }
+
+    // Aggregate size guard: reject if total payload exceeds limit
+    const totalBytes = req.files.reduce((sum, f) => sum + f.size, 0);
+    if (totalBytes > MAX_TOTAL_UPLOAD_BYTES) {
+      return res.status(413).json({ success: false, error: 'Total upload size exceeds 50 MB limit' });
     }
 
     const inserted = [];

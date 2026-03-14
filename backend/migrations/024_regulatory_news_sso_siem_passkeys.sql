@@ -43,12 +43,15 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- evidence_control_links: ensure unique constraint for ON CONFLICT
+-- vulnerabilities: add partial unique constraint on (organization_id, vuln_id)
+-- NULLs are never considered equal in PostgreSQL unique constraints, so rows
+-- without a vuln_id will not conflict with each other — only named CVE/vuln IDs
+-- are deduplicated within an organization.
 DO $$ BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'uq_evidence_control_links_pair'
+    SELECT 1 FROM pg_constraint WHERE conname = 'uq_vulnerability_org_id_vuln_id'
   ) THEN
-    ALTER TABLE evidence_control_links ADD CONSTRAINT uq_evidence_control_links_pair UNIQUE (evidence_id, control_id);
+    ALTER TABLE vulnerabilities ADD CONSTRAINT uq_vulnerability_org_id_vuln_id UNIQUE (organization_id, vuln_id);
   END IF;
 END $$;
 

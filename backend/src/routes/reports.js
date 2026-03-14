@@ -89,9 +89,14 @@ router.get('/ssp/json', requirePermission('assessments.read'), async (req, res) 
           'oscal-version': '1.1.1'
         },
         'system-characteristics': {
-          'system-name': org.rows[0]?.name,
-          description: profile.rows[0]?.description || '',
-          'security-sensitivity-level': profile.rows[0]?.security_level || 'moderate'
+          'system-name': profile.rows[0]?.system_name || org.rows[0]?.name,
+          description: profile.rows[0]?.system_description || profile.rows[0]?.company_description || '',
+          'security-sensitivity-level': (
+            profile.rows[0]?.confidentiality_impact ??
+            profile.rows[0]?.integrity_impact ??
+            profile.rows[0]?.availability_impact ??
+            'moderate'
+          ).toLowerCase()
         },
         'control-implementation': {
           description: 'Control implementations for this system',

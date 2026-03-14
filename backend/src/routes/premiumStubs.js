@@ -1,11 +1,8 @@
 // @tier: enterprise
 // Advanced premium feature stubs — contacts, phase6, RAG, RMF, PLOT4AI, billing
 const express = require('express');
-const router = express.Router();
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { stubList, stubCreate, stubGet, stubAction } = require('./_stubs');
-
-router.use(authenticate);
 
 // ---------------------------------------------------------------
 // Contacts
