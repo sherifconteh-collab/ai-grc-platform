@@ -227,6 +227,8 @@ const issueReportRoutes = require('./routes/issueReport');
 const totpRoutes = require('./routes/totp');
 const openclawWebhookRoutes = require('./routes/openclawWebhook');
 const licenseRoutes = require('./routes/license');
+const vulnerabilitiesRoutes = require('./routes/vulnerabilities');
+const sbomRoutes = require('./routes/sbom');
 
 // Mount routes
 app.use('/api/v1/auth', authRoutes);
@@ -257,6 +259,8 @@ app.use('/api/v1/issues', issueReportRoutes);
 app.use('/api/v1/auth/totp', totpRoutes);
 app.use('/api/v1/openclaw/webhook', openclawWebhookRoutes);
 app.use('/api/v1/license', licenseRoutes);
+app.use('/api/v1/vulnerabilities', vulnerabilitiesRoutes);
+app.use('/api/v1/sbom', sbomRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
