@@ -1285,4 +1285,68 @@ router.get('/agent-booster/status', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------
+// AI Monitoring — rule-based monitoring and event log
+// ---------------------------------------------------------------
+
+// GET /ai/monitoring/dashboard
+router.get('/monitoring/dashboard', requirePermission('settings.manage'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const usage = await pool.query(
+      `SELECT COUNT(*) AS total_decisions,
+              COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') AS decisions_7d,
+              COUNT(*) FILTER (WHERE bias_flags != '[]'::jsonb) AS flagged_decisions
+       FROM ai_decision_log WHERE organization_id=$1`,
+      [orgId]
+    );
+    const recentDecisions = await pool.query(
+      `SELECT id, feature, status, created_at
+       FROM ai_decision_log WHERE organization_id=$1
+       ORDER BY created_at DESC LIMIT 10`,
+      [orgId]
+    );
+    res.json({
+      success: true,
+      data: {
+        summary: usage.rows[0],
+        recent_decisions: recentDecisions.rows,
+        monitoring_rules: 0,
+        active_rules: 0
+      }
+    });
+  } catch (err) {
+    console.error('AI monitoring dashboard error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load AI monitoring dashboard' });
+  }
+});
+
+// GET /ai/monitoring/rules
+router.get('/monitoring/rules', requirePermission('settings.manage'), async (req, res) => {
+  res.json({ success: true, data: [] });
+});
+
+// POST /ai/monitoring/rules
+router.post('/monitoring/rules', requirePermission('settings.manage'), async (req, res) => {
+  res.json({ success: true, data: { message: 'AI monitoring rules are an enterprise feature' } });
+});
+
+// GET /ai/monitoring/events
+router.get('/monitoring/events', requirePermission('settings.manage'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const { limit = 50, offset = 0 } = req.query;
+    const result = await pool.query(
+      `SELECT id, feature, input_summary, output_summary, status, bias_flags, created_at
+       FROM ai_decision_log WHERE organization_id=$1
+       ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [orgId, Number(limit) || 50, Number(offset) || 0]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('AI monitoring events error:', err);
+    res.status(500).json({ success: false, error: 'Failed to load AI monitoring events' });
+  }
+});
+
 module.exports = router;
