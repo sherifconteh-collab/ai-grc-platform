@@ -68,7 +68,7 @@ router.use(licenseRateLimiter);
  * Includes whether a license is stored in the database.
  * Restricted to users with settings.manage permission.
  */
-router.get('/', authenticate, requirePermission('settings.manage'), async (req, res) => {
+router.get('/', licenseRateLimiter, authenticate, requirePermission('settings.manage'), async (req, res) => {
   try {
     const info = getEditionInfo();
     const envKey = process.env.LICENSE_KEY || process.env.CONTROLWEAVE_LICENSE_KEY || '';
@@ -109,6 +109,7 @@ router.get('/', authenticate, requirePermission('settings.manage'), async (req, 
  */
 router.post(
   '/activate',
+  licenseRateLimiter,
   authenticate,
   requirePermission('settings.manage'),
   async (req, res) => {
