@@ -245,7 +245,7 @@ Full RMF lifecycle management without leaving the platform:
 ### Unique Differentiators:
 
 1. **100% Open Source & Free**
-   - AGPL-3.0 licensed — use, modify, and distribute freely
+   - AGPL-3.0 licensed — open source with copyleft protections (see [LICENSE](./LICENSE))
    - Self-hostable — your data stays on your infrastructure
    - No per-user fees, no vendor lock-in
    - Commercial tools cost $30K–200K/year

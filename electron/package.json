@@ -3,7 +3,7 @@
   "version": "2.1.0",
   "description": "ControlWeave AI GRC Platform — Desktop Edition",
   "author": "ControlWeave <contehconsulting@gmail.com>",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "main": "main.js",
   "private": true,
   "scripts": {

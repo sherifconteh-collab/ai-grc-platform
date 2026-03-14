@@ -249,7 +249,7 @@ jobs:
                   "ControlWeave SDK for logging external AI decisions into the platform "
                   "audit trail. Enables third-party AI systems to emit governance records."
               ),
-              "licenses":   [{"license": {"id": "MIT"}}],
+              "licenses":   [{"license": {"id": "AGPL-3.0-only"}}],
               "externalReferences": [
                   {"type": "vcs", "url": "https://github.com/sherifconteh-collab/ai-grc-platform"},
               ],
@@ -348,9 +348,9 @@ jobs:
                       "description": (
                           "Open-source AI-powered GRC platform with multi-framework compliance "
                           "management, crosswalk intelligence, and BYOK AI analysis. "
-                          "Community edition — MIT licensed."
+                          "Community edition — AGPL-3.0 licensed."
                       ),
-                      "licenses": [{"license": {"id": "MIT"}}],
+                      "licenses": [{"license": {"id": "AGPL-3.0-only"}}],
                       "externalReferences": [
                           {
                               "type": "vcs",

@@ -130,24 +130,12 @@ On GitHub, go to your repo → About (gear icon) → Add topics:
 ### Create a LICENSE
 ```bash
 # AGPL-3.0 License is already referenced in README
-# Create LICENSE file:
-echo "GNU AFFERO GENERAL PUBLIC LICENSE
-Version 3, 19 November 2007
+# Download the official AGPL-3.0 license text:
+curl -o LICENSE https://www.gnu.org/licenses/agpl-3.0.txt
 
-Copyright (c) 2025 ControlWeave (contehconsulting@gmail.com)
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>." > LICENSE
+# Or copy the LICENSE file from the repository root if you already have it.
+# Do NOT modify the license text — add project copyright notices
+# in source file headers or a separate COPYRIGHT file.
 
 git add LICENSE
 git commit -m "docs: add AGPL-3.0 license"
