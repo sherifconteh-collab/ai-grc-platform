@@ -72,6 +72,7 @@ const navigationSections: NavigationSection[] = [
       { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
       { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'], minTier: 'enterprise' },
       { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', requiredPermissionsAny: ['settings.manage', 'roles.manage'] },
+      { name: 'LLM Configuration', href: '/dashboard/settings/llm', icon: '🧠', requiredPermissions: ['settings.manage'] },
       { name: 'License', href: '/dashboard/license', icon: '🔑', requiredPermissions: ['settings.manage'], isVisible: (u) => u?.role === 'admin' },
       { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔', requiredPermissions: ['dashboard.read'] },
       { name: 'Help Center', href: '/dashboard/help', icon: '❓', requiredPermissions: ['dashboard.read'] },
