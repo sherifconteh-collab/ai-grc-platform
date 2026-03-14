@@ -35,12 +35,12 @@ const {
   generateCommunityKey,
   setLocalPublicKey
 } = require('../services/licenseService');
-const { createRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 
-const licenseRateLimiter = createRateLimiter({ label: 'license', windowMs: 60 * 1000, max: 10 });
+const licenseRateLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
 // RSA key generation is CPU-intensive — apply a tighter limiter to the
 // generate-community endpoint: 3 generations per hour per IP.
-const licenseGenerateLimiter = createRateLimiter({ label: 'license-generate', windowMs: 60 * 60 * 1000, max: 3 });
+const licenseGenerateLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, standardHeaders: true, legacyHeaders: false });
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
