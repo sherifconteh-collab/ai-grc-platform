@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
+const { log } = require('../utils/logger');
 
 // Public endpoints (no auth required)
 router.post('/auth/options', async (req, res) => {
@@ -13,7 +14,7 @@ router.post('/auth/options', async (req, res) => {
       data: { challenge: 'stub', message: 'WebAuthn authentication not yet configured' }
     });
   } catch (error) {
-    console.error('Passkey auth options error:', error);
+    log('error', 'passkey.auth_options', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to generate authentication options' });
   }
 });
@@ -25,7 +26,7 @@ router.post('/auth/verify', async (req, res) => {
       data: { authenticated: false, message: 'WebAuthn authentication not yet configured' }
     });
   } catch (error) {
-    console.error('Passkey auth verify error:', error);
+    log('error', 'passkey.auth_verify', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to verify authentication' });
   }
 });
@@ -45,7 +46,7 @@ router.get('/register/options', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Passkey register options error:', error);
+    log('error', 'passkey.register_options', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to generate registration options' });
   }
 });
@@ -57,7 +58,7 @@ router.post('/register/verify', async (req, res) => {
       data: { registered: false, message: 'WebAuthn registration not yet configured' }
     });
   } catch (error) {
-    console.error('Passkey register verify error:', error);
+    log('error', 'passkey.register_verify', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to verify registration' });
   }
 });
@@ -73,7 +74,7 @@ router.get('/list', async (req, res) => {
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('List passkeys error:', error);
+    log('error', 'passkey.list', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to list passkeys' });
   }
 });
@@ -89,7 +90,7 @@ router.delete('/:id', async (req, res) => {
     }
     res.json({ success: true, data: { deleted: true } });
   } catch (error) {
-    console.error('Delete passkey error:', error);
+    log('error', 'passkey.delete', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to delete passkey' });
   }
 });
@@ -109,7 +110,7 @@ router.patch('/:id/rename', async (req, res) => {
     }
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Rename passkey error:', error);
+    log('error', 'passkey.rename', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to rename passkey' });
   }
 });
