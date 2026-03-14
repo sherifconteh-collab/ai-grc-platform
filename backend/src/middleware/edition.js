@@ -86,7 +86,7 @@ function requireProEdition(feature) {
         feature: feature,
         edition: 'community',
         requiredEdition: 'pro',
-        upgradeUrl: 'https://controlweave.com/pricing'
+        upgradeUrl: 'https://controlweave.com/#pricing'
       });
     }
     
@@ -148,7 +148,7 @@ function blockProFeaturesInCommunity(req, res, next) {
       message: 'This feature is not available in the Community Edition. Please upgrade to Pro edition for access to enterprise features.',
       edition: 'community',
       requiredEdition: 'pro',
-      upgradeUrl: 'https://controlweave.com/pricing'
+      upgradeUrl: 'https://controlweave.com/#pricing'
     });
   }
   next();

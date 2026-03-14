@@ -8,7 +8,7 @@
 ```
 ai-grc-platform/
 ├── README.md                           ✅ CRITICAL - First thing people see
-├── LICENSE                             ✅ CRITICAL - MIT License
+├── LICENSE                             ✅ CRITICAL - AGPL-3.0 License
 ├── .gitignore                          ✅ CRITICAL - Don't commit secrets
 ├── CONTRIBUTING.md                     ✅ Helps contributors
 ├── CODE_OF_CONDUCT.md                  ✅ Professional touch
@@ -87,7 +87,7 @@ Enterprise GRC tools cost $50k-300k/year. This is the free, open-source alternat
 - ✅ 528+ controls with 80+ cross-framework mappings
 - ✅ 40-60% compliance cost reduction through intelligent crosswalks
 - ✅ AI system governance (NIST AI RMF)
-- ✅ 100% free and open source (MIT license)
+- ✅ 100% free and open source (AGPL-3.0 license)
 
 ## 🚀 Quick Start
 
@@ -101,7 +101,7 @@ Enterprise GRC tools cost $50k-300k/year. This is the free, open-source alternat
 3. **Support contracts** ($10k-50k/year) - Priority support
 4. **Consulting** ($200/hour) - Compliance expertise
 
-**Want to self-host forever?** Go for it! MIT license means it's yours.
+**Want to self-host forever?** Go for it! AGPL-3.0 license means it's yours.
 
 **Need help?** Visit [contehconsulting.com](https://contehconsulting.com) or email contehconsulting@gmail.com
 
@@ -113,7 +113,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE)
+AGPL-3.0 License - See [LICENSE](../LICENSE)
 
 ## 📧 Contact
 
@@ -130,37 +130,14 @@ If this project helps you, please give it a star on GitHub! ⭐
 
 ### 2. LICENSE (CRITICAL!)
 
-Create a file called `LICENSE` with this exact text:
+Create a file called `LICENSE` containing the full verbatim [GNU AGPL-3.0 license text](https://www.gnu.org/licenses/agpl-3.0.txt).
+Add your project copyright notice in source file headers or a separate `COPYRIGHT` file — do **not** modify the LICENSE text itself.
 
-```
-MIT License
-
-Copyright (c) 2026 Conteh Consulting LLC
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-**Why MIT?**: 
-- Most permissive license
-- Allows commercial use
-- Companies trust it
-- Same as React, Node.js, etc.
+**Why AGPL-3.0?**: 
+- Ensures modifications to the platform remain open source
+- Protects community contributions
+- Companies trust it for network server software
+- Same as Grafana, Nextcloud, etc.
 
 ---
 
@@ -578,7 +555,7 @@ git push
 
 ### Add Badges to README.md
 ```markdown
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![GitHub stars](https://img.shields.io/github/stars/yourusername/ai-grc-platform.svg)](https://github.com/yourusername/ai-grc-platform/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/yourusername/ai-grc-platform.svg)](https://github.com/yourusername/ai-grc-platform/issues)
 ![Database: PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-blue)
@@ -613,7 +590,7 @@ ai-grc-platform/
 Before making repo public:
 
 - [ ] README.md is comprehensive
-- [ ] LICENSE file exists (MIT)
+- [ ] LICENSE file exists (AGPL-3.0)
 - [ ] .gitignore is present
 - [ ] No secrets/credentials in code
 - [ ] CONTRIBUTING.md exists
@@ -686,7 +663,7 @@ See [mcp-server/README.md](mcp-server/README.md) for full documentation.
 ## 🎯 Bottom Line
 
 **Upload to GitHub NOW:**
-1. ✅ LICENSE (MIT)
+1. ✅ LICENSE (AGPL-3.0)
 2. ✅ README.md (comprehensive)
 3. ✅ .gitignore (no secrets)
 4. ✅ All database files (schema + seeds)

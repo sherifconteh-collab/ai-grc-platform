@@ -2,11 +2,11 @@
 
 **Open-source AI-powered GRC platform with multi-framework compliance management, crosswalk intelligence, and BYOK AI analysis**
 
-> 🔗 **Upstream**: This repository is the community edition of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features are periodically synced here. The code is fully MIT-licensed and self-contained — no dependency on the upstream repo is required. Premium tiers (CMDB, Vendor Risk, Threat Intelligence, etc.) are available at [controlweave.com](https://controlweave.com).
+> 🔗 **Upstream**: This repository is the community edition of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features are periodically synced here. The code is fully AGPL-3.0-licensed and self-contained — no dependency on the upstream repo is required. Premium tiers (CMDB, Vendor Risk, Threat Intelligence, etc.) are available at [controlweave.com](https://controlweave.com).
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/github/v/release/sherifconteh-collab/ai-grc-platform?label=Latest%20Release&color=green)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
+[![Version](https://img.shields.io/badge/version-v0.3.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -39,7 +39,7 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **Multi-Framework**: Supports 25+ major frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, and MAESTRO
-- **Open Source**: MIT licensed, self-hostable, transparent
+- **Open Source**: AGPL-3.0 licensed, self-hostable, transparent
 - **MCP-Enabled**: Can act as an AI agent via Model Context Protocol
 - **Enterprise-Grade**: Designed for real compliance workflows
 
@@ -142,6 +142,8 @@ npm run dev                  # starts Next.js on port 3000
 - **ISO/IEC TR 24368** — AI Ethics Overview
 
 ### Tier 4 — Planned / In Progress
+> Available now at [ControlWeave.com](https://controlweave.com)
+
 - GDPR
 - PCI DSS 4.0
 - CIS Controls v8
@@ -243,7 +245,7 @@ Full RMF lifecycle management without leaving the platform:
 ### Unique Differentiators:
 
 1. **100% Open Source & Free**
-   - MIT licensed — use, modify, sell without restrictions
+   - AGPL-3.0 licensed — open source with copyleft protections (see [LICENSE](./LICENSE))
    - Self-hostable — your data stays on your infrastructure
    - No per-user fees, no vendor lock-in
    - Commercial tools cost $30K–200K/year
@@ -550,7 +552,7 @@ We welcome contributions! This is an open-source project designed to help organi
 
 ## 📜 License
 
-MIT License — see [LICENSE](./LICENSE) file for details.
+AGPL-3.0 License — see [LICENSE](./LICENSE) file for details.
 
 By contributing, you agree to the [Contributor License Agreement](./CLA.md). Signing is automated — the CLA bot (see [`.github/workflows/cla.yml`](./.github/workflows/cla.yml)) will prompt you on your first PR.
 
@@ -567,7 +569,7 @@ This community edition gives you a fully functional GRC platform. If you need en
 - 🏗️ **Multi-tenant Management** — Platform administration across organizations
 - 🎯 **Unlimited Frameworks** — No limits on simultaneously active frameworks
 
-👉 **[Get started at ControlWeave.com](https://controlweave.com/pricing)**
+👉 **[Get started at ControlWeave.com](https://controlweave.com/#pricing)**
 
 ## 🙋 Support
 
