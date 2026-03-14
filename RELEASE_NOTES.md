@@ -1,6 +1,6 @@
 # ControlWeave Community Edition — Release Notes
 
-> This document contains release notes for features available on the **Free tier** of ControlWeave.
+> This document contains release notes for features available on the **Community tier** of ControlWeave.
 > Premium-only features (CMDB, Vulnerability Management, Threat Intelligence, Vendor Risk,
 > Enterprise Integrations, etc.) are excluded.
 >
@@ -9,16 +9,15 @@
 
 ---
 
-## [Unreleased]
+## [2.1.0] — 2026-03-14
 
-
-> Changes staged but not yet released to production.
+> **Released:** 2026-03-14
 
 ### Added
 
 #### 🔵 RMF Lifecycle (NIST SP 800-37 Rev 2)
 
-> ✅ **Tier availability:** Free · Starter · Professional · Enterprise
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
 
 The **RMF Lifecycle** module walks your team through the full NIST SP 800-37 Rev 2 process — from system categorization through authorization and continuous monitoring — without leaving ControlWeave.
 
@@ -36,9 +35,9 @@ The **RMF Lifecycle** module walks your team through the full NIST SP 800-37 Rev
 > 💡 **Getting started:** Navigate to *RMF Lifecycle* in the sidebar (visible once you activate NIST 800-53, NIST 800-171, or CMMC 2.0).
 #### 🤖 AI Platform
 
-> ✅ **Tier availability:** Free · Starter · Professional · Enterprise
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
 
-ControlWeave ships with a **built-in AI layer** that any user can activate with their own API key (BYOK). Free users receive **10 AI requests per month** across gap analysis, policy generation, crosswalk optimization, compliance forecasting, and remediation playbooks.
+ControlWeave ships with a **built-in AI layer** that any user can activate with their own API key (BYOK). Community users receive **10 AI requests per month** across gap analysis, policy generation, crosswalk optimization, compliance forecasting, and remediation playbooks.
 
 - AI Copilot — org-aware conversational assistant with 25+ analysis features (gap analysis, compliance forecast, etc.)
 > 🎯 **Gap analysis** compares your current implementation status against a target framework baseline and lists missing controls.
@@ -51,9 +50,9 @@ ControlWeave ships with a **built-in AI layer** that any user can activate with 
 > 💡 **Getting started:** Go to *Settings* → *LLM Configuration* → enter your API key for Anthropic, OpenAI, Gemini, Grok, Groq, or Ollama.
 #### 📋 Compliance Frameworks
 
-> ✅ **Tier availability:** Free · Starter · Professional · Enterprise
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
 
-ControlWeave supports **25+ compliance frameworks** out of the box. Free-tier organizations can activate up to 2 frameworks simultaneously and benefit from automatic crosswalk mappings between them.
+ControlWeave supports **25+ compliance frameworks** out of the box. Community-tier organizations can activate up to 2 frameworks simultaneously and benefit from automatic crosswalk mappings between them.
 
 - CMMC 2.0 framework module with crosswalk mappings
 > 🔗 **Crosswalk mapping** automatically surfaces overlapping controls across frameworks so you comply once and satisfy many.
@@ -69,7 +68,7 @@ ControlWeave supports **25+ compliance frameworks** out of the box. Free-tier or
 > 💡 **Getting started:** Go to *Frameworks* in the sidebar → click *Activate* on any framework to begin.
 #### 🔒 Security & Risk Management
 
-> ✅ **Tier availability:** Free · Starter · Professional · Enterprise
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
 
 Security fixes are applied across all tiers. The following improvements shipped in this release to harden the platform against identified vulnerabilities.
 
@@ -82,7 +81,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 > 💡 **Action required:** Update to this version to benefit from all security patches.
 #### 🚀 CI/CD & Release Management
 
-> ✅ **Tier availability:** Free · Starter · Professional · Enterprise
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
 
 **CI/CD and Release Management** improvements keep the development pipeline reliable and auditable — branch naming enforcement, automated release notes, and hardened security scanning.
 
@@ -105,9 +104,9 @@ Security fixes are applied across all tiers. The following improvements shipped 
 - Auth `/me` endpoint now returns `framework_codes` array for client-side feature gating
 - Trial period updated from 7 to 14 days across all references
 - Branding updated to "From Policy to Proof"
-- Professional tier framework limit bumped to 20
+- Enterprise tier framework limit bumped to 20
 - Dashboard sidebar reorganized with framework-gated entries (RMF Lifecycle, Auditor Workspace)
-- Pricing tiers restructured: Starter / Professional / Enterprise / Utilities
+- Pricing tiers restructured: Community / Pro / Enterprise / Gov Cloud
 - `console.error` replaced with structured logger across all backend routes
 
 ### Fixed
@@ -117,7 +116,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 - Railway deployment — correct builders, `startCommand`, PORT configuration, standalone runtime compatibility
 - Docker frontend build — bake correct `NEXT_PUBLIC_API_URL` via `.env.production`
 - Pagination offset bug returning duplicate records on page 2+
-- Professional tier incorrectly showing unlimited frameworks
+- Pro tier incorrectly showing unlimited frameworks
 - Menu path consistency: Settings → External Contacts
 - Sidebar rail full-height with internal scroll
 - CW emblem centering within branding
@@ -152,14 +151,14 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 ---
 
-## [0.3.0] — 2026-02-18
+## [2.0.0] — 2026-02-18
 
 > **Released:** 2026-02-18
 
 
 ### Added
 - NERC CIP framework module: initial control library with 47 requirements mapped to NIST 800-53 Rev. 5
-- Feature gating system: tiered access control tied to pricing plan (Starter / Professional / Enterprise)
+- Feature gating system: tiered access control tied to pricing plan (Community / Pro / Enterprise / Gov Cloud)
 - EU AI Act Article 17 compliance checklist: 22-point evidence collection workflow
 > 📎 **Evidence** can be uploaded as files (PDF, DOCX, XLSX, images) or linked as external URLs and is versioned automatically.
 
@@ -181,7 +180,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 ---
 
-## [0.2.1] — 2026-02-05
+## [1.1.1] — 2026-02-05
 
 > **Released:** 2026-02-05
 
@@ -194,7 +193,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 ---
 
-## [0.2.0] — 2026-01-22
+## [1.1.0] — 2026-01-22
 
 > **Released:** 2026-01-22
 
@@ -219,7 +218,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 
 ### Deprecated
-- Legacy CSV import format (v1): will be removed in v0.4.0
+- Legacy CSV import format (v1): will be removed in v2.0.0
 
 ### Security
 - Implemented field-level encryption for PII in `user_profiles` table
@@ -229,7 +228,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 ---
 
-## [0.1.0] — 2026-01-05
+## [1.0.0] — 2026-01-05
 
 > **Released:** 2026-01-05
 
@@ -250,4 +249,4 @@ Security fixes are applied across all tiers. The following improvements shipped 
 
 ---
 
-<!-- Generated by generate-public-release-notes.js on 2026-03-12T10:49:40.051Z -->
+<!-- Generated by generate-public-release-notes.js on 2026-03-14T19:45:21.798Z -->
