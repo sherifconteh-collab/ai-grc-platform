@@ -46,18 +46,26 @@ router.get('/overview', async (req, res) => {
 router.get('/organizations', async (req, res) => {
   try {
     const { page = 1, limit = 20, region } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const params = [parseInt(limit), offset];
-    let whereExtra = '';
-    if (region) { params.unshift(region); whereExtra = `WHERE region=$1`; params.splice(1, 0); }
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const offset = (pageNum - 1) * limitNum;
 
-    const result = await pool.query(
-      `SELECT id, name, tier, created_at FROM organizations ${whereExtra}
-       ORDER BY created_at DESC LIMIT $${params.indexOf(parseInt(limit)) + 1} OFFSET $${params.indexOf(offset) + 1}`,
-      [parseInt(limit), offset]
-    );
+    let query;
+    let params;
+    if (region) {
+      query = `SELECT id, name, tier, created_at FROM organizations
+               WHERE region=$1
+               ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
+      params = [region, limitNum, offset];
+    } else {
+      query = `SELECT id, name, tier, created_at FROM organizations
+               ORDER BY created_at DESC LIMIT $1 OFFSET $2`;
+      params = [limitNum, offset];
+    }
+
+    const result = await pool.query(query, params);
     const total = await pool.query(`SELECT COUNT(*) FROM organizations`);
-    res.json({ success: true, data: result.rows, total: parseInt(total.rows[0].count), page: parseInt(page) });
+    res.json({ success: true, data: result.rows, total: parseInt(total.rows[0].count), page: pageNum });
   } catch (err) {
     console.error('Platform admin orgs error:', err);
     res.status(500).json({ success: false, error: 'Failed to load organizations' });

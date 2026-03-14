@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const pool = require('./config/database');
 const { attachRequestContext } = require('./middleware/requestContext');
 const { createRateLimiter } = require('./middleware/rateLimit');
@@ -97,6 +98,15 @@ app.use('/api/v1/auth/refresh', refreshRateLimiter);
 app.use('/api/v1/auth/forgot-password', passwordRecoveryRateLimiter);
 app.use('/api/v1/auth/reset-password', passwordRecoveryRateLimiter);
 app.use('/api/v1', apiRateLimiter);
+
+// Secondary global rate limit using express-rate-limit (satisfies CodeQL js/missing-rate-limiting)
+const globalApiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/', globalApiRateLimiter);
 
 // Validate edition at startup
 validateEdition();
