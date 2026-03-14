@@ -17,8 +17,7 @@ Everything is bundled — PostgreSQL included. No setup required. Just install a
 
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
-After installing, launch ControlWeave and visit **http://localhost:3000/register** to create your first account.
-The app automatically checks for updates from this repository so you always stay current.
+After installing, launch ControlWeave — the app opens automatically and walks you through creating your first account. Updates are delivered automatically so you always stay on the latest version.
 
 <details>
 <summary>System requirements &amp; release notes</summary>
