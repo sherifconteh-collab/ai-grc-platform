@@ -227,6 +227,35 @@ const issueReportRoutes = require('./routes/issueReport');
 const totpRoutes = require('./routes/totp');
 const openclawWebhookRoutes = require('./routes/openclawWebhook');
 const licenseRoutes = require('./routes/license');
+// Additional routes for full API coverage
+const evidenceRoutes = require('./routes/evidence');
+const vulnerabilitiesRoutes = require('./routes/vulnerabilities');
+const sbomRoutes = require('./routes/sbom');
+const settingsRoutes = require('./routes/settings');
+const tprmRoutes = require('./routes/tprm');
+const cmdbRoutes = require('./routes/cmdb');
+const dataGovernanceRoutes = require('./routes/dataGovernance');
+const regulatoryNewsRoutes = require('./routes/regulatoryNews');
+const reportsRoutes = require('./routes/reports');
+const ssoRoutes = require('./routes/sso');
+const siemRoutes = require('./routes/siem');
+const platformAdminRoutes = require('./routes/platformAdmin');
+const integrationsRoutes = require('./routes/integrations');
+const autoEvidenceRoutes = require('./routes/autoEvidenceCollection');
+const pendingEvidenceRoutes = require('./routes/pendingEvidence');
+const aiGovernanceRoutes = require('./routes/aiGovernance');
+const threatIntelRoutes = require('./routes/threatIntel');
+const vendorSecurityRoutes = require('./routes/vendorSecurity');
+const dataSovereigntyRoutes = require('./routes/dataSovereignty');
+const integrationsHubRoutes = require('./routes/integrationsHub');
+const {
+  contactsRouter,
+  phase6Router,
+  ragRouter,
+  rmfRouter,
+  plot4aiRouter,
+  billingRouter
+} = require('./routes/premiumStubs');
 
 // Mount routes
 app.use('/api/v1/auth', authRoutes);
@@ -257,6 +286,33 @@ app.use('/api/v1/issues', issueReportRoutes);
 app.use('/api/v1/auth/totp', totpRoutes);
 app.use('/api/v1/openclaw/webhook', openclawWebhookRoutes);
 app.use('/api/v1/license', licenseRoutes);
+// Additional routes
+app.use('/api/v1/evidence', evidenceRoutes);
+app.use('/api/v1/vulnerabilities', vulnerabilitiesRoutes);
+app.use('/api/v1/sbom', sbomRoutes);
+app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/tprm', tprmRoutes);
+app.use('/api/v1/cmdb', cmdbRoutes);
+app.use('/api/v1/data-governance', dataGovernanceRoutes);
+app.use('/api/v1/regulatory-news', regulatoryNewsRoutes);
+app.use('/api/v1/reports', reportsRoutes);
+app.use('/api/v1/sso', ssoRoutes);
+app.use('/api/v1/siem', siemRoutes);
+app.use('/api/v1/platform-admin', platformAdminRoutes);
+app.use('/api/v1/integrations', integrationsRoutes);
+app.use('/api/v1/auto-evidence', autoEvidenceRoutes);
+app.use('/api/v1/pending-evidence', pendingEvidenceRoutes);
+app.use('/api/v1/ai-governance', aiGovernanceRoutes);
+app.use('/api/v1/threat-intel', threatIntelRoutes);
+app.use('/api/v1/vendor-security', vendorSecurityRoutes);
+app.use('/api/v1/data-sovereignty', dataSovereigntyRoutes);
+app.use('/api/v1/integrations-hub', integrationsHubRoutes);
+app.use('/api/v1/contacts', contactsRouter);
+app.use('/api/v1/phase6', phase6Router);
+app.use('/api/v1/rag', ragRouter);
+app.use('/api/v1/rmf', rmfRouter);
+app.use('/api/v1/plot4ai', plot4aiRouter);
+app.use('/api/v1/billing', billingRouter);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

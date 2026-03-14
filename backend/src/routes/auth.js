@@ -1265,4 +1265,40 @@ router.post('/accept-invite', validateBody((body) => {
   }
 });
 
+// ---------------------------------------------------------------
+// Passkey / WebAuthn routes (stubs — full FIDO2 requires premium)
+// ---------------------------------------------------------------
+
+// GET /api/v1/auth/passkey/register/options
+router.get('/passkey/register/options', async (req, res) => {
+  res.status(501).json({ success: false, error: 'WebAuthn passkey registration requires a premium edition' });
+});
+
+// POST /api/v1/auth/passkey/register/verify
+router.post('/passkey/register/verify', async (req, res) => {
+  res.status(501).json({ success: false, error: 'WebAuthn passkey registration requires a premium edition' });
+});
+
+// POST /api/v1/auth/passkey/auth/options
+router.post('/passkey/auth/options', async (req, res) => {
+  res.status(501).json({ success: false, error: 'WebAuthn passkey authentication requires a premium edition' });
+});
+
+// POST /api/v1/auth/passkey/auth/verify
+router.post('/passkey/auth/verify', async (req, res) => {
+  res.status(501).json({ success: false, error: 'WebAuthn passkey authentication requires a premium edition' });
+});
+
+// GET /api/v1/auth/passkey/list
+router.get('/passkey/list', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.json({ success: true, data: [] });
+    // Return empty list for community edition
+    res.json({ success: true, data: [] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to list passkeys' });
+  }
+});
+
 module.exports = router;
