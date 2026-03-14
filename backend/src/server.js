@@ -417,80 +417,117 @@ async function ensureAssessmentProcedures() {
 }
 
 // If LICENSE_KEY env var is not set, try to load a stored license from the DB
-// and upgrade the edition accordingly.  This runs async after server startup.
+// and upgrade the edition accordingly.  Runs BEFORE server.listen so edition
+// gating is correct from the very first request.
 async function ensureLicenseFromDb() {
-  if (process.env.LICENSE_KEY) return; // env var takes priority
-  try {
-    const { loadLicenseFromDb, setActiveLicense } = require('./services/licenseService');
-    const { upgradeEdition, LICENSE_TIER_TO_EDITION, EDITION } = require('./middleware/edition');
-    const license = await loadLicenseFromDb();
-    if (license && license.valid) {
-      // Cache the license in-memory so the GET /license endpoint finds it
-      setActiveLicense(license);
-      const effectiveEdition = LICENSE_TIER_TO_EDITION[license.tier] || 'pro';
-      const valid = ['community', 'pro', 'enterprise'];
-      if (valid.indexOf(effectiveEdition) > valid.indexOf(EDITION)) {
-        upgradeEdition(effectiveEdition);
-        log('info', 'license.restored_from_db', {
-          licensee: license.licensee,
-          tier: license.tier,
-          edition: effectiveEdition,
-        });
-      }
+  const {
+    loadLicenseKeyFromDb,
+    validateLicenseKey,
+    setLocalPublicKey
+  } = require('./services/licenseService');
+  const { upgradeEdition, LICENSE_TIER_TO_EDITION } = require('./middleware/edition');
+
+  let activeKey = null;
+
+  // Check env var first — but only honour it if the key actually validates.
+  const envKey = (process.env.LICENSE_KEY || process.env.CONTROLWEAVE_LICENSE_KEY || '').trim();
+  if (envKey) {
+    const envResult = validateLicenseKey(envKey);
+    if (envResult.valid) {
+      activeKey = envKey;
+    } else {
+      log('warn', 'license.env_key_invalid', {
+        error: envResult.error,
+        note: 'Env var LICENSE_KEY is set but invalid — falling through to DB-persisted key.'
+      });
     }
-  } catch (err) {
-    log('warn', 'license.db_restore_skipped', { error: err.message });
+  }
+
+  // Fall through to DB when env key is absent or invalid.
+  if (!activeKey) {
+    const { licenseKey: dbKey, localPublicKey } = await loadLicenseKeyFromDb(pool);
+    if (dbKey) {
+      // If a locally-generated key was used, restore its public key in-process
+      // so validation succeeds without CONTROLWEAVE_LICENSE_PUBKEY in env.
+      if (localPublicKey) {
+        setLocalPublicKey(localPublicKey);
+      }
+      const result = validateLicenseKey(dbKey);
+      if (result.valid) {
+        const effectiveEdition = LICENSE_TIER_TO_EDITION[result.tier] || 'community';
+        upgradeEdition(effectiveEdition);
+        log('info', 'license.loaded_from_db', {
+          tier: result.tier,
+          edition: effectiveEdition,
+          licensee: result.licensee
+        });
+      } else {
+        log('warn', 'license.db_key_invalid', { error: result.error });
+      }
+    } else {
+      log('info', 'license.unlicensed', {
+        note: 'No license key found. Use POST /api/v1/license/generate-community to generate a free community license, or POST /api/v1/license/activate to activate a purchased key.'
+      });
+    }
   }
 }
 
 // Start server
+// Apply DB-persisted license BEFORE listening so edition/tier gating is correct
+// from the very first request. If license loading fails (DB unreachable, etc.),
+// the server still starts — community tier works unlicensed by design.
+// Other startup tasks (platform admin, framework seeding) are non-blocking.
 const HOST = process.env.HOST || '0.0.0.0';
-const server = app.listen(PORT, HOST, () => {
-  log('info', 'server.started', {
-    host: HOST,
-    port: Number(PORT),
-    health: `http://localhost:${PORT}/health`,
-    environment: process.env.NODE_ENV || 'development'
-  });
 
-  // Initialize WebSocket server after HTTP server is ready
-  const { initializeWebSocket } = require('./services/websocketService');
-  initializeWebSocket(server);
+ensureLicenseFromDb()
+  .catch((err) => {
+    // Non-fatal: the server should start even if license loading fails.
+    // Community tier is the default when no valid license is present.
+    log('warn', 'license.startup_error', { error: err.message });
+  })
+  .then(() => {
+    const server = app.listen(PORT, HOST, () => {
+      log('info', 'server.started', {
+        host: HOST,
+        port: Number(PORT),
+        health: `http://localhost:${PORT}/health`,
+        environment: process.env.NODE_ENV || 'development'
+      });
 
-  // Auto-provision platform admin if env vars are present
-  ensurePlatformAdmin().catch((err) =>
-    log('error', 'platform.admin.startup_error', { error: err.message })
-  );
+      // Initialize WebSocket server after HTTP server is ready
+      const { initializeWebSocket } = require('./services/websocketService');
+      initializeWebSocket(server);
 
-  // Auto-seed frameworks if table is empty (must run before assessment procedures)
-  ensureFrameworks()
-    .then(() => {
-      // Auto-seed assessment procedures if table is empty
-      ensureAssessmentProcedures().catch((err) =>
-        log('error', 'assessment.procedures.startup_error', { error: err.message })
+      // Auto-provision platform admin if env vars are present
+      ensurePlatformAdmin().catch((err) =>
+        log('error', 'platform.admin.startup_error', { error: err.message })
       );
-    })
-    .catch((err) =>
-      log('error', 'frameworks.startup_error', { error: err.message })
-    );
 
-  // Restore license from DB if LICENSE_KEY env var is not set
-  ensureLicenseFromDb().catch((err) =>
-    log('error', 'license.startup_error', { error: err.message })
-  );
-});
-
-// Graceful shutdown
-function shutdown(signal) {
-  log('warn', 'server.shutdown.requested', { signal });
-  server.close(() => {
-    log('info', 'server.http.closed');
-    pool.end(() => {
-      log('info', 'server.db.closed');
-      process.exit(0);
+      // Auto-seed frameworks if table is empty (must run before assessment procedures)
+      ensureFrameworks()
+        .then(() => {
+          // Auto-seed assessment procedures if table is empty
+          ensureAssessmentProcedures().catch((err) =>
+            log('error', 'assessment.procedures.startup_error', { error: err.message })
+          );
+        })
+        .catch((err) =>
+          log('error', 'frameworks.startup_error', { error: err.message })
+        );
     });
-  });
-}
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+    // Graceful shutdown
+    function shutdown(signal) {
+      log('warn', 'server.shutdown.requested', { signal });
+      server.close(() => {
+        log('info', 'server.http.closed');
+        pool.end(() => {
+          log('info', 'server.db.closed');
+          process.exit(0);
+        });
+      });
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+  });
