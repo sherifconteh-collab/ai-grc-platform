@@ -6,8 +6,29 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
+[![Release](https://img.shields.io/github/v/release/sherifconteh-collab/ai-grc-platform?label=Latest%20Release&color=green)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
+---
+
+### 📥 Download the Desktop App
+
+Everything is bundled — PostgreSQL included. No setup required. Just install and run.
+
+> [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
+
+After installing, launch ControlWeave and visit **http://localhost:3000/register** to create your first account.
+The app automatically checks for updates from this repository so you always stay current.
+
+<details>
+<summary>System requirements &amp; release notes</summary>
+
+- Windows 10+, macOS 10.13+, or Ubuntu 18.04+ (or equivalent)
+- 2 GB RAM · ~500 MB disk space
+- [All releases](https://github.com/sherifconteh-collab/ai-grc-platform/releases) · [Release notes](./RELEASE_NOTES.md)
+</details>
+
+---
 
 <!-- LAST_UPDATED: 2026-03-13 | PR #43: feat: bundle PostgreSQL + auto-migrate in Electron desktop installer -->
 
@@ -40,24 +61,6 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 - 🔒 Enterprise security (Helmet, CORS, rate limiting, bcrypt, field-level encryption)
 - 📡 Webhook and notification system
 - 📄 Policy management with gap analysis
-
-## 📥 Download
-
-Get the ControlWeave desktop app — everything you need is bundled in a single installer (including PostgreSQL). No external database or server setup required.
-
-| Platform | Installer | Architecture |
-|----------|-----------|--------------|
-| **Windows** | `.exe` (NSIS installer) | x64 |
-| **macOS** | `.dmg` | Intel & Apple Silicon |
-| **Linux** | `.AppImage` | x64 |
-
-**👉 [Download the latest release](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)**
-
-> **System requirements:** Windows 10+, macOS 10.13+, or Ubuntu 18.04+ (or equivalent) · 2 GB RAM · ~500 MB disk space
->
-> After installing, launch ControlWeave and visit **http://localhost:3000/register** to create your first account.
-
-Looking for older versions? See [all releases](https://github.com/sherifconteh-collab/ai-grc-platform/releases).
 
 ## 🚀 Quick Start (Development)
 

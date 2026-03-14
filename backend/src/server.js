@@ -365,10 +365,14 @@ async function ensurePlatformAdmin() {
 // so the first user who registers can select frameworks during onboarding.
 async function ensureFrameworks() {
   const client = await pool.connect();
-  let count;
+  let count = 0;
   try {
     const { rows } = await client.query('SELECT COUNT(*) AS count FROM frameworks');
     count = parseInt(rows[0].count, 10);
+  } catch (err) {
+    // Table may not exist yet (migrations not run). Skip seeding silently.
+    log('warn', 'frameworks.check_skipped', { error: err.message });
+    return;
   } finally {
     client.release();
   }
