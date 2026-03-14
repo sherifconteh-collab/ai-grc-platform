@@ -264,6 +264,13 @@ router.post('/questionnaires', async (req, res) => {
     if (!vendor_id || !title) {
       return res.status(400).json({ success: false, error: 'vendor_id and title are required' });
     }
+    const vendorCheck = await pool.query(
+      'SELECT id FROM tprm_vendors WHERE id = $1 AND organization_id = $2',
+      [vendor_id, orgId]
+    );
+    if (vendorCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
+    }
     const responseToken = crypto.randomBytes(32).toString('hex');
     const result = await pool.query(
       `INSERT INTO tprm_questionnaires (organization_id, vendor_id, title, description, questions, due_date, response_token)
@@ -465,6 +472,13 @@ router.post('/documents', async (req, res) => {
     const { vendor_id, title, document_type, status, file_path, metadata } = req.body;
     if (!vendor_id || !title) {
       return res.status(400).json({ success: false, error: 'vendor_id and title are required' });
+    }
+    const vendorCheck = await pool.query(
+      'SELECT id FROM tprm_vendors WHERE id = $1 AND organization_id = $2',
+      [vendor_id, orgId]
+    );
+    if (vendorCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
     }
     const result = await pool.query(
       `INSERT INTO tprm_documents (organization_id, vendor_id, title, document_type, status, file_path, metadata)
