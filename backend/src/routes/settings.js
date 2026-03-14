@@ -92,22 +92,22 @@ router.post('/llm/test', async (req, res) => {
 router.delete('/llm/:provider', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const providerMap = {
-      anthropic: 'anthropic_api_key_enc',
-      openai: 'openai_api_key_enc',
-      gemini: 'gemini_api_key_enc',
-      xai: 'xai_api_key_enc'
-    };
-    const column = providerMap[req.params.provider];
-    if (!column) {
+    const provider = req.params.provider;
+    const validProviders = ['anthropic', 'openai', 'gemini', 'xai'];
+    if (!validProviders.includes(provider)) {
       return res.status(400).json({ success: false, error: 'Invalid provider' });
     }
     await pool.query(
-      `UPDATE llm_configurations SET ${column} = NULL, updated_at = NOW()
+      `UPDATE llm_configurations SET
+         anthropic_api_key_enc = CASE WHEN $2 = 'anthropic' THEN NULL ELSE anthropic_api_key_enc END,
+         openai_api_key_enc = CASE WHEN $2 = 'openai' THEN NULL ELSE openai_api_key_enc END,
+         gemini_api_key_enc = CASE WHEN $2 = 'gemini' THEN NULL ELSE gemini_api_key_enc END,
+         xai_api_key_enc = CASE WHEN $2 = 'xai' THEN NULL ELSE xai_api_key_enc END,
+         updated_at = NOW()
        WHERE organization_id = $1`,
-      [orgId]
+      [orgId, provider]
     );
-    res.json({ success: true, data: { provider: req.params.provider, message: 'API key removed' } });
+    res.json({ success: true, data: { provider, message: 'API key removed' } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
