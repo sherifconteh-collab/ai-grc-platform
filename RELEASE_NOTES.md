@@ -37,7 +37,7 @@ The **RMF Lifecycle** module walks your team through the full NIST SP 800-37 Rev
 
 > ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
 
-ControlWeave ships with a **built-in AI layer** that any user can activate with their own API key (BYOK). Community users receive **10 AI requests per month** across gap analysis, policy generation, crosswalk optimization, compliance forecasting, and remediation playbooks.
+ControlWeave ships with a **built-in AI layer** that any user can activate with their own API key (BYOK). Self-hosted deployments have **unlimited AI requests** across gap analysis, policy generation, crosswalk optimization, compliance forecasting, and remediation playbooks.
 
 - AI Copilot — org-aware conversational assistant with 25+ analysis features (gap analysis, compliance forecast, etc.)
 > 🎯 **Gap analysis** compares your current implementation status against a target framework baseline and lists missing controls.

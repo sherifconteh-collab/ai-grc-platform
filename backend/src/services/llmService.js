@@ -20,7 +20,7 @@ try { axios = require('axios'); } catch (_e) { axios = null; }
 // Constants
 // ---------------------------------------------------------------------------
 
-const USAGE_LIMITS = { community: 10, pro: 500, enterprise: -1, govcloud: -1 };
+const USAGE_LIMITS = { community: -1, pro: -1, enterprise: -1, govcloud: -1 };
 
 const PROVIDER_MODELS = {
   anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'],
