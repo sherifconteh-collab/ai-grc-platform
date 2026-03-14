@@ -229,6 +229,10 @@ const openclawWebhookRoutes = require('./routes/openclawWebhook');
 const licenseRoutes = require('./routes/license');
 const vulnerabilitiesRoutes = require('./routes/vulnerabilities');
 const sbomRoutes = require('./routes/sbom');
+const settingsRoutes = require('./routes/settings');
+const integrationsRoutes = require('./routes/integrations');
+const autoEvidenceRoutes = require('./routes/autoEvidence');
+const pendingEvidenceRoutes = require('./routes/pendingEvidence');
 
 // Mount routes
 app.use('/api/v1/auth', authRoutes);
@@ -261,6 +265,10 @@ app.use('/api/v1/openclaw/webhook', openclawWebhookRoutes);
 app.use('/api/v1/license', licenseRoutes);
 app.use('/api/v1/vulnerabilities', vulnerabilitiesRoutes);
 app.use('/api/v1/sbom', sbomRoutes);
+app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/integrations', integrationsRoutes);
+app.use('/api/v1/auto-evidence', autoEvidenceRoutes);
+app.use('/api/v1/pending-evidence', pendingEvidenceRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
