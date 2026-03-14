@@ -284,7 +284,7 @@ ai-grc-platform/
 ### Initial Commit Checklist
 - [ ] Create GitHub repo
 - [ ] Add .gitignore
-- [ ] Add LICENSE (MIT)
+- [ ] Add LICENSE (AGPL-3.0)
 - [ ] Add README.md
 - [ ] Commit database schema
 - [ ] Commit seed files

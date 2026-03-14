@@ -2,179 +2,262 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'cmdb-route' }));
 
-// ---------------------------------------------------------------
-// CMDB — Configuration Management Database
-// Assets are stored in the `assets` table (migration 022).
-// Relationships live in the POAM/vulnerability linking tables.
-// ---------------------------------------------------------------
+const VALID_RESOURCE_TYPES = [
+  'hardware',
+  'software',
+  'ai-agents',
+  'service-accounts',
+  'environments',
+  'password-vaults',
+];
 
-// GET /api/v1/cmdb/assets
-router.get('/assets', requirePermission('controls.read'), async (req, res) => {
+// ── Search across all resource types ────────────────────────────────────────
+router.get('/assets', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const { search, asset_type, limit = 200, offset = 0 } = req.query;
+    const org_id = req.user.organization_id;
+    const { search } = req.query;
 
-    const params = [orgId];
-    const filters = [];
-    if (asset_type) { params.push(asset_type); filters.push(`asset_type = $${params.length}`); }
+    let query = 'SELECT * FROM cmdb_assets WHERE organization_id = $1';
+    const params = [org_id];
+
     if (search) {
       params.push(`%${search}%`);
-      filters.push(`(name ILIKE $${params.length} OR description ILIKE $${params.length})`);
+      query += ` AND name ILIKE $${params.length}`;
     }
-    const whereExtra = filters.length ? ' AND ' + filters.join(' AND ') : '';
-    params.push(Number(limit) || 200, Number(offset) || 0);
 
-    const result = await pool.query(
-      `SELECT a.*,
-              ac.name AS category_name
-       FROM assets a
-       LEFT JOIN asset_categories ac ON ac.id = a.category_id
-       WHERE a.organization_id=$1 ${whereExtra}
-       ORDER BY a.name
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
-    const total = await pool.query(
-      `SELECT COUNT(*) FROM assets WHERE organization_id=$1`,
-      [orgId]
-    );
-    res.json({ success: true, data: result.rows, total: parseInt(total.rows[0].count) });
-  } catch (err) {
-    console.error('CMDB assets error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load assets' });
+    query += ' ORDER BY created_at DESC';
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('CMDB search assets error:', error);
+    res.status(500).json({ success: false, error: 'Failed to search assets' });
   }
 });
 
-// POST /api/v1/cmdb/assets
-router.post('/assets', requirePermission('controls.write'), async (req, res) => {
+// ── List ALL relationships for the org ──────────────────────────────────────
+router.get('/relationships/all', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const { name, asset_type, description, ip_address, hostname, os, owner_id, category_id, criticality } = req.body || {};
-    if (!name) {
-      return res.status(400).json({ success: false, error: 'name is required' });
-    }
+    const org_id = req.user.organization_id;
     const result = await pool.query(
-      `INSERT INTO assets (organization_id, name, asset_type, description, ip_address, hostname, os, owner_id, category_id, criticality)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [orgId, name, asset_type || null, description || null, ip_address || null,
-       hostname || null, os || null, owner_id || null, category_id || null, criticality || null]
+      'SELECT * FROM cmdb_relationships WHERE organization_id = $1 ORDER BY created_at DESC',
+      [org_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('CMDB list all relationships error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list relationships' });
+  }
+});
+
+// ── List relationships filtered by asset_id ─────────────────────────────────
+router.get('/relationships', async (req, res) => {
+  try {
+    const org_id = req.user.organization_id;
+    const { asset_id } = req.query;
+
+    if (!asset_id) {
+      return res.status(400).json({ success: false, error: 'asset_id query param is required' });
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM cmdb_relationships
+       WHERE organization_id = $1
+         AND (source_asset_id = $2 OR target_asset_id = $2)
+       ORDER BY created_at DESC`,
+      [org_id, asset_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('CMDB list relationships error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list relationships' });
+  }
+});
+
+// ── Create relationship ─────────────────────────────────────────────────────
+router.post('/relationships', async (req, res) => {
+  try {
+    const org_id = req.user.organization_id;
+    const { source_asset_id, target_asset_id, relationship_type } = req.body;
+
+    if (!source_asset_id || !target_asset_id || !relationship_type) {
+      return res.status(400).json({
+        success: false,
+        error: 'source_asset_id, target_asset_id, and relationship_type are required',
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO cmdb_relationships (organization_id, source_asset_id, target_asset_id, relationship_type)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [org_id, source_asset_id, target_asset_id, relationship_type]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('CMDB asset create error:', err);
-    res.status(500).json({ success: false, error: 'Failed to create asset' });
+  } catch (error) {
+    console.error('CMDB create relationship error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create relationship' });
   }
 });
 
-// GET /api/v1/cmdb/assets/:id
-router.get('/assets/:id', requirePermission('controls.read'), async (req, res) => {
+// ── Delete relationship ─────────────────────────────────────────────────────
+router.delete('/relationships/:id', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
+    const org_id = req.user.organization_id;
+    const { id } = req.params;
+
     const result = await pool.query(
-      `SELECT a.*, ac.name AS category_name
-       FROM assets a LEFT JOIN asset_categories ac ON ac.id=a.category_id
-       WHERE a.organization_id=$1 AND a.id=$2`,
-      [orgId, req.params.id]
+      'DELETE FROM cmdb_relationships WHERE id = $1 AND organization_id = $2 RETURNING *',
+      [id, org_id]
     );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Relationship not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('CMDB delete relationship error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete relationship' });
+  }
+});
+
+// ── List assets by resource type ────────────────────────────────────────────
+router.get('/:resource', async (req, res) => {
+  try {
+    const org_id = req.user.organization_id;
+    const { resource } = req.params;
+
+    if (!VALID_RESOURCE_TYPES.includes(resource)) {
+      return res.status(400).json({ success: false, error: `Invalid resource type: ${resource}` });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM cmdb_assets WHERE organization_id = $1 AND resource_type = $2 ORDER BY created_at DESC',
+      [org_id, resource]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('CMDB list assets error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list assets' });
+  }
+});
+
+// ── Get single asset ────────────────────────────────────────────────────────
+router.get('/:resource/:id', async (req, res) => {
+  try {
+    const org_id = req.user.organization_id;
+    const { resource, id } = req.params;
+
+    if (!VALID_RESOURCE_TYPES.includes(resource)) {
+      return res.status(400).json({ success: false, error: `Invalid resource type: ${resource}` });
+    }
+
+    const result = await pool.query(
+      'SELECT * FROM cmdb_assets WHERE id = $1 AND organization_id = $2 AND resource_type = $3',
+      [id, org_id, resource]
+    );
+
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Asset not found' });
     }
     res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('CMDB asset get error:', err);
+  } catch (error) {
+    console.error('CMDB get asset error:', error);
     res.status(500).json({ success: false, error: 'Failed to get asset' });
   }
 });
 
-// PUT /api/v1/cmdb/assets/:id
-router.put('/assets/:id', requirePermission('controls.write'), async (req, res) => {
+// ── Create asset ────────────────────────────────────────────────────────────
+router.post('/:resource', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const { name, asset_type, description, ip_address, hostname, os, owner_id, category_id, criticality } = req.body || {};
+    const org_id = req.user.organization_id;
+    const { resource } = req.params;
+
+    if (!VALID_RESOURCE_TYPES.includes(resource)) {
+      return res.status(400).json({ success: false, error: `Invalid resource type: ${resource}` });
+    }
+
+    const { name, description, owner, status, metadata } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'name is required' });
+    }
+
     const result = await pool.query(
-      `UPDATE assets
-       SET name = COALESCE($3, name),
-           asset_type = COALESCE($4, asset_type),
-           description = COALESCE($5, description),
-           ip_address = COALESCE($6, ip_address),
-           hostname = COALESCE($7, hostname),
-           os = COALESCE($8, os),
-           owner_id = COALESCE($9, owner_id),
-           category_id = COALESCE($10, category_id),
-           criticality = COALESCE($11, criticality),
-           updated_at = NOW()
-       WHERE organization_id=$1 AND id=$2
+      `INSERT INTO cmdb_assets (organization_id, resource_type, name, description, owner, status, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [orgId, req.params.id, name || null, asset_type || null, description || null,
-       ip_address || null, hostname || null, os || null, owner_id || null, category_id || null, criticality || null]
+      [org_id, resource, name, description || null, owner || null, status || 'active', metadata ? JSON.stringify(metadata) : null]
     );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('CMDB create asset error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create asset' });
+  }
+});
+
+// ── Update asset ────────────────────────────────────────────────────────────
+router.put('/:resource/:id', async (req, res) => {
+  try {
+    const org_id = req.user.organization_id;
+    const { resource, id } = req.params;
+
+    if (!VALID_RESOURCE_TYPES.includes(resource)) {
+      return res.status(400).json({ success: false, error: `Invalid resource type: ${resource}` });
+    }
+
+    const { name, description, owner, status, metadata } = req.body;
+
+    const result = await pool.query(
+      `UPDATE cmdb_assets
+       SET name = COALESCE($1, name),
+           description = COALESCE($2, description),
+           owner = COALESCE($3, owner),
+           status = COALESCE($4, status),
+           metadata = COALESCE($5, metadata),
+           updated_at = NOW()
+       WHERE id = $6 AND organization_id = $7 AND resource_type = $8
+       RETURNING *`,
+      [name, description, owner, status, metadata ? JSON.stringify(metadata) : null, id, org_id, resource]
+    );
+
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Asset not found' });
     }
     res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('CMDB asset update error:', err);
+  } catch (error) {
+    console.error('CMDB update asset error:', error);
     res.status(500).json({ success: false, error: 'Failed to update asset' });
   }
 });
 
-// DELETE /api/v1/cmdb/assets/:id
-router.delete('/assets/:id', requirePermission('controls.write'), async (req, res) => {
+// ── Delete asset ────────────────────────────────────────────────────────────
+router.delete('/:resource/:id', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
+    const org_id = req.user.organization_id;
+    const { resource, id } = req.params;
+
+    if (!VALID_RESOURCE_TYPES.includes(resource)) {
+      return res.status(400).json({ success: false, error: `Invalid resource type: ${resource}` });
+    }
+
     const result = await pool.query(
-      `DELETE FROM assets WHERE organization_id=$1 AND id=$2 RETURNING id, name`,
-      [orgId, req.params.id]
+      'DELETE FROM cmdb_assets WHERE id = $1 AND organization_id = $2 AND resource_type = $3 RETURNING *',
+      [id, org_id, resource]
     );
+
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Asset not found' });
     }
     res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('CMDB asset delete error:', err);
+  } catch (error) {
+    console.error('CMDB delete asset error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete asset' });
-  }
-});
-
-// ---------------------------------------------------------------
-// Relationships (stub — stored as JSONB on assets for now)
-// ---------------------------------------------------------------
-
-// GET /api/v1/cmdb/relationships
-router.get('/relationships', requirePermission('controls.read'), async (req, res) => {
-  res.json({ success: true, data: [] });
-});
-
-// GET /api/v1/cmdb/relationships/all
-router.get('/relationships/all', requirePermission('controls.read'), async (req, res) => {
-  res.json({ success: true, data: [] });
-});
-
-// POST /api/v1/cmdb/relationships
-router.post('/relationships', requirePermission('controls.write'), async (req, res) => {
-  res.json({ success: true, data: { id: null, message: 'Asset relationships are a premium CMDB feature' } });
-});
-
-// ---------------------------------------------------------------
-// Asset categories
-// ---------------------------------------------------------------
-
-// GET /api/v1/cmdb/categories
-router.get('/categories', requirePermission('controls.read'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const result = await pool.query(
-      `SELECT * FROM asset_categories WHERE organization_id IS NULL OR organization_id=$1 ORDER BY name`,
-      [orgId]
-    );
-    res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error('CMDB categories error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load asset categories' });
   }
 });
 

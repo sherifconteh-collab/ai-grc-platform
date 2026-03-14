@@ -47,7 +47,7 @@ By submitting a Contribution, you grant to the Project maintainers a perpetual,
 worldwide, non-exclusive, no-charge, royalty-free, irrevocable license to use,
 reproduce, modify, prepare derivative works of, publicly display, publicly
 perform, sublicense, and distribute your Contribution and any derivative works
-under the terms of the [MIT License](./LICENSE).
+under the terms of the [AGPL-3.0 License](./LICENSE).
 
 ### 3. Representations
 

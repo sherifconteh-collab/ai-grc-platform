@@ -2,109 +2,160 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'regulatory-news-route' }));
 
-const REGULATORY_NEWS_NS = 'regulatory_news';
-
-// GET /api/v1/regulatory-news
-router.get('/', requirePermission('controls.read'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { read, source, limit = 50, offset = 0 } = req.query;
-
-    const params = [orgId];
-    const filters = [];
-    if (read !== undefined) { params.push(read === 'true'); filters.push(`rni.is_read = $${params.length}`); }
-    if (source) { params.push(source); filters.push(`rni.source = $${params.length}`); }
-
-    const whereExtra = filters.length ? ' AND ' + filters.join(' AND ') : '';
-    params.push(Number(limit) || 50, Number(offset) || 0);
-
-    const result = await pool.query(
-      `SELECT * FROM regulatory_news_items rni
-       WHERE rni.organization_id=$1 ${whereExtra}
-       ORDER BY rni.published_at DESC NULLS LAST, rni.created_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
-
-    const unread = await pool.query(
-      `SELECT COUNT(*) FROM regulatory_news_items WHERE organization_id=$1 AND is_read=false`,
-      [orgId]
-    );
-
-    res.json({ success: true, data: result.rows, unread_count: parseInt(unread.rows[0].count) });
-  } catch (err) {
-    console.error('Regulatory news error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load regulatory news' });
-  }
-});
-
-// GET /api/v1/regulatory-news/unread-count
-router.get('/unread-count', requirePermission('controls.read'), async (req, res) => {
+// GET /unread-count - Count unread news items (before /:id)
+router.get('/unread-count', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      `SELECT COUNT(*) FROM regulatory_news_items WHERE organization_id=$1 AND is_read=false`,
+      'SELECT COUNT(*) as count FROM regulatory_news_items WHERE organization_id = $1 AND is_read = false AND is_archived = false',
       [orgId]
     );
-    res.json({ success: true, data: { count: parseInt(result.rows[0].count) } });
-  } catch (err) {
-    console.error('Regulatory news unread count error:', err);
+    res.json({ success: true, data: { unread_count: parseInt(result.rows[0].count, 10) } });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
     res.status(500).json({ success: false, error: 'Failed to get unread count' });
   }
 });
 
-// POST /api/v1/regulatory-news/mark-all-read
-router.post('/mark-all-read', requirePermission('controls.read'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    await pool.query(
-      `UPDATE regulatory_news_items SET is_read=true WHERE organization_id=$1`,
-      [orgId]
-    );
-    res.json({ success: true, data: { marked: true } });
-  } catch (err) {
-    console.error('Mark all read error:', err);
-    res.status(500).json({ success: false, error: 'Failed to mark news as read' });
-  }
-});
-
-// POST /api/v1/regulatory-news/refresh
-router.post('/refresh', requirePermission('controls.read'), async (req, res) => {
-  // Stub — actual feed refresh would pull from external sources
-  res.json({ success: true, data: { message: 'News feed refresh is handled by the scheduled job processor', items_added: 0 } });
-});
-
-// GET /api/v1/regulatory-news/sources/list
-router.get('/sources/list', requirePermission('controls.read'), async (req, res) => {
+// GET /sources/list - List distinct sources (before /:id)
+router.get('/sources/list', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      `SELECT DISTINCT source FROM regulatory_news_items WHERE organization_id=$1 AND source IS NOT NULL ORDER BY source`,
+      'SELECT DISTINCT source FROM regulatory_news_items WHERE organization_id = $1 ORDER BY source',
       [orgId]
     );
     res.json({ success: true, data: result.rows.map(r => r.source) });
-  } catch (err) {
-    console.error('Regulatory news sources error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load news sources' });
+  } catch (error) {
+    console.error('Error listing sources:', error);
+    res.status(500).json({ success: false, error: 'Failed to list sources' });
   }
 });
 
-// POST /api/v1/regulatory-news/:id/read
-router.post('/:id/read', requirePermission('controls.read'), async (req, res) => {
+// POST /refresh - Stub feed refresh (before /:id)
+router.post('/refresh', async (req, res) => {
+  try {
+    res.json({ success: true, data: { refreshed: true, new_items: 0, message: 'Feed refresh not yet configured' } });
+  } catch (error) {
+    console.error('Error refreshing feeds:', error);
+    res.status(500).json({ success: false, error: 'Failed to refresh feeds' });
+  }
+});
+
+// POST /mark-all-read - Mark all news as read (before /:id)
+router.post('/mark-all-read', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    await pool.query(
-      `UPDATE regulatory_news_items SET is_read=true WHERE organization_id=$1 AND id=$2`,
-      [orgId, req.params.id]
+    const result = await pool.query(
+      'UPDATE regulatory_news_items SET is_read = true WHERE organization_id = $1 AND is_read = false',
+      [orgId]
     );
-    res.json({ success: true, data: { id: req.params.id, is_read: true } });
-  } catch (err) {
-    console.error('Mark read error:', err);
-    res.status(500).json({ success: false, error: 'Failed to mark as read' });
+    res.json({ success: true, data: { marked_read: result.rowCount } });
+  } catch (error) {
+    console.error('Error marking all read:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark all read' });
+  }
+});
+
+// GET / - List news items
+router.get('/', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const { source, is_read, is_archived, impact_level, limit } = req.query;
+
+    let query = 'SELECT * FROM regulatory_news_items WHERE organization_id = $1';
+    const values = [orgId];
+    let idx = 2;
+
+    if (source) {
+      query += ` AND source = $${idx++}`;
+      values.push(source);
+    }
+    if (is_read !== undefined) {
+      query += ` AND is_read = $${idx++}`;
+      values.push(is_read);
+    }
+    if (is_archived !== undefined) {
+      query += ` AND is_archived = $${idx++}`;
+      values.push(is_archived);
+    }
+    if (impact_level) {
+      query += ` AND impact_level = $${idx++}`;
+      values.push(impact_level);
+    }
+
+    query += ' ORDER BY published_at DESC';
+
+    const maxRows = limit ? parseInt(limit, 10) : 50;
+    query += ` LIMIT $${idx++}`;
+    values.push(maxRows);
+
+    const result = await pool.query(query, values);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error listing news:', error);
+    res.status(500).json({ success: false, error: 'Failed to list news' });
+  }
+});
+
+// GET /:id - Get single news item and mark as read
+router.get('/:id', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const result = await pool.query(
+      'UPDATE regulatory_news_items SET is_read = true WHERE id = $1 AND organization_id = $2 RETURNING *',
+      [req.params.id, orgId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'News item not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error getting news item:', error);
+    res.status(500).json({ success: false, error: 'Failed to get news item' });
+  }
+});
+
+// PATCH /:id - Update flags
+router.patch('/:id', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    for (const [key, value] of Object.entries(req.body)) {
+      if (['is_read', 'is_archived'].includes(key)) {
+        fields.push(`${key} = $${idx}`);
+        values.push(value);
+        idx++;
+      }
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ success: false, error: 'No valid fields to update' });
+    }
+
+    values.push(req.params.id, orgId);
+
+    const result = await pool.query(
+      `UPDATE regulatory_news_items SET ${fields.join(', ')} WHERE id = $${idx} AND organization_id = $${idx + 1} RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'News item not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating news item:', error);
+    res.status(500).json({ success: false, error: 'Failed to update news item' });
   }
 });
 

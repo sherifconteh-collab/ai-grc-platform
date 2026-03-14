@@ -2,120 +2,133 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'reports-route' }));
 
-// ---------------------------------------------------------------
-// Reports — compliance and SSP report generation
-// ---------------------------------------------------------------
-
-// GET /api/v1/reports/types
-router.get('/types', requirePermission('assessments.read'), async (req, res) => {
-  res.json({
-    success: true,
-    data: [
-      { id: 'compliance_pdf', name: 'Compliance Report (PDF)', format: 'pdf', tier: 'community' },
-      { id: 'compliance_excel', name: 'Compliance Report (Excel)', format: 'excel', tier: 'professional' },
-      { id: 'ssp_pdf', name: 'System Security Plan (PDF)', format: 'pdf', tier: 'professional' },
-      { id: 'ssp_json', name: 'System Security Plan (JSON/OSCAL)', format: 'json', tier: 'enterprise' }
-    ]
-  });
-});
-
-// GET /api/v1/reports/compliance/pdf
-router.get('/compliance/pdf', requirePermission('assessments.read'), async (req, res) => {
+// GET /types - Available report types
+router.get('/types', (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const org = await pool.query(`SELECT name FROM organizations WHERE id=$1`, [orgId]);
-    const controls = await pool.query(
-      `SELECT ci.status, COUNT(*) as count
-       FROM control_implementations ci
-       WHERE ci.organization_id=$1
-       GROUP BY ci.status`,
-      [orgId]
-    );
-
-    const reportData = {
-      organization: org.rows[0]?.name || 'Unknown',
-      generated_at: new Date().toISOString(),
-      summary: controls.rows,
-      note: 'Full PDF generation requires a PDF library integration (premium feature)'
-    };
-
-    // Return JSON as placeholder; real PDF generation is premium
-    res.setHeader('Content-Disposition', 'attachment; filename="compliance-report.json"');
-    res.setHeader('Content-Type', 'application/json');
-    res.send(JSON.stringify(reportData, null, 2));
+    const types = [
+      { type: 'compliance_pdf', name: 'Compliance Report (PDF)' },
+      { type: 'compliance_excel', name: 'Compliance Report (Excel)' },
+      { type: 'ssp_pdf', name: 'System Security Plan (PDF)' },
+      { type: 'ssp_json', name: 'System Security Plan (JSON)' }
+    ];
+    res.json({ success: true, data: types });
   } catch (err) {
-    console.error('Compliance PDF error:', err);
-    res.status(500).json({ success: false, error: 'Failed to generate compliance report' });
+    console.error('Error fetching report types:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch report types' });
   }
 });
 
-// GET /api/v1/reports/compliance/excel
-router.get('/compliance/excel', requirePermission('assessments.read'), async (req, res) => {
-  res.status(402).json({ success: false, error: 'Excel report generation is a professional-tier feature' });
-});
-
-// GET /api/v1/reports/ssp/pdf
-router.get('/ssp/pdf', requirePermission('assessments.read'), async (req, res) => {
-  res.status(402).json({ success: false, error: 'SSP PDF generation is a professional-tier feature' });
-});
-
-// GET /api/v1/reports/ssp/json
-router.get('/ssp/json', requirePermission('assessments.read'), async (req, res) => {
+// GET /compliance/pdf - Compliance report PDF (stub)
+router.get('/compliance/pdf', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const org = await pool.query(`SELECT * FROM organizations WHERE id=$1`, [orgId]);
-    const profile = await pool.query(`SELECT * FROM organization_profiles WHERE organization_id=$1`, [orgId]);
-    const controls = await pool.query(
-      `SELECT ci.*, fc.control_id AS control_code, fc.title AS control_title, f.code AS framework_code
-       FROM control_implementations ci
-       JOIN framework_controls fc ON fc.id = ci.control_id
-       JOIN frameworks f ON f.id = fc.framework_id
-       WHERE ci.organization_id=$1
-       ORDER BY f.code, fc.control_id`,
+    await pool.query(
+      `SELECT fc.id, fc.control_id, fc.name, ci.status, ci.implementation_details
+       FROM framework_controls fc
+       LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+       WHERE fc.framework_id IN (SELECT id FROM frameworks WHERE organization_id = $1)`,
+      [orgId]
+    );
+    res.json({
+      success: true,
+      data: { message: 'PDF generation requires additional configuration', format: 'pdf' }
+    });
+  } catch (err) {
+    console.error('Error generating compliance PDF:', err);
+    res.status(500).json({ success: false, error: 'Failed to generate compliance PDF' });
+  }
+});
+
+// GET /compliance/excel - Compliance report Excel (stub)
+router.get('/compliance/excel', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    await pool.query(
+      `SELECT fc.id, fc.control_id, fc.name, ci.status, ci.implementation_details
+       FROM framework_controls fc
+       LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+       WHERE fc.framework_id IN (SELECT id FROM frameworks WHERE organization_id = $1)`,
+      [orgId]
+    );
+    res.json({
+      success: true,
+      data: { message: 'Excel generation requires additional configuration', format: 'xlsx' }
+    });
+  } catch (err) {
+    console.error('Error generating compliance Excel:', err);
+    res.status(500).json({ success: false, error: 'Failed to generate compliance Excel' });
+  }
+});
+
+// GET /ssp/pdf - SSP PDF (stub)
+router.get('/ssp/pdf', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: { message: 'SSP PDF generation requires additional configuration' }
+    });
+  } catch (err) {
+    console.error('Error generating SSP PDF:', err);
+    res.status(500).json({ success: false, error: 'Failed to generate SSP PDF' });
+  }
+});
+
+// GET /ssp/json - SSP as structured JSON
+router.get('/ssp/json', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+
+    const frameworksResult = await pool.query(
+      'SELECT id, name, version, description FROM frameworks WHERE organization_id = $1',
       [orgId]
     );
 
-    const oscal = {
-      'system-security-plan': {
-        uuid: orgId,
-        metadata: {
-          title: `System Security Plan — ${org.rows[0]?.name}`,
-          'last-modified': new Date().toISOString(),
-          version: '1.0',
-          'oscal-version': '1.1.1'
-        },
-        'system-characteristics': {
-          'system-name': profile.rows[0]?.system_name || org.rows[0]?.name,
-          description: profile.rows[0]?.system_description || profile.rows[0]?.company_description || '',
-          'security-sensitivity-level': (
-            profile.rows[0]?.confidentiality_impact ??
-            profile.rows[0]?.integrity_impact ??
-            profile.rows[0]?.availability_impact ??
-            'moderate'
-          ).toLowerCase()
-        },
-        'control-implementation': {
-          description: 'Control implementations for this system',
-          'implemented-requirements': controls.rows.map(c => ({
-            uuid: c.id,
-            'control-id': c.control_code,
-            description: c.implementation_details || '',
-            props: [{ name: 'status', value: c.status }]
-          }))
-        }
+    const controlsResult = await pool.query(
+      `SELECT fc.id, fc.control_id, fc.name, fc.description, fc.framework_id,
+              ci.status, ci.implementation_details
+       FROM framework_controls fc
+       LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+       WHERE fc.framework_id IN (SELECT id FROM frameworks WHERE organization_id = $1)`,
+      [orgId]
+    );
+
+    const controlsByFramework = {};
+    for (const control of controlsResult.rows) {
+      if (!controlsByFramework[control.framework_id]) {
+        controlsByFramework[control.framework_id] = [];
       }
+      controlsByFramework[control.framework_id].push({
+        control_id: control.control_id,
+        name: control.name,
+        description: control.description,
+        status: control.status || 'not_implemented',
+        implementation_details: control.implementation_details || null
+      });
+    }
+
+    const ssp = {
+      title: 'System Security Plan',
+      generated_at: new Date().toISOString(),
+      organization_id: orgId,
+      frameworks: frameworksResult.rows.map(fw => ({
+        id: fw.id,
+        name: fw.name,
+        version: fw.version,
+        description: fw.description,
+        controls: controlsByFramework[fw.id] || []
+      }))
     };
 
-    res.setHeader('Content-Disposition', 'attachment; filename="ssp.json"');
-    res.setHeader('Content-Type', 'application/json');
-    res.send(JSON.stringify(oscal, null, 2));
+    res.json({ success: true, data: ssp });
   } catch (err) {
-    console.error('SSP JSON error:', err);
-    res.status(500).json({ success: false, error: 'Failed to generate SSP' });
+    console.error('Error generating SSP JSON:', err);
+    res.status(500).json({ success: false, error: 'Failed to generate SSP JSON' });
   }
 });
 

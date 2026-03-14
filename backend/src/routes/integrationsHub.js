@@ -1,79 +1,141 @@
-// @tier: professional
-// Integrations Hub — connectors management
+// @tier: community
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'integrations-hub-route' }));
 
-// GET /api/v1/integrations-hub/templates
-router.get('/templates', requirePermission('settings.manage'), async (req, res) => {
-  res.json({
-    success: true,
-    data: [
-      { id: 'splunk', name: 'Splunk', category: 'siem', description: 'Forward audit events to Splunk' },
-      { id: 'elastic', name: 'Elastic / OpenSearch', category: 'siem', description: 'Forward audit events to Elastic' },
-      { id: 'slack', name: 'Slack', category: 'notifications', description: 'Send compliance alerts to Slack' },
-      { id: 'jira', name: 'Jira', category: 'ticketing', description: 'Create Jira issues for POAM items' },
-      { id: 'servicenow', name: 'ServiceNow', category: 'ticketing', description: 'Create ServiceNow tickets for findings' }
-    ]
-  });
-});
+const CONNECTOR_TEMPLATES = [
+  { id: 'splunk', name: 'Splunk', category: 'SIEM', description: 'Import events from Splunk' },
+  { id: 'sentinel', name: 'Microsoft Sentinel', category: 'SIEM' },
+  { id: 'jira', name: 'Jira', category: 'Ticketing' },
+  { id: 'servicenow', name: 'ServiceNow', category: 'ITSM' },
+  { id: 'aws_cloudtrail', name: 'AWS CloudTrail', category: 'Cloud' },
+  { id: 'github', name: 'GitHub', category: 'DevOps' }
+];
 
-// GET /api/v1/integrations-hub/connectors
-router.get('/connectors', requirePermission('settings.manage'), async (req, res) => {
+router.get('/templates', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const result = await pool.query(
-      `SELECT id, connector_type, name, status, last_synced_at, created_at
-       FROM integrations_hub_connectors
-       WHERE organization_id=$1
-       ORDER BY created_at DESC`,
-      [orgId]
-    );
-    res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error('Integrations hub connectors error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load connectors' });
+    return res.json({ success: true, data: CONNECTOR_TEMPLATES });
+  } catch (error) {
+    console.error('Error fetching templates:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch templates' });
   }
 });
 
-// POST /api/v1/integrations-hub/connectors
-router.post('/connectors', requirePermission('settings.manage'), async (req, res) => {
+router.get('/connectors', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const { connector_type, name, config } = req.body || {};
-    if (!connector_type || !name) {
-      return res.status(400).json({ success: false, error: 'connector_type and name are required' });
+    const org = req.user.organization_id;
+    const result = await pool.query(
+      'SELECT * FROM integrations_hub_connectors WHERE organization_id = $1 ORDER BY created_at DESC',
+      [org]
+    );
+    return res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error listing connectors:', error);
+    return res.status(500).json({ success: false, error: 'Failed to list connectors' });
+  }
+});
+
+router.post('/connectors', async (req, res) => {
+  try {
+    const org = req.user.organization_id;
+    const { template_id, name, config } = req.body;
+    const result = await pool.query(
+      `INSERT INTO integrations_hub_connectors (organization_id, template_id, name, config)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [org, template_id, name, config || {}]
+    );
+    return res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating connector:', error);
+    return res.status(500).json({ success: false, error: 'Failed to create connector' });
+  }
+});
+
+router.patch('/connectors/:id', async (req, res) => {
+  try {
+    const org = req.user.organization_id;
+    const { id } = req.params;
+    const { name, config, enabled } = req.body;
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
+    if (config !== undefined) { fields.push(`config = $${idx++}`); values.push(config); }
+    if (enabled !== undefined) { fields.push(`enabled = $${idx++}`); values.push(enabled); }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
     }
+
+    fields.push(`updated_at = NOW()`);
+    values.push(id, org);
+
     const result = await pool.query(
-      `INSERT INTO integrations_hub_connectors (organization_id, connector_type, name, config, created_by)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id, connector_type, name, status, created_at`,
-      [orgId, connector_type, name, config ? JSON.stringify(config) : null, req.user.id]
+      `UPDATE integrations_hub_connectors SET ${fields.join(', ')}
+       WHERE id = $${idx++} AND organization_id = $${idx}
+       RETURNING *`,
+      values
     );
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('Integrations hub connector create error:', err);
-    res.status(500).json({ success: false, error: 'Failed to create connector' });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Connector not found' });
+    }
+    return res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating connector:', error);
+    return res.status(500).json({ success: false, error: 'Failed to update connector' });
   }
 });
 
-// DELETE /api/v1/integrations-hub/connectors/:id
-router.delete('/connectors/:id', requirePermission('settings.manage'), async (req, res) => {
+router.delete('/connectors/:id', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
+    const org = req.user.organization_id;
+    const { id } = req.params;
     const result = await pool.query(
-      `DELETE FROM integrations_hub_connectors WHERE organization_id=$1 AND id=$2 RETURNING id`,
-      [orgId, req.params.id]
+      'DELETE FROM integrations_hub_connectors WHERE id = $1 AND organization_id = $2 RETURNING id',
+      [id, org]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Connector not found' });
     }
-    res.json({ success: true, data: { id: req.params.id } });
-  } catch (err) {
-    console.error('Integrations hub connector delete error:', err);
-    res.status(500).json({ success: false, error: 'Failed to delete connector' });
+    return res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    console.error('Error deleting connector:', error);
+    return res.status(500).json({ success: false, error: 'Failed to delete connector' });
+  }
+});
+
+router.post('/connectors/:id/run', async (req, res) => {
+  try {
+    const org = req.user.organization_id;
+    const { id } = req.params;
+    const result = await pool.query(
+      `UPDATE integrations_hub_connectors SET last_run_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND organization_id = $2 RETURNING *`,
+      [id, org]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Connector not found' });
+    }
+    return res.json({ success: true, data: { run_id: null, message: 'Connector execution not yet configured' } });
+  } catch (error) {
+    console.error('Error running connector:', error);
+    return res.status(500).json({ success: false, error: 'Failed to run connector' });
+  }
+});
+
+router.get('/connectors/:id/runs', async (req, res) => {
+  try {
+    return res.json({ success: true, data: [] });
+  } catch (error) {
+    console.error('Error fetching runs:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch runs' });
   }
 });
 

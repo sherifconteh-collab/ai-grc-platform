@@ -295,7 +295,7 @@ npm install pg
 ### Revenue Model (Hybrid)
 
 **Free Forever**:
-- ✅ All code (MIT license)
+- ✅ All code (AGPL-3.0 license)
 - ✅ Self-hosting guide
 - ✅ Community support
 - ✅ Framework data
@@ -336,7 +336,7 @@ npm install pg
 - [ ] README is clear and compelling
 - [ ] Database actually works (test it!)
 - [ ] GitHub repository is public
-- [ ] LICENSE file added (MIT)
+- [ ] LICENSE file added (AGPL-3.0)
 - [ ] Code of Conduct added
 - [ ] Contributing guidelines added
 - [ ] Demo video recorded (optional but powerful)

@@ -9,6 +9,7 @@ import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import { WebSocketStatusIndicator } from './WebSocketStatusIndicator';
 import Sidebar from './Sidebar';
 import AICopilot from './AICopilot';
+import UpdateBanner from './UpdateBanner';
 
 export default function DashboardLayout({
   children,
@@ -85,13 +86,16 @@ export default function DashboardLayout({
 
   return (
     <WebSocketProvider token={token} enabled={isAuthenticated}>
-      <div className="flex h-screen bg-gray-100">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto px-6 py-8">{children}</div>
-        </main>
-        <AICopilot />
-        <WebSocketStatusIndicator />
+      <div className="flex flex-col h-screen bg-gray-100">
+        <UpdateBanner />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto">
+            <div className="container mx-auto px-6 py-8">{children}</div>
+          </main>
+          <AICopilot />
+          <WebSocketStatusIndicator />
+        </div>
       </div>
     </WebSocketProvider>
   );

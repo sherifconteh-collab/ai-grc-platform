@@ -1,292 +1,547 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const pool = require('../config/database');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'tprm-route' }));
 
-// ---------------------------------------------------------------
-// TPRM — Third-Party Risk Management
-// ---------------------------------------------------------------
-
-// GET /api/v1/tprm/summary
-router.get('/summary', requirePermission('controls.read'), async (req, res) => {
+// --- Summary ---
+router.get('/summary', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const vendors = await pool.query(
-      `SELECT
-         COUNT(*) AS total,
-         COUNT(*) FILTER (WHERE risk_tier = 'critical') AS critical,
-         COUNT(*) FILTER (WHERE risk_tier = 'high') AS high,
-         COUNT(*) FILTER (WHERE risk_tier = 'medium') AS medium,
-         COUNT(*) FILTER (WHERE risk_tier = 'low') AS low
-       FROM tprm_vendors WHERE organization_id=$1`,
+    const totalResult = await pool.query(
+      'SELECT COUNT(*) AS total FROM tprm_vendors WHERE organization_id = $1',
       [orgId]
     );
-    const questionnaires = await pool.query(
-      `SELECT
-         COUNT(*) AS total,
-         COUNT(*) FILTER (WHERE status = 'pending') AS pending,
-         COUNT(*) FILTER (WHERE status = 'submitted') AS submitted,
-         COUNT(*) FILTER (WHERE status = 'completed') AS completed
-       FROM tprm_questionnaires WHERE organization_id=$1`,
+    const tierResult = await pool.query(
+      'SELECT risk_tier, COUNT(*) AS count FROM tprm_vendors WHERE organization_id = $1 GROUP BY risk_tier',
+      [orgId]
+    );
+    const pendingResult = await pool.query(
+      `SELECT COUNT(*) AS count FROM tprm_vendors WHERE organization_id = $1 AND review_status = 'pending'`,
       [orgId]
     );
     res.json({
       success: true,
       data: {
-        vendors: vendors.rows[0],
-        questionnaires: questionnaires.rows[0]
+        total_vendors: parseInt(totalResult.rows[0].total, 10),
+        by_risk_tier: tierResult.rows,
+        pending_reviews: parseInt(pendingResult.rows[0].count, 10)
       }
     });
-  } catch (err) {
-    console.error('TPRM summary error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load TPRM summary' });
+  } catch (error) {
+    console.error('TPRM summary error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch TPRM summary' });
   }
 });
 
-// GET /api/v1/tprm/vendors
-router.get('/vendors', requirePermission('controls.read'), async (req, res) => {
+// --- Vendors ---
+router.get('/vendors', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { risk_tier, status, search, limit = 100, offset = 0 } = req.query;
-
+    const { risk_tier, review_status, search } = req.query;
+    const conditions = ['organization_id = $1'];
     const params = [orgId];
-    const filters = [];
-    if (risk_tier) { params.push(risk_tier); filters.push(`risk_tier = $${params.length}`); }
-    if (status) { params.push(status); filters.push(`status = $${params.length}`); }
-    if (search) { params.push(`%${search}%`); filters.push(`vendor_name ILIKE $${params.length}`); }
+    let idx = 2;
 
-    const whereExtra = filters.length ? ' AND ' + filters.join(' AND ') : '';
-    params.push(Number(limit) || 100, Number(offset) || 0);
+    if (risk_tier) {
+      conditions.push(`risk_tier = $${idx++}`);
+      params.push(risk_tier);
+    }
+    if (review_status) {
+      conditions.push(`review_status = $${idx++}`);
+      params.push(review_status);
+    }
+    if (search) {
+      conditions.push(`vendor_name ILIKE $${idx++}`);
+      params.push(`%${search}%`);
+    }
 
     const result = await pool.query(
-      `SELECT * FROM tprm_vendors WHERE organization_id=$1 ${whereExtra}
-       ORDER BY risk_tier, vendor_name
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      `SELECT * FROM tprm_vendors WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`,
       params
     );
     res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error('TPRM vendors error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load vendors' });
+  } catch (error) {
+    console.error('List vendors error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list vendors' });
   }
 });
 
-// POST /api/v1/tprm/vendors
-router.post('/vendors', requirePermission('controls.write'), async (req, res) => {
+router.get('/vendors/:id', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const {
-      vendor_name, vendor_type, risk_tier, services_provided, data_access_level,
-      website, primary_contact, contact_email
-    } = req.body || {};
-    if (!vendor_name) {
-      return res.status(400).json({ success: false, error: 'vendor_name is required' });
-    }
     const result = await pool.query(
-      `INSERT INTO tprm_vendors (
-         organization_id, vendor_name, vendor_type, risk_tier, services_provided,
-         data_access_level, website, primary_contact, contact_email, created_by
-       )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       RETURNING *`,
-      [
-        orgId, vendor_name, vendor_type || null, risk_tier || 'medium',
-        services_provided || null, data_access_level || 'none',
-        website || null, primary_contact || null, contact_email || null, req.user.id
-      ]
-    );
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('TPRM vendor create error:', err);
-    res.status(500).json({ success: false, error: 'Failed to create vendor' });
-  }
-});
-
-// PUT /api/v1/tprm/vendors/:id
-router.put('/vendors/:id', requirePermission('controls.write'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { vendor_name, vendor_type, risk_tier, services_provided, data_access_level,
-            website, primary_contact, contact_email, status } = req.body || {};
-    const result = await pool.query(
-      `UPDATE tprm_vendors
-       SET vendor_name = COALESCE($3, vendor_name),
-           vendor_type = COALESCE($4, vendor_type),
-           risk_tier = COALESCE($5, risk_tier),
-           services_provided = COALESCE($6, services_provided),
-           data_access_level = COALESCE($7, data_access_level),
-           website = COALESCE($8, website),
-           primary_contact = COALESCE($9, primary_contact),
-           contact_email = COALESCE($10, contact_email),
-           status = COALESCE($11, status),
-           updated_at = NOW()
-       WHERE organization_id=$1 AND id=$2
-       RETURNING *`,
-      [orgId, req.params.id, vendor_name || null, vendor_type || null, risk_tier || null,
-       services_provided || null, data_access_level || null, website || null,
-       primary_contact || null, contact_email || null, status || null]
+      'SELECT * FROM tprm_vendors WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Vendor not found' });
     }
     res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('TPRM vendor update error:', err);
-    res.status(500).json({ success: false, error: 'Failed to update vendor' });
+  } catch (error) {
+    console.error('Get vendor error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch vendor' });
   }
 });
 
-// DELETE /api/v1/tprm/vendors/:id
-router.delete('/vendors/:id', requirePermission('controls.write'), async (req, res) => {
+router.post('/vendors', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
+    const { vendor_name, vendor_type, risk_tier, review_status, contact_email, contact_name, metadata } = req.body;
+    if (!vendor_name) {
+      return res.status(400).json({ success: false, error: 'vendor_name is required' });
+    }
     const result = await pool.query(
-      `DELETE FROM tprm_vendors WHERE organization_id=$1 AND id=$2 RETURNING id`,
-      [orgId, req.params.id]
+      `INSERT INTO tprm_vendors (organization_id, vendor_name, vendor_type, risk_tier, review_status, contact_email, contact_name, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [orgId, vendor_name, vendor_type || null, risk_tier || null, review_status || 'pending', contact_email || null, contact_name || null, metadata ? JSON.stringify(metadata) : null]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Create vendor error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create vendor' });
+  }
+});
+
+router.patch('/vendors/:id', async (req, res) => {
+  try {
+    const allowedFields = ['vendor_name', 'vendor_type', 'risk_tier', 'review_status', 'contact_email', 'contact_name', 'metadata'];
+    const updates = [];
+    const params = [];
+    let idx = 1;
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        const value = field === 'metadata' ? JSON.stringify(req.body[field]) : req.body[field];
+        updates.push(`${field} = $${idx++}`);
+        params.push(value);
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    params.push(req.params.id, req.user.organization_id);
+
+    const result = await pool.query(
+      `UPDATE tprm_vendors SET ${updates.join(', ')} WHERE id = $${idx++} AND organization_id = $${idx} RETURNING *`,
+      params
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Vendor not found' });
     }
-    res.json({ success: true, data: { id: req.params.id } });
-  } catch (err) {
-    console.error('TPRM vendor delete error:', err);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Update vendor error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update vendor' });
+  }
+});
+
+router.delete('/vendors/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM tprm_vendors WHERE id = $1 AND organization_id = $2 RETURNING id',
+      [req.params.id, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
+    }
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    console.error('Delete vendor error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete vendor' });
   }
 });
 
-// GET /api/v1/tprm/cmdb-assets
-router.get('/cmdb-assets', requirePermission('controls.read'), async (req, res) => {
+router.post('/vendors/:id/store-ai-assessment', async (req, res) => {
+  try {
+    const { ai_risk_score, ai_risk_summary } = req.body;
+    const result = await pool.query(
+      `UPDATE tprm_vendors SET ai_risk_score = $1, ai_risk_summary = $2, updated_at = NOW()
+       WHERE id = $3 AND organization_id = $4 RETURNING *`,
+      [ai_risk_score, ai_risk_summary, req.params.id, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Store AI assessment error:', error);
+    res.status(500).json({ success: false, error: 'Failed to store AI assessment' });
+  }
+});
+
+// --- CMDB Assets ---
+router.get('/cmdb-assets', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { search } = req.query;
+    const conditions = ['organization_id = $1'];
     const params = [orgId];
-    let whereExtra = '';
-    if (search) { params.push(`%${search}%`); whereExtra = ` AND name ILIKE $${params.length}`; }
-    const result = await pool.query(
-      `SELECT id, name, asset_type, description FROM assets WHERE organization_id=$1 ${whereExtra} ORDER BY name LIMIT 200`,
-      params
-    );
-    res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error('TPRM cmdb assets error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load assets' });
-  }
-});
 
-// GET /api/v1/tprm/questionnaires
-router.get('/questionnaires', requirePermission('controls.read'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { vendor_id, status, limit = 100, offset = 0 } = req.query;
-    const params = [orgId];
-    const filters = [];
-    if (vendor_id) { params.push(vendor_id); filters.push(`q.vendor_id = $${params.length}`); }
-    if (status) { params.push(status); filters.push(`q.status = $${params.length}`); }
-    const whereExtra = filters.length ? ' AND ' + filters.join(' AND ') : '';
-    params.push(Number(limit) || 100, Number(offset) || 0);
-
-    const result = await pool.query(
-      `SELECT q.*, v.vendor_name, v.risk_tier
-       FROM tprm_questionnaires q
-       JOIN tprm_vendors v ON v.id = q.vendor_id
-       WHERE q.organization_id=$1 ${whereExtra}
-       ORDER BY q.created_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
-    res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error('TPRM questionnaires error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load questionnaires' });
-  }
-});
-
-// POST /api/v1/tprm/questionnaires
-router.post('/questionnaires', requirePermission('controls.write'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { vendor_id, title, questions, due_date } = req.body || {};
-    if (!vendor_id || !title) {
-      return res.status(400).json({ success: false, error: 'vendor_id and title are required' });
+    if (search) {
+      conditions.push('(name ILIKE $2 OR asset_type ILIKE $2)');
+      params.push(`%${search}%`);
     }
+
     const result = await pool.query(
-      `INSERT INTO tprm_questionnaires (organization_id, vendor_id, title, questions, status, due_date, created_by)
-       VALUES ($1,$2,$3,$4,'draft',$5,$6)
-       RETURNING *`,
-      [orgId, vendor_id, title, questions || null, due_date || null, req.user.id]
+      `SELECT * FROM cmdb_assets WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`,
+      params
     );
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('TPRM questionnaire create error:', err);
-    res.status(500).json({ success: false, error: 'Failed to create questionnaire' });
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('List CMDB assets error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list CMDB assets' });
   }
 });
 
-// GET /api/v1/tprm/questionnaires/:id
-router.get('/questionnaires/:id', requirePermission('controls.read'), async (req, res) => {
+router.get('/cmdb-assets/:assetId/vendors', async (req, res) => {
+  try {
+    // Stub: vendor-to-asset linking not yet implemented
+    res.json({ success: true, data: [] });
+  } catch (error) {
+    console.error('Get asset vendors error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch asset vendors' });
+  }
+});
+
+// --- Questionnaires ---
+router.get('/questionnaires', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
+    const { vendor_id, status } = req.query;
+    const conditions = ['organization_id = $1'];
+    const params = [orgId];
+    let idx = 2;
+
+    if (vendor_id) {
+      conditions.push(`vendor_id = $${idx++}`);
+      params.push(vendor_id);
+    }
+    if (status) {
+      conditions.push(`status = $${idx++}`);
+      params.push(status);
+    }
+
     const result = await pool.query(
-      `SELECT q.*, v.vendor_name, v.risk_tier, v.contact_email
-       FROM tprm_questionnaires q JOIN tprm_vendors v ON v.id=q.vendor_id
-       WHERE q.organization_id=$1 AND q.id=$2`,
-      [orgId, req.params.id]
+      `SELECT * FROM tprm_questionnaires WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`,
+      params
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('List questionnaires error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list questionnaires' });
+  }
+});
+
+router.get('/questionnaires/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM tprm_questionnaires WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Questionnaire not found' });
     }
     res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('TPRM questionnaire get error:', err);
-    res.status(500).json({ success: false, error: 'Failed to get questionnaire' });
+  } catch (error) {
+    console.error('Get questionnaire error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch questionnaire' });
   }
 });
 
-// GET /api/v1/tprm/documents
-router.get('/documents', requirePermission('controls.read'), async (req, res) => {
+router.post('/questionnaires', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { questionnaire_id, limit = 50, offset = 0 } = req.query;
-    const params = [orgId];
-    let whereExtra = '';
-    if (questionnaire_id) { params.push(questionnaire_id); whereExtra = ` AND questionnaire_id=$${params.length}`; }
-    params.push(Number(limit) || 50, Number(offset) || 0);
+    const { vendor_id, title, description, questions, due_date } = req.body;
+    if (!vendor_id || !title) {
+      return res.status(400).json({ success: false, error: 'vendor_id and title are required' });
+    }
+    const vendorCheck = await pool.query(
+      'SELECT id FROM tprm_vendors WHERE id = $1 AND organization_id = $2',
+      [vendor_id, orgId]
+    );
+    if (vendorCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
+    }
+    const responseToken = crypto.randomBytes(32).toString('hex');
     const result = await pool.query(
-      `SELECT id, questionnaire_id, original_filename, file_size_bytes, mime_type,
-              is_sbom, sbom_format, sbom_component_count, ai_analyzed_at, uploaded_at
-       FROM tprm_evidence
-       WHERE organization_id=$1 ${whereExtra}
-       ORDER BY uploaded_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      `INSERT INTO tprm_questionnaires (organization_id, vendor_id, title, description, questions, due_date, response_token)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [orgId, vendor_id, title, description || null, questions ? JSON.stringify(questions) : null, due_date || null, responseToken]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Create questionnaire error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create questionnaire' });
+  }
+});
+
+router.patch('/questionnaires/:id', async (req, res) => {
+  try {
+    const allowedFields = ['title', 'description', 'questions', 'due_date', 'status'];
+    const updates = [];
+    const params = [];
+    let idx = 1;
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        const value = field === 'questions' ? JSON.stringify(req.body[field]) : req.body[field];
+        updates.push(`${field} = $${idx++}`);
+        params.push(value);
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    params.push(req.params.id, req.user.organization_id);
+
+    const result = await pool.query(
+      `UPDATE tprm_questionnaires SET ${updates.join(', ')} WHERE id = $${idx++} AND organization_id = $${idx} RETURNING *`,
+      params
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Questionnaire not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Update questionnaire error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update questionnaire' });
+  }
+});
+
+router.delete('/questionnaires/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM tprm_questionnaires WHERE id = $1 AND organization_id = $2 RETURNING id',
+      [req.params.id, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Questionnaire not found' });
+    }
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    console.error('Delete questionnaire error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete questionnaire' });
+  }
+});
+
+router.post('/questionnaires/:id/send', async (req, res) => {
+  try {
+    const { recipient_email, due_date } = req.body;
+    if (!recipient_email) {
+      return res.status(400).json({ success: false, error: 'recipient_email is required' });
+    }
+    const result = await pool.query(
+      `UPDATE tprm_questionnaires
+       SET status = 'sent', sent_at = NOW(), recipient_email = $1, due_date = COALESCE($2, due_date), updated_at = NOW()
+       WHERE id = $3 AND organization_id = $4
+       RETURNING *`,
+      [recipient_email, due_date || null, req.params.id, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Questionnaire not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Send questionnaire error:', error);
+    res.status(500).json({ success: false, error: 'Failed to send questionnaire' });
+  }
+});
+
+router.post('/questionnaires/:id/remind', async (req, res) => {
+  try {
+    res.json({ success: true, data: { reminded: true } });
+  } catch (error) {
+    console.error('Remind questionnaire error:', error);
+    res.status(500).json({ success: false, error: 'Failed to send reminder' });
+  }
+});
+
+// --- Evidence ---
+router.get('/questionnaires/:questionnaireId/evidence', async (req, res) => {
+  try {
+    // Verify questionnaire belongs to org
+    const qCheck = await pool.query(
+      'SELECT id FROM tprm_questionnaires WHERE id = $1 AND organization_id = $2',
+      [req.params.questionnaireId, req.user.organization_id]
+    );
+    if (qCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Questionnaire not found' });
+    }
+    const result = await pool.query(
+      'SELECT * FROM tprm_evidence WHERE questionnaire_id = $1 ORDER BY created_at DESC',
+      [req.params.questionnaireId]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('List evidence error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list evidence' });
+  }
+});
+
+router.delete('/evidence/:evidenceId', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM tprm_evidence
+       WHERE id = $1 AND questionnaire_id IN (
+         SELECT id FROM tprm_questionnaires WHERE organization_id = $2
+       )
+       RETURNING id`,
+      [req.params.evidenceId, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence not found' });
+    }
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    console.error('Delete evidence error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete evidence' });
+  }
+});
+
+router.post('/evidence/:evidenceId/store-ai-analysis', async (req, res) => {
+  try {
+    const { ai_analysis, ai_risk_flags } = req.body;
+    const result = await pool.query(
+      `UPDATE tprm_evidence
+       SET ai_analysis = $1, ai_risk_flags = $2, updated_at = NOW()
+       WHERE id = $3 AND questionnaire_id IN (
+         SELECT id FROM tprm_questionnaires WHERE organization_id = $4
+       )
+       RETURNING *`,
+      [ai_analysis ? JSON.stringify(ai_analysis) : null, ai_risk_flags ? JSON.stringify(ai_risk_flags) : null, req.params.evidenceId, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Store AI analysis error:', error);
+    res.status(500).json({ success: false, error: 'Failed to store AI analysis' });
+  }
+});
+
+// --- Documents ---
+router.get('/documents', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const { vendor_id, status, document_type } = req.query;
+    const conditions = ['organization_id = $1'];
+    const params = [orgId];
+    let idx = 2;
+
+    if (vendor_id) {
+      conditions.push(`vendor_id = $${idx++}`);
+      params.push(vendor_id);
+    }
+    if (status) {
+      conditions.push(`status = $${idx++}`);
+      params.push(status);
+    }
+    if (document_type) {
+      conditions.push(`document_type = $${idx++}`);
+      params.push(document_type);
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM tprm_documents WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`,
       params
     );
     res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error('TPRM documents error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load documents' });
+  } catch (error) {
+    console.error('List documents error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list documents' });
   }
 });
 
-// POST /api/v1/tprm/documents
-router.post('/documents', requirePermission('controls.write'), async (req, res) => {
+router.post('/documents', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { questionnaire_id, original_filename, file_size_bytes, mime_type } = req.body || {};
-    if (!questionnaire_id || !original_filename) {
-      return res.status(400).json({ success: false, error: 'questionnaire_id and original_filename are required' });
+    const { vendor_id, title, document_type, status, file_path, metadata } = req.body;
+    if (!vendor_id || !title) {
+      return res.status(400).json({ success: false, error: 'vendor_id and title are required' });
+    }
+    const vendorCheck = await pool.query(
+      'SELECT id FROM tprm_vendors WHERE id = $1 AND organization_id = $2',
+      [vendor_id, orgId]
+    );
+    if (vendorCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vendor not found' });
     }
     const result = await pool.query(
-      `INSERT INTO tprm_evidence (organization_id, questionnaire_id, original_filename, file_size_bytes, mime_type, uploaded_by)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, questionnaire_id, original_filename, uploaded_at`,
-      [orgId, questionnaire_id, original_filename, file_size_bytes || null, mime_type || null, req.user.id]
+      `INSERT INTO tprm_documents (organization_id, vendor_id, title, document_type, status, file_path, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [orgId, vendor_id, title, document_type || null, status || 'pending', file_path || null, metadata ? JSON.stringify(metadata) : null]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('TPRM document create error:', err);
+  } catch (error) {
+    console.error('Create document error:', error);
     res.status(500).json({ success: false, error: 'Failed to create document' });
+  }
+});
+
+router.patch('/documents/:id', async (req, res) => {
+  try {
+    const allowedFields = ['title', 'document_type', 'status', 'file_path', 'metadata'];
+    const updates = [];
+    const params = [];
+    let idx = 1;
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        const value = field === 'metadata' ? JSON.stringify(req.body[field]) : req.body[field];
+        updates.push(`${field} = $${idx++}`);
+        params.push(value);
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    params.push(req.params.id, req.user.organization_id);
+
+    const result = await pool.query(
+      `UPDATE tprm_documents SET ${updates.join(', ')} WHERE id = $${idx++} AND organization_id = $${idx} RETURNING *`,
+      params
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Document not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Update document error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update document' });
+  }
+});
+
+router.delete('/documents/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM tprm_documents WHERE id = $1 AND organization_id = $2 RETURNING id',
+      [req.params.id, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Document not found' });
+    }
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    console.error('Delete document error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete document' });
   }
 });
 

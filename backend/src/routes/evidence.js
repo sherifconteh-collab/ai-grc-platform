@@ -2,271 +2,428 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticate, requirePermission } = require('../middleware/auth');
-const { enqueueWebhookEvent } = require('../services/webhookService');
+const { authenticate } = require('../middleware/auth');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const multer = require('multer');
-
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;   // 10 MB per file
-const MAX_TOTAL_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB aggregate for bulk-upload
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_FILE_SIZE_BYTES },
-});
+const path = require('path');
+const fs = require('fs');
 
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'evidence-route' }));
 
-async function emitEvidenceEvent(organizationId, eventType, payload) {
-  await enqueueWebhookEvent({ organizationId, eventType, payload }).catch(() => {});
+// Configure multer storage
+const uploadsDir = path.join(__dirname, '../../../uploads/evidence');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// GET /api/v1/evidence
-router.get('/', requirePermission('assessments.read'), async (req, res) => {
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
+
+// GET / - List evidence files
+router.get('/', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { search, tags, limit = 100, offset = 0 } = req.query;
 
-    const params = [orgId, Number(limit) || 100, Number(offset) || 0];
-    let whereExtra = '';
+    const params = [orgId];
+    const conditions = ['ef.organization_id = $1'];
+    let paramIndex = 2;
 
     if (search) {
+      conditions.push(`(ef.file_name ILIKE $${paramIndex} OR ef.description ILIKE $${paramIndex})`);
       params.push(`%${search}%`);
-      whereExtra += ` AND (e.title ILIKE $${params.length} OR e.description ILIKE $${params.length})`;
+      paramIndex++;
     }
+
     if (tags) {
-      params.push(tags);
-      whereExtra += ` AND $${params.length} = ANY(e.tags)`;
+      const tagsArray = Array.isArray(tags) ? tags : tags.split(',');
+      conditions.push(`ef.tags ?| $${paramIndex}::text[]`);
+      params.push(tagsArray);
+      paramIndex++;
     }
 
-    const result = await pool.query(
-      `SELECT e.*,
-              u.email AS uploaded_by_email,
-              COALESCE(
-                json_agg(json_build_object('control_id', ecl.control_id, 'notes', ecl.notes))
-                FILTER (WHERE ecl.id IS NOT NULL), '[]'
-              ) AS control_links
-       FROM evidence e
-       LEFT JOIN users u ON u.id = e.uploaded_by
-       LEFT JOIN evidence_control_links ecl ON ecl.evidence_id = e.id
-       WHERE e.organization_id = $1 ${whereExtra}
-       GROUP BY e.id, u.email
-       ORDER BY e.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      params
-    );
+    params.push(Math.min(parseInt(limit, 10) || 100, 500));
+    const limitIdx = paramIndex++;
+    params.push(parseInt(offset, 10) || 0);
+    const offsetIdx = paramIndex++;
 
-    const count = await pool.query(
-      `SELECT COUNT(*) FROM evidence WHERE organization_id = $1`,
-      [orgId]
-    );
+    const query = `
+      SELECT ef.*, u.email AS uploaded_by_email
+      FROM evidence_files ef
+      LEFT JOIN users u ON ef.uploaded_by = u.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY ef.created_at DESC
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `;
 
-    res.json({ success: true, data: result.rows, total: parseInt(count.rows[0].count) });
-  } catch (err) {
-    console.error('Evidence list error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load evidence' });
+    const countQuery = `
+      SELECT COUNT(*) FROM evidence_files ef
+      WHERE ${conditions.join(' AND ')}
+    `;
+    const countParams = params.slice(0, conditions.length);
+
+    const [result, countResult] = await Promise.all([
+      pool.query(query, params),
+      pool.query(countQuery, countParams)
+    ]);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      total: parseInt(countResult.rows[0].count, 10)
+    });
+  } catch (error) {
+    console.error('Error listing evidence files:', error);
+    res.status(500).json({ success: false, error: 'Failed to list evidence files' });
   }
 });
 
-// POST /api/v1/evidence/upload
-router.post('/upload', requirePermission('assessments.write'), upload.single('file'), async (req, res) => {
+// POST /upload - Upload a single evidence file
+router.post('/upload', upload.single('file'), async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const { title, description, tags, pii_classification, data_sensitivity } = req.body || {};
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file provided' });
     }
 
-    const parsedTags = tags ? (Array.isArray(tags) ? tags : String(tags).split(',').map(t => t.trim())) : [];
-    const effectiveTitle = title || req.file.originalname;
-    // Store file content in binary column (migration 024 adds file_content to evidence)
+    const orgId = req.user.organization_id;
+    const userId = req.user.id;
+    const { description, tags } = req.body;
+
+    let parsedTags = [];
+    if (tags) {
+      try {
+        parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      } catch {
+        parsedTags = [];
+      }
+    }
+
     const result = await pool.query(
-      `INSERT INTO evidence (
-         organization_id, title, file_name, file_path, file_size, mime_type,
-         file_content, description, tags, pii_classification, data_sensitivity, uploaded_by
-       )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-       RETURNING id, title, file_name, file_size, mime_type,
-                 description, tags, pii_classification, data_sensitivity, created_at`,
+      `INSERT INTO evidence_files (organization_id, file_name, file_path, file_size_bytes, mime_type, description, tags, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
       [
         orgId,
-        effectiveTitle,
         req.file.originalname,
-        '', // file_path placeholder (no filesystem storage in community edition)
+        req.file.filename,
         req.file.size,
         req.file.mimetype,
-        req.file.buffer,
         description || null,
-        parsedTags,
-        pii_classification || null,
-        data_sensitivity || null,
-        req.user.id
+        JSON.stringify(parsedTags),
+        userId
       ]
     );
 
-    const row = result.rows[0];
-    await emitEvidenceEvent(orgId, 'evidence.uploaded', { id: row.id, title: row.title });
-    res.status(201).json({ success: true, data: row });
-  } catch (err) {
-    console.error('Evidence upload error:', err);
-    res.status(500).json({ success: false, error: 'Failed to upload evidence' });
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('Error uploading evidence file:', error);
+    // Clean up uploaded file on failure
+    if (req.file && req.file.path) {
+      fs.unlink(req.file.path, () => {});
+    }
+    res.status(500).json({ success: false, error: 'Failed to upload evidence file' });
   }
 });
 
-// POST /api/v1/evidence/bulk-upload
-router.post('/bulk-upload', requirePermission('assessments.write'), upload.array('files', 10), async (req, res) => {
+// POST /bulk-upload - Upload multiple evidence files
+router.post('/bulk-upload', upload.array('files', 20), async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, error: 'No files provided' });
     }
 
-    // Aggregate size guard: reject if total payload exceeds limit
-    const totalBytes = req.files.reduce((sum, f) => sum + f.size, 0);
-    if (totalBytes > MAX_TOTAL_UPLOAD_BYTES) {
-      return res.status(413).json({ success: false, error: 'Total upload size exceeds 50 MB limit' });
+    const orgId = req.user.organization_id;
+    const userId = req.user.id;
+    const { description, tags } = req.body;
+
+    let parsedTags = [];
+    if (tags) {
+      try {
+        parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      } catch {
+        parsedTags = [];
+      }
     }
 
-    const inserted = [];
+    const valueClauses = [];
+    const params = [];
+    let paramIndex = 1;
+
     for (const file of req.files) {
-      const r = await pool.query(
-        `INSERT INTO evidence (organization_id, title, file_name, file_path, file_size, mime_type, file_content, uploaded_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, title, file_name, created_at`,
-        [orgId, file.originalname, file.originalname, '', file.size, file.mimetype, file.buffer, req.user.id]
+      valueClauses.push(
+        `($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`
       );
-      inserted.push(r.rows[0]);
+      params.push(
+        orgId,
+        file.originalname,
+        file.filename,
+        file.size,
+        file.mimetype,
+        description || null,
+        JSON.stringify(parsedTags),
+        userId
+      );
     }
 
-    res.status(201).json({ success: true, data: inserted, count: inserted.length });
-  } catch (err) {
-    console.error('Evidence bulk-upload error:', err);
-    res.status(500).json({ success: false, error: 'Failed to bulk upload evidence' });
+    const result = await pool.query(
+      `INSERT INTO evidence_files (organization_id, file_name, file_path, file_size_bytes, mime_type, description, tags, uploaded_by)
+       VALUES ${valueClauses.join(', ')}
+       RETURNING *`,
+      params
+    );
+    const results = result.rows;
+
+    res.status(201).json({ success: true, data: results });
+  } catch (error) {
+    console.error('Error bulk uploading evidence files:', error);
+    // Clean up uploaded files on failure
+    if (req.files) {
+      for (const file of req.files) {
+        fs.unlink(file.path, () => {});
+      }
+    }
+    res.status(500).json({ success: false, error: 'Failed to bulk upload evidence files' });
   }
 });
 
-// GET /api/v1/evidence/:id
-router.get('/:id', requirePermission('assessments.read'), async (req, res) => {
+// GET /:id - Get single evidence file by id
+router.get('/:id', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
+    const { id } = req.params;
+
     const result = await pool.query(
-      `SELECT e.*, u.email AS uploaded_by_email
-       FROM evidence e
-       LEFT JOIN users u ON u.id = e.uploaded_by
-       WHERE e.organization_id = $1 AND e.id = $2`,
-      [orgId, req.params.id]
+      `SELECT ef.*, u.email AS uploaded_by_email
+       FROM evidence_files ef
+       LEFT JOIN users u ON ef.uploaded_by = u.id
+       WHERE ef.id = $1 AND ef.organization_id = $2`,
+      [id, orgId]
     );
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Evidence not found' });
+      return res.status(404).json({ success: false, error: 'Evidence file not found' });
     }
+
     res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('Evidence get error:', err);
-    res.status(500).json({ success: false, error: 'Failed to get evidence' });
+  } catch (error) {
+    console.error('Error getting evidence file:', error);
+    res.status(500).json({ success: false, error: 'Failed to get evidence file' });
   }
 });
 
-// GET /api/v1/evidence/:id/download
-router.get('/:id/download', requirePermission('assessments.read'), async (req, res) => {
+// GET /:id/download - Download evidence file
+router.get('/:id/download', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
+    const { id } = req.params;
+
     const result = await pool.query(
-      `SELECT file_name, mime_type, file_content FROM evidence WHERE organization_id=$1 AND id=$2`,
-      [orgId, req.params.id]
+      `SELECT * FROM evidence_files WHERE id = $1 AND organization_id = $2`,
+      [id, orgId]
     );
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Evidence not found' });
+      return res.status(404).json({ success: false, error: 'Evidence file not found' });
     }
-    const { file_name, mime_type, file_content } = result.rows[0];
-    if (!file_content) {
-      return res.status(404).json({ success: false, error: 'No file content stored' });
+
+    const evidence = result.rows[0];
+    const filePath = path.join(uploadsDir, evidence.file_path);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'File not found on disk' });
     }
-    res.setHeader('Content-Disposition', `attachment; filename="${file_name}"`);
-    res.setHeader('Content-Type', mime_type || 'application/octet-stream');
-    res.send(file_content);
-  } catch (err) {
-    console.error('Evidence download error:', err);
-    res.status(500).json({ success: false, error: 'Failed to download evidence' });
+
+    res.setHeader('Content-Type', evidence.mime_type || 'application/octet-stream');
+    const sanitizedName = evidence.file_name.replace(/[^\w.\-]/g, '_');
+    res.setHeader('Content-Disposition', `attachment; filename="${sanitizedName}"; filename*=UTF-8''${encodeURIComponent(evidence.file_name)}`);
+
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('Error downloading evidence file:', error);
+    res.status(500).json({ success: false, error: 'Failed to download evidence file' });
   }
 });
 
-// PUT /api/v1/evidence/:id
-router.put('/:id', requirePermission('assessments.write'), async (req, res) => {
+// PUT /:id - Update evidence metadata
+router.put('/:id', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { description, tags, pii_classification, pii_types, data_sensitivity } = req.body || {};
+    const { id } = req.params;
+    const { description, tags, pii_classification, pii_types, data_sensitivity } = req.body;
+
+    // Verify ownership
+    const existing = await pool.query(
+      `SELECT id FROM evidence_files WHERE id = $1 AND organization_id = $2`,
+      [id, orgId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence file not found' });
+    }
+
+    const fields = [];
+    const params = [];
+    let paramIndex = 1;
+
+    if (description !== undefined) {
+      fields.push(`description = $${paramIndex++}`);
+      params.push(description);
+    }
+    if (tags !== undefined) {
+      fields.push(`tags = $${paramIndex++}`);
+      params.push(JSON.stringify(tags));
+    }
+    if (pii_classification !== undefined) {
+      fields.push(`pii_classification = $${paramIndex++}`);
+      params.push(pii_classification);
+    }
+    if (pii_types !== undefined) {
+      fields.push(`pii_types = $${paramIndex++}`);
+      params.push(JSON.stringify(pii_types));
+    }
+    if (data_sensitivity !== undefined) {
+      fields.push(`data_sensitivity = $${paramIndex++}`);
+      params.push(data_sensitivity);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+
+    fields.push(`updated_at = NOW()`);
+    params.push(id);
+    params.push(orgId);
 
     const result = await pool.query(
-      `UPDATE evidence
-       SET description = COALESCE($3, description),
-           tags = COALESCE($4, tags),
-           pii_classification = COALESCE($5, pii_classification),
-           pii_types = COALESCE($6, pii_types),
-           data_sensitivity = COALESCE($7, data_sensitivity),
-           updated_at = NOW()
-       WHERE organization_id=$1 AND id=$2
-       RETURNING id, title, description, tags, pii_classification, data_sensitivity, updated_at`,
-      [orgId, req.params.id, description || null, tags || null, pii_classification || null, pii_types || null, data_sensitivity || null]
+      `UPDATE evidence_files SET ${fields.join(', ')}
+       WHERE id = $${paramIndex++} AND organization_id = $${paramIndex}
+       RETURNING *`,
+      params
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Evidence not found' });
-    }
+
     res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('Evidence update error:', err);
-    res.status(500).json({ success: false, error: 'Failed to update evidence' });
+  } catch (error) {
+    console.error('Error updating evidence file:', error);
+    res.status(500).json({ success: false, error: 'Failed to update evidence file' });
   }
 });
 
-// DELETE /api/v1/evidence/:id
-router.delete('/:id', requirePermission('assessments.write'), async (req, res) => {
+// DELETE /:id - Delete evidence file
+router.delete('/:id', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
+    const { id } = req.params;
+
     const result = await pool.query(
-      `DELETE FROM evidence WHERE organization_id=$1 AND id=$2 RETURNING id, title`,
-      [orgId, req.params.id]
+      `DELETE FROM evidence_files WHERE id = $1 AND organization_id = $2 RETURNING *`,
+      [id, orgId]
     );
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Evidence not found' });
+      return res.status(404).json({ success: false, error: 'Evidence file not found' });
     }
-    await emitEvidenceEvent(orgId, 'evidence.deleted', { id: req.params.id });
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('Evidence delete error:', err);
-    res.status(500).json({ success: false, error: 'Failed to delete evidence' });
+
+    const evidence = result.rows[0];
+    const filePath = path.join(uploadsDir, evidence.file_path);
+    fs.unlink(filePath, (err) => {
+      if (err && err.code !== 'ENOENT') {
+        console.error('Error deleting file from disk:', err);
+      }
+    });
+
+    res.json({ success: true, data: { id: evidence.id } });
+  } catch (error) {
+    console.error('Error deleting evidence file:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete evidence file' });
   }
 });
 
-// POST /api/v1/evidence/:id/link
-router.post('/:id/link', requirePermission('assessments.write'), async (req, res) => {
+// POST /:id/link - Link evidence to controls
+router.post('/:id/link', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const evidenceId = req.params.id;
-    const { controlIds, notes } = req.body || {};
-    if (!Array.isArray(controlIds) || controlIds.length === 0) {
+    const { id } = req.params;
+    const { controlIds, notes } = req.body;
+
+    if (!controlIds || !Array.isArray(controlIds) || controlIds.length === 0) {
       return res.status(400).json({ success: false, error: 'controlIds array is required' });
     }
 
-    // Verify evidence belongs to org
-    const ev = await pool.query(`SELECT id FROM evidence WHERE organization_id=$1 AND id=$2`, [orgId, evidenceId]);
-    if (ev.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Evidence not found' });
+    // Verify evidence belongs to the organization
+    const evidence = await pool.query(
+      `SELECT id FROM evidence_files WHERE id = $1 AND organization_id = $2`,
+      [id, orgId]
+    );
+
+    if (evidence.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence file not found' });
     }
 
-    const links = [];
+    const valueClauses = [];
+    const params = [id];
+    let paramIndex = 2;
+
     for (const controlId of controlIds) {
-      const r = await pool.query(
-        `INSERT INTO evidence_control_links (evidence_id, control_id, notes, linked_by)
-         VALUES ($1,$2,$3,$4)
-         ON CONFLICT (evidence_id, control_id) DO UPDATE SET notes=EXCLUDED.notes, updated_at=NOW()
-         RETURNING *`,
-        [evidenceId, controlId, notes || null, req.user.id]
-      );
-      links.push(r.rows[0]);
+      valueClauses.push(`($1, $${paramIndex++}, $${paramIndex++})`);
+      params.push(controlId, notes || null);
     }
 
-    res.json({ success: true, data: links });
-  } catch (err) {
-    console.error('Evidence link error:', err);
+    const result = await pool.query(
+      `INSERT INTO control_evidence (evidence_file_id, control_id, notes)
+       VALUES ${valueClauses.join(', ')}
+       ON CONFLICT DO NOTHING
+       RETURNING *`,
+      params
+    );
+
+    res.status(201).json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Error linking evidence to controls:', error);
     res.status(500).json({ success: false, error: 'Failed to link evidence to controls' });
+  }
+});
+
+// DELETE /:id/unlink/:controlId - Unlink evidence from a control
+router.delete('/:id/unlink/:controlId', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const { id, controlId } = req.params;
+
+    // Verify evidence belongs to the organization
+    const evidence = await pool.query(
+      `SELECT id FROM evidence_files WHERE id = $1 AND organization_id = $2`,
+      [id, orgId]
+    );
+
+    if (evidence.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence file not found' });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM control_evidence WHERE evidence_file_id = $1 AND control_id = $2 RETURNING *`,
+      [id, controlId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Link not found' });
+    }
+
+    res.json({ success: true, data: { evidenceFileId: id, controlId } });
+  } catch (error) {
+    console.error('Error unlinking evidence from control:', error);
+    res.status(500).json({ success: false, error: 'Failed to unlink evidence from control' });
   }
 });
 

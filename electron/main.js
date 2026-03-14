@@ -19,6 +19,7 @@ const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
 const EmbeddedPostgres = require('embedded-postgres');
+const { initAutoUpdater, checkForUpdatesManual } = require('./updater');
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Config
@@ -378,6 +379,11 @@ function buildMenu() {
       label: 'Help',
       submenu: [
         {
+          label: 'Check for Updates…',
+          click: () => checkForUpdatesManual(),
+        },
+        { type: 'separator' },
+        {
           label: 'Documentation',
           click: () => openSafeExternal('https://github.com/sherifconteh-collab/ai-grc-platform'),
         },
@@ -425,6 +431,10 @@ app.whenReady().then(async () => {
     console.log(`Frontend ready on port ${FRONTEND_PORT}`);
 
     createWindow();
+
+    // Initialise the auto-updater after the window is ready so status
+    // events can be forwarded to the renderer.
+    initAutoUpdater(mainWindow);
   } catch (err) {
     dialog.showErrorBox(
       'ControlWeave — Startup Error',

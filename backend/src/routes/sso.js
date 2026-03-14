@@ -2,76 +2,98 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { authenticate, requirePermission } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'sso-route' }));
 
-// ---------------------------------------------------------------
-// SSO — Single Sign-On configuration
-// ---------------------------------------------------------------
-
-// GET /api/v1/sso/providers
-router.get('/providers', async (req, res) => {
-  res.json({ success: true, data: ['saml', 'oidc', 'google', 'microsoft', 'github'] });
+// GET /providers - Available SSO providers
+router.get('/providers', (req, res) => {
+  try {
+    const providers = [
+      { id: 'saml', name: 'SAML 2.0', enabled: false },
+      { id: 'oidc', name: 'OpenID Connect', enabled: false },
+      { id: 'google', name: 'Google Workspace', enabled: false },
+      { id: 'microsoft', name: 'Microsoft Entra ID', enabled: false }
+    ];
+    res.json({ success: true, data: providers });
+  } catch (err) {
+    console.error('Error fetching SSO providers:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch SSO providers' });
+  }
 });
 
-// GET /api/v1/sso/config
-router.get('/config', requirePermission('settings.manage'), async (req, res) => {
+// GET /config - Get SSO configuration for organization
+router.get('/config', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      `SELECT id, provider, is_enabled, client_id, metadata_url, login_url, attribute_mapping, created_at, updated_at
-       FROM sso_configurations WHERE organization_id=$1 LIMIT 1`,
+      'SELECT id, organization_id, provider_type, display_name, discovery_url, client_id, enabled, created_at, updated_at FROM sso_configurations WHERE organization_id = $1',
       [orgId]
     );
     res.json({ success: true, data: result.rows[0] || null });
   } catch (err) {
-    console.error('SSO config get error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load SSO configuration' });
+    console.error('Error fetching SSO config:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch SSO configuration' });
   }
 });
 
-// PUT /api/v1/sso/config
-router.put('/config', requirePermission('settings.manage'), async (req, res) => {
+// PUT /config - Upsert SSO configuration
+router.put('/config', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { provider, is_enabled, client_id, client_secret, metadata_url, login_url, logout_url, attribute_mapping } = req.body || {};
+    const { provider_type, display_name, discovery_url, client_id, client_secret, scopes, enabled } = req.body;
+
     const result = await pool.query(
-      `INSERT INTO sso_configurations (organization_id, provider, is_enabled, client_id, client_secret, metadata_url, login_url, logout_url, attribute_mapping)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
-       ON CONFLICT (organization_id) DO UPDATE
-         SET provider=$2, is_enabled=$3, client_id=$4, client_secret=$5,
-             metadata_url=$6, login_url=$7, logout_url=$8, attribute_mapping=$9::jsonb, updated_at=NOW()
-       RETURNING id, provider, is_enabled, client_id, metadata_url, login_url, attribute_mapping, updated_at`,
-      [orgId, provider || 'saml', is_enabled || false, client_id || null, client_secret || null,
-       metadata_url || null, login_url || null, logout_url || null,
-       attribute_mapping !== undefined && attribute_mapping !== null
-         ? JSON.stringify(attribute_mapping)
-         : null]
+      `INSERT INTO sso_configurations (organization_id, provider_type, display_name, discovery_url, client_id, client_secret, scopes, enabled, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+       ON CONFLICT (organization_id)
+       DO UPDATE SET provider_type = $2, display_name = $3, discovery_url = $4, client_id = $5, client_secret = $6, scopes = $7, enabled = $8, updated_at = NOW()
+       RETURNING *`,
+      [orgId, provider_type, display_name || null, discovery_url || null, client_id || null, client_secret || null, scopes || null, enabled !== false]
     );
+
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
-    console.error('SSO config update error:', err);
+    console.error('Error updating SSO config:', err);
     res.status(500).json({ success: false, error: 'Failed to update SSO configuration' });
   }
 });
 
-// GET /api/v1/sso/social-logins
-router.get('/social-logins', requirePermission('users.manage'), async (req, res) => {
+// GET /social-logins - List social logins for current user
+router.get('/social-logins', async (req, res) => {
   try {
+    const userId = req.user.id;
     const result = await pool.query(
-      `SELECT usl.id, usl.provider, usl.email, usl.display_name, usl.created_at,
-              u.email AS user_email
-       FROM user_social_logins usl
-       JOIN users u ON u.id = usl.user_id
-       WHERE u.organization_id=$1
-       ORDER BY usl.created_at DESC`,
-      [req.user.organization_id]
+      'SELECT id, user_id, provider, provider_user_id, created_at FROM user_social_logins WHERE user_id = $1',
+      [userId]
     );
     res.json({ success: true, data: result.rows });
   } catch (err) {
-    console.error('Social logins error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load social logins' });
+    console.error('Error fetching social logins:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch social logins' });
+  }
+});
+
+// DELETE /social-logins/:provider - Remove a social login
+router.delete('/social-logins/:provider', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { provider } = req.params;
+    const result = await pool.query(
+      'DELETE FROM user_social_logins WHERE user_id = $1 AND provider = $2 RETURNING *',
+      [userId, provider]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Social login not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('Error deleting social login:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete social login' });
   }
 });
 

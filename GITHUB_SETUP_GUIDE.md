@@ -13,40 +13,16 @@ Your file: /ai-grc-platform/README.md
 Status: ✅ Ready to go
 ```
 
-### 2. LICENSE ⚠️ (Need to add)
+### 2. LICENSE ✅
 ```
 Location: Root directory
-Purpose: Tells people they can use it (MIT license recommended)
-Status: ❌ Need to create
+Purpose: Tells people they can use it (AGPL-3.0 license)
+Status: ✅ Already exists
 
-Content:
-```
-```
-MIT License
-
-Copyright (c) 2026 Conteh Consulting LLC
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-```
-
-Save as: LICENSE (no extension)
+The LICENSE file contains the full verbatim GNU AGPL-3.0 license text.
+See https://www.gnu.org/licenses/agpl-3.0.txt for the official text.
+Do NOT modify the license text — add project copyright notices
+in source file headers or a separate COPYRIGHT file.
 ```
 
 ### 3. .gitignore ⚠️ (Need to add)
@@ -409,7 +385,7 @@ await server.connect(transport);
 ```bash
 # Create this file in root directory
 File: LICENSE
-Content: (MIT license text from above)
+Content: (AGPL-3.0 license text — see LICENSE file)
 ```
 
 ### 2. .gitignore
@@ -745,7 +721,7 @@ The world's first open source GRC platform with:
 - AI system governance
 - Optional Claude AI integration
 
-MIT licensed. Self-hostable. Free forever.
+AGPL-3.0 licensed. Self-hostable. Free forever.
 
 GitHub: github.com/conteh-consulting/ai-grc-platform
 ```
@@ -762,7 +738,7 @@ GitHub: github.com/conteh-consulting/ai-grc-platform
 ## ✅ Final Checklist Before GitHub Push
 
 - [ ] README.md is clear and compelling
-- [ ] LICENSE file added (MIT)
+- [ ] LICENSE file added (AGPL-3.0)
 - [ ] .gitignore includes secrets/credentials
 - [ ] CONTRIBUTING.md explains how to contribute
 - [ ] CODE_OF_CONDUCT.md sets expectations

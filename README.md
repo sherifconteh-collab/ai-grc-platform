@@ -2,14 +2,34 @@
 
 **Open-source AI-powered GRC platform with multi-framework compliance management, crosswalk intelligence, and BYOK AI analysis**
 
-> 🔗 **Upstream**: This repository is the community edition of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features are periodically synced here. The code is fully MIT-licensed and self-contained — no dependency on the upstream repo is required. Premium tiers (CMDB, Vendor Risk, Threat Intelligence, etc.) are available at [controlweave.com](https://controlweave.com).
+> 🔗 **Upstream**: This repository is the community edition of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features are periodically synced here. The code is fully AGPL-3.0-licensed and self-contained — no dependency on the upstream repo is required. Premium tiers (CMDB, Vendor Risk, Threat Intelligence, etc.) are available at [controlweave.com](https://controlweave.com).
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Release](https://img.shields.io/badge/Release-v2.1.0-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v0.3.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-<!-- LAST_UPDATED: 2026-03-13 | PR #43: feat: bundle PostgreSQL + auto-migrate in Electron desktop installer -->
+---
+
+### 📥 Download the Desktop App
+
+Everything is bundled — PostgreSQL included. No setup required. Just install and run.
+
+> [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
+
+After installing, launch ControlWeave — the app opens automatically and walks you through creating your first account. Updates are delivered automatically so you always stay on the latest version.
+
+<details>
+<summary>System requirements &amp; release notes</summary>
+
+- Windows 10+, macOS 10.13+, or Ubuntu 18.04+ (or equivalent)
+- 2 GB RAM · ~500 MB disk space
+- [All releases](https://github.com/sherifconteh-collab/ai-grc-platform/releases) · [Release notes](./RELEASE_NOTES.md)
+</details>
+
+---
+
+<!-- LAST_UPDATED: 2026-03-14 | PR #47: Fix broken pricing links, update license to AGPL-3.0, fix README badges -->
 
 ## 🎯 What is This?
 
@@ -18,7 +38,7 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **Multi-Framework**: Supports 25+ major frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, and MAESTRO
-- **Open Source**: MIT licensed, self-hostable, transparent
+- **Open Source**: AGPL-3.0 licensed, self-hostable, transparent
 - **MCP-Enabled**: Can act as an AI agent via Model Context Protocol
 - **Enterprise-Grade**: Designed for real compliance workflows
 
@@ -41,29 +61,54 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 - 📡 Webhook and notification system
 - 📄 Policy management with gap analysis
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Development)
+
+> The steps below are for developers who want to run from source. If you just want to use ControlWeave, [download the installer](#-download) instead.
+
+### Prerequisites
+
+- **Node.js** 20+ — [download](https://nodejs.org)
+- **PostgreSQL** 14+ — [download](https://www.postgresql.org/download/) (or use `brew install postgresql` on macOS / `sudo apt install postgresql` on Ubuntu)
+
+### 1. Create the database
 
 ```bash
-# Clone the repository
-git clone https://github.com/sherifconteh-collab/ai-grc-platform.git
-cd ai-grc-platform
+# Start PostgreSQL if it isn't running
+# macOS:  brew services start postgresql
+# Linux:  sudo systemctl start postgresql
 
-# Backend setup
+createdb controlweave        # create the application database
+```
+
+### 2. Backend
+
+```bash
 cd backend
 npm install
-# Create .env file (see backend/.env.example for configuration)
-npm run seed  # Seeds database with frameworks and controls
-npm start     # Starts on port 3001
 
-# Frontend setup (in new terminal)
+# Create your .env from the example and set DATABASE_URL
+cp .env.example .env
+# Edit .env — update the DATABASE_URL line:
+#   DATABASE_URL=postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/controlweave
+# On macOS/Linux you can often use your OS username with no password:
+#   DATABASE_URL=postgresql://localhost:5432/controlweave
+
+npm run migrate              # creates tables and schema
+npm start                    # starts API on port 3001
+# Frameworks and controls are auto-seeded on first launch
+```
+
+### 3. Frontend (in a new terminal)
+
+```bash
 cd frontend
 npm install
-npm run dev   # Starts on port 3000
+npm run dev                  # starts Next.js on port 3000
 ```
 
 **First login:** Visit http://localhost:3000/register to create your account!
 
-> 💡 For detailed setup including database configuration and environment variables, see [QUICKSTART.md](./QUICKSTART.md) and [QUICK_START.md](./QUICK_START.md).
+> 💡 For detailed setup including environment variables and advanced configuration, see [QUICKSTART.md](./QUICKSTART.md) and [QUICK_START.md](./QUICK_START.md).
 
 ## 📚 Supported Frameworks
 
@@ -96,6 +141,8 @@ npm run dev   # Starts on port 3000
 - **ISO/IEC TR 24368** — AI Ethics Overview
 
 ### Tier 4 — Planned / In Progress
+> Available now at [ControlWeave.com](https://controlweave.com)
+
 - GDPR
 - PCI DSS 4.0
 - CIS Controls v8
@@ -197,7 +244,7 @@ Full RMF lifecycle management without leaving the platform:
 ### Unique Differentiators:
 
 1. **100% Open Source & Free**
-   - MIT licensed — use, modify, sell without restrictions
+   - AGPL-3.0 licensed — open source with copyleft protections (see [LICENSE](./LICENSE))
    - Self-hostable — your data stays on your infrastructure
    - No per-user fees, no vendor lock-in
    - Commercial tools cost $30K–200K/year
@@ -504,7 +551,7 @@ We welcome contributions! This is an open-source project designed to help organi
 
 ## 📜 License
 
-MIT License — see [LICENSE](./LICENSE) file for details.
+AGPL-3.0 License — see [LICENSE](./LICENSE) file for details.
 
 By contributing, you agree to the [Contributor License Agreement](./CLA.md). Signing is automated — the CLA bot (see [`.github/workflows/cla.yml`](./.github/workflows/cla.yml)) will prompt you on your first PR.
 
@@ -521,7 +568,7 @@ This community edition gives you a fully functional GRC platform. If you need en
 - 🏗️ **Multi-tenant Management** — Platform administration across organizations
 - 🎯 **Unlimited Frameworks** — No limits on simultaneously active frameworks
 
-👉 **[Get started at ControlWeave.com](https://controlweave.com/pricing)**
+👉 **[Get started at ControlWeave.com](https://controlweave.com/#pricing)**
 
 ## 🙋 Support
 
