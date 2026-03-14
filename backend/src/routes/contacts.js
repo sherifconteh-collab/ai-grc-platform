@@ -25,11 +25,11 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const org = req.user.organization_id;
-    const { name, email, role, phone, notes } = req.body;
+    const { full_name, email, title, team, notes } = req.body;
     const result = await pool.query(
-      `INSERT INTO organization_contacts (organization_id, name, email, role, phone, notes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [org, name, email, role, phone, notes]
+      `INSERT INTO organization_contacts (organization_id, full_name, email, title, team, notes, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [org, full_name, email, title, team, notes, req.user.id]
     );
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -42,15 +42,15 @@ router.patch('/:id', async (req, res) => {
   try {
     const org = req.user.organization_id;
     const { id } = req.params;
-    const { name, email, role, phone, notes } = req.body;
+    const { full_name, email, title, team, notes } = req.body;
     const fields = [];
     const values = [];
     let idx = 1;
 
-    if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
+    if (full_name !== undefined) { fields.push(`full_name = $${idx++}`); values.push(full_name); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email); }
-    if (role !== undefined) { fields.push(`role = $${idx++}`); values.push(role); }
-    if (phone !== undefined) { fields.push(`phone = $${idx++}`); values.push(phone); }
+    if (title !== undefined) { fields.push(`title = $${idx++}`); values.push(title); }
+    if (team !== undefined) { fields.push(`team = $${idx++}`); values.push(team); }
     if (notes !== undefined) { fields.push(`notes = $${idx++}`); values.push(notes); }
 
     if (fields.length === 0) {

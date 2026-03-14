@@ -29,7 +29,7 @@ router.get('/config', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      'SELECT id, organization_id, provider_type, config, enabled, created_at, updated_at FROM sso_configurations WHERE organization_id = $1',
+      'SELECT id, organization_id, provider_type, display_name, discovery_url, client_id, enabled, created_at, updated_at FROM sso_configurations WHERE organization_id = $1',
       [orgId]
     );
     res.json({ success: true, data: result.rows[0] || null });
@@ -43,15 +43,15 @@ router.get('/config', async (req, res) => {
 router.put('/config', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { provider_type, config, enabled } = req.body;
+    const { provider_type, display_name, discovery_url, client_id, client_secret, scopes, enabled } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO sso_configurations (organization_id, provider_type, config, enabled, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, NOW(), NOW())
+      `INSERT INTO sso_configurations (organization_id, provider_type, display_name, discovery_url, client_id, client_secret, scopes, enabled, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
        ON CONFLICT (organization_id)
-       DO UPDATE SET provider_type = $2, config = $3, enabled = $4, updated_at = NOW()
+       DO UPDATE SET provider_type = $2, display_name = $3, discovery_url = $4, client_id = $5, client_secret = $6, scopes = $7, enabled = $8, updated_at = NOW()
        RETURNING *`,
-      [orgId, provider_type, JSON.stringify(config), enabled !== false]
+      [orgId, provider_type, display_name || null, discovery_url || null, client_id || null, client_secret || null, scopes || null, enabled !== false]
     );
 
     res.json({ success: true, data: result.rows[0] });
@@ -66,7 +66,7 @@ router.get('/social-logins', async (req, res) => {
   try {
     const userId = req.user.id;
     const result = await pool.query(
-      'SELECT id, user_id, provider, provider_user_id, created_at FROM social_logins WHERE user_id = $1',
+      'SELECT id, user_id, provider, provider_user_id, created_at FROM user_social_logins WHERE user_id = $1',
       [userId]
     );
     res.json({ success: true, data: result.rows });
@@ -82,7 +82,7 @@ router.delete('/social-logins/:provider', async (req, res) => {
     const userId = req.user.id;
     const { provider } = req.params;
     const result = await pool.query(
-      'DELETE FROM social_logins WHERE user_id = $1 AND provider = $2 RETURNING *',
+      'DELETE FROM user_social_logins WHERE user_id = $1 AND provider = $2 RETURNING *',
       [userId, provider]
     );
 

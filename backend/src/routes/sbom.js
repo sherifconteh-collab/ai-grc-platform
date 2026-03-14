@@ -21,21 +21,21 @@ router.get('/assets', async (req, res) => {
     const { search } = req.query;
 
     const params = [orgId];
-    const conditions = ['organization_id = $1', 'asset_name IS NOT NULL'];
+    const conditions = ['organization_id = $1', 'name IS NOT NULL'];
     let paramIndex = 2;
 
     if (search) {
-      conditions.push(`asset_name ILIKE $${paramIndex}`);
+      conditions.push(`name ILIKE $${paramIndex}`);
       params.push(`%${search}%`);
       paramIndex++;
     }
 
     const result = await pool.query(
-      `SELECT DISTINCT asset_name FROM sbom_components WHERE ${conditions.join(' AND ')} ORDER BY asset_name`,
+      `SELECT DISTINCT name FROM software_components WHERE ${conditions.join(' AND ')} ORDER BY name`,
       params
     );
 
-    res.json({ success: true, data: result.rows.map(r => r.asset_name) });
+    res.json({ success: true, data: result.rows.map(r => r.name) });
   } catch (error) {
     console.error('Get SBOM assets error:', error);
     res.status(500).json({ success: false, error: 'Failed to load SBOM assets' });
@@ -53,14 +53,14 @@ router.get('/', async (req, res) => {
 
     const query = `
       SELECT *
-      FROM sbom_components
+      FROM software_components
       WHERE organization_id = $1
       ORDER BY created_at DESC
       LIMIT $2 OFFSET $3
     `;
 
     const countQuery = `
-      SELECT COUNT(*) FROM sbom_components WHERE organization_id = $1
+      SELECT COUNT(*) FROM software_components WHERE organization_id = $1
     `;
 
     const [result, countResult] = await Promise.all([
@@ -84,7 +84,7 @@ router.get('/:id', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      `SELECT * FROM sbom_components WHERE id = $1 AND organization_id = $2`,
+      `SELECT * FROM software_components WHERE id = $1 AND organization_id = $2`,
       [req.params.id, orgId]
     );
 

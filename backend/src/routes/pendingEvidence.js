@@ -23,8 +23,8 @@ router.get('/', async (req, res) => {
     const orgId = req.user.organization_id;
     const status = req.query.status || 'pending';
     const result = await pool.query(
-      `SELECT id, title, description, source, suggested_control_ids, status,
-              reviewer_notes, created_at, updated_at
+      `SELECT id, ai_title, ai_description, source_type, suggested_controls, status,
+              review_notes, created_at, updated_at
        FROM pending_evidence
        WHERE organization_id = $1 AND status = $2
        ORDER BY created_at DESC`,
@@ -63,10 +63,10 @@ router.post('/:id/approve', async (req, res) => {
     const orgId = req.user.organization_id;
     const { reviewer_notes } = req.body;
     const result = await pool.query(
-      `UPDATE pending_evidence SET status = 'approved', reviewer_notes = $1, updated_at = NOW()
-       WHERE id = $2 AND organization_id = $3
+      `UPDATE pending_evidence SET status = 'approved', review_notes = $1, reviewed_by = $2, reviewed_at = NOW(), updated_at = NOW()
+       WHERE id = $3 AND organization_id = $4
        RETURNING *`,
-      [reviewer_notes || null, req.params.id, orgId]
+      [reviewer_notes || null, req.user.id, req.params.id, orgId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Pending evidence not found' });
@@ -83,10 +83,10 @@ router.post('/:id/reject', async (req, res) => {
     const orgId = req.user.organization_id;
     const { reviewer_notes } = req.body;
     const result = await pool.query(
-      `UPDATE pending_evidence SET status = 'rejected', reviewer_notes = $1, updated_at = NOW()
-       WHERE id = $2 AND organization_id = $3
+      `UPDATE pending_evidence SET status = 'rejected', review_notes = $1, reviewed_by = $2, reviewed_at = NOW(), updated_at = NOW()
+       WHERE id = $3 AND organization_id = $4
        RETURNING *`,
-      [reviewer_notes || null, req.params.id, orgId]
+      [reviewer_notes || null, req.user.id, req.params.id, orgId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Pending evidence not found' });

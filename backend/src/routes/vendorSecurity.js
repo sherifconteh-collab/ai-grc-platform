@@ -68,11 +68,11 @@ router.get('/scores/:id', async (req, res) => {
 router.post('/scores', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { vendor_name, domain, score_provider, current_score, factors } = req.body;
+    const { vendor_name, vendor_domain, score_provider, score_value, score_date, risk_factors } = req.body;
     const result = await pool.query(
-      `INSERT INTO vendor_security_scores (organization_id, vendor_name, domain, score_provider, current_score, factors)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [orgId, vendor_name, domain, score_provider, current_score, JSON.stringify(factors)]
+      `INSERT INTO vendor_security_scores (organization_id, vendor_name, vendor_domain, score_provider, score_value, score_date, risk_factors)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [orgId, vendor_name, vendor_domain, score_provider, score_value, score_date || new Date().toISOString().slice(0, 10), JSON.stringify(risk_factors)]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -86,7 +86,7 @@ router.post('/scores/:id/refresh', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      `UPDATE vendor_security_scores SET last_refreshed_at = NOW(), updated_at = NOW()
+      `UPDATE vendor_security_scores SET updated_at = NOW()
        WHERE id = $1 AND organization_id = $2 RETURNING *`,
       [req.params.id, orgId]
     );
@@ -123,7 +123,7 @@ router.get('/trends/:domain', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      'SELECT * FROM vendor_security_scores WHERE domain = $1 AND organization_id = $2 ORDER BY created_at ASC',
+      'SELECT * FROM vendor_security_scores WHERE vendor_domain = $1 AND organization_id = $2 ORDER BY created_at ASC',
       [req.params.domain, orgId]
     );
     res.json({ success: true, data: result.rows });

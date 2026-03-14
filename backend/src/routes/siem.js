@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      'SELECT id, organization_id, name, endpoint, authentication_type, status, created_at, updated_at FROM siem_configurations WHERE organization_id = $1',
+      'SELECT id, organization_id, name, provider, enabled, endpoint_url, event_filter, created_at, updated_at FROM siem_configurations WHERE organization_id = $1',
       [orgId]
     );
     res.json({ success: true, data: result.rows });
@@ -27,13 +27,13 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { name, endpoint, authentication_type, credentials, status } = req.body;
+    const { name, provider, endpoint_url, api_key, enabled, event_filter } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO siem_configurations (organization_id, name, endpoint, authentication_type, credentials_enc, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-       RETURNING id, organization_id, name, endpoint, authentication_type, status, created_at, updated_at`,
-      [orgId, name, endpoint, authentication_type, credentials, status || 'inactive']
+      `INSERT INTO siem_configurations (organization_id, name, provider, endpoint_url, api_key, enabled, event_filter, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+       RETURNING id, organization_id, name, provider, enabled, endpoint_url, event_filter, created_at, updated_at`,
+      [orgId, name, provider, endpoint_url, api_key, enabled !== false, event_filter || null]
     );
 
     res.status(201).json({ success: true, data: result.rows[0] });
@@ -48,7 +48,7 @@ router.put('/:id', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
-    const { name, endpoint, authentication_type, credentials, status } = req.body;
+    const { name, provider, endpoint_url, api_key, enabled, event_filter } = req.body;
 
     const existing = await pool.query(
       'SELECT id FROM siem_configurations WHERE id = $1 AND organization_id = $2',
@@ -64,10 +64,11 @@ router.put('/:id', async (req, res) => {
     let paramIndex = 1;
 
     if (name !== undefined) { fields.push(`name = $${paramIndex++}`); values.push(name); }
-    if (endpoint !== undefined) { fields.push(`endpoint = $${paramIndex++}`); values.push(endpoint); }
-    if (authentication_type !== undefined) { fields.push(`authentication_type = $${paramIndex++}`); values.push(authentication_type); }
-    if (credentials !== undefined) { fields.push(`credentials_enc = $${paramIndex++}`); values.push(credentials); }
-    if (status !== undefined) { fields.push(`status = $${paramIndex++}`); values.push(status); }
+    if (provider !== undefined) { fields.push(`provider = $${paramIndex++}`); values.push(provider); }
+    if (endpoint_url !== undefined) { fields.push(`endpoint_url = $${paramIndex++}`); values.push(endpoint_url); }
+    if (api_key !== undefined) { fields.push(`api_key = $${paramIndex++}`); values.push(api_key); }
+    if (enabled !== undefined) { fields.push(`enabled = $${paramIndex++}`); values.push(enabled); }
+    if (event_filter !== undefined) { fields.push(`event_filter = $${paramIndex++}`); values.push(event_filter); }
 
     if (fields.length === 0) {
       return res.status(400).json({ success: false, error: 'No fields to update' });
@@ -79,7 +80,7 @@ router.put('/:id', async (req, res) => {
     const result = await pool.query(
       `UPDATE siem_configurations SET ${fields.join(', ')}
        WHERE id = $${paramIndex++} AND organization_id = $${paramIndex}
-       RETURNING id, organization_id, name, endpoint, authentication_type, status, created_at, updated_at`,
+       RETURNING id, organization_id, name, provider, enabled, endpoint_url, event_filter, created_at, updated_at`,
       values
     );
 

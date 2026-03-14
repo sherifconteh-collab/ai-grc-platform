@@ -1,8 +1,6 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const pool = require('../config/database');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -10,29 +8,16 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 // Public route - no auth, just rate limiting
 router.use(createRateLimiter({ windowMs: 60 * 1000, max: 60, label: 'tprm-public-route' }));
 
-// Configure multer for evidence uploads
-const uploadsDir = path.join(__dirname, '../../uploads/tprm-evidence');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
-
+// Configure multer for evidence uploads (memory storage for DB persistence)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 // Helper: validate token and return questionnaire
 async function getQuestionnaireByToken(token) {
   const result = await pool.query(
-    `SELECT * FROM tprm_questionnaires WHERE response_token = $1 AND status IN ('sent', 'in_progress')`,
+    `SELECT * FROM tprm_questionnaires WHERE access_token = $1 AND status IN ('sent', 'in_progress')`,
     [token]
   );
   return result.rows[0] || null;
@@ -98,16 +83,16 @@ router.post('/respond/:token/evidence', upload.single('file'), async (req, res) 
     }
 
     const result = await pool.query(
-      `INSERT INTO tprm_evidence (questionnaire_id, file_name, file_path, file_size_bytes, mime_type, description)
+      `INSERT INTO tprm_evidence (questionnaire_id, organization_id, original_filename, file_size_bytes, mime_type, file_content)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
         questionnaire.id,
+        questionnaire.organization_id,
         req.file.originalname,
-        req.file.filename,
         req.file.size,
         req.file.mimetype,
-        req.body.description || null
+        req.file.buffer ? req.file.buffer.toString('base64') : null
       ]
     );
     res.status(201).json({ success: true, data: result.rows[0] });

@@ -13,7 +13,7 @@ router.get('/unread-count', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      'SELECT COUNT(*) as count FROM regulatory_news WHERE organization_id = $1 AND is_read = false AND is_archived = false',
+      'SELECT COUNT(*) as count FROM regulatory_news_items WHERE organization_id = $1 AND is_read = false AND is_archived = false',
       [orgId]
     );
     res.json({ success: true, data: { unread_count: parseInt(result.rows[0].count, 10) } });
@@ -28,7 +28,7 @@ router.get('/sources/list', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      'SELECT DISTINCT source FROM regulatory_news WHERE organization_id = $1 ORDER BY source',
+      'SELECT DISTINCT source FROM regulatory_news_items WHERE organization_id = $1 ORDER BY source',
       [orgId]
     );
     res.json({ success: true, data: result.rows.map(r => r.source) });
@@ -53,7 +53,7 @@ router.post('/mark-all-read', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      'UPDATE regulatory_news SET is_read = true WHERE organization_id = $1 AND is_read = false',
+      'UPDATE regulatory_news_items SET is_read = true WHERE organization_id = $1 AND is_read = false',
       [orgId]
     );
     res.json({ success: true, data: { marked_read: result.rowCount } });
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
     const orgId = req.user.organization_id;
     const { source, is_read, is_archived, impact_level, limit } = req.query;
 
-    let query = 'SELECT * FROM regulatory_news WHERE organization_id = $1';
+    let query = 'SELECT * FROM regulatory_news_items WHERE organization_id = $1';
     const values = [orgId];
     let idx = 2;
 
@@ -109,7 +109,7 @@ router.get('/:id', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(
-      'UPDATE regulatory_news SET is_read = true WHERE id = $1 AND organization_id = $2 RETURNING *',
+      'UPDATE regulatory_news_items SET is_read = true WHERE id = $1 AND organization_id = $2 RETURNING *',
       [req.params.id, orgId]
     );
     if (result.rows.length === 0) {
@@ -131,7 +131,7 @@ router.patch('/:id', async (req, res) => {
     let idx = 1;
 
     for (const [key, value] of Object.entries(req.body)) {
-      if (['is_read', 'is_archived', 'is_bookmarked'].includes(key)) {
+      if (['is_read', 'is_archived'].includes(key)) {
         fields.push(`${key} = $${idx}`);
         values.push(value);
         idx++;
@@ -145,7 +145,7 @@ router.patch('/:id', async (req, res) => {
     values.push(req.params.id, orgId);
 
     const result = await pool.query(
-      `UPDATE regulatory_news SET ${fields.join(', ')} WHERE id = $${idx} AND organization_id = $${idx + 1} RETURNING *`,
+      `UPDATE regulatory_news_items SET ${fields.join(', ')} WHERE id = $${idx} AND organization_id = $${idx + 1} RETURNING *`,
       values
     );
 

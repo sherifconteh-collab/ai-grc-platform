@@ -66,8 +66,8 @@ router.post('/register/verify', async (req, res) => {
 router.get('/list', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, credential_id, name, sign_count, created_at, last_used_at
-       FROM passkeys
+      `SELECT id, credential_id, name, counter, created_at, last_used_at
+       FROM user_passkeys
        WHERE user_id = $1
        ORDER BY created_at DESC`,
       [req.user.id]
@@ -82,7 +82,7 @@ router.get('/list', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const result = await pool.query(
-      'DELETE FROM passkeys WHERE id = $1 AND user_id = $2 RETURNING id',
+      'DELETE FROM user_passkeys WHERE id = $1 AND user_id = $2 RETURNING id',
       [req.params.id, req.user.id]
     );
     if (result.rows.length === 0) {
@@ -102,7 +102,7 @@ router.patch('/:id/rename', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Name is required' });
     }
     const result = await pool.query(
-      'UPDATE passkeys SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING id, name',
+      'UPDATE user_passkeys SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING id, name',
       [name, req.params.id, req.user.id]
     );
     if (result.rows.length === 0) {

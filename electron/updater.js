@@ -4,8 +4,8 @@
  * ControlWeave Desktop — Auto-Updater
  *
  * Uses electron-updater to check the online ControlWeave GitHub Releases for
- * new versions.  Downloads are manual (autoDownload: false) so the user stays
- * in control.  Status events are forwarded to the renderer via IPC so the UI
+ * new versions.  Downloads happen automatically (autoDownload: true) so the
+ * user gets the latest version as soon as possible.  Status events are forwarded to the renderer via IPC so the UI
  * can display update notifications.
  */
 
