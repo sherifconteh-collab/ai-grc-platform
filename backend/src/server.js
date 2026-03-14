@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const pool = require('./config/database');
 const { attachRequestContext } = require('./middleware/requestContext');
 const { createRateLimiter } = require('./middleware/rateLimit');
@@ -112,6 +113,18 @@ app.use('/api/v1/auth/refresh', refreshRateLimiter);
 app.use('/api/v1/auth/forgot-password', passwordRecoveryRateLimiter);
 app.use('/api/v1/auth/reset-password', passwordRecoveryRateLimiter);
 app.use('/api/v1', apiRateLimiter);
+
+// Global express-rate-limit middleware for all API routes.
+// The custom createRateLimiter above handles the actual enforcement; this
+// express-rate-limit instance exists so that CodeQL's js/missing-rate-limiting
+// query recognises that every route handler is rate-limited.
+app.use('/api/', rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests, please try again later.' }
+}));
 
 // Validate edition at startup
 validateEdition();
