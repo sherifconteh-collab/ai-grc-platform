@@ -36,10 +36,10 @@ router.post('/', requirePermission('settings.manage'), async (req, res) => {
     }
     const result = await pool.query(
       `INSERT INTO siem_configurations (organization_id, provider, endpoint_url, api_key, index_name, enabled, extra_config)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)
        RETURNING id, provider, endpoint_url, index_name, enabled, created_at`,
       [orgId, provider, endpoint_url || null, api_key || null, index_name || null, enabled || false,
-       extra_config ? JSON.stringify(extra_config) : null]
+       extra_config !== undefined && extra_config !== null ? JSON.stringify(extra_config) : null]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {

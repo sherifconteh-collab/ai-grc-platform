@@ -8,7 +8,7 @@ const multer = require('multer');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
 });
 
 router.use(authenticate);

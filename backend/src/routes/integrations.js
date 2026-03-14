@@ -39,9 +39,9 @@ router.put('/splunk', requirePermission('settings.manage'), async (req, res) => 
     for (const [key, value] of Object.entries(entries)) {
       await pool.query(
         `INSERT INTO dynamic_config_entries (organization_id, config_domain, config_key, config_value)
-         VALUES ($1,$2,$3,$4)
-         ON CONFLICT (organization_id, config_domain, config_key) DO UPDATE SET config_value=$4, updated_at=NOW()`,
-        [orgId, SPLUNK_DOMAIN, key, String(value)]
+         VALUES ($1,$2,$3,$4::jsonb)
+         ON CONFLICT (organization_id, config_domain, config_key) DO UPDATE SET config_value=$4::jsonb, updated_at=NOW()`,
+        [orgId, SPLUNK_DOMAIN, key, JSON.stringify(value)]
       );
     }
     res.json({ success: true, data: { message: 'Splunk configuration updated' } });
