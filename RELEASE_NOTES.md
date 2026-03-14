@@ -5,7 +5,7 @@
 > Enterprise Integrations, etc.) are excluded.
 >
 > For the full changelog see the private repository. For upgrade information visit
-> [controlweave.com/pricing](https://controlweave.com/pricing).
+> [controlweave.com/#pricing](https://controlweave.com/#pricing).
 
 ---
 

@@ -8,7 +8,7 @@
 ```
 ai-grc-platform/
 ├── README.md                           ✅ CRITICAL - First thing people see
-├── LICENSE                             ✅ CRITICAL - MIT License
+├── LICENSE                             ✅ CRITICAL - AGPL-3.0 License
 ├── .gitignore                          ✅ CRITICAL - Don't commit secrets
 ├── CONTRIBUTING.md                     ✅ Helps contributors
 ├── CODE_OF_CONDUCT.md                  ✅ Professional touch
@@ -87,7 +87,7 @@ Enterprise GRC tools cost $50k-300k/year. This is the free, open-source alternat
 - ✅ 528+ controls with 80+ cross-framework mappings
 - ✅ 40-60% compliance cost reduction through intelligent crosswalks
 - ✅ AI system governance (NIST AI RMF)
-- ✅ 100% free and open source (MIT license)
+- ✅ 100% free and open source (AGPL-3.0 license)
 
 ## 🚀 Quick Start
 
@@ -101,7 +101,7 @@ Enterprise GRC tools cost $50k-300k/year. This is the free, open-source alternat
 3. **Support contracts** ($10k-50k/year) - Priority support
 4. **Consulting** ($200/hour) - Compliance expertise
 
-**Want to self-host forever?** Go for it! MIT license means it's yours.
+**Want to self-host forever?** Go for it! AGPL-3.0 license means it's yours.
 
 **Need help?** Visit [contehconsulting.com](https://contehconsulting.com) or email contehconsulting@gmail.com
 
