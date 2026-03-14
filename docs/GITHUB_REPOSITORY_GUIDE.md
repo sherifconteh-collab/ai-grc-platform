@@ -113,7 +113,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE)
+AGPL-3.0 License - See [LICENSE](LICENSE)
 
 ## 📧 Contact
 
@@ -133,34 +133,29 @@ If this project helps you, please give it a star on GitHub! ⭐
 Create a file called `LICENSE` with this exact text:
 
 ```
-MIT License
+AGPL-3.0 License
 
-Copyright (c) 2026 Conteh Consulting LLC
+Copyright (c) 2025 ControlWeave (contehconsulting@gmail.com)
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
 ```
 
-**Why MIT?**: 
-- Most permissive license
-- Allows commercial use
-- Companies trust it
-- Same as React, Node.js, etc.
+**Why AGPL-3.0?**: 
+- Ensures modifications to the platform remain open source
+- Protects community contributions
+- Companies trust it for network server software
+- Same as Grafana, MongoDB Community, etc.
 
 ---
 
@@ -578,7 +573,7 @@ git push
 
 ### Add Badges to README.md
 ```markdown
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![GitHub stars](https://img.shields.io/github/stars/yourusername/ai-grc-platform.svg)](https://github.com/yourusername/ai-grc-platform/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/yourusername/ai-grc-platform.svg)](https://github.com/yourusername/ai-grc-platform/issues)
 ![Database: PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-blue)
@@ -613,7 +608,7 @@ ai-grc-platform/
 Before making repo public:
 
 - [ ] README.md is comprehensive
-- [ ] LICENSE file exists (MIT)
+- [ ] LICENSE file exists (AGPL-3.0)
 - [ ] .gitignore is present
 - [ ] No secrets/credentials in code
 - [ ] CONTRIBUTING.md exists
