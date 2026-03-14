@@ -141,7 +141,9 @@ npm run dev                  # starts Next.js on port 3000
 - **ISO/IEC TR 24028** — Trustworthiness in AI
 - **ISO/IEC TR 24368** — AI Ethics Overview
 
-### Tier 4 — Premium (Paid Tier)
+### Tier 4 — Planned / In Progress
+> Available now at [ControlWeave.com](https://controlweave.com)
+
 - GDPR
 - PCI DSS 4.0
 - CIS Controls v8
