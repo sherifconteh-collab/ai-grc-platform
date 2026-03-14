@@ -30,7 +30,7 @@ The app automatically checks for updates from this repository so you always stay
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-13 | PR #43: feat: bundle PostgreSQL + auto-migrate in Electron desktop installer -->
+<!-- LAST_UPDATED: 2026-03-14 | PR #47: Fix broken pricing links, update license to AGPL-3.0, fix README badges -->
 
 ## 🎯 What is This?
 
