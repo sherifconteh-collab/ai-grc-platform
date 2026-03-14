@@ -10,7 +10,7 @@ router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'contact
 
 router.get('/', async (req, res) => {
   try {
-    const org = req.user.organization_id;
+    const orgId = req.user.organization_id;
     const result = await pool.query(
       'SELECT * FROM organization_contacts WHERE organization_id = $1 ORDER BY created_at DESC',
       [org]
@@ -24,12 +24,12 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const org = req.user.organization_id;
+    const orgId = req.user.organization_id;
     const { full_name, email, title, team, notes } = req.body;
     const result = await pool.query(
       `INSERT INTO organization_contacts (organization_id, full_name, email, title, team, notes, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [org, full_name, email, title, team, notes, req.user.id]
+      [orgId, full_name, email, title, team, notes, req.user.id]
     );
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   try {
-    const org = req.user.organization_id;
+    const orgId = req.user.organization_id;
     const { id } = req.params;
     const { full_name, email, title, team, notes } = req.body;
     const fields = [];
@@ -79,11 +79,11 @@ router.patch('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const org = req.user.organization_id;
+    const orgId = req.user.organization_id;
     const { id } = req.params;
     const result = await pool.query(
       'DELETE FROM organization_contacts WHERE id = $1 AND organization_id = $2 RETURNING id',
-      [id, org]
+      [id, orgId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Contact not found' });

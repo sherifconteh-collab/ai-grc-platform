@@ -92,7 +92,7 @@ router.post('/respond/:token/evidence', upload.single('file'), async (req, res) 
         req.file.originalname,
         req.file.size,
         req.file.mimetype,
-        req.file.buffer ? req.file.buffer.toString('base64') : null
+        req.file.buffer.toString('base64')
       ]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
