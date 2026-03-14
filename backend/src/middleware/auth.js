@@ -291,6 +291,21 @@ const hasRole = async (userId, roleName, organizationId) => {
   return false;
 };
 
+/**
+ * requirePlatformOwner – ensures the authenticated user has is_platform_admin flag.
+ * Used for server-wide operations like license key generation.
+ */
+const requirePlatformOwner = (req, res, next) => {
+  if (!req.user || !req.user.is_platform_admin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Platform admin access required',
+      message: 'This action requires platform administrator privileges.'
+    });
+  }
+  next();
+};
+
 module.exports = {
   authenticate,
   authenticateToken,
@@ -299,6 +314,7 @@ module.exports = {
   requireAllPermissions,
   requireRole,
   requireTier,
+  requirePlatformOwner,
   getUserPermissions,
   hasRole
 };

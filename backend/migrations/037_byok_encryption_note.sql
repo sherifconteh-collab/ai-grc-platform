@@ -1,0 +1,20 @@
+-- Migration 037: BYOK API key encryption enforcement
+--
+-- The organization_settings table already has is_encrypted BOOLEAN DEFAULT FALSE
+-- (created in migration 009). This migration does not alter the schema.
+--
+-- What changes with the application code (llmService.js + orgSettings.js):
+--   - New keys are now encrypted with AES-256-GCM before storage
+--   - is_encrypted is set TRUE only when a real encrypted envelope is stored
+--   - getOrgApiKey() now decrypts values transparently
+--   - Legacy plain-text rows are handled gracefully by the decrypt() utility
+--     (returned as-is) so existing BYOK keys continue to work until re-saved
+--
+-- DEPLOY NOTE:
+--   After deploying the code change, prompt org admins to re-save their API keys
+--   to upgrade existing plain-text rows to encrypted envelopes.
+--   A one-time admin re-encryption script can be run with:
+--     node backend/scripts/encrypt-existing-byok-keys.js
+--
+-- No DDL needed.
+SELECT 1;

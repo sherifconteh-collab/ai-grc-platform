@@ -24,6 +24,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "updater.js",
       "build/**"
     ],
     "asarUnpack": [
@@ -39,7 +40,16 @@
           "!**/*.log",
           "!.env*",
           "!scripts/qa-*.js",
-          "!scripts/seed-*.js"
+          "!scripts/seed-demo-*.js",
+          "!scripts/seed-enterprise-*.js",
+          "!scripts/seed-free-*.js",
+          "!scripts/seed-starter-*.js",
+          "!scripts/seed-professional-*.js",
+          "!scripts/seed-utilities-*.js",
+          "!scripts/seed-cmdb-*.js",
+          "!scripts/seed-showcase-*.js",
+          "!scripts/seed-hf-*.js",
+          "!scripts/seed-cyber-*.js"
         ]
       },
       {
@@ -93,9 +103,15 @@
       ],
       "icon": "build/icon.png",
       "category": "Office"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "sherifconteh-collab",
+      "repo": "ai-grc-platform"
     }
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "embedded-postgres": "17.9.0-beta.16"
   },
   "devDependencies": {

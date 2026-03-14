@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "start:prod": "NODE_ENV=production node src/server.js",
     "dev": "nodemon src/server.js",
+    "seed": "node scripts/seed-frameworks.js",
     "mcp": "node scripts/mcp-server-secure.js",
     "mcp:secure": "node scripts/mcp-server-secure.js",
     "mcp:login": "node scripts/mcp-auth-login.js",
@@ -76,6 +77,7 @@
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.2.2",
     "geoip-lite": "^1.4.10",
     "hono": "^4.12.7",
     "ioredis": "^5.4.1",
@@ -101,9 +103,10 @@
     "nodemon": "^3.0.1"
   },
   "overrides": {
-    "express-rate-limit": "8.2.2",
+    "express-rate-limit": "$express-rate-limit",
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
-    "hono": "^4.12.7"
+    "hono": "^4.12.7",
+    "yauzl": ">=3.2.1"
   }
 }

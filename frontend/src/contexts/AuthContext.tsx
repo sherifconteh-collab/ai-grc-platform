@@ -12,6 +12,10 @@ interface User {
   organizationId: string;
   roles: string[];
   permissions: string[];
+  onboardingCompleted?: boolean;
+  isPlatformAdmin?: boolean;
+  organizationTier?: string;
+  effectiveTier?: string;
 }
 
 interface AuthContextType {
@@ -20,6 +24,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName: string, organizationName: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -54,7 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userData.role,
         organizationId: userData.organization.id,
         roles: userData.roles || [],
-        permissions: userData.permissions || []
+        permissions: userData.permissions || [],
+        onboardingCompleted: Boolean(userData.onboarding_completed),
+        isPlatformAdmin: Boolean(userData.is_platform_admin),
+        organizationTier: userData.organization_tier || userData.organization?.tier || undefined,
+        effectiveTier: userData.effective_tier || userData.organization_tier || userData.organization?.tier || undefined,
       });
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -137,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        refreshUser: checkAuth,
         isAuthenticated: !!user,
       }}
     >
