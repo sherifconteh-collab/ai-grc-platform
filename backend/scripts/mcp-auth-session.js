@@ -22,11 +22,23 @@ const DEFAULT_SESSION_DIR = path.join(os.homedir(), '.controlweave');
 const DEFAULT_SESSION_FILE = path.join(DEFAULT_SESSION_DIR, 'mcp-session.json');
 
 /**
+ * Expand a leading `~` or `~/` to the current user's home directory.
+ */
+function expandTilde(p) {
+  if (typeof p === 'string' && p.startsWith('~')) {
+    return path.join(os.homedir(), p.slice(1));
+  }
+  return p;
+}
+
+/**
  * Return the absolute path to the session file.
  * Honors the MCP_SESSION_FILE env var if provided.
+ * A leading `~` is expanded to the user's home directory.
  */
 function getSessionFilePath(env) {
-  return (env && env.MCP_SESSION_FILE) || DEFAULT_SESSION_FILE;
+  const raw = (env && env.MCP_SESSION_FILE) || DEFAULT_SESSION_FILE;
+  return expandTilde(raw);
 }
 
 // ── URL helpers ────────────────────────────────────────────────────────────────
@@ -93,6 +105,7 @@ function readSession(filePath) {
 /**
  * Write a session object to disk.  Creates the parent directory with mode 0700
  * and writes the file with mode 0600 so only the current user can access it.
+ * Explicitly sets permissions after writing to handle pre-existing files.
  */
 function writeSession(filePath, data) {
   const dir = path.dirname(filePath);
@@ -101,6 +114,8 @@ function writeSession(filePath, data) {
     encoding: 'utf8',
     mode: 0o600
   });
+  // Ensure permissions even if the file already existed with looser perms
+  fs.chmodSync(filePath, 0o600);
 }
 
 /**

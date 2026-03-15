@@ -20,7 +20,7 @@ This guide covers **self-hosted** deployments.
 
 | Requirement | Notes |
 |-------------|-------|
-| Node.js ≥ 18 | Required for native `fetch()` API |
+| Node.js ≥ 20 | Required for native `fetch()` API |
 | Running ControlWeave backend | Default: `http://localhost:3001` |
 | A registered user account | Any role — permissions are enforced per-tool |
 
@@ -179,7 +179,7 @@ Add these to `backend/.env` (or export in your shell / AI client config):
 |----------|-------------|---------|
 | `GRC_API_BASE_URL` | Backend API endpoint | `http://localhost:3001/api/v1` |
 | `GRC_HEALTH_URL` | Health check endpoint (auto-derived if omitted) | — |
-| `MCP_SESSION_FILE` | Override session file path | `~/.controlweave/mcp-session.json` |
+| `MCP_SESSION_FILE` | Override session file path (`~` is expanded) | `~/.controlweave/mcp-session.json` |
 | `MCP_RATE_LIMIT` | Max requests per minute per tool | `30` |
 | `MCP_REQUEST_TIMEOUT_MS` | Request timeout in milliseconds | `30000` |
 | `MCP_MAX_INPUT_LENGTH` | Max characters for text inputs | `10000` |
@@ -192,24 +192,24 @@ Add these to `backend/.env` (or export in your shell / AI client config):
 
 ## Available Tools
 
-The MCP server exposes 50+ tools organized by category:
+The Community Edition MCP server includes the following tools:
 
-| Category | Examples | Tier |
-|----------|----------|------|
-| **System** | Health check, auth verification | Community |
-| **Compliance** | Frameworks, controls, crosswalks, assessments | Community |
-| **POA&M** | Plan of Action & Milestones management | Community |
-| **Reports** | Compliance reports (PDF, Excel, JSON) | Community |
-| **Exceptions** | Risk acceptances, compensating controls | Community |
-| **Audit** | Logging, AI decision tracking | Community |
-| **Evidence** | File management, control linking | Community |
-| **Assets / CMDB** | Inventory management | Pro |
-| **TPRM** | Third-party risk management | Enterprise |
-| **AI Governance** | Vendor assessment, supply chain | Enterprise |
-| **Threat Intel** | CVE / indicator management | Enterprise |
+| Category | Tools | Tier |
+|----------|-------|------|
+| **System** | `grc_health`, `grc_whoami` | Community |
+| **Compliance** | `grc_list_frameworks`, `grc_get_dashboard_stats`, `grc_list_controls`, `grc_update_control_implementation`, `grc_list_assessment_procedures` | Community |
+| **Notifications** | `grc_list_notifications` | Community |
+| **AI** | `grc_ai_query` | Community |
+| **Evidence** | `grc_list_evidence`, `grc_get_evidence`, `grc_link_evidence`, `grc_unlink_evidence`, `grc_update_evidence` | Community |
+| **Assets / CMDB** | `grc_list_assets`, `grc_get_asset_categories`, `grc_get_asset`, `grc_create_asset`, `grc_update_asset`, `grc_delete_asset`, `grc_get_asset_stats` | Community |
 
 Tools that require a higher tier will return a clear error message when invoked
 on an insufficient plan.
+
+> **Want more?** Licensed editions (Pro, Enterprise, Gov Cloud) unlock
+> additional MCP tools for TPRM, AI Governance, Threat Intel, advanced
+> reporting, and more. Visit [controlweave.com](https://controlweave.com) for
+> licensing details.
 
 ---
 
