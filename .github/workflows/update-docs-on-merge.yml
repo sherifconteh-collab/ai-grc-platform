@@ -93,20 +93,14 @@ jobs:
               content = f.read()
 
           # ── Idempotency guard ──────────────────────────────────────────────
-          # If this PR number already appears in the [Unreleased] block
-          # (e.g. workflow was manually re-run), skip to prevent duplicates.
+          # If this PR number already appears anywhere in the file
+          # (e.g. workflow re-run, or PR already listed in a released version),
+          # skip to prevent duplicates.
+          if f"(#{pr_number})" in content or f"[#{pr_number}]" in content:
+              print(f"PR #{pr_number} already present in RELEASE_NOTES.md — skipping insertion.")
+              exit(0)
+
           unreleased_header = "## [Unreleased]"
-          if unreleased_header in content:
-              unreleased_pos = content.index(unreleased_header)
-              next_match = re.search(r"\n## \[", content[unreleased_pos + len(unreleased_header):])
-              unreleased_end = (
-                  unreleased_pos + len(unreleased_header) + next_match.start()
-                  if next_match else len(content)
-              )
-              unreleased_block = content[unreleased_pos:unreleased_end]
-              if f"(#{pr_number})" in unreleased_block or f"[#{pr_number}]" in unreleased_block:
-                  print(f"PR #{pr_number} already present in [Unreleased] — skipping insertion.")
-                  exit(0)
 
           if unreleased_header not in content:
               # No [Unreleased] block at all — prepend one after the file preamble (first ---)
