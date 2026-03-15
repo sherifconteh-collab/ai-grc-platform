@@ -1,10 +1,13 @@
 name: Build & Release Desktop App
 
-# Trigger when a version tag is pushed, a GitHub Release is created, or manually.
+# Trigger when a version tag is pushed, a GitHub Release is created,
+# a PR is merged to main, or manually.
 on:
   push:
     tags:
       - 'v*'           # e.g. v2.1.0, v2.2.0-beta.1
+    branches:
+      - main           # auto-release when a PR is merged
   release:
     types: [created]
   workflow_dispatch:
@@ -25,11 +28,53 @@ permissions:
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
+  # Gate: decide whether a release is needed (push-to-main only)
+  # ────────────────────────────────────────────────────────────────────────────
+  check-release:
+    name: Check if release needed
+    runs-on: ubuntu-latest
+    # Only run the gate on push-to-main; for tags / releases / dispatch the
+    # build jobs should always execute.
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compare package version to existing tags
+        id: check
+        run: |
+          VERSION=$(node -p "require('./electron/package.json').version")
+          TAG="v${VERSION}"
+          echo "Detected version: ${VERSION} → tag: ${TAG}"
+
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+            echo "Tag ${TAG} already exists — skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag ${TAG} does not exist — will create release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+
+  # ────────────────────────────────────────────────────────────────────────────
   # Build Windows installer (.exe)
   # ────────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Windows Installer (.exe)
     runs-on: windows-latest
+    needs: [check-release]
+    # Run when: (a) check-release said yes, (b) check-release was skipped
+    # because the trigger wasn't push-to-main (tag / release / dispatch).
+    if: |
+      always() && (
+        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
+        needs.check-release.result == 'skipped'
+      )
 
     permissions:
       contents: write   # needed to upload release assets
@@ -83,11 +128,15 @@ jobs:
 
       # ── Publish ──────────────────────────────────────────────────────────────
       - name: Upload installer to GitHub Release
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.version || github.ref_name }}
-          name: ${{ github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
+          name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
           draft: false
           prerelease: false
           files: |
@@ -112,6 +161,12 @@ jobs:
   build-macos:
     name: macOS Installer (.dmg)
     runs-on: macos-latest
+    needs: [check-release]
+    if: |
+      always() && (
+        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
+        needs.check-release.result == 'skipped'
+      )
 
     permissions:
       contents: write
@@ -157,11 +212,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload DMG to GitHub Release
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.version || github.ref_name }}
-          name: ${{ github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
+          name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
           draft: false
           prerelease: false
           files: |
@@ -186,6 +245,12 @@ jobs:
   build-linux:
     name: Linux AppImage
     runs-on: ubuntu-latest
+    needs: [check-release]
+    if: |
+      always() && (
+        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
+        needs.check-release.result == 'skipped'
+      )
 
     permissions:
       contents: write
@@ -231,11 +296,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload AppImage to GitHub Release
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.version || github.ref_name }}
-          name: ${{ github.event.inputs.version || github.ref_name }}
+          tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
+          name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
           draft: false
           prerelease: false
           files: |

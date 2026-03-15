@@ -12,12 +12,16 @@
 ---
 
 <a id="desktop-app"></a>
-### 📥 Desktop App
+### 📥 Download the Desktop App
 
-Everything is bundled — PostgreSQL included. No setup required. Just build, install, and run.
+Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 
-> **Pre-built installers** will be published on the [Releases](https://github.com/sherifconteh-collab/ai-grc-platform/releases) page once the first release is tagged.
-> In the meantime you can build the desktop app from source:
+> [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
+
+After installing, launch ControlWeave — the app opens automatically and walks you through creating your first account. Updates are delivered automatically so you always stay on the latest version. Releases are published automatically whenever a version bump is merged to `main`.
+
+<details>
+<summary>Build from source</summary>
 
 ```bash
 # 1. Install dependencies
@@ -35,7 +39,8 @@ npm run dist:mac      # → .dmg   (macOS)
 npm run dist:linux    # → .AppImage (Linux)
 ```
 
-The resulting installer is in `electron/dist/`. Launch ControlWeave and it walks you through creating your first account.
+The resulting installer is in `electron/dist/`.
+</details>
 
 <details>
 <summary>System requirements &amp; release notes</summary>
@@ -81,7 +86,7 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 
 ## 🚀 Quick Start (Development)
 
-> The steps below are for developers who want to run from source. To build the desktop app instead, see [Desktop App](#desktop-app).
+> The steps below are for developers who want to run from source. If you just want to use ControlWeave, [download the installer](#desktop-app) instead.
 
 ### Prerequisites
 
