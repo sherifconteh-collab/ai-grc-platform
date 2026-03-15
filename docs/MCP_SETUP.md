@@ -10,11 +10,11 @@ The MCP server communicates over **stdio** and delegates every request to the
 ControlWeave backend API using JWT authentication — the same tokens your
 browser session uses.
 
-This guide covers both **self-hosted** and **Railway-hosted** deployments.
+This guide covers **self-hosted** deployments.
 
 ---
 
-## Quick Start (Self-Hosted)
+## Quick Start
 
 ### Prerequisites
 
@@ -102,26 +102,6 @@ read it.  Tokens are standard JWTs signed by the backend — access tokens
 expire in 15 minutes (configurable via `JWT_ACCESS_EXPIRY`) and are silently
 refreshed before expiry.
 
-### Self-Hosted vs Railway
-
-| Aspect | Self-Hosted | Railway-Hosted |
-|--------|-------------|----------------|
-| Backend URL | `http://localhost:3001/api/v1` | `https://<app>.up.railway.app/api/v1` |
-| Auth method | `npm run mcp:login` (same) | `npm run mcp:login` (same) |
-| Session storage | `~/.controlweave/mcp-session.json` | Same (on the machine running the MCP client) |
-| AI client location | Runs locally alongside the backend | Runs locally; connects to Railway backend over HTTPS |
-| Billing / Stripe | Not required | Required for paid tiers |
-
-For Railway users, set the backend URL before logging in:
-
-```bash
-# In backend/.env (or export in your shell)
-GRC_API_BASE_URL=https://your-app.up.railway.app/api/v1
-```
-
-Then run `npm run mcp:login` as normal — the session will record the API base
-URL and the MCP server will use it for all requests.
-
 ---
 
 ## Client Configuration
@@ -150,8 +130,6 @@ Add the following to your Claude Desktop configuration file:
 
 > Replace `/absolute/path/to/backend` with the actual path to the cloned
 > repository's `backend` directory.
->
-> For Railway-hosted backends, change `GRC_API_BASE_URL` to your Railway URL.
 
 ### Cursor
 
@@ -245,7 +223,6 @@ Run `npm run mcp:login` from the `backend` directory to authenticate.
 
 1. Ensure the backend is running (`npm run dev` or `npm start` in `backend/`).
 2. Verify `GRC_API_BASE_URL` matches the running backend.
-3. For Railway, confirm the app is deployed and the URL is correct.
 
 ### "Token refresh failed"
 
