@@ -11,6 +11,7 @@
 
 ---
 
+<a id="desktop-app"></a>
 ### 📥 Desktop App
 
 Everything is bundled — PostgreSQL included. No setup required. Just build, install, and run.
@@ -80,7 +81,7 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 
 ## 🚀 Quick Start (Development)
 
-> The steps below are for developers who want to run from source. To build the desktop app instead, see [Desktop App](#-desktop-app).
+> The steps below are for developers who want to run from source. To build the desktop app instead, see [Desktop App](#desktop-app).
 
 ### Prerequisites
 
