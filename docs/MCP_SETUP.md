@@ -20,7 +20,7 @@ This guide covers both **self-hosted** and **Railway-hosted** deployments.
 
 | Requirement | Notes |
 |-------------|-------|
-| Node.js ≥ 18 | Required for `fetch` and `base64url` support |
+| Node.js ≥ 18 | Required for native `fetch()` API |
 | Running ControlWeave backend | Default: `http://localhost:3001` |
 | A registered user account | Any role — permissions are enforced per-tool |
 
