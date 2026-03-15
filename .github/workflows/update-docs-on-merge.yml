@@ -325,23 +325,28 @@ jobs:
           corrections = []
 
           # ── 1. Count frameworks from seed data and migrations ──────────────
-          framework_inserts = 0
-          # Count from SQL seed/migration files
-          for pattern in ["db/seeds/*.sql", "backend/migrations/*.sql"]:
-              for path in glob.glob(pattern):
-                  with open(path) as f:
-                      framework_inserts += len(re.findall(
-                          r"INSERT INTO frameworks\s*\(",
-                          f.read(), re.IGNORECASE
-                      ))
-          # Count from JavaScript seed files (code: 'xxx' entries)
+          # JS seed files are the primary/authoritative source for frameworks.
+          # SQL seeds are a secondary source (some older frameworks were added via SQL).
           js_fw_count = 0
           for path in glob.glob("backend/scripts/seed-frameworks*.js"):
               with open(path) as f:
                   js_fw_count += len(re.findall(r"code:\s*'", f.read()))
-          # Use the higher count (JS seeds are the primary source)
-          framework_inserts = max(framework_inserts, js_fw_count)
-          # Round down to nearest 5 for a conservative "X+" claim
+
+          sql_fw_count = 0
+          for pattern in ["db/seeds/*.sql", "backend/migrations/*.sql"]:
+              for path in glob.glob(pattern):
+                  with open(path) as f:
+                      sql_fw_count += len(re.findall(
+                          r"INSERT INTO frameworks\s*\(",
+                          f.read(), re.IGNORECASE
+                      ))
+
+          # Prefer JS count (primary); fall back to SQL count if no JS seeds exist
+          framework_inserts = js_fw_count if js_fw_count > 0 else sql_fw_count
+
+          # Round down to nearest 5 for a conservative "X+" claim.
+          # For very small counts (< 10) use the exact number to avoid
+          # misleading claims like "5+ frameworks" when there are only 7.
           fw_bucket = (framework_inserts // 5) * 5
           if fw_bucket < 10:
               fw_bucket = framework_inserts
@@ -361,7 +366,8 @@ jobs:
 
           # ── 2. Count route modules ─────────────────────────────────────────
           route_files = glob.glob("backend/src/routes/*.js")
-          # Exclude internal helpers like _stubs.js
+          # Files prefixed with _ (e.g. _stubs.js) are internal helpers, not
+          # standalone API route modules, so exclude them from the count.
           route_count = len([f for f in route_files
                             if not os.path.basename(f).startswith("_")])
           route_bucket = (route_count // 10) * 10
@@ -389,8 +395,10 @@ jobs:
           for pattern in ["db/schema.sql", "backend/migrations/*.sql"]:
               for path in glob.glob(pattern):
                   with open(path) as f:
+                      # Handles: CREATE TABLE t, CREATE TABLE IF NOT EXISTS t,
+                      # CREATE TABLE public.t, CREATE TABLE "t"
                       for m in re.finditer(
-                          r"CREATE TABLE (?:IF NOT EXISTS\s+)?(\w+)",
+                          r'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:\w+\.)?\"?(\w+)\"?',
                           f.read(), re.IGNORECASE
                       ):
                           table_names.add(m.group(1).lower())
