@@ -106,7 +106,11 @@ Respond in JSON format:
 
 Focus on the first 20 controls. Be concise.`;
     
-    const response = await llmChat(orgId, null, null, prompt, [{ role: 'user', content: prompt }]);
+    const response = await llmChat({
+      organizationId: orgId,
+      systemPrompt: 'You are a compliance analyst. Respond only in valid JSON.',
+      messages: [{ role: 'user', content: prompt }],
+    });
     const text = typeof response === 'string' ? response : (response?.text || response?.content || JSON.stringify(response));
     
     // Try to parse JSON response

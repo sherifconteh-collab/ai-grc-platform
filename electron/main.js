@@ -285,7 +285,6 @@ function startServer(label, dirPath, scriptRelPath, port, extraEnv = {}) {
 function startBackend(backendDir, databaseUrl) {
   // Generate a random password for the default platform admin to avoid
   // shipping a known credential that is reachable on the network.
-  const crypto = require('crypto');
   const generatedPassword = `CW-${crypto.randomBytes(12).toString('base64url')}!1`;
 
   const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {

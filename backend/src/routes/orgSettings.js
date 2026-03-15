@@ -147,6 +147,7 @@ router.delete('/llm/:provider', async (req, res) => {
         groq: 'groq_api_key_enc',
       };
       const col = colMap[provider];
+      if (!col) return res.status(400).json({ success: false, error: 'Invalid provider' });
       await pool.query(
         `UPDATE llm_configurations SET ${col} = NULL, updated_at = NOW() WHERE organization_id = $1`,
         [orgId]
