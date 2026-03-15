@@ -120,7 +120,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 - Production build failure — `useSearchParams()` missing Suspense boundary in `register/page.tsx`
 - Demo login credentials — passwords updated to comply with 12-char minimum policy
 - Authentication middleware — resilient to missing `feature_overrides` column, non-fatal trial check failures
-- Railway deployment — correct builders, `startCommand`, PORT configuration, standalone runtime compatibility
+- Deployment configuration — correct builders, `startCommand`, PORT configuration, standalone runtime compatibility
 - Docker frontend build — bake correct `NEXT_PUBLIC_API_URL` via `.env.production`
 - Pagination offset bug returning duplicate records on page 2+
 - Pro tier incorrectly showing unlimited frameworks

@@ -506,7 +506,7 @@ controlweave/
 - **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **API**: REST with OpenAPI specification
 - **MCP**: Model Context Protocol server
-- **Deployment**: Docker, Railway, Render, or self-hosted
+- **Deployment**: Docker or self-hosted
 
 ## 📖 Documentation
 

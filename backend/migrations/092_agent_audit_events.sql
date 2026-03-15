@@ -36,7 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_audit_events_date_outcome
     ON agent_audit_events(date_trunc('day', created_at), outcome);
 
 -- Comments for documentation
-COMMENT ON TABLE agent_audit_events IS 'AU-2 compliant audit log for OpenClaw orchestrator agent activities. Platform-level events (not org-scoped). Written by the Railway orchestrator when DATABASE_URL is configured.';
+COMMENT ON TABLE agent_audit_events IS 'AU-2 compliant audit log for OpenClaw orchestrator agent activities. Platform-level events (not org-scoped). Written by the orchestrator when DATABASE_URL is configured.';
 COMMENT ON COLUMN agent_audit_events.event_type IS 'Event type: agent.task.started, agent.task.completed, agent.task.failed, system.*';
 COMMENT ON COLUMN agent_audit_events.agent_name IS 'Human-readable agent name (e.g., ControlWeave Security Engineer)';
 COMMENT ON COLUMN agent_audit_events.agent_file IS 'Path to agent persona file within .openclaw/agents/';

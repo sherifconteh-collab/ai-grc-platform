@@ -40,7 +40,7 @@ Paste logs here
 | Node.js version | e.g. 20.11.0 |
 | PostgreSQL version | e.g. 15.2 |
 | Browser (if UI bug) | e.g. Chrome 122 |
-| Deploy method | e.g. Local / Railway / Docker |
+| Deploy method | e.g. Local / Docker / Self-hosted |
 
 ## Additional Context
 

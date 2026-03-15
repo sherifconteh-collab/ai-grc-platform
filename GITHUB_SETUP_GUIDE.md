@@ -520,7 +520,7 @@ psql ai_grc_platform -c "SELECT COUNT(*) FROM control_mappings;"
 
 ## Deployment
 
-See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for Railway, Render, or AWS deployment instructions.
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker or self-hosted deployment instructions.
 
 ## Support
 
