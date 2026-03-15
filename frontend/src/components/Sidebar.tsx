@@ -72,6 +72,7 @@ const navigationSections: NavigationSection[] = [
       { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
       { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'], minTier: 'enterprise' },
       { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', requiredPermissionsAny: ['settings.manage', 'roles.manage'] },
+      { name: 'LLM Configuration', href: '/dashboard/settings/llm', icon: '🧠', requiredPermissions: ['settings.manage'] },
       { name: 'License', href: '/dashboard/license', icon: '🔑', requiredPermissions: ['settings.manage'], isVisible: (u) => u?.role === 'admin' },
       { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔', requiredPermissions: ['dashboard.read'] },
       { name: 'Help Center', href: '/dashboard/help', icon: '❓', requiredPermissions: ['dashboard.read'] },
@@ -204,17 +205,6 @@ export default function Sidebar() {
             >
               <span className="mr-3 text-lg">🏢</span>
               All Organizations
-            </Link>
-            <Link
-              href="/dashboard/platform/llm-status"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform/llm-status'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🔌</span>
-              LLM Status
             </Link>
           </>
         )}

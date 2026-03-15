@@ -494,7 +494,7 @@ Feature-by-feature comparison across all ControlWeave tiers.
 
 ## Community Tier (Free / AGPL)
 - Up to 2 compliance frameworks
-- 10 AI requests per month
+- Unlimited AI requests (BYOK — bring your own API key)
 - Core dashboard, controls, and assessments
 - AI Copilot with basic context
 - Community support

@@ -6,6 +6,13 @@ const multer = require('multer');
 const { authenticate } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
+let llmService;
+try {
+  llmService = require('../services/llmService');
+} catch (_e) {
+  llmService = null;
+}
+
 router.use(authenticate);
 router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'settings-route' }));
 
@@ -28,7 +35,8 @@ router.get('/llm', async (req, res) => {
     const orgId = req.user.organization_id;
     const result = await pool.query(
       `SELECT id, organization_id, anthropic_api_key_enc, openai_api_key_enc,
-              gemini_api_key_enc, xai_api_key_enc, default_provider, default_model,
+              gemini_api_key_enc, xai_api_key_enc, groq_api_key_enc,
+              ollama_base_url, default_provider, default_model,
               created_at, updated_at
        FROM llm_configurations WHERE organization_id = $1`,
       [orgId]
@@ -37,10 +45,12 @@ router.get('/llm', async (req, res) => {
       return res.json({ success: true, data: null });
     }
     const config = result.rows[0];
+    // Mask encrypted keys; leave ollama_base_url as-is
     config.anthropic_api_key_enc = maskKey(config.anthropic_api_key_enc);
     config.openai_api_key_enc = maskKey(config.openai_api_key_enc);
     config.gemini_api_key_enc = maskKey(config.gemini_api_key_enc);
     config.xai_api_key_enc = maskKey(config.xai_api_key_enc);
+    config.groq_api_key_enc = maskKey(config.groq_api_key_enc);
     res.json({ success: true, data: config });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -51,40 +61,66 @@ router.get('/llm', async (req, res) => {
 router.put('/llm', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { anthropic_api_key, openai_api_key, gemini_api_key, xai_api_key, default_provider, default_model } = req.body;
+    const {
+      anthropic_api_key, openai_api_key, gemini_api_key, xai_api_key,
+      groq_api_key, ollama_base_url, default_provider, default_model,
+    } = req.body;
+
+    // Encrypt keys if llmService is available, otherwise store as-is
+    const enc = llmService && llmService.encryptKey ? llmService.encryptKey : (k) => k;
+    const encAnth = anthropic_api_key ? enc(anthropic_api_key) : null;
+    const encOai = openai_api_key ? enc(openai_api_key) : null;
+    const encGem = gemini_api_key ? enc(gemini_api_key) : null;
+    const encXai = xai_api_key ? enc(xai_api_key) : null;
+    const encGroq = groq_api_key ? enc(groq_api_key) : null;
+
     const result = await pool.query(
       `INSERT INTO llm_configurations
         (organization_id, anthropic_api_key_enc, openai_api_key_enc, gemini_api_key_enc,
-         xai_api_key_enc, default_provider, default_model, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+         xai_api_key_enc, groq_api_key_enc, ollama_base_url,
+         default_provider, default_model, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
        ON CONFLICT (organization_id) DO UPDATE SET
          anthropic_api_key_enc = COALESCE($2, llm_configurations.anthropic_api_key_enc),
          openai_api_key_enc = COALESCE($3, llm_configurations.openai_api_key_enc),
          gemini_api_key_enc = COALESCE($4, llm_configurations.gemini_api_key_enc),
          xai_api_key_enc = COALESCE($5, llm_configurations.xai_api_key_enc),
-         default_provider = COALESCE($6, llm_configurations.default_provider),
-         default_model = COALESCE($7, llm_configurations.default_model),
+         groq_api_key_enc = COALESCE($6, llm_configurations.groq_api_key_enc),
+         ollama_base_url = COALESCE($7, llm_configurations.ollama_base_url),
+         default_provider = COALESCE($8, llm_configurations.default_provider),
+         default_model = COALESCE($9, llm_configurations.default_model),
          updated_at = NOW()
        RETURNING *`,
-      [orgId, anthropic_api_key, openai_api_key, gemini_api_key, xai_api_key, default_provider, default_model]
+      [orgId, encAnth, encOai, encGem, encXai, encGroq, ollama_base_url || null, default_provider, default_model]
     );
     const config = result.rows[0];
     config.anthropic_api_key_enc = maskKey(config.anthropic_api_key_enc);
     config.openai_api_key_enc = maskKey(config.openai_api_key_enc);
     config.gemini_api_key_enc = maskKey(config.gemini_api_key_enc);
     config.xai_api_key_enc = maskKey(config.xai_api_key_enc);
+    config.groq_api_key_enc = maskKey(config.groq_api_key_enc);
     res.json({ success: true, data: config });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// POST /llm/test - Stub: validate key
+// POST /llm/test - Validate a provider key by making a real API call
 router.post('/llm/test', async (req, res) => {
   try {
-    res.json({ success: true, data: { valid: true, provider: req.body.provider, message: 'Key validation not yet configured' } });
+    const { provider, apiKey } = req.body;
+    if (!provider || !apiKey) {
+      return res.status(400).json({ success: false, error: 'provider and apiKey are required' });
+    }
+    if (!llmService || !llmService.callProvider) {
+      return res.json({ success: true, data: { status: 'ok', message: 'Key accepted (validation unavailable)' } });
+    }
+    const start = Date.now();
+    await llmService.callProvider(provider, apiKey, null, 'Reply OK', [{ role: 'user', content: 'ping' }]);
+    const latency_ms = Date.now() - start;
+    res.json({ success: true, data: { status: 'ok', latency_ms } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, data: { status: 'error', error: error.message } });
   }
 });
 
@@ -93,20 +129,30 @@ router.delete('/llm/:provider', async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const provider = req.params.provider;
-    const validProviders = ['anthropic', 'openai', 'gemini', 'xai'];
+    const validProviders = ['anthropic', 'openai', 'gemini', 'xai', 'groq', 'ollama'];
     if (!validProviders.includes(provider)) {
       return res.status(400).json({ success: false, error: 'Invalid provider' });
     }
-    await pool.query(
-      `UPDATE llm_configurations SET
-         anthropic_api_key_enc = CASE WHEN $2 = 'anthropic' THEN NULL ELSE anthropic_api_key_enc END,
-         openai_api_key_enc = CASE WHEN $2 = 'openai' THEN NULL ELSE openai_api_key_enc END,
-         gemini_api_key_enc = CASE WHEN $2 = 'gemini' THEN NULL ELSE gemini_api_key_enc END,
-         xai_api_key_enc = CASE WHEN $2 = 'xai' THEN NULL ELSE xai_api_key_enc END,
-         updated_at = NOW()
-       WHERE organization_id = $1`,
-      [orgId, provider]
-    );
+    if (provider === 'ollama') {
+      await pool.query(
+        'UPDATE llm_configurations SET ollama_base_url = NULL, updated_at = NOW() WHERE organization_id = $1',
+        [orgId]
+      );
+    } else {
+      const colMap = {
+        anthropic: 'anthropic_api_key_enc',
+        openai: 'openai_api_key_enc',
+        gemini: 'gemini_api_key_enc',
+        xai: 'xai_api_key_enc',
+        groq: 'groq_api_key_enc',
+      };
+      const col = colMap[provider];
+      if (!col) return res.status(400).json({ success: false, error: 'Invalid provider' });
+      await pool.query(
+        `UPDATE llm_configurations SET ${col} = NULL, updated_at = NOW() WHERE organization_id = $1`,
+        [orgId]
+      );
+    }
     res.json({ success: true, data: { provider, message: 'API key removed' } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

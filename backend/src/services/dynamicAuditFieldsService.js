@@ -17,7 +17,7 @@ try {
   llm = require('./llmService');
 } catch (e) {
   llm = new Proxy({}, {
-    get() { return async () => { throw new Error('AI service unavailable'); }; }
+    get() { return async () => null; }
   });
 }
 

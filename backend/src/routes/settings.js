@@ -12,6 +12,8 @@ router.use(authenticate);
 
 const LLM_DOMAIN = 'llm_config';
 
+const LLM_TEST_TIMEOUT_MS = 15000; // intentionally shorter than provider defaults for quick UX feedback
+
 // GET /api/v1/settings/llm
 router.get('/llm', requirePermission('settings.manage'), async (req, res) => {
   try {
@@ -58,11 +60,44 @@ router.put('/llm', requirePermission('settings.manage'), async (req, res) => {
 // POST /api/v1/settings/llm/test
 router.post('/llm/test', requirePermission('settings.manage'), async (req, res) => {
   try {
-    const { provider, model, api_key, base_url } = req.body || {};
+    const { provider, model, api_key, apiKey, base_url } = req.body || {};
+    const key = api_key || apiKey; // accept both naming conventions
     if (!provider) {
       return res.status(400).json({ success: false, error: 'provider is required' });
     }
-    // Stub response — actual test would call the LLM endpoint
+    // Attempt a real validation call to the LLM provider
+    let llm;
+    try { llm = require('../services/llmService'); } catch (_e) { llm = null; }
+    if (llm && typeof llm.callProvider === 'function' && key) {
+      const testProvider = provider.toLowerCase();
+      const PROVIDER_MODELS = llm.PROVIDER_MODELS || {};
+      const effectiveModel = model || (PROVIDER_MODELS[testProvider] ? PROVIDER_MODELS[testProvider][0] : null);
+      const startMs = Date.now();
+      try {
+        const testMessages = [{ role: 'user', content: 'Respond with exactly: OK' }];
+        // Direct provider call with the supplied key (not from DB)
+        await Promise.race([
+          llm.callProvider(testProvider, key, effectiveModel, 'Respond with exactly one word: OK', testMessages),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), LLM_TEST_TIMEOUT_MS))
+        ]);
+        const latencyMs = Date.now() - startMs;
+        return res.json({ success: true, data: { status: 'ok', provider, model: effectiveModel, latency_ms: latencyMs } });
+      } catch (testErr) {
+        const latencyMs = Date.now() - startMs;
+        const msg = testErr.message || 'Unknown error';
+        return res.json({
+          success: false,
+          data: {
+            status: msg.includes('timeout') ? 'timeout' : 'error',
+            provider,
+            model: effectiveModel || 'default',
+            latency_ms: latencyMs,
+            error: msg.slice(0, 200)
+          }
+        });
+      }
+    }
+    // Fallback stub when no service or key
     res.json({ success: true, data: { status: 'ok', provider, model: model || 'default', latency_ms: 0 } });
   } catch (err) {
     console.error('LLM test error:', err);
