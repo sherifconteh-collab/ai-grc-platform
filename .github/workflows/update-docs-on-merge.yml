@@ -93,20 +93,14 @@ jobs:
               content = f.read()
 
           # ── Idempotency guard ──────────────────────────────────────────────
-          # If this PR number already appears in the [Unreleased] block
-          # (e.g. workflow was manually re-run), skip to prevent duplicates.
+          # If this PR number already appears anywhere in the file
+          # (e.g. workflow re-run, or PR already listed in a released version),
+          # skip to prevent duplicates.
+          if f"(#{pr_number})" in content or f"[#{pr_number}]" in content:
+              print(f"PR #{pr_number} already present in RELEASE_NOTES.md — skipping insertion.")
+              exit(0)
+
           unreleased_header = "## [Unreleased]"
-          if unreleased_header in content:
-              unreleased_pos = content.index(unreleased_header)
-              next_match = re.search(r"\n## \[", content[unreleased_pos + len(unreleased_header):])
-              unreleased_end = (
-                  unreleased_pos + len(unreleased_header) + next_match.start()
-                  if next_match else len(content)
-              )
-              unreleased_block = content[unreleased_pos:unreleased_end]
-              if f"(#{pr_number})" in unreleased_block or f"[#{pr_number}]" in unreleased_block:
-                  print(f"PR #{pr_number} already present in [Unreleased] — skipping insertion.")
-                  exit(0)
 
           if unreleased_header not in content:
               # No [Unreleased] block at all — prepend one after the file preamble (first ---)
@@ -170,6 +164,42 @@ jobs:
               f.write(content)
 
           print(f"README.md last-updated marker refreshed → {date_str}")
+          PYEOF
+
+      - name: Sync README version badge from RELEASE_NOTES.md
+        if: steps.pr.outputs.skip != 'true'
+        run: |
+          python3 - <<'PYEOF'
+          import re
+
+          # ── Read the latest released version from RELEASE_NOTES.md ──────────
+          with open("RELEASE_NOTES.md", "r") as f:
+              release_notes = f.read()
+
+          # Match the first versioned header (skip [Unreleased])
+          match = re.search(r"^## \[(\d+\.\d+\.\d+)\]", release_notes, re.MULTILINE)
+          if not match:
+              print("No versioned release found in RELEASE_NOTES.md — skipping badge sync.")
+              exit(0)
+
+          latest_version = match.group(1)
+
+          # ── Update the shields.io badge in README.md ────────────────────────
+          with open("README.md", "r") as f:
+              readme = f.read()
+
+          badge_pattern = r"(!\[Version\]\(https://img\.shields\.io/badge/version-v)\d+\.\d+\.\d+(-green\.svg\))"
+          new_badge = rf"\g<1>{latest_version}\2"
+          updated, count = re.subn(badge_pattern, new_badge, readme)
+
+          if count == 0:
+              print(f"Version badge not found in README.md — skipping.")
+          elif updated == readme:
+              print(f"Badge already shows v{latest_version} — no change needed.")
+          else:
+              with open("README.md", "w") as f:
+                  f.write(updated)
+              print(f"README.md version badge updated → v{latest_version}")
           PYEOF
 
       - name: Scan codebase for undocumented features
@@ -280,6 +310,169 @@ jobs:
 
           total = len(undocumented_routes) + len(undocumented_pages) + len(undocumented_migrations)
           print(f"Documentation gap scan complete — {total} undocumented item(s) found.")
+          PYEOF
+
+      - name: Auto-verify and correct README stats
+        if: steps.pr.outputs.skip != 'true'
+        run: |
+          python3 - <<'PYEOF'
+          import os, re, glob, subprocess
+
+          readme_path = "README.md"
+          with open(readme_path, "r") as f:
+              readme = f.read()
+
+          corrections = []
+
+          # ── 1. Count frameworks from seed data and migrations ──────────────
+          # JS seed files are the primary/authoritative source for frameworks.
+          # SQL seeds are a secondary source (some older frameworks were added via SQL).
+          js_fw_count = 0
+          for path in glob.glob("backend/scripts/seed-frameworks*.js"):
+              with open(path) as f:
+                  js_fw_count += len(re.findall(r"code:\s*'", f.read()))
+
+          sql_fw_count = 0
+          for pattern in ["db/seeds/*.sql", "backend/migrations/*.sql"]:
+              for path in glob.glob(pattern):
+                  with open(path) as f:
+                      sql_fw_count += len(re.findall(
+                          r"INSERT INTO frameworks\s*\(",
+                          f.read(), re.IGNORECASE
+                      ))
+
+          # Prefer JS count (primary); fall back to SQL count if no JS seeds exist
+          framework_inserts = js_fw_count if js_fw_count > 0 else sql_fw_count
+
+          # Round down to nearest 5 for a conservative "X+" claim.
+          # For very small counts (< 10) use the exact number to avoid
+          # misleading claims like "5+ frameworks" when there are only 7.
+          fw_bucket = (framework_inserts // 5) * 5
+          if fw_bucket < 10:
+              fw_bucket = framework_inserts
+          fw_label = f"{fw_bucket}+"
+
+          # Update every "N+ framework" or "N+ major framework" occurrence
+          def replace_fw_count(m):
+              old = m.group(1)
+              if old != str(fw_bucket):
+                  corrections.append(f"frameworks: {old}+ → {fw_label}")
+              return m.group(0).replace(f"{old}+", fw_label)
+          readme = re.sub(
+              r"(\d+)\+(\s+(?:major )?frameworks?\b)",
+              replace_fw_count,
+              readme
+          )
+
+          # ── 2. Count route modules ─────────────────────────────────────────
+          route_files = glob.glob("backend/src/routes/*.js")
+          # Files prefixed with _ (e.g. _stubs.js) are internal helpers, not
+          # standalone API route modules, so exclude them from the count.
+          route_count = len([f for f in route_files
+                            if not os.path.basename(f).startswith("_")])
+          route_bucket = (route_count // 10) * 10
+          route_label = f"{route_bucket}+"
+          readme, n = re.subn(
+              r"(\*\*API Routes\*\*:\s*)\d+\+?\s*(route modules)",
+              rf"\g<1>{route_label} \2",
+              readme
+          )
+          if n:
+              corrections.append(f"API routes → {route_label}")
+
+          # ── 3. Count service modules ───────────────────────────────────────
+          service_count = len(glob.glob("backend/src/services/*.js"))
+          readme, n = re.subn(
+              r"(\*\*Services\*\*:\s*)\d+(\s*service modules)",
+              rf"\g<1>{service_count}\2",
+              readme
+          )
+          if n:
+              corrections.append(f"services → {service_count}")
+
+          # ── 4. Count database tables ───────────────────────────────────────
+          table_names = set()
+          for pattern in ["db/schema.sql", "backend/migrations/*.sql"]:
+              for path in glob.glob(pattern):
+                  with open(path) as f:
+                      # Handles: CREATE TABLE t, CREATE TABLE IF NOT EXISTS t,
+                      # CREATE TABLE public.t, CREATE TABLE "t"
+                      for m in re.finditer(
+                          r'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:\w+\.)?\"?(\w+)\"?',
+                          f.read(), re.IGNORECASE
+                      ):
+                          table_names.add(m.group(1).lower())
+          tbl_bucket = (len(table_names) // 10) * 10
+          tbl_label = f"{tbl_bucket}+"
+          readme, n = re.subn(
+              r"(\*\*Tables\*\*:\s*)\d+\+?\s*(database tables)",
+              rf"\g<1>{tbl_label} \2",
+              readme
+          )
+          if n:
+              corrections.append(f"tables → {tbl_label}")
+
+          # ── 5. Count MCP tools ─────────────────────────────────────────────
+          mcp_path = "backend/scripts/mcp-server-secure.js"
+          if os.path.exists(mcp_path):
+              with open(mcp_path) as f:
+                  mcp_tool_count = len(re.findall(r"server\.registerTool\(", f.read()))
+              readme, n = re.subn(
+                  r"(\*\*MCP Tools\*\*:\s*)\d+(\s*tools)",
+                  rf"\g<1>{mcp_tool_count}\2",
+                  readme
+              )
+              if n:
+                  corrections.append(f"MCP tools → {mcp_tool_count}")
+              # Also update the prose mention: "exposes N tools"
+              readme, n = re.subn(
+                  r"(exposes\s+)\d+(\s+tools)",
+                  rf"\g<1>{mcp_tool_count}\2",
+                  readme
+              )
+
+          # ── 6. Verify deployment options match reality ─────────────────────
+          has_docker = any(
+              os.path.exists(p) for p in [
+                  "Dockerfile", "docker-compose.yml", "docker-compose.yaml",
+                  ".dockerignore",
+              ]
+          )
+          if not has_docker:
+              readme, n = re.subn(
+                  r"Desktop \(Electron\),\s*Docker,\s*or self-hosted",
+                  "Desktop (Electron) or self-hosted",
+                  readme,
+              )
+              if n:
+                  corrections.append("removed false Docker deployment claim")
+
+          # ── 7. Write updated README if anything changed ────────────────────
+          if corrections:
+              with open(readme_path, "w") as f:
+                  f.write(readme)
+              print(f"README.md auto-corrected: {'; '.join(corrections)}")
+          else:
+              print("README.md stats are already accurate — no corrections needed.")
+
+          # ── 8. Append verification results to job summary ──────────────────
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
+          with open(summary_path, "a") as f:
+              f.write("\n## 📊 README Stats Verification\n\n")
+              f.write(f"| Metric | Actual | README |\n")
+              f.write(f"|--------|--------|--------|\n")
+              f.write(f"| Frameworks | {framework_inserts} | {fw_label} |\n")
+              f.write(f"| Route modules | {route_count} | {route_label} |\n")
+              f.write(f"| Service modules | {service_count} | {service_count} |\n")
+              f.write(f"| Database tables | {len(table_names)} | {tbl_label} |\n")
+              if os.path.exists(mcp_path):
+                  f.write(f"| MCP tools | {mcp_tool_count} | {mcp_tool_count} |\n")
+              f.write(f"| Docker files present | {'Yes' if has_docker else 'No'} | — |\n")
+              f.write("\n")
+              if corrections:
+                  f.write(f"**Auto-corrected:** {', '.join(corrections)}\n")
+              else:
+                  f.write("✅ All README stats are accurate.\n")
           PYEOF
 
       - name: Commit and push doc updates

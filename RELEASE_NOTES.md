@@ -13,11 +13,20 @@
 
 > Changes staged but not yet released to production.
 
+## [2.2.0] — 2026-03-15
+
+> **Released:** 2026-03-15
+
 ### Changed
+- Fix README inaccuracies and regenerate electron lock file to fix desktop app build ([#53](https://github.com/sherifconteh-collab/ai-grc-platform/pull/53)) — @Copilot
 - Add missing frontend components to fix desktop app build ([#52](https://github.com/sherifconteh-collab/ai-grc-platform/pull/52)) — @Copilot
 - ci: auto-release desktop installers on PR merge to main ([#51](https://github.com/sherifconteh-collab/ai-grc-platform/pull/51)) — @Copilot
-
 - Fix RELEASE_NOTES.md versioning/tiers, implement BYOK AI infrastructure, remove platform admin LLM page ([#49](https://github.com/sherifconteh-collab/ai-grc-platform/pull/49)) — @Copilot
+
+### Fixed
+- Regenerated `electron/package-lock.json` to include `electron-updater` and transitive dependencies — fixes all desktop build failures
+- README: corrected framework/control count, removed false AI rate limit claim, fixed MCP code example, fixed tier names, added Desktop deployment option
+- SDK README: corrected tier name from "utilities" to "govcloud"
 
 ## [2.1.0] — 2026-03-14
 

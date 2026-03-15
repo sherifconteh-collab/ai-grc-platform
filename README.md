@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v2.1.0-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v2.2.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -56,9 +56,9 @@ The resulting installer is in `electron/dist/`.
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 12+ frameworks with 500+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 30+ frameworks with 1,000+ controls. Built to be:
 
-- **Multi-Framework**: Supports 25+ major frameworks out of the box
+- **Multi-Framework**: Supports 30+ major frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, and MAESTRO
 - **Open Source**: AGPL-3.0 licensed, self-hostable, transparent
@@ -71,7 +71,7 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 
 - 🔐 User authentication (JWT-based with OAuth 2.0, refresh tokens, TOTP 2FA)
 - 📊 Compliance dashboard with real-time metrics
-- 🎯 Framework selection (25+ frameworks, 1,000+ controls)
+- 🎯 Framework selection (30+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks)
 - 📜 AU-2 compliant immutable audit logging
@@ -177,7 +177,7 @@ npm run dev                  # starts Next.js on port 3000
 
 ### 🤖 AI Platform (BYOK — Bring Your Own Key)
 
-The platform ships with a **built-in AI layer** that any user can activate with their own API key. Self-hosted deployments have no usage limits. The hosted ControlWeave service applies tier-based rate limits (e.g., 10 AI requests/month on the free tier).
+The platform ships with a **built-in AI layer** that any user can activate with their own API key. Self-hosted deployments have no usage limits.
 
 - **AI Copilot** — org-aware conversational assistant with 25+ analysis capabilities:
   - Gap analysis comparing current implementation against target baselines
@@ -211,7 +211,7 @@ Full RMF lifecycle management without leaving the platform:
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
-- Track compliance across 25+ frameworks simultaneously
+- Track compliance across 30+ frameworks simultaneously
 - **Cross-framework control mapping (Crosswalks)** — 80+ mappings showing control overlaps
 - Unified risk register
 - Gap analysis across standards
@@ -318,7 +318,7 @@ Full RMF lifecycle management without leaving the platform:
 | Cost | **Free** | $30K–200K/yr | $50K–150K/yr | $100K+/yr |
 | Open Source | ✅ | ❌ | ❌ | ❌ |
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
-| Frameworks | 25+ | 10–15 | 10–20 | 20+ |
+| Frameworks | 30+ | 10–15 | 10–20 | 20+ |
 | Auto-Crosswalk | ✅ | ❌ | ❌ | ❌ |
 | Built-in AI Copilot | ✅ (BYOK) | ❌ | ❌ | ❌ |
 | AI Governance (NIST AI RMF) | ✅ | ❌ | ❌ | ❌ |
@@ -338,22 +338,25 @@ This platform can act as an MCP server, allowing AI agents to:
 - Analyze risk posture
 - Recommend remediation actions
 
-```javascript
-// Example MCP usage
-const mcp = require('./src/mcp/server');
+The MCP server lives in `backend/scripts/mcp-server-secure.js` and exposes 21 tools. See [`docs/MCP_SETUP.md`](./docs/MCP_SETUP.md) for full configuration.
 
-// AI agent queries compliance status
-const status = await mcp.query({
-  action: 'getComplianceStatus',
-  framework: 'nist_csf_2.0',
-  organizationId: 'org-123'
+**Example tool registrations (from the server source):**
+
+```javascript
+// Health check (no auth required)
+server.registerTool('grc_health', {
+  description: 'Check AI GRC backend health and database connectivity.',
+  inputSchema: {}
+}, async () => { /* ... */ });
+
+// List compliance frameworks (auth required)
+server.registerTool('grc_list_frameworks', { /* ... */ }, async () => {
+  return await apiRequest('GET', '/frameworks');
 });
 
-// AI agent suggests controls for AI system
-const suggestions = await mcp.query({
-  action: 'suggestControls',
-  aiSystemId: 'ai-sys-456',
-  riskLevel: 'high'
+// AI-powered compliance query
+server.registerTool('grc_ai_query', { /* ... */ }, async ({ prompt }) => {
+  return await apiRequest('POST', '/ai/query', { prompt });
 });
 ```
 
@@ -392,7 +395,7 @@ SDK features:
 - **BYOK-compatible** — Uses your API key generated in *Settings → Platform Admin*
 - **TypeScript types** — Full `index.d.ts` type definitions included
 - **Batch logging** — Log multiple AI decisions in a single call
-- **Available for Enterprise and Utilities tiers** — External SDK ingestion requires org tier eligibility
+- **Available for Enterprise and Gov Cloud tiers** — External SDK ingestion requires org tier eligibility
 
 See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup instructions.
 
@@ -433,7 +436,7 @@ controlweave/
 ### Core Tables
 - `organizations` — Multi-tenant support
 - `users` — Authentication and profiles with field-level PII encryption
-- `frameworks` — Framework catalog (25+ frameworks)
+- `frameworks` — Framework catalog (30+ frameworks)
 - `framework_controls` — Individual controls/requirements
 - `control_implementations` — Org-specific implementation status
 
@@ -466,7 +469,7 @@ controlweave/
 ## 🎯 Use Cases
 
 ### For Compliance Officers
-- Track compliance across 25+ frameworks simultaneously
+- Track compliance across 30+ frameworks simultaneously
 - Leverage auto-crosswalk to reduce compliance burden by 40-60%
 - Use AI Copilot for gap analysis and compliance forecasting
 - Generate audit-ready reports and documentation
@@ -506,7 +509,7 @@ controlweave/
 - **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **API**: REST with OpenAPI specification
 - **MCP**: Model Context Protocol server
-- **Deployment**: Docker or self-hosted
+- **Deployment**: Desktop (Electron) or self-hosted
 
 ## 📖 Documentation
 
@@ -529,8 +532,8 @@ controlweave/
 ## 🚧 Roadmap
 
 ### Phase 1: Foundation ✅
-- ✅ Complete PostgreSQL schema (25+ tables)
-- ✅ 25+ framework seed data (1,000+ controls)
+- ✅ Complete PostgreSQL schema (140+ tables)
+- ✅ 30+ framework seed data (1,000+ controls)
 - ✅ Cross-framework crosswalk mappings (80+)
 - ✅ REST API with full CRUD operations
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA
@@ -618,14 +621,15 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 ## 📈 Stats
 
-- **Frameworks**: 25+ supported
+- **Frameworks**: 30+ supported
 - **Controls**: 1,000+ controls in database
 - **Crosswalks**: 80+ cross-framework mappings
 - **AI Features**: 25+ analysis capabilities
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
-- **Tables**: 25+ database tables
-- **API Routes**: 27 route modules
-- **Services**: 17 service modules
+- **Tables**: 140+ database tables
+- **API Routes**: 60+ route modules
+- **Services**: 19 service modules
+- **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Security**: 14-day trial, all 12 audit findings remediated in v2.2.0
 - **Development Status**: Active — synced with [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) upstream
