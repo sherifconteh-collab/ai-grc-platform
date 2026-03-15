@@ -740,7 +740,7 @@ You created a **complete GRC platform** with:
    JWT tokens, role-based access
 
 4. **Deploy MVP**  
-   Railway/Render for quick deployment
+   Docker or self-hosted for deployment
 
 5. **Get First Customer**  
    Show them the crosswalk savings calculator

@@ -324,7 +324,7 @@ Now that everything works, you can:
 ### This Month
 - [ ] Build assessment module
 - [ ] Add PDF report generation
-- [ ] Deploy to Railway/Render
+- [ ] Deploy to self-hosted server
 - [ ] Get first beta user
 
 ---

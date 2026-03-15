@@ -187,20 +187,11 @@ app.get('/health', async (req, res) => {
       health.status = 'degraded';
     }
     
-    // Add Railway environment info if available
-    if (process.env.RAILWAY_ENVIRONMENT_NAME) {
-      health.railway = {
-        environment: process.env.RAILWAY_ENVIRONMENT_NAME,
-        serviceId: process.env.RAILWAY_SERVICE_ID || null,
-        deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null
-      };
-    }
-    
     res.json(health);
   } catch (error) {
     const redisStatus = getRedisAdapterStatus();
 
-    // Return 200 with degraded status so Railway health check treats the
+    // Return 200 with degraded status so the health check treats the
     // container as alive even when the database is temporarily unavailable.
     res.json({
       status: 'degraded',
@@ -441,7 +432,7 @@ app.use((req, res) => {
 // Auto-provision platform admin on startup if env vars are set
 // Set PLATFORM_ADMIN_EMAIL (+ optionally PLATFORM_ADMIN_PASSWORD,
 // PLATFORM_ADMIN_FIRST_NAME, PLATFORM_ADMIN_LAST_NAME, PLATFORM_ADMIN_ORG)
-// in Railway Variables and the account is created/updated on every deploy.
+// as environment variables and the account is created/updated on every startup.
 async function ensurePlatformAdmin() {
   const email = String(process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
   if (!email) return; // env var not set — skip silently
