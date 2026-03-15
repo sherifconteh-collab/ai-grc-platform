@@ -29,7 +29,7 @@ After installing, launch ControlWeave — the app opens automatically and walks 
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-14 | PR #47: Fix broken pricing links, update license to AGPL-3.0, fix README badges -->
+<!-- LAST_UPDATED: 2026-03-15 | PR #49: Fix RELEASE_NOTES.md versioning/tiers, implement BYOK AI infrastructure, remove platform admin LLM page -->
 
 ## 🎯 What is This?
 

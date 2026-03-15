@@ -9,6 +9,14 @@
 
 ---
 
+## [Unreleased]
+
+> Changes staged but not yet released to production.
+
+### Changed
+
+- Fix RELEASE_NOTES.md versioning/tiers, implement BYOK AI infrastructure, remove platform admin LLM page ([#49](https://github.com/sherifconteh-collab/ai-grc-platform/pull/49)) — @Copilot
+
 ## [2.1.0] — 2026-03-14
 
 > **Released:** 2026-03-14
