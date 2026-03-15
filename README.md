@@ -638,7 +638,6 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 - **Community Repository**: [ai-grc-platform](https://github.com/sherifconteh-collab/ai-grc-platform) *(you are here)*
 - **Premium Product**: [ControlWeave.com](https://controlweave.com) — CMDB, Vendor Risk, Threat Intel, and more
-- **Upstream Source**: [ControlWeave on GitHub](https://github.com/sherifconteh-collab/ControlWeave)
 - **Release Notes**: [RELEASE_NOTES.md](./RELEASE_NOTES.md)
 - Documentation: See [docs/](./docs/) folder
 
