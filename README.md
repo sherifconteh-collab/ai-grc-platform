@@ -56,9 +56,9 @@ The resulting installer is in `electron/dist/`.
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 25+ frameworks with 1,000+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with special focus on AI governance. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 30+ frameworks with 1,000+ controls. Built to be:
 
-- **Multi-Framework**: Supports 25+ major frameworks out of the box
+- **Multi-Framework**: Supports 30+ major frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, and MAESTRO
 - **Open Source**: AGPL-3.0 licensed, self-hostable, transparent
@@ -71,7 +71,7 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 
 - 🔐 User authentication (JWT-based with OAuth 2.0, refresh tokens, TOTP 2FA)
 - 📊 Compliance dashboard with real-time metrics
-- 🎯 Framework selection (25+ frameworks, 1,000+ controls)
+- 🎯 Framework selection (30+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks)
 - 📜 AU-2 compliant immutable audit logging
@@ -211,7 +211,7 @@ Full RMF lifecycle management without leaving the platform:
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
-- Track compliance across 25+ frameworks simultaneously
+- Track compliance across 30+ frameworks simultaneously
 - **Cross-framework control mapping (Crosswalks)** — 80+ mappings showing control overlaps
 - Unified risk register
 - Gap analysis across standards
@@ -318,7 +318,7 @@ Full RMF lifecycle management without leaving the platform:
 | Cost | **Free** | $30K–200K/yr | $50K–150K/yr | $100K+/yr |
 | Open Source | ✅ | ❌ | ❌ | ❌ |
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
-| Frameworks | 25+ | 10–15 | 10–20 | 20+ |
+| Frameworks | 30+ | 10–15 | 10–20 | 20+ |
 | Auto-Crosswalk | ✅ | ❌ | ❌ | ❌ |
 | Built-in AI Copilot | ✅ (BYOK) | ❌ | ❌ | ❌ |
 | AI Governance (NIST AI RMF) | ✅ | ❌ | ❌ | ❌ |
@@ -436,7 +436,7 @@ controlweave/
 ### Core Tables
 - `organizations` — Multi-tenant support
 - `users` — Authentication and profiles with field-level PII encryption
-- `frameworks` — Framework catalog (25+ frameworks)
+- `frameworks` — Framework catalog (30+ frameworks)
 - `framework_controls` — Individual controls/requirements
 - `control_implementations` — Org-specific implementation status
 
@@ -469,7 +469,7 @@ controlweave/
 ## 🎯 Use Cases
 
 ### For Compliance Officers
-- Track compliance across 25+ frameworks simultaneously
+- Track compliance across 30+ frameworks simultaneously
 - Leverage auto-crosswalk to reduce compliance burden by 40-60%
 - Use AI Copilot for gap analysis and compliance forecasting
 - Generate audit-ready reports and documentation
@@ -509,7 +509,7 @@ controlweave/
 - **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **API**: REST with OpenAPI specification
 - **MCP**: Model Context Protocol server
-- **Deployment**: Desktop (Electron), Docker, or self-hosted
+- **Deployment**: Desktop (Electron) or self-hosted
 
 ## 📖 Documentation
 
@@ -532,8 +532,8 @@ controlweave/
 ## 🚧 Roadmap
 
 ### Phase 1: Foundation ✅
-- ✅ Complete PostgreSQL schema (25+ tables)
-- ✅ 25+ framework seed data (1,000+ controls)
+- ✅ Complete PostgreSQL schema (140+ tables)
+- ✅ 30+ framework seed data (1,000+ controls)
 - ✅ Cross-framework crosswalk mappings (80+)
 - ✅ REST API with full CRUD operations
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA
@@ -621,14 +621,15 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 ## 📈 Stats
 
-- **Frameworks**: 25+ supported
+- **Frameworks**: 30+ supported
 - **Controls**: 1,000+ controls in database
 - **Crosswalks**: 80+ cross-framework mappings
 - **AI Features**: 25+ analysis capabilities
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
-- **Tables**: 25+ database tables
-- **API Routes**: 27 route modules
-- **Services**: 17 service modules
+- **Tables**: 140+ database tables
+- **API Routes**: 60+ route modules
+- **Services**: 19 service modules
+- **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Security**: 14-day trial, all 12 audit findings remediated in v2.2.0
 - **Development Status**: Active — synced with [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) upstream
