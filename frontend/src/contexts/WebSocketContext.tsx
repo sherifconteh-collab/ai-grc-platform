@@ -34,6 +34,8 @@ export function WebSocketProvider({ children, token, enabled }: WebSocketProvide
       return;
     }
 
+    // Connect to the current origin.  In production a reverse proxy (or
+    // Electron's built-in proxy) routes /socket.io/ to the backend.
     const socket = io({
       path: '/socket.io/',
       transports: ['websocket', 'polling'],

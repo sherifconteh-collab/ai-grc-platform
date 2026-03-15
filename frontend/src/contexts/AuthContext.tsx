@@ -116,7 +116,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (email: string, password: string, fullName: string, organizationName: string, role?: string, frameworkCodes?: string[], informationTypes?: string[]) => {
     try {
-      const response = await authAPI.register({ email, password, fullName, organizationName, ...(role ? { role } : {}), ...(frameworkCodes?.length ? { frameworkCodes } : {}), ...(informationTypes?.length ? { informationTypes } : {}) });
+      const response = await authAPI.register({
+        email,
+        password,
+        fullName,
+        organizationName,
+        ...(role ? { initialRole: role as 'admin' | 'auditor' | 'user' } : {}),
+        ...(frameworkCodes?.length ? { frameworkCodes } : {}),
+        ...(informationTypes?.length ? { informationTypes } : {}),
+      });
       const { user, organization, tokens } = response.data.data;
 
       localStorage.setItem('accessToken', tokens.accessToken);
