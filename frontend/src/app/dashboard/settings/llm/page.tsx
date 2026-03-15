@@ -44,6 +44,12 @@ interface LLMConfig {
   groq_api_key?: string | null;
   xai_api_key?: string | null;
   ollama_base_url?: string | null;
+  // Backend returns masked keys with _enc suffix
+  anthropic_api_key_enc?: string | null;
+  openai_api_key_enc?: string | null;
+  gemini_api_key_enc?: string | null;
+  groq_api_key_enc?: string | null;
+  xai_api_key_enc?: string | null;
   default_provider?: string;
   default_model?: string;
   configured_providers?: string[];
@@ -179,8 +185,22 @@ export default function LLMConfigurationPage() {
         settingsAPI.getLLMConfig().catch(() => ({ data: {} })),
         aiAPI.getStatus().catch(() => ({ data: {} })),
       ]);
-      const llm: LLMConfig = llmRes.data ?? {};
-      const status: AIStatus = statusRes.data ?? {};
+      // Backend returns { success, data: { ...config } } – unwrap inner data
+      const raw = llmRes.data?.data ?? llmRes.data ?? {};
+      // Map backend's *_api_key_enc masked fields to the UI's *_api_key fields
+      const llm: LLMConfig = {
+        ...raw,
+        anthropic_api_key: raw.anthropic_api_key_enc ?? raw.anthropic_api_key ?? null,
+        openai_api_key: raw.openai_api_key_enc ?? raw.openai_api_key ?? null,
+        gemini_api_key: raw.gemini_api_key_enc ?? raw.gemini_api_key ?? null,
+        groq_api_key: raw.groq_api_key_enc ?? raw.groq_api_key ?? null,
+        xai_api_key: raw.xai_api_key_enc ?? raw.xai_api_key ?? null,
+        ollama_base_url: raw.ollama_base_url ?? null,
+        default_provider: raw.default_provider ?? '',
+        default_model: raw.default_model ?? '',
+      };
+      const statusRaw = statusRes.data?.data ?? statusRes.data ?? {};
+      const status: AIStatus = statusRaw;
       setConfig(llm);
       setAIStatus(status);
       setDefaultProvider(llm.default_provider ?? '');

@@ -30,6 +30,9 @@ const PROVIDER_MODELS = {
   grok: ['grok-3', 'grok-3-mini'],
   ollama: ['llama3.2', 'mistral', 'codellama'],
 };
+// Alias: ai.js uses 'claude' for Anthropic
+PROVIDER_MODELS.claude = PROVIDER_MODELS.anthropic;
+PROVIDER_MODELS.xai = PROVIDER_MODELS.grok;
 
 const PROVIDER_KEY_COLUMNS = {
   anthropic: 'anthropic_api_key_enc',
@@ -38,6 +41,8 @@ const PROVIDER_KEY_COLUMNS = {
   grok: 'xai_api_key_enc',
   groq: 'groq_api_key_enc',
 };
+PROVIDER_KEY_COLUMNS.claude = PROVIDER_KEY_COLUMNS.anthropic;
+PROVIDER_KEY_COLUMNS.xai = PROVIDER_KEY_COLUMNS.grok;
 
 const PROVIDER_ENV_VARS = {
   anthropic: 'ANTHROPIC_API_KEY',
@@ -47,6 +52,8 @@ const PROVIDER_ENV_VARS = {
   groq: 'GROQ_API_KEY',
   ollama: 'OLLAMA_BASE_URL',
 };
+PROVIDER_ENV_VARS.claude = PROVIDER_ENV_VARS.anthropic;
+PROVIDER_ENV_VARS.xai = PROVIDER_ENV_VARS.grok;
 
 const DEFAULT_PROVIDER = 'anthropic';
 
@@ -370,12 +377,17 @@ async function callOllama(baseUrl, model, systemPrompt, messages) {
 // ---------------------------------------------------------------------------
 
 function callProvider(provider, apiKey, model, systemPrompt, messages) {
-  switch (provider) {
-    case 'anthropic': return callAnthropic(apiKey, model, systemPrompt, messages);
+  const p = (provider || '').toLowerCase();
+  switch (p) {
+    case 'anthropic':
+    case 'claude':
+      return callAnthropic(apiKey, model, systemPrompt, messages);
     case 'openai': return callOpenAI(apiKey, model, systemPrompt, messages);
     case 'gemini': return callGemini(apiKey, model, systemPrompt, messages);
     case 'groq': return callGroq(apiKey, model, systemPrompt, messages);
-    case 'grok': return callGrok(apiKey, model, systemPrompt, messages);
+    case 'grok':
+    case 'xai':
+      return callGrok(apiKey, model, systemPrompt, messages);
     case 'ollama': return callOllama(apiKey, model, systemPrompt, messages);
     default: throw new Error(`Unsupported provider: ${provider}`);
   }
@@ -482,6 +494,14 @@ async function getOrgDefaultModel(orgId) {
 
 async function getOrgApiKey(orgId, provider) {
   const p = (provider || DEFAULT_PROVIDER).toLowerCase();
+  // Ollama uses base_url, not an encrypted key column
+  if (p === 'ollama') {
+    const row = await _queryOne(
+      'SELECT ollama_base_url FROM llm_configurations WHERE organization_id = $1',
+      [orgId]
+    );
+    return (row && row.ollama_base_url) ? row.ollama_base_url : null;
+  }
   const col = PROVIDER_KEY_COLUMNS[p];
   if (!col) return null;
   const row = await _queryOne(
@@ -522,14 +542,15 @@ async function getPlatformApiKey(provider) {
 async function logAIUsage(orgId, userId, feature, provider, model, meta = {}) {
   await _exec(
     `INSERT INTO ai_usage_log
-       (organization_id, user_id, feature, provider, model, success, tokens_used, duration_ms, error_message, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+       (organization_id, user_id, feature, provider, model, success, tokens_input, tokens_output, duration_ms, error_message, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
     [
       orgId, userId, feature,
       provider || null,
       model || null,
       meta.success !== undefined ? meta.success : true,
-      meta.tokens_used || meta.tokensUsed || 0,
+      meta.tokens_input || meta.tokensInput || 0,
+      meta.tokens_output || meta.tokensOutput || 0,
       meta.duration_ms || meta.durationMs || 0,
       meta.error_message || meta.errorMessage || null,
     ]
@@ -544,20 +565,18 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
   await _exec(
     `INSERT INTO ai_decision_log
        (organization_id, feature, input_hash, output_hash, model_version,
-        correlation_id, session_id, resource_type, resource_id,
+        correlation_id, session_id,
         data_lineage, risk_level, human_reviewed, bias_flags, bias_reviewed)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       orgId, feature, inputHash, outputHash,
       meta.model_version || meta.modelVersion || null,
       meta.correlation_id || meta.correlationId || null,
       meta.session_id || meta.sessionId || null,
-      meta.resource_type || meta.resourceType || null,
-      meta.resource_id || meta.resourceId || null,
       meta.data_lineage || meta.dataLineage || null,
       meta.risk_level || meta.riskLevel || null,
       meta.human_reviewed || meta.humanReviewed || false,
-      meta.bias_flags || meta.biasFlags || null,
+      meta.bias_flags ? JSON.stringify(meta.bias_flags || meta.biasFlags) : null,
       meta.bias_reviewed || meta.biasReviewed || false,
     ]
   );

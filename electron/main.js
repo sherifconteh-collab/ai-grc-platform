@@ -283,18 +283,25 @@ function startServer(label, dirPath, scriptRelPath, port, extraEnv = {}) {
 }
 
 function startBackend(backendDir, databaseUrl) {
+  // Generate a random password for the default platform admin to avoid
+  // shipping a known credential that is reachable on the network.
+  const crypto = require('crypto');
+  const generatedPassword = `CW-${crypto.randomBytes(12).toString('base64url')}!1`;
+
   const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {
     // Allow the frontend origin so CORS is satisfied
     CORS_ORIGIN: `http://localhost:${FRONTEND_PORT}`,
     // Inject the embedded-postgres connection string so the backend never
     // needs an external DATABASE_URL in the environment or .env file.
     DATABASE_URL: databaseUrl,
+    // Bind to loopback only — never expose the desktop backend on the LAN
+    HOST: '127.0.0.1',
     // Frontend URL for CORS and email links
     FRONTEND_URL: `http://localhost:${FRONTEND_PORT}`,
     // Auto-provision a platform admin on first desktop launch so the user
     // can sign in immediately without running any CLI seed scripts.
     PLATFORM_ADMIN_EMAIL: process.env.PLATFORM_ADMIN_EMAIL || 'admin@controlweave.local',
-    PLATFORM_ADMIN_PASSWORD: process.env.PLATFORM_ADMIN_PASSWORD || 'ControlWeave2026!',
+    PLATFORM_ADMIN_PASSWORD: process.env.PLATFORM_ADMIN_PASSWORD || generatedPassword,
     PLATFORM_ADMIN_FIRST_NAME: process.env.PLATFORM_ADMIN_FIRST_NAME || 'Platform',
     PLATFORM_ADMIN_LAST_NAME: process.env.PLATFORM_ADMIN_LAST_NAME || 'Admin',
     PLATFORM_ADMIN_ORG: process.env.PLATFORM_ADMIN_ORG || 'ControlWeave Desktop',

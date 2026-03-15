@@ -1080,6 +1080,8 @@ export const settingsAPI = {
     openai_api_key?: string | null;
     gemini_api_key?: string | null;
     xai_api_key?: string | null;
+    groq_api_key?: string | null;
+    ollama_base_url?: string | null;
     default_provider?: string;
     default_model?: string;
   }) => api.put('/settings/llm', data),
