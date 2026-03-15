@@ -38,8 +38,14 @@ export default function OrganizationSystemsAndVendors({
     async function load() {
       try {
         const [sysRes, cotsRes] = await Promise.all([
-          organizationAPI.getSystems().catch(() => ({ data: { data: [] } })),
-          organizationAPI.getCotsProducts().catch(() => ({ data: { data: [] } })),
+          organizationAPI.getSystems().catch((error) => {
+            console.error('Failed to fetch organization systems:', error);
+            return { data: { data: [] } };
+          }),
+          organizationAPI.getCotsProducts().catch((error) => {
+            console.error('Failed to fetch COTS products:', error);
+            return { data: { data: [] } };
+          }),
         ]);
 
         if (cancelled) return;

@@ -45,8 +45,8 @@ export function StatusPieChart({ data, onSliceClick }: StatusPieChartProps) {
           onClick={(entry) => onSliceClick?.(entry.name)}
           style={{ cursor: onSliceClick ? 'pointer' : undefined }}
         >
-          {data.map((d, i) => (
-            <Cell key={i} fill={d.color} />
+          {data.map((d) => (
+            <Cell key={d.name} fill={d.color} />
           ))}
         </Pie>
         <Tooltip />

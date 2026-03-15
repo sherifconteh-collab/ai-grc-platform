@@ -24,8 +24,8 @@ export default function NotificationBell() {
       const items: Notification[] = res.data?.data?.notifications ?? res.data?.data ?? [];
       setNotifications(items);
       setUnreadCount(items.filter((n) => !n.is_read).length);
-    } catch {
-      // silently ignore – bell simply shows 0
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
     }
   }, []);
 
@@ -49,8 +49,8 @@ export default function NotificationBell() {
       await notificationsAPI.markAllRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
-    } catch {
-      // ignore
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
     }
   };
 

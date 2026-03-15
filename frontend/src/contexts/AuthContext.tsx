@@ -81,22 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string, totpCode?: string) => {
     try {
       const response = await authAPI.login({ email, password, ...(totpCode ? { totp_code: totpCode } : {}) });
-      const { user, tokens } = response.data.data;
+      const { tokens } = response.data.data;
 
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
 
-      // Convert snake_case to camelCase
-      setUser({
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role,
-        organizationId: user.organization_id,
-        roles: [],
-        permissions: []
-      });
-
+      await checkAuth();
       router.push('/dashboard');
     } catch (error: any) {
       const msg = error.response?.data?.error || 'Login failed';
@@ -125,25 +115,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...(frameworkCodes?.length ? { frameworkCodes } : {}),
         ...(informationTypes?.length ? { informationTypes } : {}),
       });
-      const { user, organization, tokens } = response.data.data;
+      const { tokens } = response.data.data;
 
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
 
-      // Convert snake_case to camelCase
-      setUser({
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role,
-        organizationId: organization.id,
-        roles: [],
-        permissions: []
-      });
-
+      await checkAuth();
       router.push('/dashboard');
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Registration failed');
+      const msg = error.response?.data?.error || 'Registration failed';
+      const code = error.response?.data?.code;
+      const err = new Error(msg);
+      if (code) (err as any).code = code;
+      throw err;
     }
   };
 
