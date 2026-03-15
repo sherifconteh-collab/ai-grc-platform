@@ -172,6 +172,42 @@ jobs:
           print(f"README.md last-updated marker refreshed → {date_str}")
           PYEOF
 
+      - name: Sync README version badge from RELEASE_NOTES.md
+        if: steps.pr.outputs.skip != 'true'
+        run: |
+          python3 - <<'PYEOF'
+          import re
+
+          # ── Read the latest released version from RELEASE_NOTES.md ──────────
+          with open("RELEASE_NOTES.md", "r") as f:
+              release_notes = f.read()
+
+          # Match the first versioned header (skip [Unreleased])
+          match = re.search(r"^## \[(\d+\.\d+\.\d+)\]", release_notes, re.MULTILINE)
+          if not match:
+              print("No versioned release found in RELEASE_NOTES.md — skipping badge sync.")
+              exit(0)
+
+          latest_version = match.group(1)
+
+          # ── Update the shields.io badge in README.md ────────────────────────
+          with open("README.md", "r") as f:
+              readme = f.read()
+
+          badge_pattern = r"(!\[Version\]\(https://img\.shields\.io/badge/version-v)\d+\.\d+\.\d+(-green\.svg\))"
+          new_badge = rf"\g<1>{latest_version}\2"
+          updated, count = re.subn(badge_pattern, new_badge, readme)
+
+          if count == 0:
+              print(f"Version badge not found in README.md — skipping.")
+          elif updated == readme:
+              print(f"Badge already shows v{latest_version} — no change needed.")
+          else:
+              with open("README.md", "w") as f:
+                  f.write(updated)
+              print(f"README.md version badge updated → v{latest_version}")
+          PYEOF
+
       - name: Scan codebase for undocumented features
         if: steps.pr.outputs.skip != 'true'
         env:
