@@ -142,7 +142,7 @@ ai-grc-platform/
    - Build simple dashboard
 
 3. **Week 3: Deploy & Share**
-   - Deploy to Railway or Render
+   - Deploy to a self-hosted server or Docker
    - Record demo video
    - Post on social media
    - Submit to awesome lists

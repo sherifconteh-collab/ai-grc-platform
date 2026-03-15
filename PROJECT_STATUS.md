@@ -191,49 +191,17 @@ Testing: Jest (Node) or pytest (Python)
 
 ## 🚀 Deployment Options
 
-### Option 1: Railway (Recommended for MVP)
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Deploy database
-railway up
-railway add postgres
-
-# Deploy API (when ready)
-railway up
-```
-**Cost**: $5-20/month
-**Pros**: Easy, fast, integrated DB
-**Cons**: Less control
-
-### Option 2: Render
-```bash
-# Create render.yaml
-services:
-  - type: web
-    name: ai-grc-api
-    env: node
-    buildCommand: npm install
-    startCommand: npm start
-  - type: postgres
-    name: ai-grc-db
-```
-**Cost**: $7-25/month
-**Pros**: Simple, good free tier
-**Cons**: Slow cold starts on free tier
-
-### Option 3: Self-Hosted (DigitalOcean, AWS, etc.)
+### Option 1: Self-Hosted (Recommended)
 ```bash
 # Set up Ubuntu server
 # Install PostgreSQL, Node.js, Nginx
 # Deploy with PM2 or Docker
 ```
 **Cost**: $10-50/month
-**Pros**: Full control
+**Pros**: Full control, data sovereignty
 **Cons**: More setup, maintenance
 
-### Option 4: Docker Compose (Local Dev)
+### Option 2: Docker Compose
 ```yaml
 # docker-compose.yml
 version: '3.8'
