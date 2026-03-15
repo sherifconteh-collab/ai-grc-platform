@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import BrandLogo from '@/components/BrandLogo';
-import { APP_NAME } from '@/lib/branding';
 
 /**
  * Top navigation bar shown on the public marketing / landing page.

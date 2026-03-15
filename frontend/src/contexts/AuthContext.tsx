@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string, totpCode?: string) => {
     try {
-      const response = await authAPI.login({ email, password, ...(totpCode ? { totpCode } : {}) });
+      const response = await authAPI.login({ email, password, ...(totpCode ? { totp_code: totpCode } : {}) });
       const { user, tokens } = response.data.data;
 
       localStorage.setItem('accessToken', tokens.accessToken);

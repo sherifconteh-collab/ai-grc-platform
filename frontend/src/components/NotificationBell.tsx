@@ -8,7 +8,7 @@ interface Notification {
   title?: string;
   message: string;
   type?: string;
-  read: boolean;
+  is_read: boolean;
   created_at: string;
 }
 
@@ -23,7 +23,7 @@ export default function NotificationBell() {
       const res = await notificationsAPI.getAll({ limit: 10, unread: 'true' });
       const items: Notification[] = res.data?.data?.notifications ?? res.data?.data ?? [];
       setNotifications(items);
-      setUnreadCount(items.filter((n) => !n.read).length);
+      setUnreadCount(items.filter((n) => !n.is_read).length);
     } catch {
       // silently ignore – bell simply shows 0
     }
@@ -47,7 +47,7 @@ export default function NotificationBell() {
   const handleMarkAllRead = async () => {
     try {
       await notificationsAPI.markAllRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch {
       // ignore
@@ -87,7 +87,7 @@ export default function NotificationBell() {
               <li className="px-4 py-3 text-sm text-gray-400">No new notifications</li>
             )}
             {notifications.map((n) => (
-              <li key={n.id} className={`px-4 py-2.5 text-sm ${n.read ? 'text-gray-400' : 'text-gray-700 bg-purple-50/50'}`}>
+              <li key={n.id} className={`px-4 py-2.5 text-sm ${n.is_read ? 'text-gray-400' : 'text-gray-700 bg-purple-50/50'}`}>
                 {n.title && <p className="font-medium">{n.title}</p>}
                 <p className="truncate">{n.message}</p>
               </li>

@@ -12,8 +12,8 @@ interface CotsProduct {
 
 interface SystemItem {
   id: string;
-  name: string;
-  description?: string;
+  system_name: string;
+  system_description?: string | null;
 }
 
 interface OrganizationSystemsAndVendorsProps {
@@ -76,9 +76,9 @@ export default function OrganizationSystemsAndVendors({
           <ul className="divide-y">
             {systems.map((s) => (
               <li key={s.id} className="py-2">
-                <span className="font-medium text-gray-700">{s.name}</span>
-                {s.description && (
-                  <span className="ml-2 text-sm text-gray-400">— {s.description}</span>
+                <span className="font-medium text-gray-700">{s.system_name}</span>
+                {s.system_description && (
+                  <span className="ml-2 text-sm text-gray-400">— {s.system_description}</span>
                 )}
               </li>
             ))}

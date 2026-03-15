@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getApiBaseUrl, getSocketServerUrl } from '@/lib/apiBase';
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -34,9 +35,8 @@ export function WebSocketProvider({ children, token, enabled }: WebSocketProvide
       return;
     }
 
-    // Connect to the current origin.  In production a reverse proxy (or
-    // Electron's built-in proxy) routes /socket.io/ to the backend.
-    const socket = io({
+    const serverUrl = getSocketServerUrl(getApiBaseUrl());
+    const socket = io(serverUrl, {
       path: '/socket.io/',
       transports: ['websocket', 'polling'],
       auth: { token },
