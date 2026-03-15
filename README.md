@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-15 | PR #52: Add missing frontend components to fix desktop app build -->
+<!-- LAST_UPDATED: 2026-03-15 | PR #53: Auto-sync README version badge and stats from codebase on merge -->
 
 ## 🎯 What is This?
 
