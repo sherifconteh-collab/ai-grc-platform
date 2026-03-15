@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-15 | PR #49: Fix RELEASE_NOTES.md versioning/tiers, implement BYOK AI infrastructure, remove platform admin LLM page -->
+<!-- LAST_UPDATED: 2026-03-15 | PR #51: ci: auto-release desktop installers on PR merge to main -->
 
 ## 🎯 What is This?
 

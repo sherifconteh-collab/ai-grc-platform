@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- ci: auto-release desktop installers on PR merge to main ([#51](https://github.com/sherifconteh-collab/ai-grc-platform/pull/51)) — @Copilot
 
 - Fix RELEASE_NOTES.md versioning/tiers, implement BYOK AI infrastructure, remove platform admin LLM page ([#49](https://github.com/sherifconteh-collab/ai-grc-platform/pull/49)) — @Copilot
 
