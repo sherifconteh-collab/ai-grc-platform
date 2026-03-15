@@ -10,6 +10,7 @@ interface User {
   fullName: string;
   role: string;
   organizationId: string;
+  organizationName?: string;
   roles: string[];
   permissions: string[];
   onboardingCompleted?: boolean;
@@ -21,8 +22,9 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string, organizationName: string) => Promise<void>;
+  login: (email: string, password: string, totpCode?: string) => Promise<void>;
+  loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, organizationName: string, role?: string, frameworkCodes?: string[], informationTypes?: string[]) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
@@ -58,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName: userData.full_name,
         role: userData.role,
         organizationId: userData.organization.id,
+        organizationName: userData.organization?.name || undefined,
         roles: userData.roles || [],
         permissions: userData.permissions || [],
         onboardingCompleted: Boolean(userData.onboarding_completed),
@@ -75,53 +78,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, totpCode?: string) => {
     try {
-      const response = await authAPI.login({ email, password });
-      const { user, tokens } = response.data.data;
+      const response = await authAPI.login({ email, password, ...(totpCode ? { totp_code: totpCode } : {}) });
+      const { tokens } = response.data.data;
 
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
 
-      // Convert snake_case to camelCase
-      setUser({
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role,
-        organizationId: user.organization_id,
-        roles: [],
-        permissions: []
-      });
-
+      await checkAuth();
       router.push('/dashboard');
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Login failed');
+      const msg = error.response?.data?.error || 'Login failed';
+      const code = error.response?.data?.code;
+      const err = new Error(msg);
+      if (code) (err as any).code = code;
+      throw err;
     }
   };
 
-  const register = async (email: string, password: string, fullName: string, organizationName: string) => {
+  const loginWithTokens = async (accessToken: string, refreshToken: string) => {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    await checkAuth();
+    router.push('/dashboard');
+  };
+
+  const register = async (email: string, password: string, fullName: string, organizationName: string, role?: string, frameworkCodes?: string[], informationTypes?: string[]) => {
     try {
-      const response = await authAPI.register({ email, password, fullName, organizationName });
-      const { user, organization, tokens } = response.data.data;
+      const response = await authAPI.register({
+        email,
+        password,
+        fullName,
+        organizationName,
+        ...(role ? { initialRole: role as 'admin' | 'auditor' | 'user' } : {}),
+        ...(frameworkCodes?.length ? { frameworkCodes } : {}),
+        ...(informationTypes?.length ? { informationTypes } : {}),
+      });
+      const { tokens } = response.data.data;
 
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
 
-      // Convert snake_case to camelCase
-      setUser({
-        id: user.id,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role,
-        organizationId: organization.id,
-        roles: [],
-        permissions: []
-      });
-
+      await checkAuth();
       router.push('/dashboard');
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Registration failed');
+      const msg = error.response?.data?.error || 'Registration failed';
+      const code = error.response?.data?.code;
+      const err = new Error(msg);
+      if (code) (err as any).code = code;
+      throw err;
     }
   };
 
@@ -144,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         login,
+        loginWithTokens,
         register,
         logout,
         refreshUser: checkAuth,
