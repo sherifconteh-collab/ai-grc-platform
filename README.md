@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-15 | PR #51: ci: auto-release desktop installers on PR merge to main -->
+<!-- LAST_UPDATED: 2026-03-15 | PR #52: Add missing frontend components to fix desktop app build -->
 
 ## 🎯 What is This?
 

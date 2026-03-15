@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Add missing frontend components to fix desktop app build ([#52](https://github.com/sherifconteh-collab/ai-grc-platform/pull/52)) — @Copilot
 - ci: auto-release desktop installers on PR merge to main ([#51](https://github.com/sherifconteh-collab/ai-grc-platform/pull/51)) — @Copilot
 
 - Fix RELEASE_NOTES.md versioning/tiers, implement BYOK AI infrastructure, remove platform admin LLM page ([#49](https://github.com/sherifconteh-collab/ai-grc-platform/pull/49)) — @Copilot
