@@ -21,6 +21,12 @@ on:
         required: false
         default: 'true'
 
+# Cancel in-flight runs for the same branch/tag so a quick follow-up push
+# doesn't produce duplicate release builds.
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: true
+
 # Default: read-only token.  The upload job needs write access to attach assets
 # to the Release, so that job overrides permissions explicitly.
 permissions:
@@ -152,7 +158,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload installer as workflow artifact
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: controlweave-windows-installer
@@ -236,7 +242,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload DMG as workflow artifact
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: controlweave-macos-installer
@@ -319,7 +325,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload AppImage as workflow artifact
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: controlweave-linux-appimage
