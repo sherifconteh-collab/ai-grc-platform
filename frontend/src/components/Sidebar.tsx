@@ -206,17 +206,6 @@ export default function Sidebar() {
               <span className="mr-3 text-lg">🏢</span>
               All Organizations
             </Link>
-            <Link
-              href="/dashboard/platform/llm-status"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform/llm-status'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🔌</span>
-              LLM Status
-            </Link>
           </>
         )}
       </nav>

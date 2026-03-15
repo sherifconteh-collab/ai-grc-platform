@@ -43,7 +43,6 @@ ControlWeave ships with a **built-in AI layer** that any user can activate with 
 > 🎯 **Gap analysis** compares your current implementation status against a target framework baseline and lists missing controls.
 
 - Per-framework LLM guardrails for BYOK configurations
-- Platform fallback LLM defaults and provider model dropdowns
 - AI Governance module — governance dashboard for AI risk management
 
 
