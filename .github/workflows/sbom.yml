@@ -409,13 +409,13 @@ jobs:
 
     steps:
       - name: Download SBOM artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: sbom-${{ github.sha }}
           path: release-assets
 
       - name: Download AIBOM artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: aibom-${{ github.sha }}
           path: release-assets
