@@ -15,11 +15,12 @@ const TIER_OPTIONS: Array<{
   label: string;
   description: string;
   frameworkLimit: number;
+  externalUrl?: string;
 }> = [
   { key: 'community', label: 'Community (Free)', description: 'Self-hosted, up to 2 frameworks. AGPL v3.', frameworkLimit: 2 },
-  { key: 'pro', label: 'Pro ($499/mo)', description: 'Hosted SaaS. Unlimited frameworks, SSO, 48h SLA.', frameworkLimit: -1 },
-  { key: 'enterprise', label: 'Enterprise', description: 'Unlimited frameworks. Advanced AI governance and impact assessment.', frameworkLimit: -1 },
-  { key: 'govcloud', label: 'Gov Cloud (Custom)', description: 'FedRAMP-ready, IL4/IL5, ITAR-compliant. Custom contract.', frameworkLimit: -1 },
+  { key: 'pro', label: 'Pro ($499/mo)', description: 'Available at controlweave.com — Hosted SaaS. Unlimited frameworks, SSO, 48h SLA.', frameworkLimit: -1, externalUrl: 'https://controlweave.com/#pricing' },
+  { key: 'enterprise', label: 'Enterprise', description: 'Available at controlweave.com — Unlimited frameworks. Advanced AI governance and impact assessment.', frameworkLimit: -1, externalUrl: 'https://controlweave.com/#pricing' },
+  { key: 'govcloud', label: 'Gov Cloud (Custom)', description: 'Available at controlweave.com — FedRAMP-ready, IL4/IL5, ITAR-compliant. Custom contract.', frameworkLimit: -1, externalUrl: 'https://controlweave.com/#pricing' },
 ];
 
 const TIER_ORDER: Record<TierKey, number> = { community: 0, pro: 1, enterprise: 2, govcloud: 3 };
@@ -402,58 +403,31 @@ function RegisterPageInner() {
                     <button
                       key={tier.key}
                       type="button"
-                      onClick={() => setSelectedTier(tier.key)}
+                      onClick={() => {
+                        if (tier.externalUrl) {
+                          window.open(tier.externalUrl, '_blank', 'noopener,noreferrer');
+                        } else {
+                          setSelectedTier(tier.key);
+                        }
+                      }}
                       className={`text-left rounded-lg border p-3 transition ${
                         selectedTier === tier.key
                           ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
+                          : tier.externalUrl
+                          ? 'border-gray-200 bg-gray-50 hover:border-purple-400 opacity-75'
                           : 'border-gray-200 bg-white hover:border-purple-400'
                       }`}
                     >
-                      <p className="text-sm font-semibold text-gray-900">{tier.label}</p>
+                      <p className="text-sm font-semibold text-gray-900">{tier.label}{tier.externalUrl ? ' ↗' : ''}</p>
                       <p className="text-xs text-gray-500 mt-1">{tier.description}</p>
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Your trial starts on the selected tier. You can change tiers anytime in Settings.
+                  This is the Community Edition (self-hosted). Paid plans (Pro, Enterprise, Gov Cloud) are available at{' '}
+                  <a href="https://controlweave.com/#pricing" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">controlweave.com</a>.
                 </p>
 
-                {selectedTier !== 'community' && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Billing Cycle
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setBillingCadence('monthly')}
-                        className={`text-left rounded-lg border p-3 transition ${
-                          billingCadence === 'monthly'
-                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                            : 'border-gray-200 bg-white hover:border-purple-400'
-                        }`}
-                      >
-                        <p className="text-sm font-semibold text-gray-900">Monthly</p>
-                        <p className="text-xs text-gray-500 mt-1">Pay month-to-month</p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBillingCadence('annual')}
-                        className={`text-left rounded-lg border p-3 transition ${
-                          billingCadence === 'annual'
-                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                            : 'border-gray-200 bg-white hover:border-purple-400'
-                        }`}
-                      >
-                        <p className="text-sm font-semibold text-gray-900">Annual</p>
-                        <p className="text-xs text-gray-500 mt-1">Billed yearly</p>
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      After setup, you&apos;ll continue to Stripe with: {`${selectedTier}_${billingCadence}`}
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Framework Selection */}

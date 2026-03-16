@@ -632,7 +632,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Security**: 14-day trial, all 12 audit findings remediated in v2.2.0
-- **Development Status**: Active — synced with [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) upstream
+- **Development Status**: Active — community / self-hosted edition of [ControlWeave.com](https://controlweave.com)
 
 ## 🔗 Links
 
