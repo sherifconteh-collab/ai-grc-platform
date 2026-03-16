@@ -2,8 +2,6 @@
 
 **Open-source AI-powered GRC platform with multi-framework compliance management, crosswalk intelligence, and BYOK AI analysis**
 
-> 🔗 **Upstream**: This repository is the community edition of [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave). Community-tier features are periodically synced here. The code is fully AGPL-3.0-licensed and self-contained — no dependency on the upstream repo is required. Premium tiers (CMDB, Vendor Risk, Threat Intelligence, etc.) are available at [controlweave.com](https://controlweave.com).
-
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
 [![Version](https://img.shields.io/badge/version-v2.2.0-green.svg)](./RELEASE_NOTES.md)
