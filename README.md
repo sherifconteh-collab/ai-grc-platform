@@ -2,6 +2,8 @@
 
 **Open-source AI-powered GRC platform with multi-framework compliance management, crosswalk intelligence, and BYOK AI analysis**
 
+> 🏢 **Enterprise Tier**: Looking for CMDB, Vendor Risk, Threat Intelligence, and more? Check out [ControlWeaver-Pro](https://github.com/sherifconteh-collab/ControlWeaver-Pro).
+
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
 [![Version](https://img.shields.io/badge/version-v2.2.0-green.svg)](./RELEASE_NOTES.md)
