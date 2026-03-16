@@ -159,7 +159,7 @@ jobs:
 
       - name: Upload installer as workflow artifact
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: controlweave-windows-installer
           path: |
@@ -243,7 +243,7 @@ jobs:
 
       - name: Upload DMG as workflow artifact
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: controlweave-macos-installer
           path: |
@@ -326,7 +326,7 @@ jobs:
 
       - name: Upload AppImage as workflow artifact
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: controlweave-linux-appimage
           path: |
