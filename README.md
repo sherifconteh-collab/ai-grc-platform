@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-15 | PR #53: Auto-sync README version badge and stats from codebase on merge -->
+<!-- LAST_UPDATED: 2026-03-16 | PR #55: Point all paid-tier links to controlweave.com; clarify repo is community/self-hosted only -->
 
 ## 🎯 What is This?
 

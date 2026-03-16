@@ -13,6 +13,10 @@
 
 > Changes staged but not yet released to production.
 
+### Changed
+
+- Point all paid-tier links to controlweave.com; clarify repo is community/self-hosted only ([#55](https://github.com/sherifconteh-collab/ai-grc-platform/pull/55)) — @Copilot
+
 ## [2.2.0] — 2026-03-15
 
 > **Released:** 2026-03-15
