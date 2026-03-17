@@ -251,7 +251,7 @@ jobs:
               ),
               "licenses":   [{"license": {"id": "AGPL-3.0-only"}}],
               "externalReferences": [
-                  {"type": "vcs", "url": "https://github.com/sherifconteh-collab/ai-grc-platform"},
+                  {"type": "vcs", "url": "https://github.com/sherifconteh-collab/ControlWeave"},
               ],
           }
 
@@ -354,11 +354,11 @@ jobs:
                       "externalReferences": [
                           {
                               "type": "vcs",
-                              "url":  "https://github.com/sherifconteh-collab/ai-grc-platform",
+                              "url":  "https://github.com/sherifconteh-collab/ControlWeave",
                           },
                           {
                               "type":    "documentation",
-                              "url":     "https://github.com/sherifconteh-collab/ai-grc-platform/blob/main/RELEASE_NOTES.md",
+                              "url":     "https://github.com/sherifconteh-collab/ControlWeave/blob/main/RELEASE_NOTES.md",
                               "comment": "Release notes",
                           },
                       ],

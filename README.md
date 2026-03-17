@@ -16,7 +16,7 @@
 
 Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 
-> [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
+> [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ControlWeave/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ControlWeave/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ControlWeave/releases/latest)
 
 After installing, launch ControlWeave — the app opens automatically and walks you through creating your first account. Updates are delivered automatically so you always stay on the latest version. Releases are published automatically whenever a version bump is merged to `main`.
 
@@ -47,7 +47,7 @@ The resulting installer is in `electron/dist/`.
 
 - Windows 10+, macOS 10.13+, or Ubuntu 18.04+ (or equivalent)
 - 2 GB RAM · ~500 MB disk space
-- [All releases](https://github.com/sherifconteh-collab/ai-grc-platform/releases) · [Release notes](./RELEASE_NOTES.md)
+- [All releases](https://github.com/sherifconteh-collab/ControlWeave/releases) · [Release notes](./RELEASE_NOTES.md)
 </details>
 
 ---
@@ -568,8 +568,8 @@ We welcome contributions! This is an open-source project designed to help organi
 
 ### Quick Ways to Contribute
 
-- 🐛 **Report bugs** — [Open an issue](https://github.com/sherifconteh-collab/ai-grc-platform/issues/new?template=bug_report.md)
-- 💡 **Suggest features** — [Start a discussion](https://github.com/sherifconteh-collab/ai-grc-platform/discussions)
+- 🐛 **Report bugs** — [Open an issue](https://github.com/sherifconteh-collab/ControlWeave/issues/new?template=bug_report.md)
+- 💡 **Suggest features** — [Start a discussion](https://github.com/sherifconteh-collab/ControlWeave/discussions)
 - 📝 **Improve docs** — Fix typos, add examples, clarify setup steps
 - 🧪 **Add tests** — Coverage is always welcome
 - 🌐 **Add frameworks** — GDPR, PCI DSS 4.0, CIS Controls v8, and more are on the roadmap
@@ -598,8 +598,8 @@ This community edition gives you a fully functional GRC platform. If you need en
 
 ## 🙋 Support
 
-- **Issues**: [GitHub Issues](https://github.com/sherifconteh-collab/ai-grc-platform/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/sherifconteh-collab/ai-grc-platform/discussions)
+- **Issues**: [GitHub Issues](https://github.com/sherifconteh-collab/ControlWeave/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/sherifconteh-collab/ControlWeave/discussions)
 - **Email**: Contehconsulting@gmail.com
 - **Premium Features**: [ControlWeave.com](https://controlweave.com) — CMDB, Vendor Risk, Threat Intel, and more
 
@@ -636,7 +636,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 ## 🔗 Links
 
-- **Community Repository**: [ai-grc-platform](https://github.com/sherifconteh-collab/ai-grc-platform) *(you are here)*
+- **Community Repository**: [ControlWeave](https://github.com/sherifconteh-collab/ControlWeave) *(you are here)*
 - **Premium Product**: [ControlWeave.com](https://controlweave.com) — CMDB, Vendor Risk, Threat Intel, and more
 - **Release Notes**: [RELEASE_NOTES.md](./RELEASE_NOTES.md)
 - Documentation: See [docs/](./docs/) folder
