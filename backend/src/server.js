@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
 const pool = require('./config/database');
 const { attachRequestContext } = require('./middleware/requestContext');
 const { createRateLimiter } = require('./middleware/rateLimit');
@@ -30,8 +30,26 @@ const { getRedisAdapterStatus } = require('./services/websocketService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const openclawWebhookEnabled = String(process.env.OPENCLAW_WEBHOOK_SECRET || '').trim().length > 0;
 const corsOrigins = SECURITY_CONFIG.corsOrigins;
 const allowAnyOrigin = corsOrigins.includes('*');
+
+function loadOptionalRoute(modulePath, routeLabel, enabled) {
+  if (!enabled) {
+    return null;
+  }
+
+  try {
+    return require(modulePath);
+  } catch (error) {
+    log('error', 'server.optional_route_load_failed', {
+      route: routeLabel,
+      modulePath,
+      error: serializeError(error)
+    });
+    return null;
+  }
+}
 
 if (process.env.TRUST_PROXY !== undefined) {
   app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : process.env.TRUST_PROXY);
@@ -102,6 +120,9 @@ app.use(attachRequestContext);
 // Stripe webhook needs raw body for signature verification
 // Must be registered before express.json() middleware
 app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
+if (openclawWebhookEnabled) {
+  app.use('/api/v1/openclaw/webhook', express.raw({ type: 'application/json' }));
+}
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
@@ -113,18 +134,6 @@ app.use('/api/v1/auth/refresh', refreshRateLimiter);
 app.use('/api/v1/auth/forgot-password', passwordRecoveryRateLimiter);
 app.use('/api/v1/auth/reset-password', passwordRecoveryRateLimiter);
 app.use('/api/v1', apiRateLimiter);
-
-// Global express-rate-limit middleware for all API routes.
-// The custom createRateLimiter above handles the actual enforcement; this
-// express-rate-limit instance exists so that CodeQL's js/missing-rate-limiting
-// query recognises that every route handler is rate-limited.
-app.use('/api/', rateLimit({
-  windowMs: 60 * 1000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, error: 'Too many requests, please try again later.' }
-}));
 
 // Validate edition at startup
 validateEdition();
@@ -187,11 +196,20 @@ app.get('/health', async (req, res) => {
       health.status = 'degraded';
     }
     
+    // Add Railway environment info if available
+    if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+      health.railway = {
+        environment: process.env.RAILWAY_ENVIRONMENT_NAME,
+        serviceId: process.env.RAILWAY_SERVICE_ID || null,
+        deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null
+      };
+    }
+    
     res.json(health);
   } catch (error) {
     const redisStatus = getRedisAdapterStatus();
 
-    // Return 200 with degraded status so the health check treats the
+    // Return 200 with degraded status so Railway health check treats the
     // container as alive even when the database is temporarily unavailable.
     res.json({
       status: 'degraded',
@@ -275,7 +293,11 @@ const dataSovereigntyRoutes = safeRequire('./routes/dataSovereignty');
 const tprmRoutes = safeRequire('./routes/tprm');
 const tprmPublicRoutes = safeRequire('./routes/tprmPublic');
 const realtimeRoutes = safeRequire('./routes/realtime');
-const openclawWebhookRoutes = require('./routes/openclawWebhook');
+const openclawWebhookRoutes = loadOptionalRoute(
+  './routes/openclawWebhook',
+  '/api/v1/openclaw/webhook',
+  openclawWebhookEnabled
+);
 const aiGovernanceRoutes = safeRequire('./routes/aiGovernance');
 const autoEvidenceCollectionRoutes = safeRequire('./routes/autoEvidenceCollection');
 const contactsRoutes = safeRequire('./routes/contacts');
@@ -390,7 +412,16 @@ app.use('/api/v1/policies', policiesRoutes);
 if (tprmRoutes) app.use('/api/v1/tprm', tprmRoutes);
 if (tprmPublicRoutes) app.use('/api/v1/tprm-public', tprmPublicRoutes);
 if (realtimeRoutes) app.use('/api/v1/realtime', realtimeRoutes);
-app.use('/api/v1/openclaw/webhook', openclawWebhookRoutes);
+if (openclawWebhookRoutes) {
+  app.use('/api/v1/openclaw/webhook', openclawWebhookRoutes);
+} else if (openclawWebhookEnabled) {
+  app.use('/api/v1/openclaw/webhook', (_req, res) => {
+    res.status(503).json({
+      success: false,
+      error: 'OpenClaw webhook is temporarily unavailable'
+    });
+  });
+}
 if (aiGovernanceRoutes) app.use('/api/v1/ai-governance', aiGovernanceRoutes);
 if (autoEvidenceCollectionRoutes) app.use('/api/v1/auto-evidence', autoEvidenceCollectionRoutes);
 if (contactsRoutes) app.use('/api/v1/contacts', contactsRoutes);
@@ -432,7 +463,7 @@ app.use((req, res) => {
 // Auto-provision platform admin on startup if env vars are set
 // Set PLATFORM_ADMIN_EMAIL (+ optionally PLATFORM_ADMIN_PASSWORD,
 // PLATFORM_ADMIN_FIRST_NAME, PLATFORM_ADMIN_LAST_NAME, PLATFORM_ADMIN_ORG)
-// as environment variables and the account is created/updated on every startup.
+// in Railway Variables and the account is created/updated on every deploy.
 async function ensurePlatformAdmin() {
   const email = String(process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
   if (!email) return; // env var not set — skip silently
@@ -531,6 +562,42 @@ async function ensureAssessmentProcedures() {
   log('info', 'assessment.procedures.seeded', { status: 'done' });
 }
 
+function notifyNoLicenseConfigured() {
+  const adminEmail = (process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
+  if (!adminEmail) {
+    log('info', 'license.unlicensed', {
+      note: 'No license key found. Use POST /api/v1/license/generate-community to generate a free community license, or POST /api/v1/license/activate to activate a purchased key.'
+    });
+    return;
+  }
+
+  try {
+    const emailService = require('./services/emailService');
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+    void emailService.sendNotificationEmail(
+      { email: adminEmail, full_name: 'Platform Admin' },
+      {
+        title: 'ControlWeave — License key not configured',
+        message:
+          'Your self-hosted ControlWeave installation is running without an activated license key. ' +
+          'Community tier is free and does not require a paid license. ' +
+          'You can generate a community license key instantly from the platform admin panel, ' +
+          'or activate a purchased key via the license settings page.',
+        link: `${frontendUrl}/dashboard/settings?tab=license`
+      }
+    ).then(() => {
+      log('info', 'license.no_license_notification_sent', {
+        adminEmail: adminEmail.length > 4 ? adminEmail.replace(/(.{2}).+(@.+)/, '$1***$2') : '***'
+      });
+    }).catch((notifyErr) => {
+      log('warn', 'license.no_license_notification_failed', { error: notifyErr.message });
+    });
+  } catch (notifyErr) {
+    log('warn', 'license.no_license_notification_failed', { error: notifyErr.message });
+  }
+}
+
 /**
  * On startup: load a persisted license key from the database and apply it.
  * This means license keys activated via POST /api/v1/license/activate survive
@@ -594,35 +661,9 @@ async function ensureLicenseFromDb() {
   }
 
   // Notify platform admin by email if no license is active on this server.
-  // This is a one-time informational nudge — never blocks startup.
+  // This is a one-time informational nudge and must not delay startup.
   if (!activeKey) {
-    const adminEmail = (process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
-    if (adminEmail) {
-      try {
-        const emailService = require('./services/emailService');
-        const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
-        await emailService.sendNotificationEmail(
-          { email: adminEmail, full_name: 'Platform Admin' },
-          {
-            title: 'ControlWeave — License key not configured',
-            message:
-              'Your self-hosted ControlWeave installation is running without an activated license key. ' +
-              'Community tier is free and does not require a paid license. ' +
-              'You can generate a community license key instantly from the platform admin panel, ' +
-              'or activate a purchased key via the license settings page.',
-            link: `${frontendUrl}/dashboard/settings?tab=license`
-          }
-        );
-        log('info', 'license.no_license_notification_sent', { adminEmail: adminEmail.length > 4 ? adminEmail.replace(/(.{2}).+(@.+)/, '$1***$2') : '***' });
-      } catch (notifyErr) {
-        // Non-fatal — SMTP may not be configured
-        log('warn', 'license.no_license_notification_failed', { error: notifyErr.message });
-      }
-    } else {
-      log('info', 'license.unlicensed', {
-        note: 'No license key found. Use POST /api/v1/license/generate-community to generate a free community license, or POST /api/v1/license/activate to activate a purchased key.'
-      });
-    }
+    notifyNoLicenseConfigured();
   }
 
   // Optional background heartbeat — fires-and-forgets, never revokes access.
@@ -631,13 +672,13 @@ async function ensureLicenseFromDb() {
     heartbeatCheck(activeKey);
   }
 }
-
 // Start server
 // Apply DB-persisted license BEFORE listening so edition/tier gating is correct
 // from the very first request. If license loading fails (DB unreachable, etc.),
 // the server still starts — community tier works unlicensed by design.
-// Other startup tasks (platform admin, assessment procedures) are non-blocking.
-const stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
+// Other startup tasks (notifications, reminders, platform admin, assessment
+// procedures) are intentionally deferred until after the server is listening.
+let stopReminders = () => {};
 const HOST = process.env.HOST || '0.0.0.0';
 
 ensureLicenseFromDb()
@@ -658,6 +699,9 @@ ensureLicenseFromDb()
       // Initialize WebSocket server after HTTP server is ready
       const { initializeWebSocket } = require('./services/websocketService');
       initializeWebSocket(server);
+
+      // Start background jobs only after the HTTP server is reachable.
+      stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
 
       // Auto-provision platform admin if env vars are present
       ensurePlatformAdmin().catch((err) =>

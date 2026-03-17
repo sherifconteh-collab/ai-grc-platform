@@ -6,16 +6,14 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { licenseAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 interface LicenseStatus {
-  licensed: boolean;
-  source?: string;
-  licensee?: string;
-  tier?: string;
-  seats?: number;
-  issuedAt?: number | null;
-  expiresAt?: number | null;
   edition: string;
   isPro: boolean;
   isCommunity: boolean;
+  licensed: boolean;
+  licenseFingerprint?: string | null;
+  persistedViaEnv?: boolean;
+  persistedViaDb?: boolean;
+  source?: string;
 }
 
 function formatDate(unix: number | null | undefined): string {
@@ -63,10 +61,6 @@ export default function LicensePage() {
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState('');
 
-  // Remove confirmation
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [removing, setRemoving] = useState(false);
-
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast(msg);
     setToastType(type);
@@ -75,8 +69,18 @@ export default function LicensePage() {
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await licenseAPI.getStatus();
-      setStatus(res.data.data);
+      const res = await licenseAPI.getInfo();
+      const data = res.data.data || {};
+      setStatus({
+        edition: data.edition || 'community',
+        isPro: Boolean(data.isPro),
+        isCommunity: Boolean(data.isCommunity),
+        licensed: Boolean(data.licenseFingerprint),
+        licenseFingerprint: data.licenseFingerprint || null,
+        persistedViaEnv: Boolean(data.persistedViaEnv),
+        persistedViaDb: Boolean(data.persistedViaDb),
+        source: data.persistedViaEnv ? 'environment variable' : data.persistedViaDb ? 'database' : 'not persisted',
+      });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load license status');
     } finally {
@@ -113,20 +117,6 @@ export default function LicensePage() {
       showToast(msg, 'error');
     } finally {
       setActivating(false);
-    }
-  };
-
-  const handleRemove = async () => {
-    setRemoving(true);
-    try {
-      const res = await licenseAPI.remove();
-      showToast(res.data.message || 'License removed.');
-      setConfirmRemove(false);
-      loadStatus();
-    } catch (err: any) {
-      showToast(err.response?.data?.error || 'Failed to remove license', 'error');
-    } finally {
-      setRemoving(false);
     }
   };
 
@@ -195,62 +185,22 @@ export default function LicensePage() {
 
               {status?.licensed && (
                 <>
-                  <div className="text-gray-500 font-medium">Licensee</div>
-                  <div className="text-gray-900">{status.licensee}</div>
-
-                  <div className="text-gray-500 font-medium">Tier</div>
-                  <div>
-                    <TierBadge tier={status.tier ?? 'community'} />
+                  <div className="text-gray-500 font-medium">License Fingerprint</div>
+                  <div className="text-gray-900 font-mono text-xs break-all">
+                    {status.licenseFingerprint || '—'}
                   </div>
-
-                  <div className="text-gray-500 font-medium">Seats</div>
-                  <div className="text-gray-900">
-                    {status.seats === -1 ? 'Unlimited' : status.seats}
-                  </div>
-
-                  <div className="text-gray-500 font-medium">Issued</div>
-                  <div className="text-gray-900">{formatDate(status.issuedAt)}</div>
-
-                  <div className="text-gray-500 font-medium">Expires</div>
-                  <div className="text-gray-900">{formatExpiry(status.expiresAt)}</div>
 
                   <div className="text-gray-500 font-medium">Source</div>
                   <div className="text-gray-600 capitalize">{status.source}</div>
+
+                  <div className="text-gray-500 font-medium">Stored via Environment</div>
+                  <div className="text-gray-900">{status.persistedViaEnv ? 'Yes' : 'No'}</div>
+
+                  <div className="text-gray-500 font-medium">Stored in Database</div>
+                  <div className="text-gray-900">{status.persistedViaDb ? 'Yes' : 'No'}</div>
                 </>
               )}
             </div>
-
-            {status?.licensed && (
-              <div className="pt-4 border-t">
-                {confirmRemove ? (
-                  <div className="flex items-center gap-4">
-                    <p className="text-sm text-red-700">
-                      Remove the active license and revert to Community Edition?
-                    </p>
-                    <button
-                      onClick={handleRemove}
-                      disabled={removing}
-                      className="text-sm bg-red-600 text-white px-4 py-1.5 rounded hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {removing ? 'Removing…' : 'Yes, remove'}
-                    </button>
-                    <button
-                      onClick={() => setConfirmRemove(false)}
-                      className="text-sm text-gray-600 hover:text-gray-800"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmRemove(true)}
-                    className="text-sm text-red-600 hover:text-red-800 font-medium"
-                  >
-                    Remove license
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         )}
 

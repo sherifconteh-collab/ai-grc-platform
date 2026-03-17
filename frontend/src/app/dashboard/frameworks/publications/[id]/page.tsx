@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -102,7 +102,7 @@ export default function PublicationDetailPage() {
     [rows]
   );
 
-  async function loadPublication() {
+  const loadPublication = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -124,9 +124,9 @@ export default function PublicationDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [publicationId]);
 
-  async function searchCatalog() {
+  const searchCatalog = useCallback(async () => {
     try {
       setCatalogLoading(true);
       const response = await frameworkAPI.searchNistControlCatalog({
@@ -140,19 +140,19 @@ export default function PublicationDetailPage() {
     } finally {
       setCatalogLoading(false);
     }
-  }
+  }, [catalogFrameworkCode, catalogSearch]);
 
   useEffect(() => {
     if (!publicationId) return;
     loadPublication();
-  }, [publicationId]);
+  }, [loadPublication, publicationId]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
       searchCatalog();
     }, 250);
     return () => clearTimeout(timeout);
-  }, [catalogSearch, catalogFrameworkCode]);
+  }, [searchCatalog]);
 
   function updateRow(index: number, key: keyof PublicationMapping, value: string | number) {
     setRows((prev) => {

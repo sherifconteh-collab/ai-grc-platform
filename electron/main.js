@@ -400,13 +400,13 @@ function buildMenu() {
         { type: 'separator' },
         {
           label: 'Documentation',
-          click: () => openSafeExternal('https://github.com/sherifconteh-collab/ControlWeave'),
+          click: () => openSafeExternal('https://github.com/sherifconteh-collab/ai-grc-platform'),
         },
         {
           label: 'Report Issue',
           click: () =>
             openSafeExternal(
-              'https://github.com/sherifconteh-collab/ControlWeave/issues'
+              'https://github.com/sherifconteh-collab/ai-grc-platform/issues'
             ),
         },
       ],

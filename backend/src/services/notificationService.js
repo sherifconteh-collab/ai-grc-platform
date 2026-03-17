@@ -45,7 +45,13 @@ async function maybeEmail(orgId, userId, type, title, message, link) {
   if (!userId) {
     // Broadcast: fetch all admin users in the org
     const users = await pool.query(
-      `SELECT u.id, u.email, u.full_name FROM users u WHERE u.organization_id = $1 AND u.role = 'admin'`,
+      `SELECT u.id,
+              u.email,
+              TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS full_name
+       FROM users u
+       WHERE u.organization_id = $1
+         AND u.role = 'admin'
+         AND u.is_active = true`,
       [orgId]
     );
     for (const user of users.rows) {
@@ -56,7 +62,12 @@ async function maybeEmail(orgId, userId, type, title, message, link) {
     }
   } else {
     const userResult = await pool.query(
-      `SELECT id, email, full_name FROM users WHERE id = $1`,
+      `SELECT id,
+              email,
+              TRIM(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')) AS full_name
+       FROM users
+       WHERE id = $1
+         AND is_active = true`,
       [userId]
     );
     if (userResult.rows.length > 0) {

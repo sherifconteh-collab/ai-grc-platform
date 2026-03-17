@@ -49,7 +49,7 @@ const navigationSections: NavigationSection[] = [
       { name: 'SBOM', href: '/dashboard/sbom', icon: '📦', requiredPermissions: ['assets.read'], minTier: 'enterprise' },
       { name: 'Security Posture', href: '/dashboard/security-posture', icon: '🛡️', requiredPermissions: ['ai.use'], minTier: 'pro' },
       { name: 'Threat Intelligence', href: '/dashboard/threat-intel', icon: '🎯', requiredPermissions: ['assets.read'], minTier: 'enterprise' },
-      { name: 'Vendor Risk', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'], minTier: 'pro' },
+      { name: 'Vendor Contracts', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'], minTier: 'pro' },
       { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['organizations.read'], minTier: 'enterprise' },
       { name: 'Financial Compliance', href: '/dashboard/cmdb/financial-services-workspace', icon: '🏦', requiredPermissions: ['assets.read'], minTier: 'govcloud' },
     ],
@@ -68,12 +68,11 @@ const navigationSections: NavigationSection[] = [
   {
     label: 'Organization',
     items: [
+      { name: 'My Organizations', href: '/dashboard/my-organizations', icon: '🔀', requiredPermissions: ['organizations.read'] },
       { name: 'Organization Profile', href: '/dashboard/organization', icon: '🏢', requiredPermissions: ['organizations.read'] },
       { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
       { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'], minTier: 'enterprise' },
       { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', requiredPermissionsAny: ['settings.manage', 'roles.manage'] },
-      { name: 'LLM Configuration', href: '/dashboard/settings/llm', icon: '🧠', requiredPermissions: ['settings.manage'] },
-      { name: 'License', href: '/dashboard/license', icon: '🔑', requiredPermissions: ['settings.manage'], isVisible: (u) => u?.role === 'admin' },
       { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔', requiredPermissions: ['dashboard.read'] },
       { name: 'Help Center', href: '/dashboard/help', icon: '❓', requiredPermissions: ['dashboard.read'] },
       { name: 'Report Issue', href: '/dashboard/report-issue', icon: '🐛', requiredPermissions: ['dashboard.read'] },
@@ -132,6 +131,11 @@ export default function Sidebar() {
               {user?.fullName || 'User'}
             </p>
             <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+            {user?.organizationName && (
+              <p className="text-xs text-purple-400 truncate" title={user.organizationName}>
+                🏢 {user.organizationName}
+              </p>
+            )}
           </div>
           <NotificationBell />
         </div>
@@ -193,7 +197,7 @@ export default function Sidebar() {
               }`}
             >
               <span className="mr-3 text-lg">🎛️</span>
-              Platform Settings
+              Feature Flags
             </Link>
             <Link
               href="/dashboard/platform/organizations"
@@ -205,6 +209,17 @@ export default function Sidebar() {
             >
               <span className="mr-3 text-lg">🏢</span>
               All Organizations
+            </Link>
+            <Link
+              href="/dashboard/platform/llm-status"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                pathname === '/dashboard/platform/llm-status'
+                  ? 'bg-amber-600 text-white'
+                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
+              }`}
+            >
+              <span className="mr-3 text-lg">🔌</span>
+              LLM Status
             </Link>
           </>
         )}

@@ -1,6 +1,7 @@
 // @tier: community
 require('dotenv').config();
 const { Pool } = require('pg');
+const { AIUC1_FRAMEWORK, AIUC1_CONTROLS: AIUC1_SHARED_CONTROLS } = require('./lib/aiuc1-data');
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL })
@@ -660,6 +661,13 @@ const frameworks = [
     ]
   },
   {
+    code: AIUC1_FRAMEWORK.code, name: AIUC1_FRAMEWORK.name, version: AIUC1_FRAMEWORK.version,
+    category: AIUC1_FRAMEWORK.category, tier_required: AIUC1_FRAMEWORK.tier_required,
+    framework_group: AIUC1_FRAMEWORK.framework_group,
+    description: AIUC1_FRAMEWORK.description,
+    controls: AIUC1_SHARED_CONTROLS
+  },
+  {
     code: 'iso_27002', name: 'ISO/IEC 27002:2022', version: '2022',
     category: 'Information Security', tier_required: 'enterprise',
     framework_group: 'iso_27000',
@@ -1033,6 +1041,22 @@ async function seed() {
       ['MAP-1', 'nist_ai_rmf', 'AIA-Art6', 'eu_ai_act', 85],
       ['GOVERN-1', 'nist_ai_rmf', 'ISO42-5.2', 'iso_42001', 90],
       ['MEASURE-1', 'nist_ai_rmf', 'ISO42-9.1', 'iso_42001', 85],
+      // AIUC-1 <-> NIST AI RMF
+      ['SEC-1', 'aiuc_1', 'MEASURE-2', 'nist_ai_rmf', 92],
+      ['ACC-1', 'aiuc_1', 'GOVERN-1', 'nist_ai_rmf', 88],
+      ['ACC-3', 'aiuc_1', 'GOVERN-2', 'nist_ai_rmf', 90],
+      ['SAF-1', 'aiuc_1', 'MEASURE-1', 'nist_ai_rmf', 90],
+      ['REL-3', 'aiuc_1', 'MEASURE-3', 'nist_ai_rmf', 90],
+      // AIUC-1 <-> EU AI Act
+      ['ACC-1', 'aiuc_1', 'AIA-Art12', 'eu_ai_act', 95],
+      ['ACC-3', 'aiuc_1', 'AIA-Art14', 'eu_ai_act', 95],
+      ['SEC-3', 'aiuc_1', 'AIA-Art15', 'eu_ai_act', 90],
+      ['SOC-4', 'aiuc_1', 'AIA-Art13', 'eu_ai_act', 92],
+      ['SOC-5', 'aiuc_1', 'AIA-Art27', 'eu_ai_act', 90],
+      // AIUC-1 <-> ISO 42001
+      ['ACC-3', 'aiuc_1', 'ISO42-5.1', 'iso_42001', 85],
+      ['SAF-5', 'aiuc_1', 'ISO42-10.2', 'iso_42001', 82],
+      ['ACC-4', 'aiuc_1', 'ISO42-10.1', 'iso_42001', 88],
       // Zero Trust <-> NIST 800-53
       ['ZTA-2', 'nist_800_207', 'IA-2', 'nist_800_53', 90],
       ['ZTA-3', 'nist_800_207', 'AC-6', 'nist_800_53', 90],

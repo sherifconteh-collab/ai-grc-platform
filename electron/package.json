@@ -107,7 +107,7 @@
     "publish": {
       "provider": "github",
       "owner": "sherifconteh-collab",
-      "repo": "ControlWeave"
+      "repo": "ai-grc-platform"
     }
   },
   "dependencies": {

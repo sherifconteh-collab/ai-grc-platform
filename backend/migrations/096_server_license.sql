@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS server_license (
   seats                INTEGER DEFAULT -1,
   maintenance_until    DATE,
   activated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  activated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  activated_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
 
   -- Ensures at most one row ever exists in this table.
   CONSTRAINT server_license_single_row CHECK (id = 1)

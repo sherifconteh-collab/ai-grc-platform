@@ -1,7 +1,8 @@
 // @tier: community
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { notificationsAPI } from '@/lib/api';
 
@@ -32,6 +33,7 @@ interface Notification {
 }
 
 function NotificationCenterInner() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -39,8 +41,9 @@ function NotificationCenterInner() {
   const [typeFilter, setTypeFilter] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const filterResetRef = useRef(false);
 
-  const load = async (p = page) => {
+  const load = useCallback(async (p: number) => {
     setLoading(true);
     try {
       const res = await notificationsAPI.getAll({
@@ -57,10 +60,21 @@ function NotificationCenterInner() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [typeFilter, unreadOnly]);
 
-  useEffect(() => { load(1); setPage(1); }, [typeFilter, unreadOnly]);
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => {
+    filterResetRef.current = true;
+    setPage(1);
+    load(1);
+  }, [load]);
+
+  useEffect(() => {
+    if (filterResetRef.current) {
+      filterResetRef.current = false;
+      return;
+    }
+    load(page);
+  }, [load, page]);
 
   const handleMarkRead = async (id: string) => {
     await notificationsAPI.markRead(id).catch(() => {});
@@ -78,7 +92,12 @@ function NotificationCenterInner() {
 
   const handleClick = (n: Notification) => {
     if (!n.is_read) handleMarkRead(n.id);
-    if (n.link) window.location.href = n.link;
+    if (!n.link) return;
+    if (n.link.startsWith('/')) {
+      router.push(n.link);
+      return;
+    }
+    window.location.href = n.link;
   };
 
   const formatTime = (ts: string) => {

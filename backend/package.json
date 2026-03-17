@@ -1,16 +1,15 @@
 {
   "name": "controlweave-backend",
-  "version": "2.2.0",
-  "license": "AGPL-3.0",
+  "version": "2.4.1",
   "engines": {
     "node": ">=20.16.0"
   },
   "scripts": {
     "build": "node -e \"console.log('Backend build step complete')\"",
     "start": "node src/server.js",
-    "start:prod": "NODE_ENV=production node src/server.js",
+    "start:prod": "node -e \"process.env.NODE_ENV = process.env.NODE_ENV || 'production'; require('./src/server.js')\"",
+    "start:railway": "npm run start:prod",
     "dev": "nodemon src/server.js",
-    "seed": "node scripts/seed-frameworks.js",
     "mcp": "node scripts/mcp-server-secure.js",
     "mcp:secure": "node scripts/mcp-server-secure.js",
     "mcp:login": "node scripts/mcp-auth-login.js",
@@ -34,18 +33,16 @@
     "seed:demo-accounts": "node scripts/seed-demo-accounts.js",
     "seed:demo:tiers:reset": "node scripts/reset-demo-org-tiers.js",
     "seed:demo:hf": "node scripts/seed-hf-demo-data.js",
-    "seed:demo:hf:utilities": "node scripts/seed-hf-demo-data.js --targets=admin@utilities.com",
+    "seed:demo:hf:govcloud": "node scripts/seed-hf-demo-data.js --targets=admin@govcloud.com",
     "seed:demo:tier-cmdb": "node scripts/seed-demo-tier-cmdb.js",
     "seed:demo:generate-samples": "node scripts/generate-vulnerability-upload-samples.js",
     "seed:demo-full": "npm run seed:demo:all-test-data",
     "seed:cmdb-demo": "node scripts/seed-cmdb-data.js",
     "seed:demo:cmdb-tiered": "node scripts/seed-demo-tier-cmdb.js",
     "seed:enterprise-demo": "node scripts/seed-enterprise-demo.js",
-    "seed:enterprise-test-data": "node scripts/seed-enterprise-test-data.js",
-    "seed:free-test-data": "node scripts/seed-free-test-data.js",
-    "seed:starter-test-data": "node scripts/seed-starter-test-data.js",
-    "seed:professional-test-data": "node scripts/seed-professional-test-data.js",
-    "seed:utilities-test-data": "node scripts/seed-utilities-test-data.js",
+    "seed:community-test-data": "node scripts/seed-community-test-data.js",
+    "seed:pro-test-data": "node scripts/seed-pro-test-data.js",
+    "seed:govcloud-test-data": "node scripts/seed-govcloud-test-data.js",
     "seed:demo:all-test-data": "node scripts/seed-demo-accounts-full-test-data.js",
     "seed:all-demos": "npm run seed:demo:all-test-data",
     "seed:showcase-demo": "node scripts/seed-demo-showcase.js",
@@ -53,6 +50,7 @@
     "seed:assessment-summary": "node scripts/seed-assessment-procedures-summary.js",
     "seed:assessment-ai-governance": "node scripts/seed-assessment-procedures-ai-governance.js",
     "seed:cyber-ai-profile": "node scripts/seed-cyber-ai-profile.js",
+    "seed:aiuc1": "node scripts/seed-aiuc1-framework.js",
     "seed:assessment-rich-all": "node scripts/seed-assessment-procedures-rich-all.js",
     "seed:assessment-remaining": "node scripts/seed-assessment-procedures-remaining.js",
     "security:generate-jwt-secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
@@ -62,7 +60,7 @@
     "qa:demo:integration": "node scripts/test-demo-accounts-integration.js",
     "qa:demo:verify-logins": "node scripts/verify-demo-account-logins.js",
     "qa:demo:complete-onboarding": "node scripts/complete-demo-onboarding-via-api.js",
-    "qa:demo:repair-utilities": "node scripts/repair-utilities-demo-account-via-api.js"
+    "qa:demo:repair-account": "node scripts/repair-demo-account-via-api.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.73.0",
@@ -77,7 +75,6 @@
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^4.18.2",
-    "express-rate-limit": "^8.2.2",
     "geoip-lite": "^1.4.10",
     "hono": "^4.12.7",
     "ioredis": "^5.4.1",
@@ -103,7 +100,7 @@
     "nodemon": "^3.0.1"
   },
   "overrides": {
-    "express-rate-limit": "$express-rate-limit",
+    "express-rate-limit": "8.2.2",
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
     "hono": "^4.12.7",

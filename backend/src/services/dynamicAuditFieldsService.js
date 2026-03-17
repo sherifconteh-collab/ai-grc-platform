@@ -11,15 +11,7 @@
  */
 
 const pool = require('../config/database');
-// Optional LLM service: AI field suggestions disabled if unavailable
-let llm;
-try {
-  llm = require('./llmService');
-} catch (e) {
-  llm = new Proxy({}, {
-    get() { return async () => null; }
-  });
-}
+const llm = require('./llmService');
 
 // Configuration
 const AI_RELEVANCE_THRESHOLD = 0.5; // Minimum confidence score for suggestions

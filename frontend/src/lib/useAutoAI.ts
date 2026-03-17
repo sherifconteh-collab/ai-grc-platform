@@ -49,6 +49,7 @@ export function useAutoAIResult(opts: {
   cooldownMs?: number;
   run: () => Promise<string>;
 }) {
+  const { cacheKey, enabled, signature, run } = opts;
   const ttlMs = Number.isFinite(opts.ttlMs) ? (opts.ttlMs as number) : 6 * 60 * 60 * 1000;
   const debounceMs = Number.isFinite(opts.debounceMs) ? (opts.debounceMs as number) : 2000; // Increased from 800ms to 2000ms
   const cooldownMs = Number.isFinite(opts.cooldownMs) ? (opts.cooldownMs as number) : 60 * 1000;
@@ -64,26 +65,31 @@ export function useAutoAIResult(opts: {
   const runSeq = useRef(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownUntilRef = useRef(0);
+  const runRef = useRef(run);
+
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
 
   const loadCache = useCallback((): CacheEntry | null => {
     try {
-      return safeParseCache(localStorage.getItem(opts.cacheKey));
+      return safeParseCache(localStorage.getItem(cacheKey));
     } catch {
       return null;
     }
-  }, [opts.cacheKey]);
+  }, [cacheKey]);
 
   const saveCache = useCallback((payload: CacheEntry) => {
     try {
-      localStorage.setItem(opts.cacheKey, JSON.stringify(payload));
+      localStorage.setItem(cacheKey, JSON.stringify(payload));
     } catch {
       // ignore cache failures (private mode, quota, etc.)
     }
-  }, [opts.cacheKey]);
+  }, [cacheKey]);
 
   const clearCache = useCallback(() => {
     try {
-      localStorage.removeItem(opts.cacheKey);
+      localStorage.removeItem(cacheKey);
     } catch {
       // ignore
     }
@@ -94,17 +100,17 @@ export function useAutoAIResult(opts: {
       lastUpdatedAt: null,
       fromCache: false
     });
-  }, [opts.cacheKey]);
+  }, [cacheKey]);
 
   const runNow = useCallback(async (force = false) => {
-    if (!opts.enabled && !force) return null;
+    if (!enabled && !force) return null;
 
     if (!force && Date.now() < cooldownUntilRef.current) {
       return null;
     }
 
     const cached = loadCache();
-    if (!force && cached && isFresh(cached, opts.signature, ttlMs)) {
+    if (!force && cached && isFresh(cached, signature, ttlMs)) {
       setState({
         status: 'ready',
         result: cached.result,
@@ -125,11 +131,11 @@ export function useAutoAIResult(opts: {
     }));
 
     try {
-      const result = await opts.run();
+      const result = await runRef.current();
       if (runSeq.current !== seq) return null;
 
       const updatedAt = new Date().toISOString();
-      saveCache({ signature: opts.signature, result, updatedAt });
+      saveCache({ signature, result, updatedAt });
       setState({
         status: 'ready',
         result,
@@ -165,12 +171,12 @@ export function useAutoAIResult(opts: {
       }));
       return null;
     }
-  }, [cooldownMs, loadCache, opts, saveCache, ttlMs]);
+  }, [cooldownMs, enabled, loadCache, saveCache, signature, ttlMs]);
 
   // Load cache when key/signature changes.
   useEffect(() => {
     const cached = loadCache();
-    if (cached && isFresh(cached, opts.signature, ttlMs)) {
+    if (cached && isFresh(cached, signature, ttlMs)) {
       setState({
         status: 'ready',
         result: cached.result,
@@ -188,14 +194,14 @@ export function useAutoAIResult(opts: {
       lastUpdatedAt: prev.lastUpdatedAt,
       fromCache: false
     }));
-  }, [loadCache, opts.signature, ttlMs]);
+  }, [loadCache, signature, ttlMs]);
 
   // Auto-run (debounced) when enabled and cache is stale/missing.
   useEffect(() => {
-    if (!opts.enabled) return;
+    if (!enabled) return;
 
     const cached = loadCache();
-    if (cached && isFresh(cached, opts.signature, ttlMs)) return;
+    if (cached && isFresh(cached, signature, ttlMs)) return;
 
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
@@ -210,7 +216,7 @@ export function useAutoAIResult(opts: {
         debounceTimer.current = null;
       }
     };
-  }, [debounceMs, loadCache, opts.enabled, opts.signature, runNow, ttlMs]);
+  }, [debounceMs, enabled, loadCache, signature, runNow, ttlMs]);
 
   return {
     ...state,

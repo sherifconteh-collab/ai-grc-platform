@@ -6,7 +6,7 @@ import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { poamAPI, vulnerabilitiesAPI } from '@/lib/api';
 
-type OpsTab = 'poam' | 'vulnerabilities' | 'controls_at_risk';
+type OpsTab = 'poam' | 'priority_vulnerabilities' | 'controls_at_risk';
 
 interface PoamItem {
   id: string;
@@ -43,6 +43,27 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: 'bg-blue-100 text-blue-800',
   info: 'bg-gray-100 text-gray-700',
 };
+
+const VULN_STATUS_COLORS: Record<string, string> = {
+  open: 'bg-yellow-100 text-yellow-800',
+  remediated: 'bg-green-100 text-green-800',
+  closed: 'bg-green-100 text-green-800',
+  risk_accepted: 'bg-purple-100 text-purple-800',
+  in_progress: 'bg-blue-100 text-blue-800',
+};
+
+const VULN_PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4,
+};
+
+function isOutstandingVulnerability(status: string | null | undefined) {
+  const normalized = String(status || 'open').toLowerCase();
+  return !['remediated', 'closed', 'risk_accepted'].includes(normalized);
+}
 
 function StatusBadge({ value, colorMap }: { value: string; colorMap: Record<string, string> }) {
   const cls = colorMap[value?.toLowerCase()] || 'bg-gray-100 text-gray-700';
@@ -82,7 +103,7 @@ export default function OperationsCenterPage() {
 
   useEffect(() => {
     if (activeTab === 'poam' && poams.length === 0) loadPoams();
-    if (activeTab === 'vulnerabilities' && vulns.length === 0) loadVulns();
+    if (activeTab === 'priority_vulnerabilities' && vulns.length === 0) loadVulns();
     if (activeTab === 'controls_at_risk' && poams.length === 0) {
       loadPoams();
       loadVulns();
@@ -106,7 +127,8 @@ export default function OperationsCenterPage() {
     try {
       setVulnLoading(true);
       const res = await vulnerabilitiesAPI.getAll({ limit: 500 });
-      setVulns(res.data?.data || []);
+      const payload = res.data?.data || {};
+      setVulns(Array.isArray(payload.findings) ? payload.findings : []);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load vulnerabilities');
     } finally {
@@ -190,9 +212,25 @@ export default function OperationsCenterPage() {
       )
     : vulns;
 
+  const prioritizedVulns = [...filteredVulns]
+    .filter((vuln) => isOutstandingVulnerability(vuln.status))
+    .sort((a, b) => {
+      const severityDiff =
+        (VULN_PRIORITY_ORDER[String(a.severity || 'info').toLowerCase()] ?? 99) -
+        (VULN_PRIORITY_ORDER[String(b.severity || 'info').toLowerCase()] ?? 99);
+      if (severityDiff !== 0) return severityDiff;
+      return String(a.title || '').localeCompare(String(b.title || ''));
+    })
+    .slice(0, 25);
+
+  const remainingPriorityVulns = Math.max(
+    0,
+    filteredVulns.filter((vuln) => isOutstandingVulnerability(vuln.status)).length - prioritizedVulns.length
+  );
+
   const tabs: { id: OpsTab; label: string }[] = [
     { id: 'poam', label: 'POA&Ms' },
-    { id: 'vulnerabilities', label: 'Vulnerabilities' },
+    { id: 'priority_vulnerabilities', label: 'Priority Vulns' },
     { id: 'controls_at_risk', label: 'Controls at Risk' },
   ];
 
@@ -315,7 +353,7 @@ export default function OperationsCenterPage() {
         )}
 
         {/* Vulnerabilities Tab */}
-        {activeTab === 'vulnerabilities' && (
+        {activeTab === 'priority_vulnerabilities' && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-4 text-sm text-gray-600">
@@ -325,19 +363,32 @@ export default function OperationsCenterPage() {
                 <span className="text-blue-700 font-medium">Low: {vulnCounts.low}</span>
                 <span className="text-gray-500">Open: {vulnCounts.open} · Remediated: {vulnCounts.remediated}</span>
               </div>
-              <input
-                type="text"
-                placeholder="Filter vulnerabilities..."
-                value={vulnFilter}
-                onChange={e => setVulnFilter(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Filter priority findings..."
+                  value={vulnFilter}
+                  onChange={e => setVulnFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <Link
+                  href="/dashboard/vulnerabilities"
+                  className="px-3 py-1.5 text-sm border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50"
+                >
+                  Full Workspace
+                </Link>
+              </div>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-900">
+              Operations only shows the highest-priority open findings so this tab stays action-focused. Use the
+              full Vulnerabilities workspace for scan imports, analytics, exports, and full finding history.
             </div>
 
             {vulnLoading ? (
               <div className="py-8 text-center text-gray-500 text-sm">Loading vulnerabilities...</div>
-            ) : filteredVulns.length === 0 ? (
-              <div className="py-8 text-center text-gray-400 text-sm">No vulnerabilities found.</div>
+            ) : prioritizedVulns.length === 0 ? (
+              <div className="py-8 text-center text-gray-400 text-sm">No open priority vulnerabilities found.</div>
             ) : (
               <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -351,7 +402,7 @@ export default function OperationsCenterPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredVulns.map(vuln => (
+                    {prioritizedVulns.map(vuln => (
                       <tr key={vuln.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           {vuln.cve_id && (
@@ -363,21 +414,27 @@ export default function OperationsCenterPage() {
                           <StatusBadge value={vuln.severity} colorMap={SEVERITY_COLORS} />
                         </td>
                         <td className="px-4 py-3">
-                          <StatusBadge value={vuln.status || 'open'} colorMap={{ open: 'bg-yellow-100 text-yellow-800', remediated: 'bg-green-100 text-green-800', closed: 'bg-green-100 text-green-800', risk_accepted: 'bg-purple-100 text-purple-800', in_progress: 'bg-blue-100 text-blue-800' }} />
+                          <StatusBadge value={vuln.status || 'open'} colorMap={VULN_STATUS_COLORS} />
                         </td>
                         <td className="px-4 py-3 text-gray-600">{vuln.asset_name || '—'}</td>
                         <td className="px-4 py-3">
                           <Link
-                            href={`/dashboard/vulnerabilities/${vuln.id}`}
+                            href={`/dashboard/vulnerabilities?findingId=${encodeURIComponent(vuln.id)}`}
                             className="text-xs text-purple-600 hover:text-purple-800"
                           >
-                            View →
+                            Open in workspace →
                           </Link>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {remainingPriorityVulns > 0 && (
+                  <div className="border-t border-gray-200 px-4 py-3 text-xs text-gray-500">
+                    {remainingPriorityVulns} additional lower-priority findings are available in the full
+                    Vulnerabilities workspace.
+                  </div>
+                )}
               </div>
             )}
           </div>

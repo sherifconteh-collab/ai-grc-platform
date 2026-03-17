@@ -1,7 +1,7 @@
 // @tier: community
 'use client';
 
-import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { assessmentsAPI, usersAPI, aiAPI } from '@/lib/api';
 import { useAutoAIResult } from '@/lib/useAutoAI';
@@ -113,9 +113,103 @@ function AssessmentsPageInner() {
   const [selectedLeadAuditorId, setSelectedLeadAuditorId] = useState('');
   const [selectedOwnerUserId, setSelectedOwnerUserId] = useState('');
 
+  const loadHandoffData = useCallback(async () => {
+    if (!canAssignAuditors) return;
+    try {
+      setHandoffLoading(true);
+      const [engagementsRes, usersRes] = await Promise.all([
+        assessmentsAPI.getEngagements({ limit: 200, offset: 0 }),
+        usersAPI.getOrgUsers()
+      ]);
+
+      setEngagements(engagementsRes.data?.data?.engagements || []);
+      setTeamUsers(usersRes.data?.data || []);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load auditor handoff data');
+    } finally {
+      setHandoffLoading(false);
+    }
+  }, [canAssignAuditors]);
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [frameworksRes, statsRes] = await Promise.all([
+        assessmentsAPI.getFrameworks(),
+        assessmentsAPI.getStats(),
+      ]);
+
+      // Backend historically returned one row per (framework_code, source_document).
+      // Normalize to one row per framework_code to avoid duplicate dropdown entries and React key warnings.
+      const frameworkRows: FrameworkOption[] = Array.isArray(frameworksRes.data?.data) ? frameworksRes.data.data : [];
+      const frameworkMap = new Map<string, { row: FrameworkOption; procedureTotal: number; controlMax: number; sources: Set<string> }>();
+      for (const entry of frameworkRows) {
+        const code = String(entry.code || '').trim();
+        if (!code) continue;
+        const name = String(entry.name || '').trim() || code;
+        const procCount = Number.parseInt(String(entry.procedure_count || '0'), 10) || 0;
+        const controlCount = Number.parseInt(String(entry.control_count || '0'), 10) || 0;
+
+        const sources = new Set<string>();
+        const rawSource = entry.source_document ? String(entry.source_document) : '';
+        rawSource.split('|').map((s) => s.trim()).filter(Boolean).forEach((s) => sources.add(s));
+
+        if (!frameworkMap.has(code)) {
+          frameworkMap.set(code, {
+            row: { code, name, procedure_count: '0', control_count: '0', source_document: null },
+            procedureTotal: 0,
+            controlMax: 0,
+            sources
+          });
+        }
+
+        const state = frameworkMap.get(code)!;
+        state.procedureTotal += procCount;
+        state.controlMax = Math.max(state.controlMax, controlCount);
+        state.row.name = name;
+        sources.forEach((s) => state.sources.add(s));
+      }
+
+      const normalizedFrameworks: FrameworkOption[] = Array.from(frameworkMap.values())
+        .map((state) => ({
+          ...state.row,
+          procedure_count: String(state.procedureTotal),
+          control_count: String(state.controlMax),
+          source_document: state.sources.size > 0 ? Array.from(state.sources).sort().join(' | ') : null
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+      setFrameworks(normalizedFrameworks);
+      setStats(statsRes.data.data);
+      if (canAssignAuditors) {
+        await loadHandoffData();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load assessment data');
+    } finally {
+      setLoading(false);
+    }
+  }, [canAssignAuditors, loadHandoffData]);
+
+  const loadProcedures = useCallback(async () => {
+    try {
+      const res = await assessmentsAPI.getProcedures({
+        framework_code: selectedFramework || undefined,
+        control_id: selectedControl || undefined,
+        procedure_type: selectedType || undefined,
+        depth: selectedDepth || undefined,
+        search: searchQuery || undefined,
+        limit: 100,
+      });
+      setProcedures(res.data.data.procedures);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load procedures');
+    }
+  }, [searchQuery, selectedControl, selectedDepth, selectedFramework, selectedType]);
+
   useEffect(() => {
     loadInitialData();
-  }, [canAssignAuditors]);
+  }, [loadInitialData]);
 
   useEffect(() => {
     if (initializedFromQuery.current) return;
@@ -153,7 +247,7 @@ function AssessmentsPageInner() {
     if (activeTab === 'procedures') {
       loadProcedures();
     }
-  }, [activeTab, selectedFramework, selectedControl, selectedType, selectedDepth, searchQuery]);
+  }, [activeTab, loadProcedures]);
 
   const procedureFamilies = useMemo(
     () => groupByControlFamily(procedures, (procedure) => procedure.control_id),
@@ -219,100 +313,6 @@ function AssessmentsPageInner() {
     setSelectedOwnerUserId(selectedHandoffEngagement.engagement_owner_id || '');
     setHandoffNotice('');
   }, [selectedHandoffEngagement]);
-
-  const loadHandoffData = async () => {
-    if (!canAssignAuditors) return;
-    try {
-      setHandoffLoading(true);
-      const [engagementsRes, usersRes] = await Promise.all([
-        assessmentsAPI.getEngagements({ limit: 200, offset: 0 }),
-        usersAPI.getOrgUsers()
-      ]);
-
-      setEngagements(engagementsRes.data?.data?.engagements || []);
-      setTeamUsers(usersRes.data?.data || []);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load auditor handoff data');
-    } finally {
-      setHandoffLoading(false);
-    }
-  };
-
-  const loadInitialData = async () => {
-    try {
-      setLoading(true);
-      const [frameworksRes, statsRes] = await Promise.all([
-        assessmentsAPI.getFrameworks(),
-        assessmentsAPI.getStats(),
-      ]);
-
-      // Backend historically returned one row per (framework_code, source_document).
-      // Normalize to one row per framework_code to avoid duplicate dropdown entries and React key warnings.
-      const frameworkRows: FrameworkOption[] = Array.isArray(frameworksRes.data?.data) ? frameworksRes.data?.data : [];
-      const frameworkMap = new Map<string, { row: FrameworkOption; procedureTotal: number; controlMax: number; sources: Set<string> }>();
-      for (const entry of frameworkRows) {
-        const code = String(entry.code || '').trim();
-        if (!code) continue;
-        const name = String(entry.name || '').trim() || code;
-        const procCount = Number.parseInt(String(entry.procedure_count || '0'), 10) || 0;
-        const controlCount = Number.parseInt(String(entry.control_count || '0'), 10) || 0;
-
-        const sources = new Set<string>();
-        const rawSource = entry.source_document ? String(entry.source_document) : '';
-        rawSource.split('|').map((s) => s.trim()).filter(Boolean).forEach((s) => sources.add(s));
-
-        if (!frameworkMap.has(code)) {
-          frameworkMap.set(code, {
-            row: { code, name, procedure_count: '0', control_count: '0', source_document: null },
-            procedureTotal: 0,
-            controlMax: 0,
-            sources
-          });
-        }
-
-        const state = frameworkMap.get(code)!;
-        state.procedureTotal += procCount;
-        state.controlMax = Math.max(state.controlMax, controlCount);
-        state.row.name = name;
-        sources.forEach((s) => state.sources.add(s));
-      }
-
-      const normalizedFrameworks: FrameworkOption[] = Array.from(frameworkMap.values())
-        .map((state) => ({
-          ...state.row,
-          procedure_count: String(state.procedureTotal),
-          control_count: String(state.controlMax),
-          source_document: state.sources.size > 0 ? Array.from(state.sources).sort().join(' | ') : null
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-
-      setFrameworks(normalizedFrameworks);
-      setStats(statsRes.data?.data);
-      if (canAssignAuditors) {
-        await loadHandoffData();
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load assessment data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadProcedures = async () => {
-    try {
-      const res = await assessmentsAPI.getProcedures({
-        framework_code: selectedFramework || undefined,
-        control_id: selectedControl || undefined,
-        procedure_type: selectedType || undefined,
-        depth: selectedDepth || undefined,
-        search: searchQuery || undefined,
-        limit: 100,
-      });
-      setProcedures(res.data?.data?.procedures);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load procedures');
-    }
-  };
 
   const handleAuditorHandoff = async () => {
     if (!canAssignAuditors || !selectedHandoffEngagementId || !selectedLeadAuditorId) return;

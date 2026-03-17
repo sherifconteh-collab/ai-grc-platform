@@ -14,7 +14,7 @@ Before we start, make sure you have:
 
 1. Open VS Code
 2. File → Open Folder
-3. Navigate to this folder: `ControlWeave`
+3. Navigate to this folder: `ai-grc-platform`
 4. Click "Select Folder"
 
 ---
@@ -121,7 +121,7 @@ EOF
 
 ### Start the Backend
 ```bash
-# In terminal from ControlWeave/backend folder
+# In terminal from ai-grc-platform/backend folder
 npm run dev
 ```
 

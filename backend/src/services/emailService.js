@@ -79,7 +79,7 @@ async function getFromEmail() {
       return result.rows[0].setting_value;
     }
   } catch { /* ignore */ }
-  return 'ControlWeave <noreply@controlweave.com>';
+  return 'ControlWeave <contehconsulting@gmail.com>';
 }
 
 /**

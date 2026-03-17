@@ -6,6 +6,14 @@
 
 BEGIN;
 
+-- Drop legacy constraints before updating rows. The previous CHECKs only allow
+-- old tier names and would reject the renamed values during the data rewrite.
+ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_tier_valid_check;
+ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_tier_check;
+ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_paid_tier_valid_check;
+ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_billing_status_check;
+ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_billing_status_valid_check;
+
 -- ─── organizations.tier ───
 UPDATE organizations SET tier = 'community'  WHERE tier = 'free';
 UPDATE organizations SET tier = 'pro'        WHERE tier = 'starter';
@@ -38,24 +46,14 @@ UPDATE asset_categories SET tier_required = 'enterprise' WHERE tier_required = '
 UPDATE asset_categories SET tier_required = 'govcloud'   WHERE tier_required = 'utilities';
 
 -- ─── Update CHECK constraints ───
--- Drop old constraints (names may vary; use DO block for safety)
-DO $$
-BEGIN
-  -- organizations.tier
-  BEGIN
-    ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_tier_check;
-  EXCEPTION WHEN OTHERS THEN NULL;
-  END;
-  -- organizations.billing_status
-  BEGIN
-    ALTER TABLE organizations DROP CONSTRAINT IF EXISTS organizations_billing_status_check;
-  EXCEPTION WHEN OTHERS THEN NULL;
-  END;
-END $$;
-
--- Add updated constraints accepting both old + new values during transition
-ALTER TABLE organizations ADD CONSTRAINT organizations_tier_check
+ALTER TABLE organizations ADD CONSTRAINT organizations_tier_valid_check
   CHECK (tier IN ('community', 'pro', 'enterprise', 'govcloud'));
+
+ALTER TABLE organizations ADD CONSTRAINT organizations_paid_tier_valid_check
+  CHECK (
+    paid_tier IS NULL
+    OR paid_tier IN ('pro', 'enterprise', 'govcloud')
+  );
 
 ALTER TABLE organizations ADD CONSTRAINT organizations_billing_status_check
   CHECK (billing_status IN ('community', 'trial', 'active_paid', 'past_due', 'canceling', 'canceled', 'comped', 'license'));

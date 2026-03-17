@@ -1,12 +1,13 @@
 // @tier: community
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { organizationAPI, frameworkAPI, assessmentsAPI } from '@/lib/api';
 import { hasPermission, normalizeTier } from '@/lib/access';
+import { APP_POSITIONING_SHORT } from '@/lib/branding';
 
 function getFrameworkLimit(tier: string): number {
   switch (tier) {
@@ -15,7 +16,6 @@ function getFrameworkLimit(tier: string): number {
     default: return -1;
   }
 }
-import { APP_POSITIONING_SHORT } from '@/lib/branding';
 
 interface Framework {
   id: string;
@@ -87,29 +87,9 @@ export default function FrameworksPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    if (user?.organizationId) {
-      loadFrameworks();
-      loadSelectedFrameworks();
-      loadNistProfile();
-      loadProcedureCounts();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user?.organizationId) return;
-
-    const timeout = setTimeout(() => {
-      loadNistPublications();
-    }, 200);
-
-    return () => clearTimeout(timeout);
-  }, [user, nistSearch, nistFamilyFilter, nistTypeFilter, complianceProfile]);
-
-  const loadFrameworks = async () => {
+  const loadFrameworks = useCallback(async () => {
     try {
       const response = await frameworkAPI.getAll();
-      // Backend returns { success: true, data: [...] }, Axios wraps in response.data
       const backendFrameworks = (response.data?.data || []).map((f: any) => ({
         id: f.id,
         code: f.code,
@@ -125,9 +105,9 @@ export default function FrameworksPage() {
     } catch (err) {
       console.error('Failed to load frameworks:', err);
     }
-  };
+  }, []);
 
-  const loadProcedureCounts = async () => {
+  const loadProcedureCounts = useCallback(async () => {
     if (!canReadAssessments) return;
     try {
       const res = await assessmentsAPI.getFrameworks();
@@ -143,11 +123,12 @@ export default function FrameworksPage() {
     } catch {
       // Best-effort only; avoid blocking framework selection UX.
     }
-  };
+  }, [canReadAssessments]);
 
-  const loadSelectedFrameworks = async () => {
+  const loadSelectedFrameworks = useCallback(async () => {
+    if (!user?.organizationId) return;
     try {
-      const response = await organizationAPI.getFrameworks(user!.organizationId);
+      const response = await organizationAPI.getFrameworks(user.organizationId);
       const selected = (response.data?.data || []).map((f: any) => f.id);
       setSelectedFrameworks(selected);
     } catch (err) {
@@ -155,20 +136,20 @@ export default function FrameworksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.organizationId]);
 
-  const loadNistProfile = async () => {
+  const loadNistProfile = useCallback(async () => {
     try {
       const response = await organizationAPI.getMyProfile();
       const profile = response.data?.data?.profile || {};
       setComplianceProfile((profile.compliance_profile || 'private') as 'private' | 'federal' | 'hybrid');
       setNistMode((profile.nist_adoption_mode || 'best_practice') as 'best_practice' | 'mandatory');
-    } catch (err) {
+    } catch {
       // Keep defaults if profile fetch fails.
     }
-  };
+  }, []);
 
-  const loadNistPublications = async () => {
+  const loadNistPublications = useCallback(async () => {
     try {
       setLoadingNist(true);
       const response = await frameworkAPI.getNistPublications({
@@ -189,14 +170,33 @@ export default function FrameworksPage() {
       );
       setNistFamilies(payload.families || []);
       setNistTypes(payload.types || []);
-    } catch (err) {
+    } catch {
       setNistPublications([]);
       setNistFamilies([]);
       setNistTypes([]);
     } finally {
       setLoadingNist(false);
     }
-  };
+  }, [complianceProfile, nistFamilyFilter, nistSearch, nistTypeFilter]);
+
+  useEffect(() => {
+    if (user?.organizationId) {
+      loadFrameworks();
+      loadSelectedFrameworks();
+      loadNistProfile();
+      loadProcedureCounts();
+    }
+  }, [loadFrameworks, loadNistProfile, loadProcedureCounts, loadSelectedFrameworks, user?.organizationId]);
+
+  useEffect(() => {
+    if (!user?.organizationId) return;
+
+    const timeout = setTimeout(() => {
+      loadNistPublications();
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [loadNistPublications, user?.organizationId]);
 
   const toggleFramework = (frameworkId: string) => {
     if (!canManageFrameworks) return;

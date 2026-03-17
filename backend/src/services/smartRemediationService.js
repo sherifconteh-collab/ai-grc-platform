@@ -11,13 +11,7 @@
  */
 
 const pool = require('../config/database');
-// Optional LLM service: AI remediation features disabled if unavailable
-let llm;
-try {
-  llm = require('./llmService');
-} catch (e) {
-  llm = new Proxy({}, { get() { return async () => ''; } });
-}
+const llm = require('./llmService');
 
 /**
  * Generate smart remediation plan for a control gap

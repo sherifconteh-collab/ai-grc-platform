@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { frameworkAPI, organizationAPI } from '@/lib/api';
@@ -74,27 +74,7 @@ export default function FrameworkMappingCoveragePage() {
   const [families, setFamilies] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const bootstrap = async () => {
-      try {
-        const profileResponse = await organizationAPI.getMyProfile();
-        const profile = profileResponse.data?.data?.profile || {};
-        if (!isMounted) return;
-        setPrivateOnly(profile.compliance_profile === 'private');
-      } catch {
-        // Keep defaults when profile is unavailable.
-      }
-    };
-
-    bootstrap();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  async function loadCoverage() {
+  const loadCoverage = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -125,14 +105,34 @@ export default function FrameworkMappingCoveragePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [familyFilter, federalOnly, privateOnly, search, typeFilter]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const bootstrap = async () => {
+      try {
+        const profileResponse = await organizationAPI.getMyProfile();
+        const profile = profileResponse.data?.data?.profile || {};
+        if (!isMounted) return;
+        setPrivateOnly(profile.compliance_profile === 'private');
+      } catch {
+        // Keep defaults when profile is unavailable.
+      }
+    };
+
+    bootstrap();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
       loadCoverage();
     }, 250);
     return () => clearTimeout(timeout);
-  }, [search, familyFilter, typeFilter, privateOnly, federalOnly]);
+  }, [loadCoverage]);
 
   const heatmapCellLookup = useMemo(() => {
     const lookup = new Map<string, CoverageCell>();

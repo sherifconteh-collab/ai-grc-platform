@@ -32,9 +32,9 @@ In short:
 Fork the repo on GitHub and clone your fork locally:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ControlWeave.git
-cd ControlWeave
-git remote add upstream https://github.com/sherifconteh-collab/ControlWeave.git
+git clone https://github.com/YOUR_USERNAME/ai-grc-platform.git
+cd ai-grc-platform
+git remote add upstream https://github.com/sherifconteh-collab/ai-grc-platform.git
 ```
 
 ### 2. Create a Feature Branch
@@ -147,8 +147,8 @@ security/GRC-88/fix-ilike-injection
 
 ```bash
 # 1. Clone your fork
-git clone https://github.com/YOUR_USERNAME/ControlWeave.git
-cd ControlWeave
+git clone https://github.com/YOUR_USERNAME/ai-grc-platform.git
+cd ai-grc-platform
 
 # 2. Set up the database
 createdb ai_grc_platform
@@ -167,7 +167,7 @@ npm run seed        # Seed frameworks and assessment procedures
 npm start           # API starts on http://localhost:3001
 
 # 4. Set up the frontend (new terminal, from repo root)
-cd ControlWeave/frontend
+cd ai-grc-platform/frontend
 npm install
 npm run dev         # UI starts on http://localhost:3000
 ```
@@ -297,7 +297,7 @@ const res = await fetch('/api/v1/frameworks');
 
 ## 🐛 Reporting Bugs
 
-Use the [Bug Report issue template](https://github.com/sherifconteh-collab/ControlWeave/issues/new?template=bug_report.md) and include:
+Use the [Bug Report issue template](https://github.com/sherifconteh-collab/ai-grc-platform/issues/new?template=bug_report.md) and include:
 
 - **Clear title**: Describes the problem concisely
 - **Description**: What happened vs. what should happen
@@ -327,7 +327,7 @@ Environment:
 
 ## 💡 Suggesting Features
 
-Use the [Feature Request issue template](https://github.com/sherifconteh-collab/ControlWeave/issues/new?template=feature_request.md) and include:
+Use the [Feature Request issue template](https://github.com/sherifconteh-collab/ai-grc-platform/issues/new?template=feature_request.md) and include:
 
 - **Clear title**: Describes the feature
 - **Problem**: What problem does this solve?
@@ -335,7 +335,7 @@ Use the [Feature Request issue template](https://github.com/sherifconteh-collab/
 - **Alternatives**: Other solutions you considered
 - **Impact**: Who benefits from this and how?
 
-For larger features, open a [GitHub Discussion](https://github.com/sherifconteh-collab/ControlWeave/discussions) first to get community feedback before investing time in implementation.
+For larger features, open a [GitHub Discussion](https://github.com/sherifconteh-collab/ai-grc-platform/discussions) first to get community feedback before investing time in implementation.
 
 ## 📦 Contributing to the SDK
 

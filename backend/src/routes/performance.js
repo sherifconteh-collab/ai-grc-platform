@@ -1,7 +1,7 @@
 // @tier: community
 /**
  * Performance Monitoring Routes
- * Provides endpoints for monitoring application performance
+ * Provides endpoints for monitoring application performance on Railway
  * 
  * Security:
  * - All endpoints require admin permission
@@ -222,7 +222,9 @@ router.get('/system', requirePermission('admin'), (req, res) => {
       },
       environment: {
         nodeEnv: process.env.NODE_ENV || 'development',
-        port: process.env.PORT || 3001
+        port: process.env.PORT || 3001,
+        isRailway: !!process.env.RAILWAY_ENVIRONMENT_NAME,
+        railwayEnv: process.env.RAILWAY_ENVIRONMENT_NAME || null
       }
     };
 

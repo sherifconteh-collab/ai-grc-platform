@@ -1,7 +1,7 @@
 // @tier: community
 /**
  * Performance Monitoring Middleware
- * Tracks request performance metrics for deployment monitoring
+ * Tracks request performance metrics for Railway deployment monitoring
  */
 
 // In-memory storage for performance metrics (last 1000 requests)

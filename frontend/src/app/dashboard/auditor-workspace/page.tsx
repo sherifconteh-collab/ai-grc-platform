@@ -1,12 +1,13 @@
 // @tier: community
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { assessmentsAPI, aiAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessAuditorWorkspace, hasPermission } from '@/lib/access';
 import { groupByControlFamily, sameControlRef } from '@/lib/controlFamilies';
+import { useToast } from '@/hooks/useToast';
 
 type WorkspaceTab = 'summary' | 'procedures' | 'pbc' | 'workpapers' | 'findings' | 'signoffs' | 'analytics' | 'ai_insights' | 'client_portal';
 
@@ -66,7 +67,7 @@ export default function AuditorWorkspacePage() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
+  const { toast, showToast } = useToast(2400);
 
   const [engagements, setEngagements] = useState<any[]>([]);
   const [selectedEngagementId, setSelectedEngagementId] = useState<string | null>(null);
@@ -263,14 +264,6 @@ export default function AuditorWorkspacePage() {
   }, [procedureFamilies]);
 
   useEffect(() => {
-    if (!canViewWorkspace) {
-      setLoading(false);
-      return;
-    }
-    loadInitial();
-  }, [canViewWorkspace]);
-
-  useEffect(() => {
     if (!canViewWorkspace || !selectedEngagementId) return;
     loadWorkspace(selectedEngagementId);
   }, [canViewWorkspace, selectedEngagementId]);
@@ -291,19 +284,35 @@ export default function AuditorWorkspacePage() {
     if (selectedFinding?.status) setFindingStatusDraft(selectedFinding.status);
   }, [selectedFinding]);
 
-  function showToast(message: string) {
-    setToast(message);
-    setTimeout(() => setToast(''), 2400);
-  }
+  // ---------- Client Portal Functions ----------
+  const loadWorkspaceLinks = useCallback(async () => {
+    try {
+      setLinksLoading(true);
+      const response = await assessmentsAPI.getAuditorWorkspaceLinks();
+      setWorkspaceLinks(asList(response.data?.data || response.data));
+    } catch {
+      setWorkspaceLinks([]);
+    } finally {
+      setLinksLoading(false);
+    }
+  }, []);
 
-  async function refreshEngagements() {
+  const clientPortalLoaded = useRef(false);
+  useEffect(() => {
+    if (selectedTab === 'client_portal' && canViewWorkspace && !clientPortalLoaded.current) {
+      clientPortalLoaded.current = true;
+      loadWorkspaceLinks();
+    }
+  }, [selectedTab, canViewWorkspace, loadWorkspaceLinks]);
+
+  const refreshEngagements = useCallback(async () => {
     const response = await assessmentsAPI.getEngagements({ limit: 100, offset: 0 });
     const rows = asList(response.data?.data, 'engagements');
     setEngagements(rows);
     return rows;
-  }
+  }, []);
 
-  async function loadInitial() {
+  const loadInitial = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -313,7 +322,15 @@ export default function AuditorWorkspacePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [refreshEngagements]);
+
+  useEffect(() => {
+    if (!canViewWorkspace) {
+      setLoading(false);
+      return;
+    }
+    loadInitial();
+  }, [canViewWorkspace, loadInitial]);
 
   async function loadWorkspace(engagementId: string) {
     try {
@@ -696,19 +713,6 @@ export default function AuditorWorkspacePage() {
     }
   }
 
-  // ---------- Client Portal Functions ----------
-  async function loadWorkspaceLinks() {
-    try {
-      setLinksLoading(true);
-      const response = await assessmentsAPI.getAuditorWorkspaceLinks();
-      setWorkspaceLinks(asList(response.data?.data || response.data));
-    } catch {
-      setWorkspaceLinks([]);
-    } finally {
-      setLinksLoading(false);
-    }
-  }
-
   async function createWorkspaceLink() {
     if (!newLinkName.trim()) return;
     await runSave(async () => {
@@ -766,7 +770,7 @@ export default function AuditorWorkspacePage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {toast && <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-4 py-2 rounded-lg shadow">{toast}</div>}
+        {toast && <div role="status" aria-live="polite" className="fixed top-6 right-6 z-50 bg-green-600 text-white px-4 py-2 rounded-lg shadow">{toast}</div>}
 
         {/* Premium Header */}
         <div className="bg-gradient-to-r from-gray-900 via-purple-900 to-indigo-900 rounded-xl shadow-lg p-6 text-white">

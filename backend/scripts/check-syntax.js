@@ -1,5 +1,6 @@
 // @tier: community
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
@@ -32,11 +33,43 @@ const files = TARGET_DIRS
 let failed = false;
 
 for (const file of files) {
-  const result = spawnSync(process.execPath, ['--check', file], { stdio: 'pipe' });
-  if (result.status !== 0) {
+  try {
+    const source = fs.readFileSync(file, 'utf8').replace(/^#!.*$/m, '');
+    const tempBase = path.join(
+      os.tmpdir(),
+      `controlweave-syntax-${process.pid}-${Buffer.from(path.relative(ROOT, file)).toString('hex')}`
+    );
+
+    const runCheck = (ext) => {
+      const tempFile = `${tempBase}${ext}`;
+      try {
+        fs.writeFileSync(tempFile, source);
+        return spawnSync(process.execPath, ['--check', tempFile], { encoding: 'utf8' });
+      } finally {
+        try {
+          fs.unlinkSync(tempFile);
+        } catch (_) {
+          // ignore temp cleanup failures
+        }
+      }
+    };
+
+    let result = runCheck('.cjs');
+    const output = `${result.stderr || ''}\n${result.stdout || ''}`;
+    if (
+      result.status !== 0 &&
+      /Cannot use import statement outside a module|Unexpected token 'export'|Unexpected token 'import'/i.test(output)
+    ) {
+      result = runCheck('.mjs');
+    }
+
+    if (result.status !== 0) {
+      throw new Error((result.stderr || result.stdout || 'Syntax check failed').trim());
+      }
+  } catch (error) {
     failed = true;
     process.stderr.write(`Syntax check failed: ${path.relative(ROOT, file)}\n`);
-    process.stderr.write(result.stderr.toString());
+    process.stderr.write(`${error.stack || error.message}\n`);
   }
 }
 

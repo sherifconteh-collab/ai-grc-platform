@@ -799,4 +799,171 @@ router.put('/nist-publications/:id/mappings', requirePermission('frameworks.mana
   }
 });
 
+// GET /frameworks/crosswalk-coverage
+// Returns a matrix showing how many controls in each target framework would be
+// auto-satisfied if all controls in a source framework were implemented.
+// Useful for compliance ROI planning: "If we implement ISO 27001, how much of NIST CSF do we get free?"
+router.get('/crosswalk-coverage', requirePermission('frameworks.read'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+
+    // Get all active frameworks
+    const frameworksResult = await pool.query(
+      `SELECT id, code, name, version FROM frameworks WHERE is_active = true ORDER BY name`
+    );
+    const frameworks = frameworksResult.rows;
+
+    if (frameworks.length === 0) {
+      return res.json({ success: true, data: { frameworks: [], matrix: {} } });
+    }
+
+    // Get crosswalk-eligible pair stats in one query:
+    // For each (source_fw, target_fw) pair, count how many target controls
+    // have at least one mapping from a source control with score >= 90.
+    const matrixResult = await pool.query(
+      `WITH eligible_mappings AS (
+         SELECT
+           sf.id   AS source_fw_id,
+           sf.code AS source_fw_code,
+           tf.id   AS target_fw_id,
+           tf.code AS target_fw_code,
+           cm.target_control_id,
+           cm.source_control_id,
+           cm.similarity_score
+         FROM control_mappings cm
+         JOIN framework_controls src_fc ON src_fc.id = cm.source_control_id
+         JOIN frameworks sf ON sf.id = src_fc.framework_id AND sf.is_active = true
+         JOIN framework_controls tgt_fc ON tgt_fc.id = cm.target_control_id
+         JOIN frameworks tf ON tf.id = tgt_fc.framework_id AND tf.is_active = true
+         WHERE cm.similarity_score >= 90
+           AND sf.id <> tf.id
+       ),
+       -- Also include the reverse direction (mappings are bidirectional)
+       eligible_reverse AS (
+         SELECT
+           new_src_fw.id   AS source_fw_id,
+           new_src_fw.code AS source_fw_code,
+           new_tgt_fw.id   AS target_fw_id,
+           new_tgt_fw.code AS target_fw_code,
+           cm.source_control_id AS target_control_id,
+           cm.target_control_id AS source_control_id,
+           cm.similarity_score
+         FROM control_mappings cm
+         -- original target control becomes the source in the reverse direction
+         JOIN framework_controls orig_tgt_fc ON orig_tgt_fc.id = cm.target_control_id
+         JOIN frameworks new_src_fw ON new_src_fw.id = orig_tgt_fc.framework_id AND new_src_fw.is_active = true
+         -- original source control becomes the target in the reverse direction
+         JOIN framework_controls orig_src_fc ON orig_src_fc.id = cm.source_control_id
+         JOIN frameworks new_tgt_fw ON new_tgt_fw.id = orig_src_fc.framework_id AND new_tgt_fw.is_active = true
+         WHERE cm.similarity_score >= 90
+           AND new_src_fw.id <> new_tgt_fw.id
+       ),
+       combined AS (
+         SELECT * FROM eligible_mappings
+         UNION ALL
+         SELECT * FROM eligible_reverse
+       ),
+       target_totals AS (
+         SELECT f.id AS fw_id, COUNT(fc.id)::int AS total_controls
+         FROM frameworks f
+         JOIN framework_controls fc ON fc.framework_id = f.id
+         WHERE f.is_active = true
+         GROUP BY f.id
+       )
+       SELECT
+         c.source_fw_id,
+         c.source_fw_code,
+         c.target_fw_id,
+         c.target_fw_code,
+         COUNT(DISTINCT c.target_control_id)::int AS crosswalkable_controls,
+         tt.total_controls AS target_total_controls,
+         ROUND(
+           (COUNT(DISTINCT c.target_control_id)::numeric * 100.0) / NULLIF(tt.total_controls, 0), 1
+         )::float AS coverage_pct
+       FROM combined c
+       JOIN target_totals tt ON tt.fw_id = c.target_fw_id
+       GROUP BY c.source_fw_id, c.source_fw_code, c.target_fw_id, c.target_fw_code, tt.total_controls
+       ORDER BY c.source_fw_code, coverage_pct DESC`
+    );
+
+    // Also get current org's implementation progress per framework
+    const orgProgressResult = await pool.query(
+      `SELECT
+         f.id AS framework_id,
+         f.code,
+         COUNT(fc.id)::int AS total_controls,
+         COUNT(ci.id) FILTER (
+           WHERE ci.status IN ('implemented', 'verified', 'satisfied_via_crosswalk')
+         )::int AS implemented_controls
+       FROM frameworks f
+       JOIN framework_controls fc ON fc.framework_id = f.id
+       LEFT JOIN control_implementations ci
+         ON ci.control_id = fc.id AND ci.organization_id = $1
+       WHERE f.is_active = true
+       GROUP BY f.id, f.code`,
+      [orgId]
+    );
+
+    const orgProgress = {};
+    for (const row of orgProgressResult.rows) {
+      orgProgress[row.code] = {
+        total: row.total_controls,
+        implemented: row.implemented_controls,
+        pct: row.total_controls > 0
+          ? Math.round(row.implemented_controls / row.total_controls * 100)
+          : 0,
+      };
+    }
+
+    // Build a full dense matrix: source_fw_code → array of all target frameworks.
+    // Initialize every (source, target) pair with zero coverage so consumers
+    // always get a predictable, complete structure — even when no mappings exist.
+    const frameworkCodes = frameworks.map(f => f.code);
+    const matrixBySource = {};
+    for (const srcCode of frameworkCodes) {
+      matrixBySource[srcCode] = frameworkCodes
+        .filter(tgtCode => tgtCode !== srcCode)
+        .map(tgtCode => ({
+          target_framework_code: tgtCode,
+          crosswalkable_controls: 0,
+          target_total_controls: 0,
+          coverage_pct: 0,
+        }));
+    }
+    // Populate from actual mapping data
+    for (const row of matrixResult.rows) {
+      const targets = matrixBySource[row.source_fw_code];
+      if (!targets) continue;
+      const entry = targets.find(t => t.target_framework_code === row.target_fw_code);
+      if (entry) {
+        entry.crosswalkable_controls = row.crosswalkable_controls;
+        entry.target_total_controls = row.target_total_controls;
+        entry.coverage_pct = row.coverage_pct;
+      }
+    }
+    // Sort each source's target list by coverage_pct descending (best coverage first)
+    for (const srcCode of frameworkCodes) {
+      matrixBySource[srcCode].sort((a, b) => b.coverage_pct - a.coverage_pct);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        frameworks: frameworks.map(f => ({
+          id: f.id,
+          code: f.code,
+          name: f.name,
+          version: f.version,
+          org_progress: orgProgress[f.code] || { total: 0, implemented: 0, pct: 0 },
+        })),
+        matrix: matrixBySource,
+        description: 'coverage_pct shows what % of the target framework controls have at least one high-similarity (>=90) crosswalk mapping from the source framework — i.e., if all source framework controls were fully implemented, that percentage of the target framework would be automatically satisfied via crosswalk.',
+      }
+    });
+  } catch (error) {
+    console.error('Crosswalk coverage matrix error:', error);
+    res.status(500).json({ success: false, error: 'Failed to compute crosswalk coverage matrix' });
+  }
+});
+
 module.exports = router;
