@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Sync shared files with the latest public ControlWeave commit ([#71](https://github.com/sherifconteh-collab/ai-grc-platform/pull/71)) — @Copilot
 
 - Point all paid-tier links to controlweave.com; clarify repo is community/self-hosted only ([#55](https://github.com/sherifconteh-collab/ai-grc-platform/pull/55)) — @Copilot
 
