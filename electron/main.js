@@ -18,7 +18,8 @@ const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
-const EmbeddedPostgres = require('embedded-postgres');
+const embeddedPostgresModule = require('embedded-postgres');
+const EmbeddedPostgres = embeddedPostgresModule.default || embeddedPostgresModule;
 const { initAutoUpdater, checkForUpdatesManual } = require('./updater');
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -204,9 +205,44 @@ function loadOrCreateCredentials() {
  *
  * @returns {Promise<string>} The DATABASE_URL to inject into the backend process.
  */
+function getCorruptDataDirPath(dataDir) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  let corruptDir = `${dataDir}-corrupt-${timestamp}`;
+  let counter = 1;
+
+  while (fs.existsSync(corruptDir)) {
+    corruptDir = `${dataDir}-corrupt-${timestamp}-${counter}`;
+    counter += 1;
+  }
+
+  return corruptDir;
+}
+
+function shouldInitialiseEmbeddedPostgres(dataDir) {
+  const versionFile = path.join(dataDir, 'PG_VERSION');
+
+  if (fs.existsSync(versionFile)) {
+    return false;
+  }
+
+  if (!fs.existsSync(dataDir)) {
+    return true;
+  }
+
+  if (fs.readdirSync(dataDir).length === 0) {
+    return true;
+  }
+
+  const corruptDir = getCorruptDataDirPath(dataDir);
+  fs.renameSync(dataDir, corruptDir);
+  console.warn(`Moved invalid embedded PostgreSQL data directory to ${corruptDir}`);
+  return true;
+}
+
 async function startEmbeddedPostgres() {
   const dataDir = path.join(app.getPath('userData'), 'pgdata');
   const creds = loadOrCreateCredentials();
+  const shouldInitialise = shouldInitialiseEmbeddedPostgres(dataDir);
 
   pgInstance = new EmbeddedPostgres({
     databaseDir: dataDir,
@@ -216,8 +252,9 @@ async function startEmbeddedPostgres() {
     persistent: true,         // keep data between app restarts
   });
 
-  // initialise() is a no-op when the data directory already exists
-  await pgInstance.initialise();
+  if (shouldInitialise) {
+    await pgInstance.initialise();
+  }
   await pgInstance.start();
 
   // Ensure the application database exists (first-run setup)
