@@ -643,13 +643,25 @@ async function getLLMService(orgId) {
   if (!key) return null;
 
   const p = provider.toLowerCase();
-  if (p === 'anthropic' && Anthropic) return new Anthropic({ apiKey: key });
-  if (p === 'openai' && OpenAI) return new OpenAI({ apiKey: key });
-  // For REST-based providers return a thin wrapper
+  const defaultModel = await getOrgDefaultModel(orgId);
+
   return {
     provider: p,
     key,
     call: (model, systemPrompt, messages) => callProvider(p, key, model, systemPrompt, messages),
+    /**
+     * Convenience helper for legacy single-prompt callers.
+     * @param {string} prompt
+     * @param {{ model?: string | null, systemPrompt?: string | null }} [options]
+     * @returns {Promise<string>}
+     */
+    generateText: (prompt, options = {}) => callProvider(
+      p,
+      key,
+      options.model || defaultModel || null,
+      options.systemPrompt || null,
+      [{ role: 'user', content: String(prompt || '') }]
+    ),
   };
 }
 

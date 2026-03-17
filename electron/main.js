@@ -97,7 +97,11 @@ function waitForHttpEndpoint(port, requestPath = '/', timeoutMs = STARTUP_TIMEOU
 
 function appendStartupLog(line) {
   if (!startupLogPath) return;
-  fs.appendFileSync(startupLogPath, `${new Date().toISOString()} ${line}\n`);
+  try {
+    fs.appendFileSync(startupLogPath, `${new Date().toISOString()} ${line}\n`);
+  } catch (error) {
+    console.error('[WARN] Failed to write startup log:', error && error.message ? error.message : error);
+  }
 }
 
 function logStartup(level, message) {

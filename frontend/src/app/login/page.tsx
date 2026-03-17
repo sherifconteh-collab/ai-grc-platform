@@ -76,8 +76,7 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const cbError = params.get('error');
     if (cbError) {
-      const decoded = decodeURIComponent(cbError);
-      setError(ERROR_MESSAGES[cbError] || ERROR_MESSAGES[decoded] || decoded);
+      setError(ERROR_MESSAGES[cbError] || cbError);
     }
   }, []);
 
