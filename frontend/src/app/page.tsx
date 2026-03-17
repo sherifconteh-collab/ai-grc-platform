@@ -11,7 +11,7 @@ import MarketingNav from '@/components/MarketingNav';
 const frameworks = [
   'NIST 800-53', 'ISO 27001', 'SOC 2 Type II', 'HIPAA', 'GDPR',
   'EU AI Act', 'NIST AI RMF', 'NIST CSF 2.0', 'FedRAMP', 'NIST 800-171',
-  'ISO 42001', 'CMMC 2.0',
+  'ISO 42001', 'CMMC 2.0', 'AIUC-1',
 ];
 
 const features = [
@@ -19,8 +19,8 @@ const features = [
     icon: (
       <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
     ),
-    title: '40+ Frameworks & Standards, Zero Overlap',
-    desc: 'NIST 800-53, ISO 27001, SOC 2, HIPAA, GDPR, EU AI Act, ISO 42001, and more — all managed in one unified control library.', // ip-hygiene:ignore
+    title: '40 Frameworks & Standards, Zero Overlap',
+    desc: 'NIST 800-53, ISO 27001, SOC 2, HIPAA, GDPR, EU AI Act, ISO 42001, AIUC-1, and more — all managed in one unified control library.', // ip-hygiene:ignore
   },
   {
     icon: (
@@ -218,9 +218,9 @@ function LandingPage() {
       <section className="py-14 px-4 text-white" style={{background: 'linear-gradient(90deg, #7e22ce, #7c3aed, #4338ca)'}}>
         <div className="max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 text-center">
           {[
-            ['40+', 'Frameworks & Standards'],
+            ['40', 'Frameworks & Standards'],
             ['675+', 'Security Controls'],
-            ['97+', 'Crosswalk Mappings'],
+            ['97', 'Crosswalk Mappings'],
             ['2,000+', 'Assessment Procedures'],
             ['25+', 'AI Analysis Features'],
             ['51', 'MCP Tools'],
@@ -279,6 +279,7 @@ function LandingPage() {
                   'Up to 2 frameworks',
                   'Core security controls',
                   'AI-assisted assessments (10/mo — unlimited with own API key)',
+                  'Multi-org management & template clone',
                   'Basic evidence collection',
                   'Community support',
                   'Full source code access',
@@ -309,7 +310,7 @@ function LandingPage() {
                   '48-hour support SLA',
                 ],
                 cta: 'Start Free Trial',
-                href: 'https://controlweave.com/#pricing',
+                href: '/register?plan=pro',
                 highlighted: true,
                 badge: 'Most Popular',
               },
@@ -325,6 +326,7 @@ function LandingPage() {
                 features: [
                   'Everything in Pro',
                   'AI impact assessment (ISO 42005)',
+                  'AIUC-1 Agentic AI Certification framework',
                   'Auditor workspace & engagements',
                   'TPRM & vendor security module',
                   'SBOM / AIBOM analysis',
@@ -335,55 +337,33 @@ function LandingPage() {
                   'Priority support',
                 ],
                 cta: 'Contact Sales',
-                href: 'https://controlweave.com/#pricing',
+                href: '/contact',
                 highlighted: false,
                 badge: null,
               },
               {
-                name: 'Gov Cloud',
+                name: 'Gov Cloud & Advisory',
                 monthlyPrice: 'Custom',
                 annualPrice: 'Custom',
                 monthlyPeriod: '',
                 annualPeriod: '',
-                annualNote: 'Custom contract',
-                annualCost: 'Custom contract — contact sales',
-                description: 'FedRAMP-ready, IL4/IL5, ITAR-compliant. Dedicated infrastructure for regulated environments.',
+                annualNote: 'Custom contract + advisory',
+                annualCost: 'Custom contract — platform + consulting',
+                description: 'Full-service GRC: regulated infrastructure, hands-on consulting, and compliance program delivery.',
                 features: [
                   'Everything in Enterprise',
                   'FedRAMP / FISMA / StateRAMP',
-                  'IL4 / IL5 data sovereignty',
-                  'ITAR-compliant hosting',
+                  'IL4 / IL5 deployment patterns',
+                  'ITAR-aligned hosting options',
                   'US state AI laws & regulations',
-                  'Dedicated infrastructure',
-                  'SLA-backed uptime guarantee',
-                ],
-                cta: 'Contact Sales',
-                href: 'https://controlweave.com/#pricing',
-                highlighted: false,
-                badge: 'Regulated',
-              },
-              {
-                name: 'Consultancy',
-                monthlyPrice: 'Custom',
-                annualPrice: 'Custom',
-                monthlyPeriod: '',
-                annualPeriod: '',
-                annualNote: 'Scoped engagements',
-                annualCost: 'Scoped per engagement',
-                description: 'Hands-on professional services from GRC and AI governance experts.',
-                features: [
-                  'Compliance program design',
-                  'Framework gap assessment',
-                  'Audit readiness preparation',
-                  'AI governance strategy',
-                  'Policy & procedure authoring',
-                  'Staff training & enablement',
-                  'Dedicated engagement manager',
+                  'Compliance program design & gap assessment',
+                  'Audit readiness & policy authoring',
+                  'Staff training & dedicated engagement manager',
                 ],
                 cta: 'Request Consultation',
-                href: 'https://controlweave.com/contact',
+                href: '/contact',
                 highlighted: false,
-                badge: 'Services',
+                badge: 'Full Service',
               },
             ].map((tier) => (
               <div
@@ -485,9 +465,9 @@ function LandingPage() {
                   <div className="bg-purple-900/60 border border-purple-700/40 rounded-xl px-4 py-2.5 text-sm text-gray-100 max-w-sm">
                     <p className="font-semibold text-purple-300 mb-1">Found 3 critical gaps:</p>
                     <ol className="list-decimal list-inside space-y-1 text-gray-300">
-                      <li>A.12.6 — 4 controls lack current evidence <span className="text-red-400">(stale {'>'}90d)</span></li>
-                      <li>A.18.1 — Legal compliance review not documented</li>
-                      <li>A.9.2 — Access review overdue for 12 accounts</li>
+                      <li>A.8.8 — 4 controls lack current evidence <span className="text-red-400">(stale {'>'}90d)</span></li>
+                      <li>A.5.31 — Legal compliance review not documented</li>
+                      <li>A.5.18 — Access review overdue for 12 accounts</li>
                     </ol>
                     <p className="mt-2 text-purple-300 text-xs">Generating remediation playbook…</p>
                   </div>
@@ -498,7 +478,7 @@ function LandingPage() {
                   </div>
                   <div className="bg-purple-900/60 border border-purple-700/40 rounded-xl px-4 py-2.5 text-sm text-gray-100 max-w-sm">
                     <p className="text-purple-300 text-xs font-semibold mb-1">Remediation Plan (Priority Order)</p>
-                    <p className="text-gray-300 text-xs">1. Run access review for 12 flagged accounts this week. 2. Upload updated legal review doc to A.18.1 evidence vault. 3. Refresh 4 stale evidence artifacts in A.12.6. Estimated audit readiness: <span className="text-green-400 font-semibold">94%</span></p>
+                    <p className="text-gray-300 text-xs">1. Run access review for 12 flagged accounts this week. 2. Upload updated legal review doc to A.5.31 evidence vault. 3. Refresh 4 stale evidence artifacts in A.8.8. Estimated audit readiness: <span className="text-green-400 font-semibold">94%</span></p>
                   </div>
                 </div>
               </div>

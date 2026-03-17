@@ -3,31 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-// Optional LLM service: AI routes degrade gracefully if unavailable
-let llm;
-try {
-  llm = require('../services/llmService');
-} catch (e) {
-  // LLM service not available; provide no-op proxy so route handlers never crash
-  const noProvider = { available: false, models: [] };
-  llm = new Proxy({}, {
-    get(_, prop) {
-      if (prop === 'getUsageLimit') return () => 0;
-      if (prop === 'getUsageCount') return async () => 0;
-      if (prop === 'resolveApiKey') return async () => ({ source: 'none' });
-      if (prop === 'getProviderStatus') return () => ({
-        claude: noProvider, openai: noProvider, gemini: noProvider,
-        grok: noProvider, groq: noProvider, ollama: noProvider
-      });
-      if (prop === 'withAITrackingContext') return async (fn) => {
-        try { return { result: await fn(), tracking: null }; }
-        catch { return { result: null, tracking: null }; }
-      };
-      if (prop === 'chatStream') return async function* () { /* empty async generator */ };
-      return async () => null;
-    }
-  });
-}
+const llm = require('../services/llmService');
 const auditService = require('../services/auditService');
 const pool = require('../config/database');
 const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
@@ -1094,17 +1070,8 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
 
 // ======================== MULTI-AGENT SWARM ========================
 
-let orchestrator, reasoningMemory;
-try {
-  orchestrator = require('../services/multiAgentOrchestrator');
-} catch (e) {
-  orchestrator = { getSwarmConfigs: () => [], getSwarmConfig: () => null, executeSwarm: async () => ({}), SWARM_CONFIGS: {} };
-}
-try {
-  reasoningMemory = require('../services/reasoningMemory');
-} catch (e) {
-  reasoningMemory = { invalidateCache: () => {} };
-}
+const orchestrator = require('../services/multiAgentOrchestrator');
+const reasoningMemory = require('../services/reasoningMemory');
 
 // GET /ai/swarm/configs — list available swarm configurations
 router.get('/swarm/configs', async (req, res) => {
@@ -1313,70 +1280,6 @@ router.get('/agent-booster/status', async (req, res) => {
   } catch (err) {
     console.error('Agent booster status error:', err);
     res.status(500).json({ success: false, error: 'Failed to get agent booster status' });
-  }
-});
-
-// ---------------------------------------------------------------
-// AI Monitoring — rule-based monitoring and event log
-// ---------------------------------------------------------------
-
-// GET /ai/monitoring/dashboard
-router.get('/monitoring/dashboard', requirePermission('settings.manage'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const usage = await pool.query(
-      `SELECT COUNT(*) AS total_decisions,
-              COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') AS decisions_7d,
-              COUNT(*) FILTER (WHERE bias_flags != '[]'::jsonb) AS flagged_decisions
-       FROM ai_decision_log WHERE organization_id=$1`,
-      [orgId]
-    );
-    const recentDecisions = await pool.query(
-      `SELECT id, feature, status, created_at
-       FROM ai_decision_log WHERE organization_id=$1
-       ORDER BY created_at DESC LIMIT 10`,
-      [orgId]
-    );
-    res.json({
-      success: true,
-      data: {
-        summary: usage.rows[0],
-        recent_decisions: recentDecisions.rows,
-        monitoring_rules: 0,
-        active_rules: 0
-      }
-    });
-  } catch (err) {
-    console.error('AI monitoring dashboard error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load AI monitoring dashboard' });
-  }
-});
-
-// GET /ai/monitoring/rules
-router.get('/monitoring/rules', requirePermission('settings.manage'), async (req, res) => {
-  res.json({ success: true, data: [] });
-});
-
-// POST /ai/monitoring/rules
-router.post('/monitoring/rules', requirePermission('settings.manage'), async (req, res) => {
-  res.json({ success: true, data: { message: 'AI monitoring rules are an enterprise feature' } });
-});
-
-// GET /ai/monitoring/events
-router.get('/monitoring/events', requirePermission('settings.manage'), async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { limit = 50, offset = 0 } = req.query;
-    const result = await pool.query(
-      `SELECT id, feature, input_summary, output_summary, status, bias_flags, created_at
-       FROM ai_decision_log WHERE organization_id=$1
-       ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-      [orgId, Number(limit) || 50, Number(offset) || 0]
-    );
-    res.json({ success: true, data: result.rows });
-  } catch (err) {
-    console.error('AI monitoring events error:', err);
-    res.status(500).json({ success: false, error: 'Failed to load AI monitoring events' });
   }
 });
 

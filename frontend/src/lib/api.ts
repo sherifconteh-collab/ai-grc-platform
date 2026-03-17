@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { getApiBaseUrl } from './apiBase';
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 // Create axios instance
 const api = axios.create({
@@ -115,6 +115,11 @@ export const authAPI = {
 
   getCurrentUser: () => api.get('/auth/me'),
 
+  getMyOrganizations: () => api.get('/auth/my-organizations'),
+
+  switchOrganization: (orgId: string, refreshToken?: string) =>
+    api.post(`/auth/switch-organization/${orgId}`, refreshToken ? { refreshToken } : undefined),
+
   refreshToken: (refreshToken: string) =>
     api.post('/auth/refresh', { refreshToken }),
 
@@ -194,6 +199,12 @@ export const dashboardAPI = {
 // Organization APIs
 export const organizationAPI = {
   getFrameworks: (orgId: string) => api.get(`/organizations/${orgId}/frameworks`),
+
+  createNew: (data: { name: string }) =>
+    api.post('/organizations/me/new', data),
+
+  cloneFromTemplate: (data: { name: string }) =>
+    api.post('/organizations/me/clone', data),
 
   addFrameworks: (orgId: string, data: { frameworkIds: string[] }) =>
     api.post(`/organizations/${orgId}/frameworks`, data),
@@ -1080,8 +1091,6 @@ export const settingsAPI = {
     openai_api_key?: string | null;
     gemini_api_key?: string | null;
     xai_api_key?: string | null;
-    groq_api_key?: string | null;
-    ollama_base_url?: string | null;
     default_provider?: string;
     default_model?: string;
   }) => api.put('/settings/llm', data),
@@ -1439,6 +1448,12 @@ export const billingAPI = {
     api.post('/billing/downgrade-to-free'),
 };
 
+// License API (self-hosted / community edition)
+export const licenseAPI = {
+  getInfo: () => api.get('/license'),
+  activate: (licenseKey: string) => api.post('/license/activate', { licenseKey }),
+};
+
 // Help / Documentation API
 export const helpAPI = {
   getIndex: () => api.get('/help'),
@@ -1652,13 +1667,6 @@ export const plot4aiAPI = {
   getCategories: () => api.get('/plot4ai/categories'),
   getFilters: () => api.get('/plot4ai/filters'),
   getStats: () => api.get('/plot4ai/stats'),
-};
-
-// License API — activate/deactivate ControlWeave license keys
-export const licenseAPI = {
-  getStatus: () => api.get('/license'),
-  activate: (licenseKey: string) => api.post('/license/activate', { licenseKey }),
-  remove: () => api.delete('/license'),
 };
 
 export default api;

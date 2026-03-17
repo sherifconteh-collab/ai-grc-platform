@@ -7,6 +7,17 @@ import { APP_POSITIONING_SHORT } from '@/lib/branding';
 import BrandLogo from '@/components/BrandLogo';
 import { passkeyAPI, ssoAPI } from '@/lib/api';
 
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_state: 'Your sign-in session expired. Please try again.',
+  sso_failed: 'Single sign-on failed. Please try again or use your password instead.',
+  social_failed: 'Social sign-in failed. Please try again.',
+  sso_not_configured: 'Single sign-on is not configured for this organization.',
+  no_email: 'Your identity provider did not return an email address.',
+  account_disabled: 'Your account is disabled.',
+  missing_tokens: 'The sign-in response was incomplete. Please try again.',
+  token_exchange_failed: 'We could not complete sign-in. Please try again.'
+};
+
 const SOCIAL_LABELS: Record<string, string> = {
   google: 'Google',
   microsoft: 'Microsoft',
@@ -64,7 +75,10 @@ export default function LoginPage() {
     // Check for error from OAuth callback
     const params = new URLSearchParams(window.location.search);
     const cbError = params.get('error');
-    if (cbError) setError(decodeURIComponent(cbError));
+    if (cbError) {
+      const decoded = decodeURIComponent(cbError);
+      setError(ERROR_MESSAGES[cbError] || ERROR_MESSAGES[decoded] || decoded);
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

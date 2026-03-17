@@ -1,7 +1,7 @@
 // @tier: community
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -80,15 +80,10 @@ export default function ControlsPage() {
     }
   };
 
-  useEffect(() => {
-    if (user?.organizationId) {
-      loadControls();
-    }
-  }, [user]);
-
-  const loadControls = async () => {
+  const loadControls = useCallback(async () => {
+    if (!user?.organizationId) return;
     try {
-      const response = await organizationAPI.getControls(user!.organizationId);
+      const response = await organizationAPI.getControls(user.organizationId);
       const payload = response.data?.data;
       const rawControls = Array.isArray(payload)
         ? payload
@@ -110,7 +105,13 @@ export default function ControlsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.organizationId]);
+
+  useEffect(() => {
+    if (user?.organizationId) {
+      loadControls();
+    }
+  }, [loadControls, user?.organizationId]);
 
   const downloadExport = async (format: 'xlsx' | 'csv') => {
     if (!user?.organizationId) return;

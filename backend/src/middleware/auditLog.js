@@ -9,18 +9,7 @@
  */
 
 const { createAuditLog } = require('../services/auditService');
-// Optional geolocation service: fall back to basic IP extraction if unavailable
-let extractIpFromRequest;
-try {
-  ({ extractIpFromRequest } = require('../services/geolocationService'));
-} catch (e) {
-  extractIpFromRequest = function (req) {
-    if (!req) return null;
-    const xff = req.headers && req.headers['x-forwarded-for'];
-    if (typeof xff === 'string' && xff.length > 0) return xff.split(',')[0].trim();
-    return req.ip || (req.socket && req.socket.remoteAddress) || null;
-  };
-}
+const { extractIpFromRequest } = require('../services/geolocationService');
 
 /**
  * Create an audit log middleware for a specific event type

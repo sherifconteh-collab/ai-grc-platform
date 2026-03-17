@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -153,19 +153,7 @@ export default function ControlDetailPage() {
   const [evidenceUploadDescription, setEvidenceUploadDescription] = useState('');
   const [evidenceUploadTags, setEvidenceUploadTags] = useState('');
 
-  useEffect(() => {
-    if (id) {
-      loadData();
-      loadRiskSummary();
-    }
-  }, [id]);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [controlRes, implListRes, usersRes] = await Promise.all([
         controlsAPI.getControl(id),
@@ -187,7 +175,6 @@ export default function ControlDetailPage() {
         setTestResult(impl.test_result || 'not_assessed');
         setTestNotes(impl.test_notes || '');
       } else if (canUpdateImplementation) {
-        // Create a baseline implementation record so assignment/status/evidence linking works.
         const ensured = await implementationsAPI.ensureForControl(id);
         const implDetailRes = await implementationsAPI.getById(ensured.data?.data?.id);
         const impl = implDetailRes.data?.data;
@@ -204,7 +191,6 @@ export default function ControlDetailPage() {
         setDueDate('');
       }
 
-      // Load assessment procedures for this control
       try {
         const procRes = await assessmentsAPI.getProceduresByControl(id);
         setAssessmentProcedures(procRes.data?.data?.procedures || []);
@@ -217,14 +203,14 @@ export default function ControlDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canUpdateImplementation, id]);
 
-  const refreshProcedures = async () => {
+  const refreshProcedures = useCallback(async () => {
     const procRes = await assessmentsAPI.getProceduresByControl(id);
     setAssessmentProcedures(procRes.data?.data?.procedures || []);
-  };
+  }, [id]);
 
-  const loadRiskSummary = async () => {
+  const loadRiskSummary = useCallback(async () => {
     setRiskLoading(true);
     try {
       const [poamRes, vulnRes] = await Promise.allSettled([
@@ -236,6 +222,18 @@ export default function ControlDetailPage() {
     } finally {
       setRiskLoading(false);
     }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadData();
+      loadRiskSummary();
+    }
+  }, [id, loadData, loadRiskSummary]);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
   };
 
   const testResultCounts = useMemo(() => {

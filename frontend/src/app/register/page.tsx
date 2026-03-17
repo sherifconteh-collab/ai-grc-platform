@@ -15,12 +15,11 @@ const TIER_OPTIONS: Array<{
   label: string;
   description: string;
   frameworkLimit: number;
-  externalUrl?: string;
 }> = [
   { key: 'community', label: 'Community (Free)', description: 'Self-hosted, up to 2 frameworks. AGPL v3.', frameworkLimit: 2 },
-  { key: 'pro', label: 'Pro ($499/mo)', description: 'Available at controlweave.com — Hosted SaaS. Unlimited frameworks, SSO, 48h SLA.', frameworkLimit: -1, externalUrl: 'https://controlweave.com/#pricing' },
-  { key: 'enterprise', label: 'Enterprise', description: 'Available at controlweave.com — Unlimited frameworks. Advanced AI governance and impact assessment.', frameworkLimit: -1, externalUrl: 'https://controlweave.com/#pricing' },
-  { key: 'govcloud', label: 'Gov Cloud (Custom)', description: 'Available at controlweave.com — FedRAMP-ready, IL4/IL5, ITAR-compliant. Custom contract.', frameworkLimit: -1, externalUrl: 'https://controlweave.com/#pricing' },
+  { key: 'pro', label: 'Pro ($499/mo)', description: 'Hosted SaaS. Unlimited frameworks, SSO, 48h SLA.', frameworkLimit: -1 },
+  { key: 'enterprise', label: 'Enterprise', description: 'Unlimited frameworks. Advanced AI governance and impact assessment.', frameworkLimit: -1 },
+  { key: 'govcloud', label: 'Gov Cloud & Advisory (Custom)', description: 'Regulated platform + hands-on consulting. FedRAMP, IL4/IL5, ITAR-aligned hosting.', frameworkLimit: -1 },
 ];
 
 const TIER_ORDER: Record<TierKey, number> = { community: 0, pro: 1, enterprise: 2, govcloud: 3 };
@@ -78,7 +77,8 @@ const FRAMEWORK_OPTIONS: FrameworkOption[] = [
   { code: 'iso_31000', label: 'ISO 31000:2018', description: 'Risk management principles and guidelines.', controlCount: 11, tierRequired: 'enterprise', group: 'iso_27000' },
   { code: 'nist_800_207', label: 'NIST SP 800-207 Zero Trust Architecture', description: 'Zero Trust Architecture reference model and design principles for modern network security.', controlCount: 18, tierRequired: 'enterprise' },
   { code: 'ccpa_cpra', label: 'CCPA / CPRA', description: 'California Consumer Privacy Act and California Privacy Rights Act. Consumer data rights, opt-out requirements, and privacy risk assessments for California operations.', controlCount: 14, tierRequired: 'govcloud' },
-  { code: 'state_ai_governance', label: 'State AI Governance Laws', description: 'Consolidated state-level AI regulations including Colorado AI Act, Illinois AI Video Interview Act, and emerging state AI transparency and impact assessment laws.', controlCount: 12, tierRequired: 'govcloud' },
+  { code: 'state_ai_governance', label: 'State AI Governance Laws', description: 'Consolidated state-level AI regulations including Colorado AI Act, Illinois AI Video Interview Act, and emerging state AI transparency and impact assessment laws.', controlCount: 47, tierRequired: 'govcloud' },
+  { code: 'international_ai_governance', label: 'International AI Laws', description: 'International AI law, privacy, and policy packs covering the EU, UK, Canada proposal tracking, Brazil, Singapore, Japan, South Korea, China, Australia, and India.', controlCount: 49, tierRequired: 'govcloud' },
   // Backend: scripts/seed-cyber-ai-profile.js
   { code: 'nist_ir_8596_sec', label: 'NIST IR 8596 — Secure (SEC)', description: 'CSF 2.0 Cyber AI Profile: Secure AI System Components. Covers GV/ID/PR/DE/RS/RC for AI asset protection.', controlCount: 25, tierRequired: 'enterprise', group: 'csf_2_profiles' },
   { code: 'nist_ir_8596_def', label: 'NIST IR 8596 — Defend (DEF)', description: 'CSF 2.0 Cyber AI Profile: AI-Enabled Cyber Defense. Covers AI-augmented detection and response.', controlCount: 17, tierRequired: 'enterprise', group: 'csf_2_profiles' },
@@ -118,7 +118,12 @@ function toggleArrayValue(current: string[], value: string) {
 }
 
 function tierLabel(tier: TierKey): string {
-  return tier.charAt(0).toUpperCase() + tier.slice(1);
+  switch (tier) {
+    case 'community': return 'Community';
+    case 'pro': return 'Pro';
+    case 'enterprise': return 'Enterprise';
+    case 'govcloud': return 'Gov Cloud & Advisory';
+  }
 }
 
 export default function RegisterPage() {
@@ -157,7 +162,7 @@ function RegisterPageInner() {
   const requiresNist80053Details = frameworkCodes.includes('nist_800_53');
   const requiresNist800171Details = frameworkCodes.includes('nist_800_171');
 
-  const hasUtilitiesFrameworks = frameworkCodes.some((code) =>
+  const hasGovcloudFrameworks = frameworkCodes.some((code) =>
     FRAMEWORK_OPTIONS.some((fw) => fw.code === code && fw.tierRequired === 'govcloud')
   );
 
@@ -403,31 +408,58 @@ function RegisterPageInner() {
                     <button
                       key={tier.key}
                       type="button"
-                      onClick={() => {
-                        if (tier.externalUrl) {
-                          window.open(tier.externalUrl, '_blank', 'noopener,noreferrer');
-                        } else {
-                          setSelectedTier(tier.key);
-                        }
-                      }}
+                      onClick={() => setSelectedTier(tier.key)}
                       className={`text-left rounded-lg border p-3 transition ${
                         selectedTier === tier.key
                           ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                          : tier.externalUrl
-                          ? 'border-gray-200 bg-gray-50 hover:border-purple-400 opacity-75'
                           : 'border-gray-200 bg-white hover:border-purple-400'
                       }`}
                     >
-                      <p className="text-sm font-semibold text-gray-900">{tier.label}{tier.externalUrl ? ' ↗' : ''}</p>
+                      <p className="text-sm font-semibold text-gray-900">{tier.label}</p>
                       <p className="text-xs text-gray-500 mt-1">{tier.description}</p>
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  This is the Community Edition (self-hosted). Paid plans (Pro, Enterprise, Gov Cloud) are available at{' '}
-                  <a href="https://controlweave.com/#pricing" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">controlweave.com</a>.
+                  Your trial starts on the selected tier. You can change tiers anytime in Settings.
                 </p>
 
+                {selectedTier !== 'community' && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Billing Cycle
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setBillingCadence('monthly')}
+                        className={`text-left rounded-lg border p-3 transition ${
+                          billingCadence === 'monthly'
+                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
+                            : 'border-gray-200 bg-white hover:border-purple-400'
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-gray-900">Monthly</p>
+                        <p className="text-xs text-gray-500 mt-1">Pay month-to-month</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBillingCadence('annual')}
+                        className={`text-left rounded-lg border p-3 transition ${
+                          billingCadence === 'annual'
+                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
+                            : 'border-gray-200 bg-white hover:border-purple-400'
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-gray-900">Annual</p>
+                        <p className="text-xs text-gray-500 mt-1">Billed yearly</p>
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      After setup, you&apos;ll continue to Stripe with: {`${selectedTier}_${billingCadence}`}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Framework Selection */}
@@ -625,8 +657,8 @@ function RegisterPageInner() {
                 )}
               </div>
 
-              {/* AI Regulatory Monitoring — shown when utilities-tier frameworks selected */}
-              {hasUtilitiesFrameworks && (
+              {/* AI Regulatory Monitoring — shown when Gov Cloud-tier frameworks selected */}
+              {hasGovcloudFrameworks && (
                 <div className="border border-teal-200 bg-teal-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-base">🤖</span>
@@ -634,7 +666,7 @@ function RegisterPageInner() {
                       AI-Powered Regulatory Monitoring
                     </p>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 font-medium">
-                      Included with Utilities
+                      Included with Gov Cloud &amp; Advisory
                     </span>
                   </div>
                   <p className="text-xs text-teal-800 mt-1">

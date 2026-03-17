@@ -4,5 +4,5 @@
   "description": "SDK for logging external AI decisions into ControlWeave",
   "main": "src/index.js",
   "types": "src/index.d.ts",
-  "license": "AGPL-3.0"
+  "license": "MIT"
 }

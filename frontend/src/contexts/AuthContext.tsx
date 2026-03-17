@@ -27,6 +27,7 @@ interface AuthContextType {
   register: (email: string, password: string, fullName: string, organizationName: string, role?: string, frameworkCodes?: string[], informationTypes?: string[]) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  switchOrganization: (orgId: string) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -144,6 +145,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const switchOrganization = async (orgId: string) => {
+    const currentRefreshToken = localStorage.getItem('refreshToken') || undefined;
+    const response = await authAPI.switchOrganization(orgId, currentRefreshToken);
+    const tokens = response.data?.data?.tokens;
+
+    if (tokens?.accessToken) {
+      localStorage.setItem('accessToken', tokens.accessToken);
+    }
+    if (tokens?.refreshToken) {
+      localStorage.setItem('refreshToken', tokens.refreshToken);
+    }
+
+    await checkAuth();
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -154,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         refreshUser: checkAuth,
+        switchOrganization,
         isAuthenticated: !!user,
       }}
     >

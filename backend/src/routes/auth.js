@@ -4,38 +4,25 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createHash, randomBytes } = require('crypto');
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
-const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate');
+const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-// Optional services: fall back to safe no-ops if modules are unavailable
-let getTrialSeedData, expireOrganizationTrialIfNeeded, ensureOrgFrameworks;
-try {
-  ({ getTrialSeedData, expireOrganizationTrialIfNeeded, ensureOrgFrameworks } = require('../services/subscriptionService'));
-} catch (e) {
-  getTrialSeedData = () => ({});
-  expireOrganizationTrialIfNeeded = async () => ({});
-  ensureOrgFrameworks = async () => {};
-}
+const {
+  getTrialSeedData,
+  expireOrganizationTrialIfNeeded,
+  ensureOrgFrameworks
+} = require('../services/subscriptionService');
 const { sendPasswordResetEmail } = require('../services/emailService');
-
-let getGeolocationFromRequest, extractIpFromRequest;
-try {
-  ({ getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService'));
-} catch (e) {
-  getGeolocationFromRequest = () => ({});
-  extractIpFromRequest = function (req) {
-    if (!req) return null;
-    const xff = req.headers && req.headers['x-forwarded-for'];
-    if (typeof xff === 'string' && xff.length > 0) return xff.split(',')[0].trim();
-    return req.ip || (req.socket && req.socket.remoteAddress) || null;
-  };
-}
+const { getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService');
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
 const { decrypt } = require('../utils/encrypt');
+const { log } = require('../utils/logger');
+const { hasPublicColumn } = require('../utils/schema');
 
 const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
@@ -46,6 +33,8 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_REGISTER_FRAMEWORK_CODES = 20;
 const NIST_800_53_FRAMEWORK_CODE = 'nist_800_53';
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
+const AUTH_TOTP_COLUMNS = ['totp_enabled', 'totp_secret', 'totp_backup_codes'];
+let loggedMissingAuthTotpColumns = false;
 const forgotPasswordLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 8,
@@ -55,6 +44,18 @@ const resetPasswordLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 10,
   label: 'auth-reset-password'
+});
+const myOrgsExpressLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const switchOrgExpressLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false
 });
 const VALID_INFORMATION_TYPES = new Set([
   'pii',
@@ -297,6 +298,29 @@ function deriveOrganizationName({ organizationName, fullName, email, role }) {
 }
 
 async function getUserByEmail(email) {
+  const totpColumnChecks = await Promise.all(
+    AUTH_TOTP_COLUMNS.map(async (columnName) => [columnName, await hasPublicColumn('users', columnName)])
+  );
+  const missingTotpColumns = totpColumnChecks
+    .filter(([, present]) => !present)
+    .map(([columnName]) => columnName);
+
+  if (missingTotpColumns.length > 0 && !loggedMissingAuthTotpColumns) {
+    loggedMissingAuthTotpColumns = true;
+    log('warn', 'auth.totp_columns_missing', {
+      missingColumns: missingTotpColumns,
+      message: 'Skipping TOTP enforcement until the latest database migrations are applied.'
+    });
+  }
+
+  const totpSelect = missingTotpColumns.length === 0
+    ? `COALESCE(u.totp_enabled, false) as totp_enabled,
+            u.totp_secret,
+            u.totp_backup_codes`
+    : `false as totp_enabled,
+            NULL::text as totp_secret,
+            NULL::jsonb as totp_backup_codes`;
+
   const result = await pool.query(
     `SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, u.role, u.is_active,
             u.failed_login_attempts, u.locked_until,
@@ -307,9 +331,7 @@ async function getUserByEmail(email) {
             o.trial_started_at as organization_trial_started_at,
             o.trial_ends_at as organization_trial_ends_at,
             COALESCE(op.onboarding_completed, false) as onboarding_completed,
-            COALESCE(u.totp_enabled, false) as totp_enabled,
-            u.totp_secret,
-            u.totp_backup_codes
+            ${totpSelect}
      FROM users u
      LEFT JOIN organizations o ON u.organization_id = o.id
      LEFT JOIN organization_profiles op ON op.organization_id = o.id
@@ -479,6 +501,18 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
       );
       const user = userResult.rows[0];
 
+      // Record multi-org membership (idempotent)
+      await client.query(
+        `INSERT INTO user_organizations (user_id, organization_id, role)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, organization_id) DO NOTHING`,
+        [user.id, org.id, selectedRole]
+      ).catch((e) => {
+        // 42P01 = undefined_table — safe to ignore during first deploy before migration runs
+        if (e.code === '42P01') return;
+        log('error', 'auth.register.user_organizations_insert_failed', { error: e.message, code: e.code });
+      });
+
       if (selectedFrameworkCodes.length > 0) {
         const frameworkIds = await resolveFrameworkIdsByCode(client, selectedFrameworkCodes);
         for (const frameworkId of frameworkIds) {
@@ -565,9 +599,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
 
       // Ensure all seeded frameworks the org is entitled to are adopted.
       // Fire-and-forget — does not block the registration response.
-      ensureOrgFrameworks(org.id, org.tier).catch(err => {
-        console.error('ensureOrgFrameworks error for org', org.id, err);
-      });
+      ensureOrgFrameworks(org.id, org.tier);
 
       res.status(201).json({
         success: true,
@@ -768,9 +800,7 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
     // Ensure all seeded frameworks the org is entitled to are adopted.
     // Fire-and-forget — does not block the login response.
     if (user.organization_id && user.organization_tier) {
-      ensureOrgFrameworks(user.organization_id, user.organization_tier).catch(err => {
-        console.error('ensureOrgFrameworks error for org', user.organization_id, err);
-      });
+      ensureOrgFrameworks(user.organization_id, user.organization_tier);
     }
 
     res.json({
@@ -1195,6 +1225,17 @@ router.post('/accept-invite', validateBody((body) => {
       );
       const user = userResult.rows[0];
 
+      // Record multi-org membership
+      await client.query(
+        `INSERT INTO user_organizations (user_id, organization_id, role)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, organization_id) DO NOTHING`,
+        [user.id, invite.organization_id, invite.primary_role]
+      ).catch((e) => {
+        if (e.code === '42P01') return;
+        log('error', 'auth.invite.user_organizations_insert_failed', { error: e.message, code: e.code });
+      });
+
       // Assign system role
       await assignUserRole(client, user.id, invite.primary_role).catch(() => {});
 
@@ -1265,39 +1306,121 @@ router.post('/accept-invite', validateBody((body) => {
   }
 });
 
-// ---------------------------------------------------------------
-// Passkey / WebAuthn routes (stubs — full FIDO2 requires premium)
-// ---------------------------------------------------------------
+// =========================================================================
+// MULTI-ORGANIZATION — list orgs the authenticated user belongs to
+// =========================================================================
 
-// GET /api/v1/auth/passkey/register/options
-router.get('/passkey/register/options', async (req, res) => {
-  res.status(501).json({ success: false, error: 'WebAuthn passkey registration requires a premium edition' });
-});
-
-// POST /api/v1/auth/passkey/register/verify
-router.post('/passkey/register/verify', async (req, res) => {
-  res.status(501).json({ success: false, error: 'WebAuthn passkey registration requires a premium edition' });
-});
-
-// POST /api/v1/auth/passkey/auth/options
-router.post('/passkey/auth/options', async (req, res) => {
-  res.status(501).json({ success: false, error: 'WebAuthn passkey authentication requires a premium edition' });
-});
-
-// POST /api/v1/auth/passkey/auth/verify
-router.post('/passkey/auth/verify', async (req, res) => {
-  res.status(501).json({ success: false, error: 'WebAuthn passkey authentication requires a premium edition' });
-});
-
-// GET /api/v1/auth/passkey/list
-router.get('/passkey/list', async (req, res) => {
+// GET /auth/my-organizations
+router.get('/my-organizations', myOrgsExpressLimiter, authenticate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) return res.json({ success: true, data: [] });
-    // Return empty list for community edition
-    res.json({ success: true, data: [] });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to list passkeys' });
+    const result = await pool.query(
+      `SELECT
+         o.id,
+         o.name,
+         o.tier,
+         o.billing_status,
+         uo.role,
+         uo.joined_at,
+         (o.id = $2) AS is_active
+       FROM user_organizations uo
+       JOIN organizations o ON o.id = uo.organization_id
+       WHERE uo.user_id = $1
+       ORDER BY uo.joined_at ASC`,
+      [req.user.id, req.user.organization_id]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'auth.my_organizations_failed', { error: error.message, userId: req.user?.id });
+    res.status(500).json({ success: false, error: 'Failed to list organizations' });
+  }
+});
+
+// =========================================================================
+// MULTI-ORGANIZATION — switch the caller's active organization
+// =========================================================================
+
+// POST /auth/switch-organization/:orgId
+router.post('/switch-organization/:orgId', switchOrgExpressLimiter, authenticate, async (req, res) => {
+  const { orgId } = req.params;
+
+  if (!isUuid(orgId)) {
+    return res.status(400).json({ success: false, error: 'Invalid organization ID' });
+  }
+
+  try {
+    // Verify membership (read-only, outside transaction)
+    const membership = await pool.query(
+      `SELECT role FROM user_organizations
+       WHERE user_id = $1 AND organization_id = $2
+       LIMIT 1`,
+      [req.user.id, orgId]
+    );
+
+    if (membership.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'You are not a member of that organization' });
+    }
+
+    // Issue new tokens so every subsequent request carries the new org context
+    const isDemoAccount = isDemoEmail(req.user.email);
+    const { accessToken, refreshToken: newRefreshToken, sessionExpiresAt } =
+      generateSessionTokens(req.user.id, { isDemoAccount });
+
+    // Wrap user update + session rotation in a transaction to avoid
+    // inconsistent state if any step fails.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Update active org and set the role the user holds in the target org
+      const memberRole = membership.rows[0].role;
+      await client.query(
+        `UPDATE users SET organization_id = $1, role = $2, updated_at = NOW() WHERE id = $3`,
+        [orgId, memberRole, req.user.id]
+      );
+
+      // Replace only the caller's current session (identified by the refresh
+      // token sent in the request body).  If no token is supplied, insert a
+      // new session without removing others — this avoids logging the user
+      // out of other devices or shared demo accounts.
+      const currentRefreshToken = req.body?.refreshToken;
+      if (currentRefreshToken) {
+        await client.query(
+          'DELETE FROM sessions WHERE user_id = $1 AND refresh_token = $2',
+          [req.user.id, hashRefreshToken(currentRefreshToken)]
+        );
+      }
+
+      await client.query(
+        'INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',
+        [req.user.id, hashRefreshToken(newRefreshToken), sessionExpiresAt]
+      );
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    // Fetch new org details for the response
+    const orgResult = await pool.query(
+      `SELECT id, name, tier, billing_status FROM organizations WHERE id = $1 LIMIT 1`,
+      [orgId]
+    );
+    const org = orgResult.rows[0] || {};
+
+    res.json({
+      success: true,
+      data: {
+        organization: { id: org.id, name: org.name, tier: org.tier, billing_status: org.billing_status },
+        tokens: { accessToken, refreshToken: newRefreshToken }
+      }
+    });
+  } catch (error) {
+    log('error', 'auth.switch_organization_failed', { error: error.message, userId: req.user?.id });
+    res.status(500).json({ success: false, error: 'Failed to switch organization' });
   }
 });
 

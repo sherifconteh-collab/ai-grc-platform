@@ -22,19 +22,17 @@ interface HelpCategories {
 }
 
 const TIER_LABELS: Record<string, string> = {
-  free: 'Free',
-  starter: 'Starter',
-  professional: 'Professional',
+  community: 'Community',
+  pro: 'Pro',
   enterprise: 'Enterprise',
-  utilities: 'Utilities',
+  govcloud: 'Gov Cloud & Advisory',
 };
 
 const TIER_COLORS: Record<string, string> = {
-  free: 'bg-gray-100 text-gray-700',
-  starter: 'bg-blue-100 text-blue-700',
-  professional: 'bg-purple-100 text-purple-700',
-  enterprise: 'bg-amber-100 text-amber-700',
-  utilities: 'bg-amber-100 text-amber-700',
+  community: 'bg-gray-100 text-gray-700',
+  pro: 'bg-blue-100 text-blue-700',
+  enterprise: 'bg-purple-100 text-purple-700',
+  govcloud: 'bg-amber-100 text-amber-700',
 };
 
 // Allowed HTML tags produced by renderMarkdown — strip any others before rendering
