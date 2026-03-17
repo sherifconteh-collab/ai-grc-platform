@@ -32,6 +32,10 @@ const FRONTEND_PORT = 3000;
 const EMBEDDED_PG_PORT = 5433;
 const STARTUP_TIMEOUT_MS = 60_000; // 60 s — embedded PG init + migrations need headroom on slower machines
 const POLL_INTERVAL_MS = 500;
+const MAX_CORRUPT_DIR_ATTEMPTS = 100;
+const BACKEND_HEALTH_PATH = '/health';
+const FRONTEND_HEALTH_PATH = '/health';
+const IS_SMOKE_TEST = process.argv.includes('--smoke-test');
 
 // When packaged, electron bundles node alongside the app.  process.execPath is
 // the electron binary itself, which *is* a Node.js runtime, so we can use it
@@ -51,20 +55,21 @@ let backendProcess = null;
 let frontendProcess = null;
 let pgInstance = null;     // EmbeddedPostgres instance
 let isQuitting = false;    // guard against double-quit loop during async cleanup
+let startupLogPath = null;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
 
 /**
- * Poll http://localhost:<port>/ until it responds (any status) or times out.
+ * Poll http://localhost:<port><requestPath> until it responds (any status) or times out.
  */
-function waitForServer(port, timeoutMs = STARTUP_TIMEOUT_MS) {
+function waitForHttpEndpoint(port, requestPath = '/', timeoutMs = STARTUP_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
 
     function attempt() {
-      const req = http.get({ host: '127.0.0.1', port, path: '/' }, (res) => {
+      const req = http.get({ host: '127.0.0.1', port, path: requestPath }, (res) => {
         res.resume(); // drain the response body to release the socket
         resolve();
       });
@@ -88,6 +93,53 @@ function waitForServer(port, timeoutMs = STARTUP_TIMEOUT_MS) {
 
     attempt();
   });
+}
+
+function appendStartupLog(line) {
+  if (!startupLogPath) return;
+  fs.appendFileSync(startupLogPath, `${new Date().toISOString()} ${line}\n`);
+}
+
+function logStartup(level, message) {
+  const line = `[${level.toUpperCase()}] ${message}`;
+  if (level === 'error') {
+    console.error(line);
+  } else if (level === 'warn') {
+    console.warn(line);
+  } else {
+    console.log(line);
+  }
+  appendStartupLog(line);
+}
+
+function logStartupError(message, error) {
+  const detail = error && error.stack ? error.stack : (error && error.message ? error.message : String(error));
+  logStartup('error', `${message}: ${detail}`);
+}
+
+function pipeProcessOutput(label, chunk, isError = false) {
+  const text = chunk.toString();
+  const prefixed = `[${label}] ${text}`;
+  if (isError) {
+    process.stderr.write(prefixed);
+  } else {
+    process.stdout.write(prefixed);
+  }
+
+  const normalized = text.replace(/\r\n/g, '\n').split('\n');
+  for (const line of normalized) {
+    if (!line) continue;
+    appendStartupLog(`[${label}] ${line}`);
+  }
+}
+
+function setupStartupLogging() {
+  const logsDir = path.join(app.getPath('userData'), 'logs');
+  fs.mkdirSync(logsDir, { recursive: true });
+  startupLogPath = path.join(logsDir, 'startup.log');
+  appendStartupLog('============================================================');
+  appendStartupLog(`Desktop startup initiated${IS_SMOKE_TEST ? ' (smoke-test mode)' : ''}`);
+  appendStartupLog('============================================================');
 }
 
 /**
@@ -125,10 +177,10 @@ function spawnNode(scriptPath, cwd, env = {}) {
   });
 
   const label = path.basename(cwd);
-  child.stdout.on('data', (d) => process.stdout.write(`[${label}] ${d}`));
-  child.stderr.on('data', (d) => process.stderr.write(`[${label}] ${d}`));
+  child.stdout.on('data', (d) => pipeProcessOutput(label, d));
+  child.stderr.on('data', (d) => pipeProcessOutput(label, d, true));
   child.on('exit', (code, signal) => {
-    console.log(`[${label}] exited — code=${code} signal=${signal}`);
+    logStartup('info', `[${label}] exited — code=${code} signal=${signal}`);
   });
 
   return child;
@@ -153,8 +205,8 @@ function runNodeScriptToCompletion(scriptPath, cwd, env = {}) {
     });
 
     const label = path.basename(scriptPath, '.js');
-    child.stdout.on('data', (d) => process.stdout.write(`[${label}] ${d}`));
-    child.stderr.on('data', (d) => process.stderr.write(`[${label}] ${d}`));
+    child.stdout.on('data', (d) => pipeProcessOutput(label, d));
+    child.stderr.on('data', (d) => pipeProcessOutput(label, d, true));
 
     child.on('error', (err) => reject(err));
     child.on('close', (code) => {
@@ -209,11 +261,8 @@ function getCorruptDataDirPath(dataDir) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   let corruptDir = `${dataDir}-corrupt-${timestamp}`;
   let counter = 0;
-  // 100 attempts is ample for this one-shot recovery path while still giving us
-  // a deterministic failure instead of looping forever on an unexpected filesystem.
-  const maxAttempts = 100;
 
-  while (fs.existsSync(corruptDir) && counter < maxAttempts) {
+  while (fs.existsSync(corruptDir) && counter < MAX_CORRUPT_DIR_ATTEMPTS) {
     counter += 1;
     corruptDir = `${dataDir}-corrupt-${timestamp}-${counter}`;
   }
@@ -255,7 +304,7 @@ function shouldInitialiseEmbeddedPostgres(dataDir) {
       `Unable to move invalid embedded PostgreSQL data directory from ${dataDir} to ${corruptDir}: ${err.message}`
     );
   }
-  console.warn(`Moved invalid embedded PostgreSQL data directory to ${corruptDir}`);
+  logStartup('warn', `Moved invalid embedded PostgreSQL data directory to ${corruptDir}`);
   return true;
 }
 
@@ -286,7 +335,7 @@ async function startEmbeddedPostgres() {
     );
     if (res.rows.length === 0) {
       await client.query('CREATE DATABASE controlweave');
-      console.log('Created application database: controlweave');
+      logStartup('info', 'Created application database: controlweave');
     }
   } finally {
     await client.end();
@@ -336,7 +385,7 @@ function startServer(label, dirPath, scriptRelPath, port, extraEnv = {}) {
     ...extraEnv,
   });
 
-  return { proc, ready: waitForServer(port) };
+  return { proc, ready: waitForHttpEndpoint(port) };
 }
 
 function startBackend(backendDir, databaseUrl) {
@@ -478,29 +527,43 @@ function buildMenu() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  setupStartupLogging();
+  logStartup('info', `Startup logging enabled at ${startupLogPath}`);
   buildMenu();
 
   // Respond to renderer requests for the app version.
   ipcMain.handle('get-app-version', () => app.getVersion());
 
   try {
-    console.log('Starting embedded PostgreSQL…');
+    logStartup('info', 'Starting embedded PostgreSQL…');
     const databaseUrl = await startEmbeddedPostgres();
-    console.log(`Embedded PostgreSQL ready on port ${EMBEDDED_PG_PORT}`);
+    logStartup('info', `Embedded PostgreSQL ready on port ${EMBEDDED_PG_PORT}`);
 
     const backendDir = path.join(RESOURCES_ROOT, 'backend');
 
-    console.log('Running database migrations…');
+    logStartup('info', 'Running database migrations…');
     await runMigrations(backendDir, databaseUrl);
-    console.log('Database migrations complete');
+    logStartup('info', 'Database migrations complete');
 
-    console.log('Starting backend server…');
+    logStartup('info', 'Starting backend server…');
     await startBackend(backendDir, databaseUrl);
-    console.log(`Backend ready on port ${BACKEND_PORT}`);
+    logStartup('info', `Backend ready on port ${BACKEND_PORT}`);
 
-    console.log('Starting frontend server…');
+    logStartup('info', 'Starting frontend server…');
     await startFrontend();
-    console.log(`Frontend ready on port ${FRONTEND_PORT}`);
+    logStartup('info', `Frontend ready on port ${FRONTEND_PORT}`);
+
+    if (IS_SMOKE_TEST) {
+      logStartup('info', 'Running desktop smoke-test health checks…');
+      await Promise.all([
+        waitForHttpEndpoint(BACKEND_PORT, BACKEND_HEALTH_PATH),
+        waitForHttpEndpoint(FRONTEND_PORT, FRONTEND_HEALTH_PATH),
+      ]);
+      logStartup('info', 'Smoke test succeeded; exiting without opening a window');
+      process.exitCode = 0;
+      app.quit();
+      return;
+    }
 
     createWindow();
 
@@ -508,23 +571,30 @@ app.whenReady().then(async () => {
     // events can be forwarded to the renderer.
     initAutoUpdater(mainWindow);
   } catch (err) {
-    dialog.showErrorBox(
-      'ControlWeave — Startup Error',
-      [
-        'Failed to start one or more internal servers.',
-        '',
-        err.message,
-        '',
-        'Please ensure:',
-        '  • No other application is using ports 3000, 3001, or 5433',
-        '  • You have write permission to the application data folder',
-      ].join('\n')
-    );
+    logStartupError('Desktop startup failed', err);
+    process.exitCode = 1;
+    if (!IS_SMOKE_TEST) {
+      dialog.showErrorBox(
+        'ControlWeave — Startup Error',
+        [
+          'Failed to start one or more internal servers.',
+          '',
+          err.message,
+          '',
+          `Startup log: ${startupLogPath || 'Unavailable'}`,
+          '',
+          'Please ensure:',
+          '  • No other application is using ports 3000, 3001, or 5433',
+          '  • You have write permission to the application data folder',
+        ].join('\n')
+      );
+    }
     app.quit();
   }
 });
 
 app.on('activate', () => {
+  if (IS_SMOKE_TEST) return;
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
