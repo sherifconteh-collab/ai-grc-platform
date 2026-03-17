@@ -14,7 +14,7 @@ Your project is at a **perfect milestone** for GitHub:
 
 ### 1. Verify .env is NOT being tracked
 ```bash
-cd ai-grc-platform
+cd ControlWeave
 git status
 
 # Make sure .env is NOT in the list!
@@ -33,7 +33,7 @@ rm -f login_response.json add-frameworks.json add-priority-column.js fix-org-fra
 
 ### Step 1: Initialize Git (if not already done)
 ```bash
-cd "c:\Users\sheri\OneDrive\Desktop\GRC platform\ai-grc-platform\ai-grc-platform"
+cd "c:\Users\sheri\OneDrive\Desktop\GRC platform\ControlWeave\ControlWeave"
 
 # Check if git is initialized
 git status
@@ -45,7 +45,7 @@ git init
 ### Step 2: Create GitHub Repository
 
 1. Go to https://github.com/new
-2. Repository name: `ai-grc-platform`
+2. Repository name: `ControlWeave`
 3. Description: "Open-source GRC platform with intelligent cross-framework compliance mapping"
 4. **Public** (for open source) or **Private** (if you want to develop more first)
 5. **DO NOT** initialize with README (you already have one!)
@@ -53,7 +53,7 @@ git init
 
 ### Step 3: Add All Files
 ```bash
-cd "c:\Users\sheri\OneDrive\Desktop\GRC platform\ai-grc-platform\ai-grc-platform"
+cd "c:\Users\sheri\OneDrive\Desktop\GRC platform\ControlWeave\ControlWeave"
 
 # Stage all files
 git add .
@@ -81,7 +81,7 @@ Phase 1 backend complete. Frontend coming next."
 ### Step 5: Connect to GitHub
 ```bash
 # Replace YOUR_USERNAME with your GitHub username
-git remote add origin https://github.com/YOUR_USERNAME/ai-grc-platform.git
+git remote add origin https://github.com/YOUR_USERNAME/ControlWeave.git
 
 # Verify remote
 git remote -v
@@ -248,5 +248,5 @@ Don't wait for "perfect" - your project is already impressive and valuable to th
 
 **Ready? Let's push to GitHub!** 🚀
 
-cd "c:\Users\sheri\OneDrive\Desktop\GRC platform\ai-grc-platform\ai-grc-platform"
+cd "c:\Users\sheri\OneDrive\Desktop\GRC platform\ControlWeave\ControlWeave"
 git status
