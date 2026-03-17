@@ -1,6 +1,7 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
@@ -12,7 +13,6 @@ const { validateBody, isUuid, sanitizeInput } = require('../middleware/validate'
 const { getFrameworkLimit, normalizeTier, shouldEnforceAiLimitForByok } = require('../config/tierPolicy');
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { log } = require('../utils/logger');
-const { createRateLimiter } = require('../middleware/rateLimit');
 
 const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
 
@@ -3042,16 +3042,16 @@ router.post(
 // MULTI-ORGANIZATION — create a new organization for the current user
 // =========================================================================
 
-const createOrgLimiter = createRateLimiter({
-  windowMs: 60 * 60 * 1000, // 1 hour
+const createOrgExpressLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
   max: 10,
-  label: 'organizations-create-new',
-  keyGenerator: (req) => req.user?.id || req.ip
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 // POST /organizations/me/new
 // Body: { name: string, tier?: string }
-router.post('/me/new', requirePermission('organizations.write'), createOrgLimiter, async (req, res) => {
+router.post('/me/new', createOrgExpressLimiter, requirePermission('organizations.write'), async (req, res) => {
   const userId = req.user.id;
   const { name } = req.body || {};
 
@@ -3115,7 +3115,7 @@ router.post('/me/new', requirePermission('organizations.write'), createOrgLimite
 // Creates a new org pre-loaded with the same framework selections as the
 // current org (a "template" clone).  Controls / implementations are NOT
 // copied — only the framework list.
-router.post('/me/clone', requirePermission('organizations.write'), createOrgLimiter, async (req, res) => {
+router.post('/me/clone', createOrgExpressLimiter, requirePermission('organizations.write'), async (req, res) => {
   const userId       = req.user.id;
   const sourceOrgId  = req.user.organization_id;
   const { name }     = req.body || {};

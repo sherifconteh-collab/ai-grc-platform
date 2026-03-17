@@ -4,6 +4,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createHash, randomBytes } = require('crypto');
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
@@ -44,17 +45,17 @@ const resetPasswordLimiter = createRateLimiter({
   max: 10,
   label: 'auth-reset-password'
 });
-const myOrgsLimiter = createRateLimiter({
+const myOrgsExpressLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
-  label: 'auth-my-organizations',
-  keyGenerator: (req) => req.user?.id || req.ip
+  standardHeaders: true,
+  legacyHeaders: false
 });
-const switchOrgLimiter = createRateLimiter({
+const switchOrgExpressLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
-  label: 'auth-switch-organization',
-  keyGenerator: (req) => req.user?.id || req.ip
+  standardHeaders: true,
+  legacyHeaders: false
 });
 const VALID_INFORMATION_TYPES = new Set([
   'pii',
@@ -1310,7 +1311,7 @@ router.post('/accept-invite', validateBody((body) => {
 // =========================================================================
 
 // GET /auth/my-organizations
-router.get('/my-organizations', authenticate, myOrgsLimiter, async (req, res) => {
+router.get('/my-organizations', myOrgsExpressLimiter, authenticate, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
@@ -1340,7 +1341,7 @@ router.get('/my-organizations', authenticate, myOrgsLimiter, async (req, res) =>
 // =========================================================================
 
 // POST /auth/switch-organization/:orgId
-router.post('/switch-organization/:orgId', authenticate, switchOrgLimiter, async (req, res) => {
+router.post('/switch-organization/:orgId', switchOrgExpressLimiter, authenticate, async (req, res) => {
   const { orgId } = req.params;
 
   if (!isUuid(orgId)) {
