@@ -208,11 +208,18 @@ function loadOrCreateCredentials() {
 function getCorruptDataDirPath(dataDir) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   let corruptDir = `${dataDir}-corrupt-${timestamp}`;
-  let counter = 1;
+  let counter = 0;
+  // 100 attempts is ample for this one-shot recovery path while still giving us
+  // a deterministic failure instead of looping forever on an unexpected filesystem.
+  const maxAttempts = 100;
 
-  while (fs.existsSync(corruptDir)) {
-    corruptDir = `${dataDir}-corrupt-${timestamp}-${counter}`;
+  while (fs.existsSync(corruptDir) && counter < maxAttempts) {
     counter += 1;
+    corruptDir = `${dataDir}-corrupt-${timestamp}-${counter}`;
+  }
+
+  if (fs.existsSync(corruptDir)) {
+    throw new Error(`Unable to allocate a backup directory for invalid embedded PostgreSQL data at ${dataDir}`);
   }
 
   return corruptDir;
@@ -229,12 +236,25 @@ function shouldInitialiseEmbeddedPostgres(dataDir) {
     return true;
   }
 
-  if (fs.readdirSync(dataDir).length === 0) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dataDir);
+  } catch (err) {
+    throw new Error(`Unable to read embedded PostgreSQL data directory ${dataDir}: ${err.message}`);
+  }
+
+  if (entries.length === 0) {
     return true;
   }
 
   const corruptDir = getCorruptDataDirPath(dataDir);
-  fs.renameSync(dataDir, corruptDir);
+  try {
+    fs.renameSync(dataDir, corruptDir);
+  } catch (err) {
+    throw new Error(
+      `Unable to move invalid embedded PostgreSQL data directory from ${dataDir} to ${corruptDir}: ${err.message}`
+    );
+  }
   console.warn(`Moved invalid embedded PostgreSQL data directory to ${corruptDir}`);
   return true;
 }
