@@ -6,7 +6,7 @@
 ## 📁 Complete File Structure for GitHub
 
 ```
-ControlWeave/
+ai-grc-platform/
 ├── README.md                           ✅ CRITICAL - First thing people see
 ├── LICENSE                             ✅ CRITICAL - AGPL-3.0 License
 ├── .gitignore                          ✅ CRITICAL - Don't commit secrets
@@ -72,7 +72,7 @@ ControlWeave/
 
 ### 1. README.md (Most Important!)
 
-**You already have this** - it's in `/mnt/user-data/outputs/ControlWeave/README.md`
+**You already have this** - it's in `/mnt/user-data/outputs/ai-grc-platform/README.md`
 
 **What to add/update**:
 ```markdown
@@ -348,7 +348,7 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 #### 1. **MCP Server (Model Context Protocol)**
 ```
-ControlWeave/
+ai-grc-platform/
 ├── mcp/
 │   ├── README.md              "Use Claude Code with this platform"
 │   ├── server.py              MCP server implementation
@@ -454,7 +454,7 @@ if (!claudeEnabled) {
 
 ### Phase 1: MCP Server (Do This First!)
 ```
-ControlWeave/
+ai-grc-platform/
 ├── mcp-server/
 │   ├── README.md
 │   │   # ControlWeave - MCP Server
@@ -556,8 +556,8 @@ git push
 ### Add Badges to README.md
 ```markdown
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![GitHub stars](https://img.shields.io/github/stars/yourusername/ControlWeave.svg)](https://github.com/yourusername/ControlWeave/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/yourusername/ControlWeave.svg)](https://github.com/yourusername/ControlWeave/issues)
+[![GitHub stars](https://img.shields.io/github/stars/yourusername/ai-grc-platform.svg)](https://github.com/yourusername/ai-grc-platform/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/yourusername/ai-grc-platform.svg)](https://github.com/yourusername/ai-grc-platform/issues)
 ![Database: PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-blue)
 ![Frameworks: 6](https://img.shields.io/badge/Frameworks-6-green)
 ![Controls: 528+](https://img.shields.io/badge/Controls-528%2B-brightgreen)
@@ -577,7 +577,7 @@ git push
 ### Add a Banner
 Create a simple banner image:
 ```
-ControlWeave/
+ai-grc-platform/
 └── docs/
     └── images/
         └── banner.png

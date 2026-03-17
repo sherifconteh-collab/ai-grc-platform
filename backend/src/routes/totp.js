@@ -25,17 +25,57 @@ const { generateTOTPSecret, verifyTOTP, buildOtpauthURI, generateBackupCodes } =
 const { validateBody, requireFields } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { encrypt, decrypt } = require('../utils/encrypt');
+const { log } = require('../utils/logger');
+const { hasPublicColumn } = require('../utils/schema');
 
 const totpLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 20,
   label: 'totp'
 });
+const REQUIRED_TOTP_COLUMNS = ['totp_enabled', 'totp_secret', 'totp_verified_at', 'totp_backup_codes'];
+let loggedMissingTotpColumns = false;
+
+async function getTotpSchemaStatus() {
+  const columnChecks = await Promise.all(
+    REQUIRED_TOTP_COLUMNS.map(async (columnName) => [columnName, await hasPublicColumn('users', columnName)])
+  );
+  const missingColumns = columnChecks
+    .filter(([, present]) => !present)
+    .map(([columnName]) => columnName);
+
+  if (missingColumns.length > 0 && !loggedMissingTotpColumns) {
+    loggedMissingTotpColumns = true;
+    log('warn', 'totp.schema_columns_missing', {
+      missingColumns,
+      message: 'TOTP routes are disabled until the latest database migrations are applied.'
+    });
+  }
+
+  return {
+    available: missingColumns.length === 0,
+    missingColumns
+  };
+}
+
+function respondTotpUnavailable(res, missingColumns) {
+  return res.status(503).json({
+    success: false,
+    code: 'TOTP_SCHEMA_MISSING',
+    error: 'Two-factor authentication is temporarily unavailable until the latest database migrations are applied.',
+    missingColumns
+  });
+}
 
 // ─── GET /status ─────────────────────────────────────────────────────────────
 
 router.get('/status', totpLimiter, authenticate, async (req, res) => {
   try {
+    const schemaStatus = await getTotpSchemaStatus();
+    if (!schemaStatus.available) {
+      return respondTotpUnavailable(res, schemaStatus.missingColumns);
+    }
+
     const result = await pool.query(
       `SELECT totp_enabled, totp_verified_at FROM users WHERE id = $1 LIMIT 1`,
       [req.user.id]
@@ -63,6 +103,11 @@ router.get('/status', totpLimiter, authenticate, async (req, res) => {
 
 router.post('/setup', totpLimiter, authenticate, async (req, res) => {
   try {
+    const schemaStatus = await getTotpSchemaStatus();
+    if (!schemaStatus.available) {
+      return respondTotpUnavailable(res, schemaStatus.missingColumns);
+    }
+
     const userResult = await pool.query(
       `SELECT id, email, totp_enabled FROM users WHERE id = $1 LIMIT 1`,
       [req.user.id]
@@ -113,6 +158,11 @@ router.post(
   validateBody((body) => requireFields(body, ['code'])),
   async (req, res) => {
     try {
+      const schemaStatus = await getTotpSchemaStatus();
+      if (!schemaStatus.available) {
+        return respondTotpUnavailable(res, schemaStatus.missingColumns);
+      }
+
       const { code } = req.body;
 
       const userResult = await pool.query(
@@ -180,6 +230,11 @@ router.post(
   validateBody((body) => requireFields(body, ['password'])),
   async (req, res) => {
     try {
+      const schemaStatus = await getTotpSchemaStatus();
+      if (!schemaStatus.available) {
+        return respondTotpUnavailable(res, schemaStatus.missingColumns);
+      }
+
       const { password } = req.body;
 
       const userResult = await pool.query(
@@ -224,6 +279,11 @@ router.post(
   validateBody((body) => requireFields(body, ['password'])),
   async (req, res) => {
     try {
+      const schemaStatus = await getTotpSchemaStatus();
+      if (!schemaStatus.available) {
+        return respondTotpUnavailable(res, schemaStatus.missingColumns);
+      }
+
       const { password } = req.body;
 
       const userResult = await pool.query(

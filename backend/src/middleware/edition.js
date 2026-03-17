@@ -21,12 +21,6 @@ let IS_COMMUNITY = EDITION === 'community';
 let IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
 
 /**
- * The edition value at process start, before any runtime license upgrades.
- * Used by license removal to revert to the correct pre-license edition.
- */
-const BOOT_EDITION = EDITION;
-
-/**
  * Feature tier requirements mapping
  * These features are NOT available in community edition
  */
@@ -86,7 +80,7 @@ function requireProEdition(feature) {
         feature: feature,
         edition: 'community',
         requiredEdition: 'pro',
-        upgradeUrl: 'https://controlweave.com/#pricing'
+        upgradeUrl: 'https://controlweave.com/pricing'
       });
     }
     
@@ -148,7 +142,7 @@ function blockProFeaturesInCommunity(req, res, next) {
       message: 'This feature is not available in the Community Edition. Please upgrade to Pro edition for access to enterprise features.',
       edition: 'community',
       requiredEdition: 'pro',
-      upgradeUrl: 'https://controlweave.com/#pricing'
+      upgradeUrl: 'https://controlweave.com/pricing'
     });
   }
   next();
@@ -157,8 +151,10 @@ function blockProFeaturesInCommunity(req, res, next) {
 /**
  * Maps license tiers to server editions.
  * Gov Cloud licenses grant Enterprise edition access.
+ * Community licenses keep the server in Community edition.
  */
 const LICENSE_TIER_TO_EDITION = Object.freeze({
+  community: 'community',
   pro: 'pro',
   enterprise: 'enterprise',
   govcloud: 'enterprise'
@@ -248,7 +244,6 @@ module.exports = {
   validateEdition,
   upgradeEdition,
   LICENSE_TIER_TO_EDITION,
-  BOOT_EDITION,
   EDITION,
   IS_COMMUNITY,
   IS_PRO,

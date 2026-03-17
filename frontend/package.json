@@ -1,7 +1,6 @@
 {
   "name": "controlweave-frontend",
-  "version": "2.2.0",
-  "license": "AGPL-3.0",
+  "version": "2.4.1",
   "private": true,
   "scripts": {
     "dev": "next dev",

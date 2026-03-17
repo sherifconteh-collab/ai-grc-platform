@@ -35,12 +35,12 @@ const {
   generateCommunityKey,
   setLocalPublicKey
 } = require('../services/licenseService');
-const rateLimit = require('express-rate-limit');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
-const licenseRateLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const licenseRateLimiter = createRateLimiter({ label: 'license', windowMs: 60 * 1000, max: 10 });
 // RSA key generation is CPU-intensive — apply a tighter limiter to the
 // generate-community endpoint: 3 generations per hour per IP.
-const licenseGenerateLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, standardHeaders: true, legacyHeaders: false });
+const licenseGenerateLimiter = createRateLimiter({ label: 'license-generate', windowMs: 60 * 60 * 1000, max: 3 });
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ router.use(licenseRateLimiter);
  * Includes whether a license is stored in the database.
  * Restricted to users with settings.manage permission.
  */
-router.get('/', licenseRateLimiter, authenticate, requirePermission('settings.manage'), async (req, res) => {
+router.get('/', authenticate, requirePermission('settings.manage'), async (req, res) => {
   try {
     const info = getEditionInfo();
     const envKey = process.env.LICENSE_KEY || process.env.CONTROLWEAVE_LICENSE_KEY || '';
@@ -109,7 +109,6 @@ router.get('/', licenseRateLimiter, authenticate, requirePermission('settings.ma
  */
 router.post(
   '/activate',
-  licenseRateLimiter,
   authenticate,
   requirePermission('settings.manage'),
   async (req, res) => {
@@ -277,3 +276,4 @@ router.post(
 );
 
 module.exports = router;
+

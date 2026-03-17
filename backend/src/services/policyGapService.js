@@ -1,11 +1,6 @@
 // @tier: community
 const pool = require('../config/database');
-let llmChat;
-try {
-  ({ chat: llmChat } = require('./llmService'));
-} catch (e) {
-  llmChat = null;
-}
+const { getLLMService } = require('./llmService');
 const { extractFamilyCode, NIST_CONTROL_FAMILIES } = require('./policyService');
 
 /**
@@ -67,7 +62,9 @@ async function extractPolicyText(filePath, mimeType) {
  */
 async function analyzePolicyWithAI(orgId, policyText, controls) {
   try {
-    if (!llmChat) {
+    const llmService = await getLLMService(orgId);
+    
+    if (!llmService) {
       // Fallback to keyword-based analysis
       return analyzePolicyKeywordBased(policyText, controls);
     }
@@ -106,16 +103,14 @@ Respond in JSON format:
 
 Focus on the first 20 controls. Be concise.`;
     
-    const response = await llmChat({
-      organizationId: orgId,
-      systemPrompt: 'You are a compliance analyst. Respond only in valid JSON.',
-      messages: [{ role: 'user', content: prompt }],
+    const response = await llmService.generateText(prompt, {
+      temperature: 0.3,
+      max_tokens: 2000
     });
-    const text = typeof response === 'string' ? response : (response?.text || response?.content || JSON.stringify(response));
     
     // Try to parse JSON response
     try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         return result.gaps || [];

@@ -9,7 +9,7 @@
 ```
 Location: Root directory
 Purpose: First thing people see - explains what it is, why it matters
-Your file: /ControlWeave/README.md
+Your file: /ai-grc-platform/README.md
 Status: ✅ Ready to go
 ```
 
@@ -122,7 +122,7 @@ Status: ✅ All ready
 ## 📋 Complete File Structure for GitHub
 
 ```
-ControlWeave/
+ai-grc-platform/
 ├── README.md ✅
 ├── LICENSE ⚠️ (create)
 ├── .gitignore ⚠️ (create)
@@ -214,7 +214,7 @@ Your platform being "MCP-ready" = ahead of the curve.
 **DO: Make it optional**
 ```
 ✅ Good:
-ControlWeave/
+ai-grc-platform/
 ├── backend/              (core platform - works standalone)
 ├── frontend/             (core platform - works standalone)
 └── mcp-server/          (OPTIONAL: Claude integration)
@@ -330,7 +330,7 @@ const db = new pg.Pool({
 });
 
 const server = new Server({
-  name: "ControlWeave",
+  name: "ai-grc-platform",
   version: "1.0.0"
 }, {
   capabilities: {
@@ -413,7 +413,7 @@ Thank you for your interest in contributing!
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/ControlWeave.git
+git clone https://github.com/YOUR_USERNAME/ai-grc-platform.git
 
 # Set up database
 createdb ai_grc_platform
@@ -478,8 +478,8 @@ This Code of Conduct is adapted from the Contributor Covenant, version 2.1.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/sherifconteh-collab/ControlWeave.git
-cd ControlWeave
+git clone https://github.com/conteh-consulting/ai-grc-platform.git
+cd ai-grc-platform
 ```
 
 ### 2. Set Up Database
@@ -565,7 +565,7 @@ All notable changes to this project will be documented in this file.
 ```bash
 1. Go to github.com
 2. Click "New repository"
-3. Name: ControlWeave
+3. Name: ai-grc-platform
 4. Description: "Open source multi-framework GRC platform with AI governance"
 5. Public repository
 6. DON'T initialize with README (you already have one)
@@ -575,7 +575,7 @@ All notable changes to this project will be documented in this file.
 ### Step 2: Prepare Your Files Locally
 ```bash
 # Navigate to your project
-cd /path/to/ControlWeave
+cd /path/to/ai-grc-platform
 
 # Create missing files
 touch LICENSE
@@ -600,7 +600,7 @@ git add .
 git commit -m "Initial commit: Database layer with 6 frameworks and crosswalks"
 
 # Connect to GitHub
-git remote add origin https://github.com/sherifconteh-collab/ControlWeave.git
+git remote add origin https://github.com/conteh-consulting/ai-grc-platform.git
 
 # Push to GitHub
 git branch -M main
@@ -723,7 +723,7 @@ The world's first open source GRC platform with:
 
 AGPL-3.0 licensed. Self-hostable. Free forever.
 
-GitHub: github.com/sherifconteh-collab/ControlWeave
+GitHub: github.com/conteh-consulting/ai-grc-platform
 ```
 
 ### Where to Post

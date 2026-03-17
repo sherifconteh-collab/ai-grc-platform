@@ -1,4 +1,4 @@
-// @tier: community
+// @tier: platform
 'use strict';
 
 /**
@@ -25,7 +25,7 @@
  *   }
  *
  * Flow:
- *   1. Customer purchases perpetual license via sales@controlweave.com
+ *   1. Customer purchases perpetual license via contehconsulting@gmail.com
  *   2. Sales generates a signed JWT and delivers it as a license key
  *   3. Customer sets LICENSE_KEY=<jwt> in their .env
  *   4. On startup, this service validates the key and returns the entitlements
@@ -222,6 +222,96 @@ async function loadLicenseKeyFromDb(pool) {
 }
 
 /**
+ * Optional async heartbeat to a hosted license server.
+ *
+ * Disabled by default — only runs when LICENSE_HEARTBEAT_URL is set in env.
+ * Community-tier self-hosted installations work fully offline; this is only
+ * useful for paid-tier operators who want real-time revocation capability.
+ *
+ * Design principles:
+ *   - NEVER mandatory — a failed/unreachable heartbeat never revokes access.
+ *   - NEVER synchronous — always fires-and-forgets; never blocks a request.
+ *   - Graceful degradation — connectivity errors are logged as warnings only.
+ *
+ * The heartbeat POSTs { fingerprint } to LICENSE_HEARTBEAT_URL and expects:
+ *   { valid: true }                          — license is active
+ *   { valid: false, reason: "..." }          — license was revoked (log only)
+ *
+ * Even when the server responds with valid:false, access is NOT revoked
+ * automatically. A human must investigate and act (e.g. update the key).
+ *
+ * @param {string} licenseKey - The active license JWT
+ */
+async function heartbeatCheck(licenseKey) {
+  const rawUrl = (process.env.LICENSE_HEARTBEAT_URL || '').trim();
+  if (!rawUrl) return; // Disabled by default — no internet check
+
+  const fingerprint = licenseFingerprint(licenseKey);
+  const body = JSON.stringify({ fingerprint });
+
+  try {
+    const url = new URL(rawUrl);
+    const lib = url.protocol === 'https:' ? require('https') : require('http');
+
+    await new Promise((resolve) => {
+      const req = lib.request(
+        {
+          hostname: url.hostname,
+          port: url.port || (url.protocol === 'https:' ? 443 : 80),
+          path: url.pathname + url.search,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+            'User-Agent': 'ControlWeave-License-Heartbeat/1.0'
+          },
+          timeout: 8000
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              if (json.valid === false) {
+                log('warn', 'license.heartbeat.revoked', {
+                  reason: json.reason || 'License flagged invalid by heartbeat server — review your license key',
+                  action: 'No automatic action taken. Investigate and re-activate if needed.'
+                });
+              } else {
+                log('info', 'license.heartbeat.ok', { fingerprint });
+              }
+            } catch {
+              // Non-JSON or empty response — treat as inconclusive, not failure
+              log('warn', 'license.heartbeat.bad_response', { status: res.statusCode });
+            }
+            resolve();
+          });
+        }
+      );
+      req.on('error', (err) => {
+        log('warn', 'license.heartbeat.unreachable', {
+          error: err.message,
+          note: 'Heartbeat server unreachable — offline validation still active'
+        });
+        resolve(); // Never reject; failure is non-fatal
+      });
+      req.on('timeout', () => {
+        req.destroy();
+        log('warn', 'license.heartbeat.timeout', {
+          note: 'Heartbeat timed out — offline validation still active'
+        });
+        resolve();
+      });
+      req.write(body);
+      req.end();
+    });
+  } catch (err) {
+    log('warn', 'license.heartbeat.error', { error: err.message });
+  }
+}
+
+/**
  * Generate a self-signed community license key and matching RSA public key.
  *
  * Used by self-hosted community deployments that haven't purchased a paid tier.
@@ -279,8 +369,8 @@ module.exports = {
   licenseFingerprint,
   saveLicenseToDb,
   loadLicenseKeyFromDb,
+  heartbeatCheck,
   generateCommunityKey,
   setLocalPublicKey,
   VALID_TIERS
 };
-

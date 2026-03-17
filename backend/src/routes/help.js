@@ -135,7 +135,7 @@ const ARTICLE_CATALOG = [
   {
     slug: 'tier-comparison',
     title: 'Tier Comparison',
-    description: 'Full feature-by-feature comparison across Community, Pro, Enterprise, and Gov Cloud tiers.',
+    description: 'Full feature-by-feature comparison across Community, Pro, Enterprise, and Gov Cloud & Advisory tiers.',
     icon: '📊',
     category: 'Reference',
     file: 'TIER_COMPARISON.md',
@@ -344,6 +344,10 @@ Select, activate, and manage compliance frameworks.
 - **CMMC Level 2** — DoD contractor cybersecurity maturity
 - **GDPR** — EU data protection regulation
 - **HIPAA** — Healthcare security requirements
+- **NIST AI RMF 1.0** — AI risk management framework
+- **EU AI Act** — EU artificial intelligence governance regulation
+- **ISO/IEC 42001:2023** — AI management system standard
+- **AIUC-1** — Agentic AI certification (Data & Privacy, Security, Safety, Reliability, Accountability, Societal Impact)
 - And 15+ more frameworks
 
 ## Auto-Crosswalk
@@ -494,7 +498,7 @@ Feature-by-feature comparison across all ControlWeave tiers.
 
 ## Community Tier (Free / AGPL)
 - Up to 2 compliance frameworks
-- Unlimited AI requests (BYOK — bring your own API key)
+- 10 AI requests per month
 - Core dashboard, controls, and assessments
 - AI Copilot with basic context
 - Community support
@@ -514,6 +518,7 @@ Feature-by-feature comparison across all ControlWeave tiers.
 ## Enterprise Tier ($3,500–$12,000/mo)
 - Everything in Pro
 - AI impact assessment (ISO 42005)
+- AIUC-1 Agentic AI Certification framework (Data & Privacy, Security, Safety, Reliability, Accountability, Societal Impact)
 - Auditor workspace
 - Knowledge Base (RAG) for AI enrichment
 - Advanced AI analysis features
@@ -523,11 +528,11 @@ Feature-by-feature comparison across all ControlWeave tiers.
 - Dedicated CSM
 - Priority support
 
-## Gov Cloud Tier (Custom)
+## Gov Cloud & Advisory Tier (Custom)
 - Everything in Enterprise
 - FedRAMP / FISMA / StateRAMP compliance
 - IL4 / IL5 data sovereignty
-- ITAR-compliant hosting
+- ITAR-aligned hosting options
 - Dedicated infrastructure
 - SLA-backed uptime guarantee
 - Financial Services AI Governance workspace
@@ -590,7 +595,7 @@ Configure users, roles, integrations, AI providers, and notifications.
 - **Threat Intelligence** — CVE tracking, CISA KEV, and threat feeds
 
 ## Financial Services Compliance
-Gov Cloud-tier workspace for financial institutions: Reg BI alignment, SR 11-7 model inventory, FINRA supervisory audit trail, and SEC explainability narratives.
+Gov Cloud & Advisory workspace for financial institutions: Reg BI alignment, SR 11-7 model inventory, FINRA supervisory audit trail, and SEC explainability narratives.
 
 ## Report an Issue
 Use the **Report Issue** link in the sidebar or the **Issues** tab in the Help Center to submit bugs, feature requests, or problems. Reports are automatically forwarded to our development team for review.`,
@@ -600,7 +605,7 @@ Use the **Report Issue** link in the sidebar or the **Issues** tab in the Help C
 Specialized compliance tools for financial institutions using AI in advisory, trading, and client-facing operations.
 
 ## Access
-The Financial Services Compliance Workspace is available on the **Gov Cloud** tier. Navigate to **Financial Compliance** in the sidebar or **Assets → Financial Compliance Workspace** in the CMDB.
+The Financial Services Compliance Workspace is available on the **Gov Cloud & Advisory** tier. Navigate to **Financial Compliance** in the sidebar or **Assets → Financial Compliance Workspace** in the CMDB.
 
 ## Reg BI Alignment
 Track best-interest obligation alignment for AI-powered recommendations:

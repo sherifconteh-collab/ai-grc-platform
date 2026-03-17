@@ -39,8 +39,9 @@ function getPageContext(pathname: string): string {
 }
 
 const STORAGE_KEY = 'controlweave_copilot_messages';
-const API_BASE_URL = getApiBaseUrl();
 const MAX_STORED = 20;
+const MAX_CONTEXT_MESSAGES = 8;
+const AI_CHAT_URL = `${getApiBaseUrl()}/ai/chat`;
 
 export default function AICopilot() {
   const { user } = useAuth();
@@ -102,13 +103,14 @@ export default function AICopilot() {
     setError('');
 
     try {
+      const recentMessages = messages.slice(-MAX_CONTEXT_MESSAGES);
       const sendPayload = [
-        ...messages.map(m => ({ role: m.role, content: m.content })),
+        ...recentMessages.map(m => ({ role: m.role, content: m.content })),
         { role: 'user', content: userContent }
       ];
 
       const res = await axios.post(
-        `${API_BASE_URL}/ai/chat`,
+        AI_CHAT_URL,
         { messages: sendPayload },
         { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } }
       );

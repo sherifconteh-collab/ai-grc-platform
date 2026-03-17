@@ -71,7 +71,7 @@ const SENSITIVE_SCRIPT_RE =
  * to prevent internal QA/demo/test scripts from leaking into the public mirror.
  */
 const SAFE_SCRIPT_RE =
-  /^(?:check-syntax|check-db|ip-hygiene-check|sync-mirror-allowlist|apply-security-baseline|mcp-server|mcp-server-secure|mcp-tool-registry)\.js$/i;
+  /^(?:check-syntax|check-db|check-railway-config|ip-hygiene-check|sync-mirror-allowlist|apply-security-baseline|mcp-server|mcp-server-secure|mcp-tool-registry)\.js$/i;
 
 // ─── Annotation reader (primary classification source) ────────────────────────
 
