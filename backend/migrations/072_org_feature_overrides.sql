@@ -2,6 +2,9 @@
 -- Adds per-org feature override column + seeds global feature_flags setting.
 -- Also extends billing_status CHECK to include 'comped'.
 
+ALTER TABLE platform_settings
+  ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT FALSE;
+
 INSERT INTO platform_settings (setting_key, setting_value, is_encrypted)
 VALUES ('feature_flags', '{}', false)
 ON CONFLICT (setting_key) DO NOTHING;

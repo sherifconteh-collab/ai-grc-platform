@@ -22,6 +22,49 @@ CREATE TABLE IF NOT EXISTS regulatory_news_items (
   UNIQUE (organization_id, source, url)
 );
 
+ALTER TABLE regulatory_news_items
+  ADD COLUMN IF NOT EXISTS content TEXT,
+  ADD COLUMN IF NOT EXISTS url TEXT,
+  ADD COLUMN IF NOT EXISTS relevant_frameworks TEXT[],
+  ADD COLUMN IF NOT EXISTS impact_level VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS keywords TEXT[],
+  ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'regulatory_news_items'
+      AND column_name = 'body'
+  ) THEN
+    EXECUTE 'UPDATE regulatory_news_items SET content = COALESCE(content, body) WHERE content IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'regulatory_news_items'
+      AND column_name = 'source_url'
+  ) THEN
+    EXECUTE 'UPDATE regulatory_news_items SET url = COALESCE(url, source_url) WHERE url IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'regulatory_news_items'
+      AND column_name = 'tags'
+  ) THEN
+    EXECUTE 'UPDATE regulatory_news_items SET keywords = COALESCE(keywords, tags) WHERE keywords IS NULL';
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_org ON regulatory_news_items(organization_id);
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_source ON regulatory_news_items(source);
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_published ON regulatory_news_items(published_at DESC);

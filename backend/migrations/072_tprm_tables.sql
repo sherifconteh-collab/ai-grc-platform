@@ -26,6 +26,83 @@ CREATE TABLE IF NOT EXISTS tprm_vendors (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE tprm_vendors
+  ADD COLUMN IF NOT EXISTS vendor_website VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS vendor_contact_name VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS vendor_contact_email VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS review_status VARCHAR(30) DEFAULT 'pending_review',
+  ADD COLUMN IF NOT EXISTS last_review_date DATE,
+  ADD COLUMN IF NOT EXISTS notes TEXT,
+  ADD COLUMN IF NOT EXISTS cmdb_asset_id UUID,
+  ADD COLUMN IF NOT EXISTS ai_risk_summary TEXT,
+  ADD COLUMN IF NOT EXISTS ai_risk_score INTEGER,
+  ADD COLUMN IF NOT EXISTS ai_assessed_at TIMESTAMP;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tprm_vendors'
+      AND column_name = 'website'
+  ) THEN
+    EXECUTE 'UPDATE tprm_vendors SET vendor_website = COALESCE(vendor_website, website) WHERE vendor_website IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tprm_vendors'
+      AND column_name = 'primary_contact'
+  ) THEN
+    EXECUTE 'UPDATE tprm_vendors SET vendor_contact_name = COALESCE(vendor_contact_name, primary_contact) WHERE vendor_contact_name IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tprm_vendors'
+      AND column_name = 'contact_email'
+  ) THEN
+    EXECUTE 'UPDATE tprm_vendors SET vendor_contact_email = COALESCE(vendor_contact_email, contact_email) WHERE vendor_contact_email IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tprm_vendors'
+      AND column_name = 'last_reviewed_at'
+  ) THEN
+    EXECUTE 'UPDATE tprm_vendors SET last_review_date = COALESCE(last_review_date, last_reviewed_at) WHERE last_review_date IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tprm_vendors'
+      AND column_name = 'status'
+  ) THEN
+    EXECUTE $sql$
+      UPDATE tprm_vendors
+      SET review_status = COALESCE(
+        review_status,
+        CASE status
+          WHEN 'active' THEN 'approved'
+          WHEN 'inactive' THEN 'rejected'
+          WHEN 'offboarded' THEN 'decommissioned'
+          ELSE 'pending_review'
+        END
+      )
+      WHERE review_status IS NULL
+    $sql$;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_tprm_vendors_org ON tprm_vendors(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_vendors_risk_tier ON tprm_vendors(organization_id, risk_tier);
 CREATE INDEX IF NOT EXISTS idx_tprm_vendors_review_status ON tprm_vendors(organization_id, review_status);
@@ -52,6 +129,26 @@ CREATE TABLE IF NOT EXISTS tprm_questionnaires (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE tprm_questionnaires
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS ai_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS overall_score INTEGER;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tprm_questionnaires'
+      AND column_name = 'submitted_at'
+  ) THEN
+    EXECUTE 'UPDATE tprm_questionnaires SET completed_at = COALESCE(completed_at, submitted_at) WHERE completed_at IS NULL';
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_tprm_questionnaires_org ON tprm_questionnaires(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_questionnaires_vendor ON tprm_questionnaires(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_questionnaires_status ON tprm_questionnaires(organization_id, status);
@@ -74,6 +171,9 @@ CREATE TABLE IF NOT EXISTS tprm_documents (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE tprm_documents
+  ADD COLUMN IF NOT EXISTS request_status VARCHAR(30) DEFAULT 'requested';
 
 CREATE INDEX IF NOT EXISTS idx_tprm_documents_org ON tprm_documents(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_documents_vendor ON tprm_documents(vendor_id);

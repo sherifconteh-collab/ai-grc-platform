@@ -53,12 +53,12 @@
         ]
       },
       {
-        "from": "../frontend/.next/standalone",
+        "from": "../frontend/build/standalone",
         "to": "frontend-standalone"
       },
       {
-        "from": "../frontend/.next/static",
-        "to": "frontend-standalone/.next/static"
+        "from": "../frontend/build/static",
+        "to": "frontend-standalone/build/static"
       },
       {
         "from": "../frontend/public",
