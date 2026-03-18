@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Fix Security Checks and Build & Release workflow failures ([#77](https://github.com/sherifconteh-collab/ai-grc-platform/pull/77)) — @Copilot
 - Harden desktop startup and align Electron packaging with Next.js build output ([#74](https://github.com/sherifconteh-collab/ai-grc-platform/pull/74)) — @Copilot
 - Merge PR #70 (desktop startup hardening) and address review feedback ([#73](https://github.com/sherifconteh-collab/ai-grc-platform/pull/73)) — @Copilot
 - Sync shared files with the latest public ControlWeave commit ([#71](https://github.com/sherifconteh-collab/ai-grc-platform/pull/71)) — @Copilot
