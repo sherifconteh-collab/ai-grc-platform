@@ -121,10 +121,6 @@ function logStartup(level, message) {
   appendStartupLog(line);
 }
 
-function getDirectoryTimestamp(dirPath) {
-  return String(Math.trunc(fs.statSync(dirPath).mtimeMs));
-}
-
 function logStartupError(message, error) {
   const detail = error && error.stack ? error.stack : (error && error.message ? error.message : String(error));
   logStartup('error', `${message}: ${detail}`);
@@ -272,10 +268,10 @@ function loadOrCreateJwtSecret() {
       const stats = fs.statSync(secretFile);
       if ((stats.mode & GROUP_OTHER_PERMISSIONS_MASK) !== 0) {
         logStartup('warn', `Desktop JWT secret at ${secretFile} has permissions broader than 0600; tightening them.`);
+        fs.chmodSync(secretFile, 0o600);
       }
       const secret = fs.readFileSync(secretFile, 'utf8').trim();
       if (secret.length >= MIN_JWT_SECRET_LENGTH) {
-        fs.chmodSync(secretFile, 0o600);
         return secret;
       }
       logStartup('warn', `Desktop JWT secret at ${secretFile} is invalid; regenerating it.`);
@@ -286,7 +282,31 @@ function loadOrCreateJwtSecret() {
 
   const secret = crypto.randomBytes(JWT_SECRET_BYTES).toString('hex');
   fs.writeFileSync(secretFile, `${secret}\n`, { mode: 0o600 });
+  // Ensure permissions are tightened even if the mode flag was ignored on overwrite
+  fs.chmodSync(secretFile, 0o600);
   return secret;
+}
+
+function getMaxFileMtime(dirPath) {
+  let maxMtime = 0;
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        maxMtime = Math.max(maxMtime, getMaxFileMtime(fullPath));
+      } else if (entry.isFile()) {
+        const stat = fs.statSync(fullPath);
+        maxMtime = Math.max(maxMtime, stat.mtimeMs);
+      }
+    }
+  } catch (err) {
+    // Directory may not exist yet on first run; other errors are logged for debugging
+    if (err.code !== 'ENOENT') {
+      console.warn(`getMaxFileMtime: unexpected error reading ${dirPath}: ${err.message}`);
+    }
+  }
+  return maxMtime;
 }
 
 function syncLocalStandaloneAssets(frontendDir) {
@@ -297,7 +317,8 @@ function syncLocalStandaloneAssets(frontendDir) {
   const publicTargetDir = path.join(frontendDir, 'public');
   const markerFile = path.join(frontendDir, '.asset-sync-marker');
   const sourceBuildId = fs.readFileSync(sourceBuildIdPath, 'utf8').trim();
-  const publicMtime = getDirectoryTimestamp(sourcePublicDir);
+  // Use max file mtime recursively for reliable change detection
+  const publicMtime = String(Math.trunc(getMaxFileMtime(sourcePublicDir)));
   const markerValue = `${sourceBuildId}:${publicMtime}`;
   const currentMarker = fs.existsSync(markerFile) ? fs.readFileSync(markerFile, 'utf8').trim() : '';
 

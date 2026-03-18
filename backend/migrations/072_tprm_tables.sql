@@ -38,6 +38,30 @@ ALTER TABLE tprm_vendors
   ADD COLUMN IF NOT EXISTS ai_risk_score INTEGER,
   ADD COLUMN IF NOT EXISTS ai_assessed_at TIMESTAMP;
 
+-- Conditionally add CHECK constraints that match the CREATE TABLE definition.
+-- Upgraded installs may have added columns without them.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tprm_vendors_review_status_check') THEN
+    BEGIN
+      ALTER TABLE tprm_vendors
+        ADD CONSTRAINT tprm_vendors_review_status_check
+        CHECK (review_status IN ('pending_review', 'in_review', 'approved', 'conditional', 'rejected', 'decommissioned'));
+    EXCEPTION WHEN check_violation THEN
+      RAISE NOTICE 'Skipping review_status CHECK: existing data violates constraint';
+    END;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tprm_vendors_ai_risk_score_check') THEN
+    BEGIN
+      ALTER TABLE tprm_vendors
+        ADD CONSTRAINT tprm_vendors_ai_risk_score_check
+        CHECK (ai_risk_score BETWEEN 0 AND 100);
+    EXCEPTION WHEN check_violation THEN
+      RAISE NOTICE 'Skipping ai_risk_score CHECK: existing data violates constraint';
+    END;
+  END IF;
+END $$;
+
 DO $$
 BEGIN
   IF EXISTS (
@@ -138,6 +162,19 @@ ALTER TABLE tprm_questionnaires
 
 DO $$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tprm_questionnaires_overall_score_check') THEN
+    BEGIN
+      ALTER TABLE tprm_questionnaires
+        ADD CONSTRAINT tprm_questionnaires_overall_score_check
+        CHECK (overall_score BETWEEN 0 AND 100);
+    EXCEPTION WHEN check_violation THEN
+      RAISE NOTICE 'Skipping overall_score CHECK: existing data violates constraint';
+    END;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
@@ -174,6 +211,19 @@ CREATE TABLE IF NOT EXISTS tprm_documents (
 
 ALTER TABLE tprm_documents
   ADD COLUMN IF NOT EXISTS request_status VARCHAR(30) DEFAULT 'requested';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tprm_documents_request_status_check') THEN
+    BEGIN
+      ALTER TABLE tprm_documents
+        ADD CONSTRAINT tprm_documents_request_status_check
+        CHECK (request_status IN ('requested', 'received', 'under_review', 'accepted', 'rejected', 'expired'));
+    EXCEPTION WHEN check_violation THEN
+      RAISE NOTICE 'Skipping request_status CHECK: existing data violates constraint';
+    END;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_tprm_documents_org ON tprm_documents(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_documents_vendor ON tprm_documents(vendor_id);

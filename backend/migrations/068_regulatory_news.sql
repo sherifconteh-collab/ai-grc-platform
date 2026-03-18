@@ -65,6 +65,41 @@ BEGIN
   END IF;
 END $$;
 
+-- After backfilling, enforce NOT NULL on url so upgraded installs match fresh ones.
+-- Rows with no url/source_url get a non-fetchable placeholder so the constraint can be applied.
+UPDATE regulatory_news_items SET url = 'urn:controlweave:missing-url' WHERE url IS NULL;
+
+DO $$
+BEGIN
+  -- Only alter if the column is currently nullable
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'regulatory_news_items'
+      AND column_name = 'url'
+      AND is_nullable = 'YES'
+  ) THEN
+    ALTER TABLE regulatory_news_items ALTER COLUMN url SET NOT NULL;
+  END IF;
+END $$;
+
+-- Ensure the UNIQUE constraint exists for upgraded installs
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'regulatory_news_items_organization_id_source_url_key'
+  ) THEN
+    BEGIN
+      ALTER TABLE regulatory_news_items
+        ADD CONSTRAINT regulatory_news_items_organization_id_source_url_key
+        UNIQUE (organization_id, source, url);
+    EXCEPTION WHEN unique_violation THEN
+      RAISE NOTICE 'Skipping unique constraint: duplicate rows exist';
+    END;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_org ON regulatory_news_items(organization_id);
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_source ON regulatory_news_items(source);
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_published ON regulatory_news_items(published_at DESC);
