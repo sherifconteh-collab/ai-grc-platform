@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS risk_scores (
   
   -- Overall risk score (0-100)
   overall_risk_score NUMERIC(5,2) CHECK (overall_risk_score >= 0 AND overall_risk_score <= 100),
-  risk_grade VARCHAR(2), -- A+, A, B, C, D, F
+  risk_grade VARCHAR(4), -- A+, A, B, C, D, F
   
   -- Component scores
   control_implementation_score NUMERIC(5,2),
@@ -42,9 +42,32 @@ CREATE TABLE IF NOT EXISTS risk_scores (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE risk_scores
+  ADD COLUMN IF NOT EXISTS overall_risk_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS risk_grade VARCHAR(4),
+  ADD COLUMN IF NOT EXISTS control_implementation_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS vulnerability_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS evidence_freshness_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS assessment_coverage_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS critical_gaps_count INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS high_priority_gaps_count INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS unpatched_critical_vulns INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS overdue_assessments INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS trend_direction VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS previous_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS score_change NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS calculation_method VARCHAR(50) DEFAULT 'weighted_aggregate',
+  ADD COLUMN IF NOT EXISTS ai_provider VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS predicted_score_30d NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS predicted_score_60d NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS predicted_score_90d NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
 -- Index for fast org lookups
-CREATE INDEX idx_risk_scores_org_id ON risk_scores(organization_id);
-CREATE INDEX idx_risk_scores_calculated_at ON risk_scores(organization_id, calculated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_risk_scores_org_id ON risk_scores(organization_id);
+CREATE INDEX IF NOT EXISTS idx_risk_scores_calculated_at ON risk_scores(organization_id, calculated_at DESC);
 
 -- Regulatory impact assessments table
 CREATE TABLE IF NOT EXISTS regulatory_impact_assessments (
@@ -94,10 +117,35 @@ CREATE TABLE IF NOT EXISTS regulatory_impact_assessments (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_regulatory_impact_org_id ON regulatory_impact_assessments(organization_id);
-CREATE INDEX idx_regulatory_impact_framework ON regulatory_impact_assessments(framework_code);
-CREATE INDEX idx_regulatory_impact_level ON regulatory_impact_assessments(organization_id, impact_level);
-CREATE INDEX idx_regulatory_impact_deadline ON regulatory_impact_assessments(compliance_deadline);
+ALTER TABLE regulatory_impact_assessments
+  ADD COLUMN IF NOT EXISTS framework_code VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS change_type VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS change_title VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS change_description TEXT,
+  ADD COLUMN IF NOT EXISTS impact_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS affected_systems TEXT[],
+  ADD COLUMN IF NOT EXISTS estimated_effort_hours INTEGER,
+  ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS regulation_effective_date DATE,
+  ADD COLUMN IF NOT EXISTS compliance_deadline DATE,
+  ADD COLUMN IF NOT EXISTS days_to_comply INTEGER,
+  ADD COLUMN IF NOT EXISTS business_impact TEXT,
+  ADD COLUMN IF NOT EXISTS technical_requirements TEXT,
+  ADD COLUMN IF NOT EXISTS gap_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS recommended_actions TEXT,
+  ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS ai_provider VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS confidence_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS review_status VARCHAR(20) DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS review_notes TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_org_id ON regulatory_impact_assessments(organization_id);
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_framework ON regulatory_impact_assessments(framework_code);
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_level ON regulatory_impact_assessments(organization_id, impact_level);
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_deadline ON regulatory_impact_assessments(compliance_deadline);
 
 -- Remediation plans table: Enhanced smart remediation tracking
 CREATE TABLE IF NOT EXISTS remediation_plans (
@@ -156,10 +204,26 @@ CREATE TABLE IF NOT EXISTS remediation_plans (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_remediation_plans_org_id ON remediation_plans(organization_id);
-CREATE INDEX idx_remediation_plans_control_id ON remediation_plans(control_id);
-CREATE INDEX idx_remediation_plans_priority ON remediation_plans(organization_id, priority_level);
-CREATE INDEX idx_remediation_plans_status ON remediation_plans(organization_id, status);
+ALTER TABLE remediation_plans
+  ADD COLUMN IF NOT EXISTS control_id UUID REFERENCES framework_controls(id),
+  ADD COLUMN IF NOT EXISTS vulnerability_id UUID REFERENCES vulnerability_findings(id),
+  ADD COLUMN IF NOT EXISTS impact_assessment_id UUID REFERENCES regulatory_impact_assessments(id),
+  ADD COLUMN IF NOT EXISTS risk_reduction NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS actual_start_date DATE,
+  ADD COLUMN IF NOT EXISTS actual_completion_date DATE,
+  ADD COLUMN IF NOT EXISTS remediation_steps JSONB,
+  ADD COLUMN IF NOT EXISTS required_resources TEXT[],
+  ADD COLUMN IF NOT EXISTS dependencies TEXT[],
+  ADD COLUMN IF NOT EXISTS expected_benefits TEXT,
+  ADD COLUMN IF NOT EXISTS roi_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_org_id ON remediation_plans(organization_id);
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_control_id ON remediation_plans(control_id);
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_priority ON remediation_plans(organization_id, priority_level);
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_status ON remediation_plans(organization_id, status);
 
 -- Add comment for documentation
 COMMENT ON TABLE risk_scores IS 'Phase 6: Predictive risk scoring with 0-100 scale and trend analysis';

@@ -562,6 +562,9 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
   const outputStr = typeof outputText === 'string' ? outputText : JSON.stringify(outputText);
   const inputHash = crypto.createHash('sha256').update(inputStr).digest('hex');
   const outputHash = crypto.createHash('sha256').update(outputStr).digest('hex');
+  const normalizeId = (v) => (v == null ? null : String(v));
+  const correlationId = normalizeId(meta.correlation_id ?? meta.correlationId);
+  const sessionId = normalizeId(meta.session_id ?? meta.sessionId);
   await _exec(
     `INSERT INTO ai_decision_log
        (organization_id, feature, input_hash, output_hash, model_version,
@@ -571,8 +574,8 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
     [
       orgId, feature, inputHash, outputHash,
       meta.model_version || meta.modelVersion || null,
-      meta.correlation_id || meta.correlationId || null,
-      meta.session_id || meta.sessionId || null,
+      correlationId,
+      sessionId,
       meta.data_lineage || meta.dataLineage || null,
       meta.risk_level || meta.riskLevel || null,
       meta.human_reviewed || meta.humanReviewed || false,
@@ -641,13 +644,25 @@ async function getLLMService(orgId) {
   if (!key) return null;
 
   const p = provider.toLowerCase();
-  if (p === 'anthropic' && Anthropic) return new Anthropic({ apiKey: key });
-  if (p === 'openai' && OpenAI) return new OpenAI({ apiKey: key });
-  // For REST-based providers return a thin wrapper
+  const defaultModel = await getOrgDefaultModel(orgId);
+
   return {
     provider: p,
     key,
     call: (model, systemPrompt, messages) => callProvider(p, key, model, systemPrompt, messages),
+    /**
+     * Convenience helper for legacy single-prompt callers.
+     * @param {string} prompt
+     * @param {{ model?: string | null, systemPrompt?: string | null }} [options]
+     * @returns {Promise<string>}
+     */
+    generateText: (prompt, options = {}) => callProvider(
+      p,
+      key,
+      options.model || defaultModel || null,
+      options.systemPrompt || null,
+      [{ role: 'user', content: String(prompt || '') }]
+    ),
   };
 }
 

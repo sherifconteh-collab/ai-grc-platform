@@ -16,7 +16,7 @@
     "axios": "^1.7.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.475.0",
-    "next": "^16.1.6",
+    "next": "^16.1.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
@@ -28,7 +28,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.39.2",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "^16.1.7",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.0.0",
     "typescript": "5.9.3"

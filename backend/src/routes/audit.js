@@ -3,9 +3,18 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
-const splunk = require('../services/splunkService');
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
+
+let splunk = {
+  getOrgSplunkSettings: async () => ({}),
+  runSearch: async () => ({ sid: null, search: null, results: [] })
+};
+try {
+  splunk = require('../services/splunkService');
+} catch (_err) {
+  // Optional in the public/community repo.
+}
 
 const auditWriteLimiter = createRateLimiter({
   label: 'audit-log-write',
