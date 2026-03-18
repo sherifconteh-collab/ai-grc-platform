@@ -23,6 +23,24 @@ CREATE TABLE IF NOT EXISTS tprm_evidence (
   uploaded_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE tprm_evidence
+  ADD COLUMN IF NOT EXISTS sbom_parsed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS ai_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS ai_risk_flags JSONB;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tprm_evidence'
+      AND column_name = 'ai_analysis_result'
+  ) THEN
+    EXECUTE 'UPDATE tprm_evidence SET ai_analysis = COALESCE(ai_analysis, ai_analysis_result::text) WHERE ai_analysis IS NULL AND ai_analysis_result IS NOT NULL';
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_tprm_evidence_questionnaire ON tprm_evidence(questionnaire_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_evidence_org ON tprm_evidence(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_evidence_sbom ON tprm_evidence(questionnaire_id) WHERE is_sbom = TRUE;

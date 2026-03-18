@@ -102,22 +102,6 @@ BEGIN
   ) THEN
     EXECUTE 'ALTER TABLE ai_decision_log ALTER COLUMN ai_agent_id DROP NOT NULL';
   END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = 'ai_decision_log' AND column_name = 'correlation_id' AND data_type <> 'text'
-  ) THEN
-    EXECUTE 'ALTER TABLE ai_decision_log ALTER COLUMN correlation_id TYPE TEXT USING correlation_id::text';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = 'ai_decision_log' AND column_name = 'session_id' AND data_type <> 'text'
-  ) THEN
-    EXECUTE 'ALTER TABLE ai_decision_log ALTER COLUMN session_id TYPE TEXT USING session_id::text';
-  END IF;
 END $$;
 
 UPDATE ai_decision_log
@@ -259,17 +243,6 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_name = 'risk_scores' AND column_name = 'risk_grade' AND character_maximum_length <> 4
-  ) THEN
-    EXECUTE 'ALTER TABLE risk_scores ALTER COLUMN risk_grade TYPE VARCHAR(4)';
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
     WHERE table_name = 'risk_scores' AND column_name = 'overall_score'
   ) THEN
     EXECUTE $sql$
@@ -333,21 +306,6 @@ ALTER TABLE ai_reasoning_memory
   ADD COLUMN IF NOT EXISTS keywords TEXT,
   ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = 'ai_reasoning_memory' AND column_name = 'keywords' AND data_type = 'ARRAY'
-  ) THEN
-    EXECUTE $sql$
-      ALTER TABLE ai_reasoning_memory
-      ALTER COLUMN keywords TYPE TEXT
-      USING array_to_string(keywords, ',')
-    $sql$;
-  END IF;
-END $$;
 
 UPDATE ai_reasoning_memory
 SET feature = COALESCE(NULLIF(feature, ''), 'legacy'),

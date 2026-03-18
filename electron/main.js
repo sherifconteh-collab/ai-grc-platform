@@ -38,6 +38,9 @@ const POLL_INTERVAL_MS = 500;
 const BACKEND_HEALTH_PATH = '/health';
 const FRONTEND_HEALTH_PATH = '/health';
 const IS_SMOKE_TEST = process.argv.includes('--smoke-test');
+const MIN_JWT_SECRET_LENGTH = 32;
+const JWT_SECRET_BYTES = 48;
+const GROUP_OTHER_PERMISSIONS_MASK = 0o077;
 
 // When packaged, electron bundles node alongside the app.  process.execPath is
 // the electron binary itself, which *is* a Node.js runtime, so we can use it
@@ -257,6 +260,87 @@ function loadOrCreateCredentials() {
   return creds;
 }
 
+function loadOrCreateJwtSecret() {
+  const secretFile = path.join(app.getPath('userData'), 'jwt-secret');
+
+  if (fs.existsSync(secretFile)) {
+    try {
+      const stats = fs.statSync(secretFile);
+      if ((stats.mode & GROUP_OTHER_PERMISSIONS_MASK) !== 0) {
+        logStartup('warn', `Desktop JWT secret at ${secretFile} has permissions broader than 0600; tightening them.`);
+        fs.chmodSync(secretFile, 0o600);
+      }
+      const secret = fs.readFileSync(secretFile, 'utf8').trim();
+      if (secret.length >= MIN_JWT_SECRET_LENGTH) {
+        return secret;
+      }
+      logStartup('warn', `Desktop JWT secret at ${secretFile} is invalid; regenerating it.`);
+    } catch (error) {
+      logStartup('warn', `Desktop JWT secret at ${secretFile} could not be read (${error.message}); regenerating it.`);
+    }
+  }
+
+  const secret = crypto.randomBytes(JWT_SECRET_BYTES).toString('hex');
+  fs.writeFileSync(secretFile, `${secret}\n`, { mode: 0o600 });
+  // Ensure permissions are tightened even if the mode flag was ignored on overwrite
+  fs.chmodSync(secretFile, 0o600);
+  return secret;
+}
+
+function getMaxFileMtime(dirPath) {
+  let maxMtime = 0;
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        maxMtime = Math.max(maxMtime, getMaxFileMtime(fullPath));
+      } else if (entry.isFile()) {
+        const stat = fs.statSync(fullPath);
+        maxMtime = Math.max(maxMtime, stat.mtimeMs);
+      }
+    }
+  } catch (err) {
+    // Directory may not exist yet on first run; other errors are logged for debugging
+    if (err.code !== 'ENOENT') {
+      console.warn(`getMaxFileMtime: unexpected error reading ${dirPath}: ${err.message}`);
+    }
+  }
+  return maxMtime;
+}
+
+function syncLocalStandaloneAssets(frontendDir) {
+  const sourceBuildIdPath = path.join(RESOURCES_ROOT, 'frontend', 'build', 'BUILD_ID');
+  const sourcePublicDir = path.join(RESOURCES_ROOT, 'frontend', 'public');
+  const standaloneBuildDir = path.join(frontendDir, 'build');
+  const staticTargetDir = path.join(standaloneBuildDir, 'static');
+  const publicTargetDir = path.join(frontendDir, 'public');
+  const markerFile = path.join(frontendDir, '.asset-sync-marker');
+  const sourceBuildId = fs.readFileSync(sourceBuildIdPath, 'utf8').trim();
+  // Use max file mtime recursively for reliable change detection
+  const publicMtime = String(Math.trunc(getMaxFileMtime(sourcePublicDir)));
+  const markerValue = `${sourceBuildId}:${publicMtime}`;
+  const currentMarker = fs.existsSync(markerFile) ? fs.readFileSync(markerFile, 'utf8').trim() : '';
+
+  if (
+    currentMarker === markerValue &&
+    fs.existsSync(staticTargetDir) &&
+    fs.existsSync(publicTargetDir)
+  ) {
+    return;
+  }
+
+  fs.cpSync(path.join(RESOURCES_ROOT, 'frontend', 'build', 'static'), staticTargetDir, {
+    recursive: true,
+    force: true,
+  });
+  fs.cpSync(sourcePublicDir, publicTargetDir, {
+    recursive: true,
+    force: true,
+  });
+  fs.writeFileSync(markerFile, `${markerValue}\n`);
+}
+
 /**
  * Start the embedded PostgreSQL instance, initialise it on first run, and
  * ensure the 'controlweave' application database exists.
@@ -392,6 +476,7 @@ function startBackend(backendDir, databaseUrl) {
   // Generate a random password for the default platform admin to avoid
   // shipping a known credential that is reachable on the network.
   const generatedPassword = `CW-${crypto.randomBytes(12).toString('base64url')}!1`;
+  const jwtSecret = loadOrCreateJwtSecret();
 
   const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {
     // Allow the frontend origin so CORS is satisfied
@@ -405,6 +490,7 @@ function startBackend(backendDir, databaseUrl) {
     FRONTEND_URL: `http://localhost:${FRONTEND_PORT}`,
     // Auto-provision a platform admin on first desktop launch so the user
     // can sign in immediately without running any CLI seed scripts.
+    JWT_SECRET: jwtSecret,
     PLATFORM_ADMIN_EMAIL: process.env.PLATFORM_ADMIN_EMAIL || 'admin@controlweave.local',
     PLATFORM_ADMIN_PASSWORD: process.env.PLATFORM_ADMIN_PASSWORD || generatedPassword,
     PLATFORM_ADMIN_FIRST_NAME: process.env.PLATFORM_ADMIN_FIRST_NAME || 'Platform',
@@ -416,7 +502,14 @@ function startBackend(backendDir, databaseUrl) {
 }
 
 function startFrontend() {
-  const frontendDir = path.join(RESOURCES_ROOT, 'frontend-standalone');
+  const frontendDir = app.isPackaged
+    ? path.join(RESOURCES_ROOT, 'frontend-standalone')
+    : path.join(RESOURCES_ROOT, 'frontend', 'build', 'standalone');
+
+  if (!app.isPackaged) {
+    syncLocalStandaloneAssets(frontendDir);
+  }
+
   const { proc, ready } = startServer('Frontend', frontendDir, 'server.js', FRONTEND_PORT, {
     HOSTNAME: '127.0.0.1',
     // Tell the Next.js rewrite where the backend lives
