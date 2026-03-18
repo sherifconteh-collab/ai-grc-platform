@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-18 | PR #73: Merge PR #70 (desktop startup hardening) and address review feedback -->
+<!-- LAST_UPDATED: 2026-03-18 | PR #74: Harden desktop startup and align Electron packaging with Next.js build output -->
 
 ## 🎯 What is This?
 
