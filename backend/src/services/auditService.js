@@ -13,8 +13,16 @@
  */
 
 const pool = require('../config/database');
-const siemService = require('./siemService');
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
+
+let siemService = {
+  forwardEvent: async () => [{ ok: false, reason: 'SIEM service unavailable' }]
+};
+try {
+  siemService = require('./siemService');
+} catch (_err) {
+  // Optional in the public/community repo.
+}
 
 /**
  * Create an audit log entry with AU-2 compliant fields
@@ -136,9 +144,10 @@ async function createAuditLog(params) {
 async function forwardToSiem(organizationId, auditLogId, eventType, payload) {
   try {
     const results = await siemService.forwardEvent(organizationId, eventType, payload);
+    const normalizedResults = Array.isArray(results) ? results : [];
     
     // Check if any SIEM forwarding was successful
-    const anySuccess = results.some(r => r.ok);
+    const anySuccess = normalizedResults.some(r => r && r.ok);
     
     if (anySuccess) {
       // Mark as forwarded in audit log
@@ -148,7 +157,7 @@ async function forwardToSiem(organizationId, auditLogId, eventType, payload) {
       );
     }
 
-    return results;
+    return normalizedResults;
   } catch (error) {
     console.error('SIEM forwarding failed:', error);
     return [];

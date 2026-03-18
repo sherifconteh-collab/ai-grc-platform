@@ -10,19 +10,47 @@ const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-const {
-  getTrialSeedData,
-  expireOrganizationTrialIfNeeded,
-  ensureOrgFrameworks
-} = require('../services/subscriptionService');
 const { sendPasswordResetEmail } = require('../services/emailService');
-const { getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService');
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
 const { decrypt } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
 const { hasPublicColumn } = require('../utils/schema');
+
+let getTrialSeedData = () => ({
+  tier: 'community',
+  billingStatus: 'community',
+  trialSourceTier: 'community',
+  trialDays: 0,
+  trialStatus: 'none'
+});
+let expireOrganizationTrialIfNeeded = async () => false;
+let ensureOrgFrameworks = async () => {};
+try {
+  ({
+    getTrialSeedData,
+    expireOrganizationTrialIfNeeded,
+    ensureOrgFrameworks
+  } = require('../services/subscriptionService'));
+} catch (_err) {
+  // Optional in the public/community repo.
+}
+
+let getGeolocationFromRequest = () => ({});
+let extractIpFromRequest = (req) => {
+  if (!req) return null;
+  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
+  if (typeof xForwardedFor === 'string' && xForwardedFor.length > 0) {
+    return xForwardedFor.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || null;
+};
+try {
+  ({ getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService'));
+} catch (_err) {
+  // Optional in the public/community repo.
+}
 
 const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
@@ -599,7 +627,9 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
 
       // Ensure all seeded frameworks the org is entitled to are adopted.
       // Fire-and-forget — does not block the registration response.
-      ensureOrgFrameworks(org.id, org.tier);
+      void ensureOrgFrameworks(org.id, org.tier).catch(err => {
+        console.error('ensureOrgFrameworks error for org', org.id, err);
+      });
 
       res.status(201).json({
         success: true,
@@ -800,7 +830,9 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
     // Ensure all seeded frameworks the org is entitled to are adopted.
     // Fire-and-forget — does not block the login response.
     if (user.organization_id && user.organization_tier) {
-      ensureOrgFrameworks(user.organization_id, user.organization_tier);
+      void ensureOrgFrameworks(user.organization_id, user.organization_tier).catch(err => {
+        console.error('ensureOrgFrameworks error for org', user.organization_id, err);
+      });
     }
 
     res.json({

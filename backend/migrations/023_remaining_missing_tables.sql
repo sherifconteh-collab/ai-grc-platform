@@ -81,6 +81,11 @@ CREATE TABLE IF NOT EXISTS asset_categories (
   updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE asset_categories
+  ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES asset_categories(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
+
 -- Partial unique indexes: one for org-specific codes, one for global codes.
 -- A composite UNIQUE on (organization_id, code) would allow duplicate global
 -- categories because PostgreSQL treats NULL as distinct in unique constraints.
@@ -96,18 +101,27 @@ CREATE INDEX IF NOT EXISTS idx_ac_org
   ON asset_categories(organization_id);
 
 -- Seed global categories so JOINs don't fail on a fresh database.
-INSERT INTO asset_categories (organization_id, code, name, description) VALUES
-  (NULL, 'server',         'Servers',           'Physical and virtual servers'),
-  (NULL, 'workstation',    'Workstations',      'Employee workstations and laptops'),
-  (NULL, 'network',        'Network Equipment', 'Routers, switches, firewalls'),
-  (NULL, 'cloud',          'Cloud Resources',   'Cloud-hosted compute and storage'),
-  (NULL, 'application',    'Applications',      'Business applications and services'),
-  (NULL, 'database',       'Databases',         'Database servers and instances'),
-  (NULL, 'iot',            'IoT / OT Devices',  'Internet of Things / operational technology'),
-  (NULL, 'service_account','Service Accounts',  'Non-human identities and service accounts'),
-  (NULL, 'ai_agent',       'AI Agents',         'AI-powered automation agents'),
-  (NULL, 'other',          'Other',             'Miscellaneous assets')
-ON CONFLICT (code) WHERE organization_id IS NULL DO NOTHING;
+INSERT INTO asset_categories (organization_id, code, name, description)
+SELECT *
+FROM (
+  VALUES
+    (NULL::UUID, 'server',          'Servers',           'Physical and virtual servers'),
+    (NULL::UUID, 'workstation',     'Workstations',      'Employee workstations and laptops'),
+    (NULL::UUID, 'network',         'Network Equipment', 'Routers, switches, firewalls'),
+    (NULL::UUID, 'cloud',           'Cloud Resources',   'Cloud-hosted compute and storage'),
+    (NULL::UUID, 'application',     'Applications',      'Business applications and services'),
+    (NULL::UUID, 'database',        'Databases',         'Database servers and instances'),
+    (NULL::UUID, 'iot',             'IoT / OT Devices',  'Internet of Things / operational technology'),
+    (NULL::UUID, 'service_account', 'Service Accounts',  'Non-human identities and service accounts'),
+    (NULL::UUID, 'ai_agent',        'AI Agents',         'AI-powered automation agents'),
+    (NULL::UUID, 'other',           'Other',             'Miscellaneous assets')
+) AS seed_rows (organization_id, code, name, description)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM asset_categories existing
+  WHERE existing.organization_id IS NULL
+    AND existing.code = seed_rows.code
+);
 
 -- ============================================================
 -- PART 4: regulatory_impact_assessments

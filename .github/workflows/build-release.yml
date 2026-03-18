@@ -129,6 +129,32 @@ jobs:
         run: node scripts/generate-icons.js
         working-directory: electron
 
+      - name: Validate Windows signing secrets
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}" ] || [ -z "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" ]; then
+            echo "Missing Windows Authenticode signing secrets." >&2
+            exit 1
+          fi
+
+      - name: Prepare Windows signing certificate
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
+        shell: pwsh
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP 'controlweave-signing.p12'
+          [System.IO.File]::WriteAllBytes($certPath, [System.Convert]::FromBase64String('${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}'))
+          "CSC_LINK=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CSC_KEY_PASSWORD=${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build Windows installer
         run: npm run dist:win
         working-directory: electron
@@ -136,6 +162,57 @@ jobs:
           # electron-builder uses GH_TOKEN to publish directly to GitHub Releases
           # when the workflow is triggered by a release event.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate latest.yml Windows artifact reference
+        shell: bash
+        run: node electron/scripts/validate-latest-yml.js
+
+      - name: Install built Windows package and run smoke test
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path electron/dist -Filter 'ControlWeave.Setup.*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer) {
+            throw 'Windows installer not found after build.'
+          }
+
+          $installDir = Join-Path $env:RUNNER_TEMP 'controlweave-smoke'
+          if (Test-Path $installDir) {
+            Remove-Item -Path $installDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $installDir | Out-Null
+
+          Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait -NoNewWindow
+
+          $exePath = Join-Path $installDir 'ControlWeave.exe'
+          if (-not (Test-Path $exePath)) {
+            $exePath = (Get-ChildItem -Path $installDir -Filter 'ControlWeave.exe' -Recurse | Select-Object -First 1).FullName
+          }
+          if (-not $exePath -or -not (Test-Path $exePath)) {
+            throw 'Installed ControlWeave.exe not found.'
+          }
+
+          $process = Start-Process -FilePath $exePath -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Smoke test failed with exit code $($process.ExitCode)."
+          }
+
+      - name: Verify Windows installer Authenticode signature
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path electron/dist -Filter 'ControlWeave.Setup.*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer) {
+            throw 'Windows installer not found for signature verification.'
+          }
+
+          $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
+          if ($signature.Status -ne 'Valid') {
+            throw "Installer signature validation failed: $($signature.Status)"
+          }
 
       # ── Publish ──────────────────────────────────────────────────────────────
       - name: Upload installer to GitHub Release

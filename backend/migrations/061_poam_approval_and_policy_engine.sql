@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS poam_approval_requests (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE poam_approval_requests
+  ADD COLUMN IF NOT EXISTS framework_id UUID REFERENCES frameworks(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_poam_approval_org
   ON poam_approval_requests(organization_id, submitted_at DESC);
 
@@ -116,6 +119,9 @@ CREATE TABLE IF NOT EXISTS policy_control_mappings (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   UNIQUE(policy_section_id, control_id)
 );
+
+ALTER TABLE policy_control_mappings
+  ADD COLUMN IF NOT EXISTS framework_id UUID REFERENCES frameworks(id) ON DELETE CASCADE;
 
 CREATE INDEX IF NOT EXISTS idx_policy_control_mapping_section
   ON policy_control_mappings(policy_section_id);
@@ -245,6 +251,10 @@ CREATE TABLE IF NOT EXISTS policy_uploads (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE policy_uploads
+  ADD COLUMN IF NOT EXISTS upload_date TIMESTAMP NOT NULL DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
 CREATE INDEX IF NOT EXISTS idx_policy_uploads_org
   ON policy_uploads(organization_id, upload_date DESC);
 
@@ -265,6 +275,10 @@ CREATE TABLE IF NOT EXISTS policy_gap_analysis (
   gap_summary JSONB DEFAULT '{}'::jsonb, -- Summary statistics
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE policy_gap_analysis
+  ADD COLUMN IF NOT EXISTS framework_id UUID REFERENCES frameworks(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS analysis_date TIMESTAMP NOT NULL DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_policy_gap_upload
   ON policy_gap_analysis(policy_upload_id);
@@ -290,6 +304,12 @@ CREATE TABLE IF NOT EXISTS policy_control_gaps (
   review_notes TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE policy_control_gaps
+  ADD COLUMN IF NOT EXISTS framework_id UUID REFERENCES frameworks(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS reviewed BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS review_notes TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_policy_control_gaps_analysis
   ON policy_control_gaps(gap_analysis_id);

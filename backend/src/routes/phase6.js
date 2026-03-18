@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
+const riskScoringService = require('../services/riskScoringService');
 
 router.use(authenticate);
 router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'phase6-route' }));
@@ -12,12 +13,8 @@ router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'phase6-
 router.post('/risk-score/calculate', async (req, res) => {
   try {
     const org = req.user.organization_id;
-    const result = await pool.query(
-      `INSERT INTO risk_scores (organization_id, overall_score, breakdown, calculated_at)
-       VALUES ($1, 0, $2, NOW()) RETURNING *`,
-      [org, JSON.stringify({})]
-    );
-    return res.status(201).json({ success: true, data: result.rows[0] });
+    const result = await riskScoringService.calculateRiskScore(org);
+    return res.status(201).json({ success: true, data: result });
   } catch (error) {
     console.error('Error calculating risk score:', error);
     return res.status(500).json({ success: false, error: 'Failed to calculate risk score' });
@@ -27,11 +24,8 @@ router.post('/risk-score/calculate', async (req, res) => {
 router.get('/risk-score/latest', async (req, res) => {
   try {
     const org = req.user.organization_id;
-    const result = await pool.query(
-      'SELECT * FROM risk_scores WHERE organization_id = $1 ORDER BY calculated_at DESC LIMIT 1',
-      [org]
-    );
-    return res.json({ success: true, data: result.rows[0] || null });
+    const result = await riskScoringService.getLatestRiskScore(org);
+    return res.json({ success: true, data: result });
   } catch (error) {
     console.error('Error fetching latest risk score:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch latest risk score' });
@@ -41,11 +35,9 @@ router.get('/risk-score/latest', async (req, res) => {
 router.get('/risk-score/history', async (req, res) => {
   try {
     const org = req.user.organization_id;
-    const result = await pool.query(
-      'SELECT * FROM risk_scores WHERE organization_id = $1 ORDER BY calculated_at',
-      [org]
-    );
-    return res.json({ success: true, data: result.rows });
+    const limit = Math.min(parseInt(req.query.limit, 10) || 30, 100);
+    const result = await riskScoringService.getRiskScoreHistory(org, limit);
+    return res.json({ success: true, data: result });
   } catch (error) {
     console.error('Error fetching risk score history:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch risk score history' });
@@ -57,11 +49,23 @@ router.post('/regulatory-impact/analyze', async (req, res) => {
   try {
     const org = req.user.organization_id;
     const { title, description, regulation, impact_level, affected_controls, recommendations, status } = req.body;
+    const regulatoryChange = [regulation, description].filter(Boolean).join('\n\n') || null;
+    const requiredActions = recommendations == null
+      ? null
+      : (typeof recommendations === 'string' ? recommendations : JSON.stringify(recommendations));
     const result = await pool.query(
       `INSERT INTO regulatory_impact_assessments
-       (organization_id, title, description, regulation, impact_level, affected_controls, recommendations, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [org, title, description, regulation, impact_level, affected_controls || [], recommendations || {}, status || 'draft']
+       (organization_id, title, regulatory_change, impact_level, affected_controls, required_actions, status)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7) RETURNING *`,
+      [
+        org,
+        title,
+        regulatoryChange,
+        impact_level || 'medium',
+        JSON.stringify(affected_controls || []),
+        requiredActions,
+        status || 'open'
+      ]
     );
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -91,9 +95,14 @@ router.put('/regulatory-impact/assessments/:id/review', async (req, res) => {
     const { reviewed_by, review_notes, status } = req.body;
     const result = await pool.query(
       `UPDATE regulatory_impact_assessments
-       SET reviewed_by = $1, review_notes = $2, status = $3, updated_at = NOW()
-       WHERE id = $4 AND organization_id = $5 RETURNING *`,
-      [reviewed_by, review_notes, status, id, org]
+       SET reviewed_by = $1,
+           review_notes = $2,
+           review_status = COALESCE($3, review_status, 'reviewed'),
+           reviewed_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $4 AND organization_id = $5
+       RETURNING *`,
+      [reviewed_by, review_notes, status || null, id, org]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Assessment not found' });
@@ -112,9 +121,16 @@ router.post('/remediation/generate', async (req, res) => {
     const { title, description, priority, target_date, tasks } = req.body;
     const result = await pool.query(
       `INSERT INTO remediation_plans
-       (organization_id, title, description, status, priority, target_date, tasks)
-       VALUES ($1, $2, $3, 'draft', $4, $5, $6) RETURNING *`,
-      [org, title, description, priority, target_date, tasks || JSON.stringify([])]
+       (organization_id, plan_name, current_state, status, priority_level, estimated_completion_date, remediation_steps)
+       VALUES ($1, $2, $3, 'draft', $4, $5, $6::jsonb) RETURNING *`,
+      [
+        org,
+        title,
+        description || null,
+        priority || 'medium',
+        target_date || null,
+        JSON.stringify(tasks || [])
+      ]
     );
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -143,7 +159,10 @@ router.put('/remediation/plans/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status, notes } = req.body;
     const result = await pool.query(
-      `UPDATE remediation_plans SET status = $1, description = COALESCE($2, description), updated_at = NOW()
+      `UPDATE remediation_plans
+       SET status = $1,
+           current_state = COALESCE($2, current_state),
+           updated_at = NOW()
        WHERE id = $3 AND organization_id = $4 RETURNING *`,
       [status, notes, id, org]
     );
