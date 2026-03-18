@@ -131,14 +131,19 @@ jobs:
 
       - name: Validate Windows signing secrets
         if: >-
-          (github.event_name == 'release'
+          github.event_name == 'release'
           || startsWith(github.ref, 'refs/tags/v')
           || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
-          || needs.check-release.outputs.should_release == 'true')
-          && (secrets.WINDOWS_CERTIFICATE_BASE64 == '' || secrets.WINDOWS_CERTIFICATE_PASSWORD == '')
+          || needs.check-release.outputs.should_release == 'true'
+        env:
+          WIN_CERT_B64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WIN_CERT_PASS: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: bash
         run: |
-          echo "::error::Missing Windows Authenticode signing secrets."
-          exit 1
+          if [ -z "$WIN_CERT_B64" ] || [ -z "$WIN_CERT_PASS" ]; then
+            echo "::error::Missing Windows Authenticode signing secrets."
+            exit 1
+          fi
 
       - name: Prepare Windows signing certificate
         if: >-
