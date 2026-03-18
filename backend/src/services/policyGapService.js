@@ -103,10 +103,7 @@ Respond in JSON format:
 
 Focus on the first 20 controls. Be concise.`;
     
-    const response = await llmService.generateText(prompt, {
-      temperature: 0.3,
-      max_tokens: 2000
-    });
+    const response = await llmService.generateText(prompt);
     
     // Try to parse JSON response
     try {
