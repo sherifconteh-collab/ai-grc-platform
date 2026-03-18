@@ -49,7 +49,8 @@ router.post('/regulatory-impact/analyze', async (req, res) => {
   try {
     const org = req.user.organization_id;
     const { title, description, regulation, impact_level, affected_controls, recommendations, status } = req.body;
-    const regulatoryChange = [regulation, description].filter(Boolean).join('\n\n') || null;
+    const regulatoryParts = [regulation, description].filter(Boolean);
+    const regulatoryChange = regulatoryParts.length > 0 ? regulatoryParts.join('\n\n') : null;
     const requiredActions = recommendations == null
       ? null
       : (typeof recommendations === 'string' ? recommendations : JSON.stringify(recommendations));

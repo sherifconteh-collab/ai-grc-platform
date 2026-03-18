@@ -562,8 +562,9 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
   const outputStr = typeof outputText === 'string' ? outputText : JSON.stringify(outputText);
   const inputHash = crypto.createHash('sha256').update(inputStr).digest('hex');
   const outputHash = crypto.createHash('sha256').update(outputStr).digest('hex');
-  const correlationId = meta.correlation_id ?? meta.correlationId;
-  const sessionId = meta.session_id ?? meta.sessionId;
+  const normalizeId = (v) => (v == null ? null : String(v));
+  const correlationId = normalizeId(meta.correlation_id ?? meta.correlationId);
+  const sessionId = normalizeId(meta.session_id ?? meta.sessionId);
   await _exec(
     `INSERT INTO ai_decision_log
        (organization_id, feature, input_hash, output_hash, model_version,
@@ -573,8 +574,8 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
     [
       orgId, feature, inputHash, outputHash,
       meta.model_version || meta.modelVersion || null,
-      correlationId == null ? null : String(correlationId),
-      sessionId == null ? null : String(sessionId),
+      correlationId,
+      sessionId,
       meta.data_lineage || meta.dataLineage || null,
       meta.risk_level || meta.riskLevel || null,
       meta.human_reviewed || meta.humanReviewed || false,

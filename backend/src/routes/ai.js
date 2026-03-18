@@ -33,7 +33,7 @@ let orchestrator = {
   getSwarmConfig: () => null,
   executeSwarm: async () => {
     const err = new Error(UNAVAILABLE_SWARM_ERROR);
-    err.statusCode = 501;
+    err.statusCode = 503;
     throw err;
   }
 };

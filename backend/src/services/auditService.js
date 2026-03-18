@@ -15,6 +15,7 @@
 const pool = require('../config/database');
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
 
+/** @type {{ forwardEvent: (event: object) => Promise<Array<{ok: boolean, reason?: string}>> }} */
 let siemService = {
   forwardEvent: async () => [{ ok: false, reason: 'SIEM service unavailable' }]
 };

@@ -19,6 +19,9 @@ const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
 const embeddedPostgresModule = require('embedded-postgres');
+if (!embeddedPostgresModule) {
+  throw new Error('Failed to load embedded-postgres module — ensure the dependency is installed.');
+}
 const EmbeddedPostgres = embeddedPostgresModule.default || embeddedPostgresModule;
 const { initAutoUpdater, checkForUpdatesManual } = require('./updater');
 
@@ -32,7 +35,6 @@ const FRONTEND_PORT = 3000;
 const EMBEDDED_PG_PORT = 5433;
 const STARTUP_TIMEOUT_MS = 60_000; // 60 s — embedded PG init + migrations need headroom on slower machines
 const POLL_INTERVAL_MS = 500;
-const MAX_CORRUPT_DIR_ATTEMPTS = 100;
 const BACKEND_HEALTH_PATH = '/health';
 const FRONTEND_HEALTH_PATH = '/health';
 const IS_SMOKE_TEST = process.argv.includes('--smoke-test');
@@ -262,14 +264,8 @@ function loadOrCreateCredentials() {
  * @returns {Promise<string>} The DATABASE_URL to inject into the backend process.
  */
 function getCorruptDataDirPath(dataDir) {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  let corruptDir = `${dataDir}-corrupt-${timestamp}`;
-  let counter = 0;
-
-  while (fs.existsSync(corruptDir) && counter < MAX_CORRUPT_DIR_ATTEMPTS) {
-    counter += 1;
-    corruptDir = `${dataDir}-corrupt-${timestamp}-${counter}`;
-  }
+  const suffix = crypto.randomBytes(6).toString('hex');
+  const corruptDir = `${dataDir}-corrupt-${suffix}`;
 
   if (fs.existsSync(corruptDir)) {
     throw new Error(`Unable to allocate a backup directory for invalid embedded PostgreSQL data at ${dataDir}`);
