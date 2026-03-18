@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-17 | PR #71: Sync shared files with the latest public ControlWeave commit -->
+<!-- LAST_UPDATED: 2026-03-18 | PR #73: Merge PR #70 (desktop startup hardening) and address review feedback -->
 
 ## 🎯 What is This?
 
