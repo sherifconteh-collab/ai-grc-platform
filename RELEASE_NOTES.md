@@ -13,12 +13,15 @@
 
 > Changes staged but not yet released to production.
 
+## [2.3.0] — 2026-03-18
+
+> **Released:** 2026-03-18
+
 ### Changed
 - Fix Security Checks and Build & Release workflow failures ([#77](https://github.com/sherifconteh-collab/ai-grc-platform/pull/77)) — @Copilot
 - Harden desktop startup and align Electron packaging with Next.js build output ([#74](https://github.com/sherifconteh-collab/ai-grc-platform/pull/74)) — @Copilot
 - Merge PR #70 (desktop startup hardening) and address review feedback ([#73](https://github.com/sherifconteh-collab/ai-grc-platform/pull/73)) — @Copilot
 - Sync shared files with the latest public ControlWeave commit ([#71](https://github.com/sherifconteh-collab/ai-grc-platform/pull/71)) — @Copilot
-
 - Point all paid-tier links to controlweave.com; clarify repo is community/self-hosted only ([#55](https://github.com/sherifconteh-collab/ai-grc-platform/pull/55)) — @Copilot
 
 ## [2.2.0] — 2026-03-15
