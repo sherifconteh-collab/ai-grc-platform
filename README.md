@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-18 | PR #77: Fix Security Checks and Build & Release workflow failures -->
+<!-- LAST_UPDATED: 2026-03-19 | PR #78: fix: bump electron version to 2.3.0 to unblock desktop builds -->
 
 ## 🎯 What is This?
 

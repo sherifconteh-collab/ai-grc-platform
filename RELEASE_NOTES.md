@@ -13,6 +13,10 @@
 
 > Changes staged but not yet released to production.
 
+### Changed
+
+- fix: bump electron version to 2.3.0 to unblock desktop builds ([#78](https://github.com/sherifconteh-collab/ai-grc-platform/pull/78)) — @Copilot
+
 ## [2.3.0] — 2026-03-18
 
 > **Released:** 2026-03-18
