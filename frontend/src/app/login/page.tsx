@@ -76,7 +76,12 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const cbError = params.get('error');
     if (cbError) {
-      const decoded = decodeURIComponent(cbError);
+      let decoded = cbError;
+      try {
+        decoded = decodeURIComponent(cbError);
+      } catch {
+        // If decoding fails due to malformed percent-encoding, fall back to raw value
+      }
       setError(ERROR_MESSAGES[cbError] || ERROR_MESSAGES[decoded] || decoded);
     }
   }, []);

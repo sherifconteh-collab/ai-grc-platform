@@ -88,9 +88,14 @@ export default function Plot4aiPage() {
     setLoading(true);
     setError('');
     try {
-      const params: Record<string, string> = {};
+      const params: Parameters<typeof plot4aiAPI.getThreats>[0] = {};
       if (searchQuery) params.search = searchQuery;
-      if (selectedCategory) params.category = selectedCategory;
+      if (selectedCategory) {
+        const categoryId = Number(selectedCategory);
+        if (!Number.isNaN(categoryId)) {
+          params.category = categoryId;
+        }
+      }
       if (selectedAiType) params.aitype = selectedAiType;
       if (selectedRole) params.role = selectedRole;
       if (selectedPhase) params.phase = selectedPhase;

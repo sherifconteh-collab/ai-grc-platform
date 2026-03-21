@@ -8,6 +8,11 @@ const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
 
 router.use(authenticate);
 
+function normalizePermissionNames(permissions) {
+  if (!Array.isArray(permissions)) return [];
+  return [...new Set(permissions.map((perm) => String(perm || '').trim()).filter(Boolean))];
+}
+
 // GET /roles
 router.get('/', requirePermission('roles.manage'), async (req, res) => {
   try {
@@ -57,15 +62,13 @@ router.post('/', requirePermission('roles.manage'), validateBody((body) => {
       const role = roleResult.rows[0];
 
       if (permissions && permissions.length > 0) {
-        for (const permName of permissions) {
-          const perm = await client.query('SELECT id FROM permissions WHERE name = $1', [permName]);
-          if (perm.rows.length > 0) {
-            await client.query(
-              'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-              [role.id, perm.rows[0].id]
-            );
-          }
-        }
+        const uniquePerms = normalizePermissionNames(permissions);
+        await client.query(
+          `INSERT INTO role_permissions (role_id, permission_id)
+           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
+           ON CONFLICT DO NOTHING`,
+          [role.id, uniquePerms]
+        );
       }
 
       await client.query('COMMIT');
@@ -109,14 +112,14 @@ router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) =>
 
       if (permissions) {
         await client.query('DELETE FROM role_permissions WHERE role_id = $1', [req.params.roleId]);
-        for (const permName of permissions) {
-          const perm = await client.query('SELECT id FROM permissions WHERE name = $1', [permName]);
-          if (perm.rows.length > 0) {
-            await client.query(
-              'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)',
-              [req.params.roleId, perm.rows[0].id]
-            );
-          }
+        const uniquePerms = normalizePermissionNames(permissions);
+        if (uniquePerms.length > 0) {
+          await client.query(
+            `INSERT INTO role_permissions (role_id, permission_id)
+             SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
+             ON CONFLICT DO NOTHING`,
+            [req.params.roleId, uniquePerms]
+          );
         }
       }
 
