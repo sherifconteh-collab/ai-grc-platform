@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-21 | PR #79: Sync with ControlWeave public repo — v2.4.2 + add missing dashboard pages -->
+<!-- LAST_UPDATED: 2026-03-21 | PR #82: fix: bump electron version to 2.4.2 to match release notes -->
 
 ## 🎯 What is This?
 

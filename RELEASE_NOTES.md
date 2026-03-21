@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix: bump electron version to 2.4.2 to match release notes ([#82](https://github.com/sherifconteh-collab/ai-grc-platform/pull/82)) — @Copilot
 
 - Sync with ControlWeave public repo — v2.4.2 + add missing dashboard pages ([#79](https://github.com/sherifconteh-collab/ai-grc-platform/pull/79)) — @Copilot
 
