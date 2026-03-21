@@ -1,20 +1,12 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
-const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission, requireAnyPermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
 
 router.use(authenticate);
-
-const roleMutationLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false
-});
 
 function normalizePermissionNames(permissions) {
   if (!Array.isArray(permissions)) return [];
@@ -49,7 +41,7 @@ router.get('/', requirePermission('roles.manage'), async (req, res) => {
 });
 
 // POST /roles
-router.post('/', roleMutationLimiter, requirePermission('roles.manage'), validateBody((body) => {
+router.post('/', requirePermission('roles.manage'), validateBody((body) => {
   const errors = requireFields(body, ['name']);
   if (body.permissions && !Array.isArray(body.permissions)) {
     errors.push('permissions must be an array');
@@ -94,7 +86,7 @@ router.post('/', roleMutationLimiter, requirePermission('roles.manage'), validat
 });
 
 // PUT /roles/:roleId
-router.put('/:roleId', roleMutationLimiter, requirePermission('roles.manage'), validateBody((body) => {
+router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) => {
   const errors = [];
   if (body.permissions && !Array.isArray(body.permissions)) {
     errors.push('permissions must be an array');
@@ -124,7 +116,8 @@ router.put('/:roleId', roleMutationLimiter, requirePermission('roles.manage'), v
         if (uniquePerms.length > 0) {
           await client.query(
             `INSERT INTO role_permissions (role_id, permission_id)
-             SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])`,
+             SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
+             ON CONFLICT DO NOTHING`,
             [req.params.roleId, uniquePerms]
           );
         }

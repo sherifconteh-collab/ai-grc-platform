@@ -1,6 +1,6 @@
 {
   "name": "controlweave-backend",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
@@ -76,7 +76,6 @@
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^4.18.2",
-    "express-rate-limit": "8.2.2",
     "geoip-lite": "^1.4.10",
     "hono": "^4.12.7",
     "ioredis": "^5.4.1",
@@ -102,9 +101,11 @@
     "nodemon": "^3.0.1"
   },
   "overrides": {
+    "express-rate-limit": "8.2.2",
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
     "hono": "^4.12.7",
+    "socket.io-parser": "4.2.6",
     "yauzl": ">=3.2.1"
   }
 }

@@ -57,12 +57,13 @@ const navigationSections: NavigationSection[] = [
   {
     label: 'AI & Intelligence',
     items: [
-      { name: 'AI Analysis', href: '/dashboard/ai-analysis', icon: '✨', requiredPermissions: ['ai.use'], minTier: 'pro' },
-      { name: 'AI Monitoring', href: '/dashboard/ai-monitoring', icon: '🤖', requiredPermissions: ['settings.manage'], minTier: 'pro' },
-      { name: 'AI Governance', href: '/dashboard/ai-governance', icon: '🏛️', requiredPermissions: ['organizations.read'], minTier: 'enterprise' },
-      { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'], minTier: 'pro' },
+      { name: 'AI Analysis', href: '/dashboard/ai-analysis', icon: '✨', requiredPermissions: ['ai.use'] },
+      { name: 'AI Security', href: '/dashboard/ai-security', icon: '🔐', requiredPermissions: ['ai.use'], minTier: 'enterprise' },
+      { name: 'AI Monitoring', href: '/dashboard/ai-monitoring', icon: '🤖', requiredPermissions: ['settings.manage'], minTier: 'pro', isVisible: (u) => !hasTierAtLeast(u, 'enterprise') },
+      { name: 'AI Governance', href: '/dashboard/ai-governance', icon: '🏛️', requiredPermissions: ['organizations.read'], minTier: 'enterprise', isVisible: (u) => !hasTierAtLeast(u, 'enterprise') },
+      { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'], isVisible: (u) => !hasTierAtLeast(u, 'enterprise') },
       { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'], minTier: 'enterprise' },
-      { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'], minTier: 'pro' },
+      { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },
     ],
   },
   {

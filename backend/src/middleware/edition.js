@@ -32,7 +32,6 @@ const PRO_FEATURES = Object.freeze({
   'environments': 'pro',
   'evidence': 'pro',
   'reports': 'pro',
-  'regulatoryNews': 'pro',
   'splunk': 'pro',
   'sso': 'pro',          // SSO is included in Pro per updated tier structure
   
