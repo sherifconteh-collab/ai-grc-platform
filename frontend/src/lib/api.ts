@@ -1305,7 +1305,7 @@ export const siemAPI = {
 // Platform admin APIs
 export const platformAdminAPI = {
   getOverview: () => api.get('/platform-admin/overview'),
-  getOrganizations: (params?: { page?: number; limit?: number; region?: string }) => api.get('/platform-admin/organizations', { params }),
+  getOrganizations: (params?: { page?: number; limit?: number; region?: string; has_llm_key?: boolean; llm_provider?: string }) => api.get('/platform-admin/organizations', { params }),
   getLlmDefaults: () => api.get('/platform-admin/llm-defaults'),
   updateLlmDefaults: (data: {
     anthropic_api_key?: string | null;
@@ -1514,7 +1514,7 @@ export const vendorSecurityAPI = {
   setupMonitoring: (data: Record<string, unknown>) => api.post('/vendor-security/monitor', data),
 };
 
-// Regulatory News API (Starter tier)
+// Regulatory News API (Community tier)
 export const regulatoryNewsAPI = {
   getItems: (params?: { source?: string; is_read?: boolean; is_archived?: boolean; impact_level?: string; limit?: number }) =>
     api.get('/regulatory-news', { params }),
@@ -1660,7 +1660,7 @@ export const rmfAPI = {
     api.post(`/rmf/packages/${id}/authorization`, data),
 };
 
-// PLOT4ai Threat Library API (Pro tier — AI Threat Modeling)
+// PLOT4ai Threat Library API (Community tier — AI Threat Modeling)
 export const plot4aiAPI = {
   getThreats: (params?: { category?: number; aitype?: string; role?: string; phase?: string; search?: string }) =>
     api.get('/plot4ai/threats', { params }),

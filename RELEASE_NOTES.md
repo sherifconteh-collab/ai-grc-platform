@@ -9,13 +9,90 @@
 
 ---
 
-## [Unreleased]
+## [2.4.2] — 2026-03-20
 
-> Changes staged but not yet released to production.
+> **Released:** 2026-03-20
+
+
+### Added
+
+#### 🔒 AI Security Hub
+
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
+
+Security fixes are applied across all tiers. The following improvements shipped in this release to harden the platform against identified vulnerabilities.
+
+- Consolidated AI security view with six GRC-native pillars: OWASP Top 10 for LLMs, NIST AI RMF alignment, EU AI Act readiness, PLOT4ai threat modeling, AI supply-chain risk, and agentic AI (AIUC-1) certification status.
+
+
+> 💡 **Action required:** Update to this version to benefit from all security patches.
+### Fixed
+- Community edition license label corrected: MIT → AGPL v3.
+- Settings/billing page broken links and incorrect Gemini model name (`gemini-2.5-pro`).
+- Pricing page: Enterprise "Contact Sales" now routes to `/contact`; removed CLA gate.
+- Community mirror: fixed server startup crash, missing migrations, and self-hosted install guide.
+- Toast UX hardened across dashboard pages.
 
 ### Changed
+- All rate limiters consolidated to use `createRateLimiter` — removes direct `express-rate-limit` imports.
+- AI Analysis and Regulatory News moved to community tier (no longer restricted to pro).
+- AI Threat Library (PLOT4ai) moved to community tier.
+- New AI Security hub added to sidebar (enterprise tier).
+- Platform-level LLM fallback keys removed from AI status endpoint (BYOK-only for community).
+- `socket.io-parser` pinned to 4.2.6 via overrides for frontend and backend.
+- Canonical documentation map added; release notes, security checks, and tier marketing aligned.
+- Release notes workflow now auto-triggers on push to `main` with patch version auto-increment.
 
-- fix: bump electron version to 2.3.0 to unblock desktop builds ([#78](https://github.com/sherifconteh-collab/ai-grc-platform/pull/78)) — @Copilot
+---
+
+### Added
+
+#### 📋 AIUC-1 Agentic AI Certification Framework (v2.4.0)
+
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
+
+ControlWeave supports **25+ compliance frameworks** out of the box. Community-tier organizations can activate up to 2 frameworks simultaneously and benefit from automatic crosswalk mappings between them.
+
+- **`seed-aiuc1-framework.js`** — New seed script adding AIUC-1 as a supported compliance framework in ControlWeave. AIUC-1 is the first independently-audited certification standard purpose-built for agentic (autonomous) AI systems, developed by the Artificial Intelligence Underwriting Company (AIUC) with Schellman as the first accredited auditor.
+- **31 controls** across six risk domains: Data & Privacy (DP-1–DP-6), Security (SEC-1–SEC-6), Safety (SAF-1–SAF-5), Reliability (REL-1–REL-5), Accountability (ACC-1–ACC-5), Societal Impact (SOC-1–SOC-5).
+- **Crosswalk mappings** to NIST AI RMF 1.0, EU AI Act 2024, and ISO/IEC 42001:2023. OWASP Agentic AI Top 10 crosswalks included when that framework is pre-seeded.
+> 🔗 **Crosswalk mapping** automatically surfaces overlapping controls across frameworks so you comply once and satisfy many.
+
+- AIUC-1 added to `seed-frameworks.js` framework list with 13 core crosswalk pairs to existing AI governance frameworks.
+
+- **AI Governance check** (`llmService.js`) updated to include `aiuc_1` alongside `eu_ai_act`, `nist_ai_rmf`, `iso_42001`, and `iso_42005`. Analysis prompt extended with AIUC-1 readiness assessment across all six domains.
+- **Enterprise tier** — AIUC-1 gated at enterprise tier consistent with its use case (organizations deploying autonomous AI agents at scale).
+- `npm run seed:aiuc1` — new seed script entry in `backend/package.json`.
+
+> 💡 **Getting started:** Go to *Frameworks* in the sidebar → click *Activate* on any framework to begin.
+#### 🔔 Self-Service Community License Generation & Admin Notification (v2.3.3)
+
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
+
+**Notifications** keep your team aware of control status changes, assessment completions, and approaching due dates — delivered in-app and optionally via email.
+
+- `licenseService.js`: added `generateCommunityKey(licensee, seats)` — generates a local RSA-2048 keypair, signs a community-tier JWT (perpetual, no `exp`), returns `{ licenseKey, publicKey }`. Private key is discarded after signing.
+- `licenseService.js`: added `setLocalPublicKey(pem)` — stores a PEM public key in-module as fallback when `CONTROLWEAVE_LICENSE_PUBKEY` env var is not set. Used to verify self-generated keys.
+- Migration `097_server_license_pubkey.sql`: adds `local_public_key TEXT` column to `server_license` — stores the public key from `generate-community` so self-signed keys survive server restarts without env var changes.
+- New endpoint `POST /api/v1/license/generate-community` (platform owner only): generates, activates, and persists a community license key in one step.
+
+> 💡 **Getting started:** Click the bell icon in the top-right corner to view and manage notifications.
+#### 🔌 Community License Key Support & Self-Hosted License API (v2.3.2)
+
+> ✅ **Tier availability:** Community · Pro · Enterprise · Gov Cloud
+
+The **REST API** follows OpenAPI 3.1 and is fully documented at `/docs/openapi.yaml`. Every endpoint requires a JWT bearer token and respects your organization's tier limits.
+
+- `licenseService.js`: Added `'community'` to `VALID_TIERS` — community-tier JWTs are now accepted by `validateLicenseKey()`.
+- `edition.js`: Added `community: 'community'` to `LICENSE_TIER_TO_EDITION` — startup validation (`validateEdition()`) now correctly maps a community license to the community edition.
+- New route `backend/src/routes/license.js` (`@tier: community`): provides `GET /api/v1/license` (current edition + persistence status) and `POST /api/v1/license/activate` (runtime license key activation with audit log).
+> 🗂️ **Audit trail** entries are immutable and include the acting user, timestamp, affected resource, and change delta.
+
+- Migration `096_server_license.sql`: new `server_license` table stores the activated key so it survives restarts.
+- `server.js`: new `ensureLicenseFromDb()` startup function loads the DB-persisted license key and restores the edition automatically on restart.
+- Frontend: `licenseAPI.getInfo()` and `licenseAPI.activate(key)` added to `src/lib/api.ts`.
+
+> 💡 **Getting started:** See `docs/openapi.yaml` or run the local dev server and visit `http://localhost:3001/api-docs`.
 
 ## [2.3.0] — 2026-03-18
 

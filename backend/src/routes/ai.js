@@ -66,7 +66,7 @@ async function checkAIUsage(req, res, next) {
 
     if (!enforceByokLimits) {
       const resolvedKey = await llm.resolveApiKey(params.provider, req.user.organization_id);
-      if (resolvedKey.source === 'organization' || resolvedKey.source === 'platform') {
+      if (resolvedKey.source === 'organization') {
         req.aiUsageRemaining = 'unlimited';
         req.aiUsageByok = true;
         req.aiUsageKeySource = resolvedKey.source;
@@ -266,14 +266,6 @@ router.get('/status', async (req, res) => {
     const orgGroqKey    = await llm.getOrgApiKey(req.user.organization_id, 'groq');
     const orgOllamaUrl  = await llm.getOrgApiKey(req.user.organization_id, 'ollama');
 
-    // Platform-level fallback keys
-    const platformClaudeKey = await llm.getPlatformApiKey('claude');
-    const platformOpenAIKey = await llm.getPlatformApiKey('openai');
-    const platformGeminiKey = await llm.getPlatformApiKey('gemini');
-    const platformGrokKey = await llm.getPlatformApiKey('grok');
-    const platformGroqKey = await llm.getPlatformApiKey('groq');
-    const platformOllamaUrl = await llm.getPlatformApiKey('ollama');
-
     const status = llm.getProviderStatus({
       claude: orgClaudeKey,
       openai: orgOpenAIKey,
@@ -281,25 +273,18 @@ router.get('/status', async (req, res) => {
       grok:   orgGrokKey,
       groq:   orgGroqKey,
       ollama: orgOllamaUrl
-    }, {
-      claude: platformClaudeKey,
-      openai: platformOpenAIKey,
-      gemini: platformGeminiKey,
-      grok: platformGrokKey,
-      groq: platformGroqKey,
-      ollama: platformOllamaUrl
     });
 
     res.json({
       success: true,
       data: {
         providers: {
-          claude:  { available: status.claude.available, models: status.claude.models, hasOrgKey: !!orgClaudeKey, hasPlatformKey: !!platformClaudeKey },
-          openai:  { available: status.openai.available, models: status.openai.models, hasOrgKey: !!orgOpenAIKey, hasPlatformKey: !!platformOpenAIKey },
-          gemini:  { available: status.gemini.available, models: status.gemini.models, hasOrgKey: !!orgGeminiKey, hasPlatformKey: !!platformGeminiKey },
-          grok:    { available: status.grok.available, models: status.grok.models, hasOrgKey: !!orgGrokKey, hasPlatformKey: !!platformGrokKey },
-          groq:    { available: status.groq.available, models: status.groq.models, hasOrgKey: !!orgGroqKey, hasPlatformKey: !!platformGroqKey },
-          ollama:  { available: status.ollama.available, models: status.ollama.models, hasOrgKey: !!orgOllamaUrl, hasPlatformKey: !!platformOllamaUrl }
+          claude:  { available: status.claude.available, models: status.claude.models, hasOrgKey: !!orgClaudeKey },
+          openai:  { available: status.openai.available, models: status.openai.models, hasOrgKey: !!orgOpenAIKey },
+          gemini:  { available: status.gemini.available, models: status.gemini.models, hasOrgKey: !!orgGeminiKey },
+          grok:    { available: status.grok.available, models: status.grok.models, hasOrgKey: !!orgGrokKey },
+          groq:    { available: status.groq.available, models: status.groq.models, hasOrgKey: !!orgGroqKey },
+          ollama:  { available: status.ollama.available, models: status.ollama.models, hasOrgKey: !!orgOllamaUrl }
         },
         usage: (() => {
           // When BYOK bypass applies for this tier AND the org has at least one

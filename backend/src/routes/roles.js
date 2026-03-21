@@ -1,25 +1,12 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
-const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission, requireAnyPermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
 
 router.use(authenticate);
-
-const roleMutationLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-function normalizePermissionNames(permissions) {
-  if (!Array.isArray(permissions)) return [];
-  return [...new Set(permissions.map((perm) => String(perm || '').trim()).filter(Boolean))];
-}
 
 // GET /roles
 router.get('/', requirePermission('roles.manage'), async (req, res) => {
@@ -49,7 +36,7 @@ router.get('/', requirePermission('roles.manage'), async (req, res) => {
 });
 
 // POST /roles
-router.post('/', roleMutationLimiter, requirePermission('roles.manage'), validateBody((body) => {
+router.post('/', requirePermission('roles.manage'), validateBody((body) => {
   const errors = requireFields(body, ['name']);
   if (body.permissions && !Array.isArray(body.permissions)) {
     errors.push('permissions must be an array');
@@ -70,13 +57,15 @@ router.post('/', roleMutationLimiter, requirePermission('roles.manage'), validat
       const role = roleResult.rows[0];
 
       if (permissions && permissions.length > 0) {
-        const uniquePerms = normalizePermissionNames(permissions);
-        await client.query(
-          `INSERT INTO role_permissions (role_id, permission_id)
-           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
-           ON CONFLICT DO NOTHING`,
-          [role.id, uniquePerms]
-        );
+        for (const permName of permissions) {
+          const perm = await client.query('SELECT id FROM permissions WHERE name = $1', [permName]);
+          if (perm.rows.length > 0) {
+            await client.query(
+              'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [role.id, perm.rows[0].id]
+            );
+          }
+        }
       }
 
       await client.query('COMMIT');
@@ -94,7 +83,7 @@ router.post('/', roleMutationLimiter, requirePermission('roles.manage'), validat
 });
 
 // PUT /roles/:roleId
-router.put('/:roleId', roleMutationLimiter, requirePermission('roles.manage'), validateBody((body) => {
+router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) => {
   const errors = [];
   if (body.permissions && !Array.isArray(body.permissions)) {
     errors.push('permissions must be an array');
@@ -120,13 +109,14 @@ router.put('/:roleId', roleMutationLimiter, requirePermission('roles.manage'), v
 
       if (permissions) {
         await client.query('DELETE FROM role_permissions WHERE role_id = $1', [req.params.roleId]);
-        const uniquePerms = normalizePermissionNames(permissions);
-        if (uniquePerms.length > 0) {
-          await client.query(
-            `INSERT INTO role_permissions (role_id, permission_id)
-             SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])`,
-            [req.params.roleId, uniquePerms]
-          );
+        for (const permName of permissions) {
+          const perm = await client.query('SELECT id FROM permissions WHERE name = $1', [permName]);
+          if (perm.rows.length > 0) {
+            await client.query(
+              'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)',
+              [req.params.roleId, perm.rows[0].id]
+            );
+          }
         }
       }
 

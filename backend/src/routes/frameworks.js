@@ -1,17 +1,10 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
-const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 
 router.use(authenticate);
-const crosswalkCoverageExpressLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false
-});
 
 const VALID_MAPPING_STRENGTHS = new Set(['primary', 'supporting', 'informative']);
 const DEFAULT_COVERAGE = {
@@ -810,7 +803,7 @@ router.put('/nist-publications/:id/mappings', requirePermission('frameworks.mana
 // Returns a matrix showing how many controls in each target framework would be
 // auto-satisfied if all controls in a source framework were implemented.
 // Useful for compliance ROI planning: "If we implement ISO 27001, how much of NIST CSF do we get free?"
-router.get('/crosswalk-coverage', crosswalkCoverageExpressLimiter, requirePermission('frameworks.read'), async (req, res) => {
+router.get('/crosswalk-coverage', requirePermission('frameworks.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
 
