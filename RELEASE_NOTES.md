@@ -9,6 +9,14 @@
 
 ---
 
+## [Unreleased]
+
+> Changes staged but not yet released to production.
+
+### Changed
+
+- Sync with ControlWeave public repo — v2.4.2 + add missing dashboard pages ([#79](https://github.com/sherifconteh-collab/ai-grc-platform/pull/79)) — @Copilot
+
 ## [2.4.2] — 2026-03-20
 
 > **Released:** 2026-03-20

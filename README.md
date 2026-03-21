@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v2.3.0-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v2.4.2-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-21 | PR #80: fix: CLA workflow — use `contains` instead of `startsWith`, add `recheck` support -->
+<!-- LAST_UPDATED: 2026-03-21 | PR #79: Sync with ControlWeave public repo — v2.4.2 + add missing dashboard pages -->
 
 ## 🎯 What is This?
 
