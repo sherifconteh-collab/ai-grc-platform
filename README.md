@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-19 | PR #78: fix: bump electron version to 2.3.0 to unblock desktop builds -->
+<!-- LAST_UPDATED: 2026-03-21 | PR #80: fix: CLA workflow — use `contains` instead of `startsWith`, add `recheck` support -->
 
 ## 🎯 What is This?
 

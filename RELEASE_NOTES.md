@@ -42,6 +42,7 @@ Security fixes are applied across all tiers. The following improvements shipped 
 - `socket.io-parser` pinned to 4.2.6 via overrides for frontend and backend.
 - Canonical documentation map added; release notes, security checks, and tier marketing aligned.
 - Release notes workflow now auto-triggers on push to `main` with patch version auto-increment.
+- fix: CLA workflow — use `contains` instead of `startsWith`, add `recheck` support ([#80](https://github.com/sherifconteh-collab/ai-grc-platform/pull/80)) — @Copilot
 
 ---
 
