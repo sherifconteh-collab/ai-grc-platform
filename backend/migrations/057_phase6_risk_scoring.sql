@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS risk_scores (
 );
 
 -- Index for fast org lookups
-CREATE INDEX idx_risk_scores_org_id ON risk_scores(organization_id);
-CREATE INDEX idx_risk_scores_calculated_at ON risk_scores(organization_id, calculated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_risk_scores_org_id ON risk_scores(organization_id);
+CREATE INDEX IF NOT EXISTS idx_risk_scores_calculated_at ON risk_scores(organization_id, calculated_at DESC);
 
 -- Regulatory impact assessments table
 CREATE TABLE IF NOT EXISTS regulatory_impact_assessments (
@@ -94,10 +94,10 @@ CREATE TABLE IF NOT EXISTS regulatory_impact_assessments (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_regulatory_impact_org_id ON regulatory_impact_assessments(organization_id);
-CREATE INDEX idx_regulatory_impact_framework ON regulatory_impact_assessments(framework_code);
-CREATE INDEX idx_regulatory_impact_level ON regulatory_impact_assessments(organization_id, impact_level);
-CREATE INDEX idx_regulatory_impact_deadline ON regulatory_impact_assessments(compliance_deadline);
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_org_id ON regulatory_impact_assessments(organization_id);
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_framework ON regulatory_impact_assessments(framework_code);
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_level ON regulatory_impact_assessments(organization_id, impact_level);
+CREATE INDEX IF NOT EXISTS idx_regulatory_impact_deadline ON regulatory_impact_assessments(compliance_deadline);
 
 -- Remediation plans table: Enhanced smart remediation tracking
 CREATE TABLE IF NOT EXISTS remediation_plans (
@@ -156,10 +156,10 @@ CREATE TABLE IF NOT EXISTS remediation_plans (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_remediation_plans_org_id ON remediation_plans(organization_id);
-CREATE INDEX idx_remediation_plans_control_id ON remediation_plans(control_id);
-CREATE INDEX idx_remediation_plans_priority ON remediation_plans(organization_id, priority_level);
-CREATE INDEX idx_remediation_plans_status ON remediation_plans(organization_id, status);
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_org_id ON remediation_plans(organization_id);
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_control_id ON remediation_plans(control_id);
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_priority ON remediation_plans(organization_id, priority_level);
+CREATE INDEX IF NOT EXISTS idx_remediation_plans_status ON remediation_plans(organization_id, status);
 
 -- Add comment for documentation
 COMMENT ON TABLE risk_scores IS 'Phase 6: Predictive risk scoring with 0-100 scale and trend analysis';

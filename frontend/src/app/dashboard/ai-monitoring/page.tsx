@@ -97,7 +97,10 @@ export default function AIMonitoringPage() {
     try {
       await aiMonitoringAPI.resolveEvent(eventId, { resolution_notes: 'Resolved from dashboard' });
       fetchData();
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('Failed to resolve event:', err);
+      setError(err instanceof Error ? err.message : 'Could not resolve event.');
+    }
   };
 
   return (

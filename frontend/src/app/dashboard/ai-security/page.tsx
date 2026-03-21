@@ -100,8 +100,20 @@ export default function AISecurityPage() {
 
       // If the backend returns structured pillar data, merge it
       if (data && typeof data === 'object') {
+        // Build a lookup keyed on lowercase pillar name fragments
+        const pillarKeyMap: Record<string, Partial<SecurityPillar>> = {};
+        if (data.owasp) pillarKeyMap['owasp'] = data.owasp;
+        if (data.nist_ai_rmf) pillarKeyMap['nist ai rmf'] = data.nist_ai_rmf;
+        if (data.eu_ai_act) pillarKeyMap['eu ai act'] = data.eu_ai_act;
+        if (data.plot4ai) pillarKeyMap['plot4ai'] = data.plot4ai;
+        if (data.supply_chain) pillarKeyMap['supply chain'] = data.supply_chain;
+        if (data.aiuc1) pillarKeyMap['aiuc-1'] = data.aiuc1;
+
         setPillars(prev => prev.map(pillar => {
-          // Attempt to find matching data from the response
+          const key = Object.keys(pillarKeyMap).find(k => pillar.name.toLowerCase().includes(k));
+          if (key && pillarKeyMap[key]) {
+            return { ...pillar, ...pillarKeyMap[key] };
+          }
           return { ...pillar };
         }));
       }

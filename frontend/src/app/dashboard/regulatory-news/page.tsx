@@ -75,7 +75,10 @@ export default function RegulatoryNewsPage() {
     try {
       await regulatoryNewsAPI.refresh();
       await fetchItems();
-    } catch { /* ignore */ } finally {
+    } catch (err) {
+      console.error('Failed to refresh news:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh news');
+    } finally {
       setRefreshing(false);
     }
   };

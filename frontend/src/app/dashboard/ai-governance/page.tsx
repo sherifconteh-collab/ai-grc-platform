@@ -89,9 +89,9 @@ export default function AIGovernancePage() {
     setError('');
     try {
       const [summaryRes, vendorsRes, incidentsRes] = await Promise.all([
-        aiGovernanceAPI.getSummary().catch(() => ({ data: { data: {} } })),
-        aiGovernanceAPI.getVendors().catch(() => ({ data: { data: [] } })),
-        aiGovernanceAPI.getIncidents().catch(() => ({ data: { data: [] } })),
+        aiGovernanceAPI.getSummary().catch((err: unknown) => { console.error('Failed to get governance summary:', err); return { data: { data: {} } }; }),
+        aiGovernanceAPI.getVendors().catch((err: unknown) => { console.error('Failed to get vendors:', err); return { data: { data: [] } }; }),
+        aiGovernanceAPI.getIncidents().catch((err: unknown) => { console.error('Failed to get incidents:', err); return { data: { data: [] } }; }),
       ]);
       setSummary(summaryRes.data?.data || null);
       setVendors(vendorsRes.data?.data || []);

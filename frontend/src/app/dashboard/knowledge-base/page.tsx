@@ -101,7 +101,10 @@ export default function KnowledgeBasePage() {
     try {
       await ragAPI.removeDocument(sourceId, sourceType);
       fetchDocuments();
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('Failed to remove document:', err);
+      setError(err instanceof Error ? err.message : 'Could not remove document.');
+    }
   };
 
   return (
