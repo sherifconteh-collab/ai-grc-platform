@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix: CLA workflow — use `contains` instead of `startsWith`, add `recheck` support ([#80](https://github.com/sherifconteh-collab/ai-grc-platform/pull/80)) — @Copilot
 
 - fix: bump electron version to 2.3.0 to unblock desktop builds ([#78](https://github.com/sherifconteh-collab/ai-grc-platform/pull/78)) — @Copilot
 
