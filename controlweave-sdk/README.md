@@ -34,9 +34,11 @@ await logger.logDecision({
 ### 1) Confirm tier eligibility
 
 External SDK ingestion and related webhook workflows are available for:
+- `pro`
 - `enterprise`
+- `govcloud`
 
-If your org is on lower tiers, API key creation/ingestion will be blocked.
+If your org is on a lower tier, API key creation/ingestion will be blocked.
 
 ### 2) Create an external SDK API key
 
