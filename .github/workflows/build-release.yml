@@ -130,6 +130,7 @@ jobs:
         working-directory: electron
 
       - name: Validate Windows signing secrets
+        id: check-cert
         if: >-
           github.event_name == 'release'
           || startsWith(github.ref, 'refs/tags/v')
@@ -141,16 +142,20 @@ jobs:
         shell: bash
         run: |
           if [ -z "$WIN_CERT_B64" ] || [ -z "$WIN_CERT_PASS" ]; then
-            echo "::error::Missing Windows Authenticode signing secrets."
-            exit 1
+            echo "::warning::Windows Authenticode signing secrets are not configured. The installer will be built unsigned."
+            echo "has_cert=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_cert=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Prepare Windows signing certificate
         if: >-
+          steps.check-cert.outputs.has_cert == 'true' && (
           github.event_name == 'release'
           || startsWith(github.ref, 'refs/tags/v')
           || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
           || needs.check-release.outputs.should_release == 'true'
+          )
         shell: pwsh
         run: |
           $certPath = Join-Path $env:RUNNER_TEMP 'controlweave-signing.p12'
@@ -201,10 +206,12 @@ jobs:
 
       - name: Verify Windows installer Authenticode signature
         if: >-
+          steps.check-cert.outputs.has_cert == 'true' && (
           github.event_name == 'release'
           || startsWith(github.ref, 'refs/tags/v')
           || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
           || needs.check-release.outputs.should_release == 'true'
+          )
         shell: pwsh
         run: |
           $installer = Get-ChildItem -Path electron/dist -Filter 'ControlWeave.Setup.*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
