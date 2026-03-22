@@ -21,6 +21,8 @@ const aiDecisionWriteLimiter = createOrgRateLimiter({
 });
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
+const UNAVAILABLE_SWARM_ERROR = 'Multi-agent orchestration requires a build that includes enterprise swarm services.';
+const VALID_DECISION_SOURCES = ['platform', 'byok', 'external', 'mcp_agent'];
 
 // All AI routes require authentication
 router.use(authenticate);
@@ -745,7 +747,7 @@ router.post('/decisions', aiDecisionWriteLimiter, requirePermission('assessments
         JSON.stringify(body.bias_flags || []),
         body.reasoning || null,
         body.confidence_score != null ? body.confidence_score : null,
-        body.decision_source && ['platform', 'byok', 'external', 'mcp_agent'].includes(body.decision_source)
+        body.decision_source && VALID_DECISION_SOURCES.includes(body.decision_source)
           ? body.decision_source
           : 'platform'
       ]

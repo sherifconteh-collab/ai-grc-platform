@@ -150,7 +150,7 @@ async function forwardToSiem(organizationId, auditLogId, eventType, payload) {
       );
     }
 
-    return results;
+    return normalizedResults;
   } catch (error) {
     console.error('SIEM forwarding failed:', error);
     return [];

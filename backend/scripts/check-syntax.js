@@ -34,7 +34,7 @@ let failed = false;
 
 for (const file of files) {
   try {
-    const source = fs.readFileSync(file, 'utf8').replace(/^#!.*\r?\n/, '');
+    const source = fs.readFileSync(file, 'utf8').replace(/^#!.*$/m, '');
     new vm.Script(Module.wrap(source), { filename: file });
   } catch (error) {
     failed = true;
