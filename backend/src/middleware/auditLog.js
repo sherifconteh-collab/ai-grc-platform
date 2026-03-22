@@ -9,7 +9,12 @@
  */
 
 const { createAuditLog } = require('../services/auditService');
-const { extractIpFromRequest } = require('../services/geolocationService');
+let extractIpFromRequest;
+try {
+  ({ extractIpFromRequest } = require('../services/geolocationService'));
+} catch (e) {
+  extractIpFromRequest = (req) => req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+}
 
 /**
  * Create an audit log middleware for a specific event type

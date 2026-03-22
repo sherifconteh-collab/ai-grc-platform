@@ -624,7 +624,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
 
       // Ensure all seeded frameworks the org is entitled to are adopted.
       // Fire-and-forget — does not block the registration response.
-      ensureOrgFrameworks(org.id, org.tier);
+      ensureOrgFrameworks(org.id, org.tier).catch(err => console.error('ensureOrgFrameworks error:', err));
 
       res.status(201).json({
         success: true,
@@ -825,7 +825,7 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
     // Ensure all seeded frameworks the org is entitled to are adopted.
     // Fire-and-forget — does not block the login response.
     if (user.organization_id && user.organization_tier) {
-      ensureOrgFrameworks(user.organization_id, user.organization_tier);
+      ensureOrgFrameworks(user.organization_id, user.organization_tier).catch(err => console.error('ensureOrgFrameworks error:', err));
     }
 
     res.json({
