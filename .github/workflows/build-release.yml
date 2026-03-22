@@ -175,28 +175,17 @@ jobs:
         shell: bash
         run: node electron/scripts/validate-latest-yml.js
 
-      - name: Install built Windows package and run smoke test
+      - name: Smoke-test Windows build
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Path electron/dist -Filter 'ControlWeave.Setup.*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          if (-not $installer) {
-            throw 'Windows installer not found after build.'
-          }
-
-          $installDir = Join-Path $env:RUNNER_TEMP 'controlweave-smoke'
-          if (Test-Path $installDir) {
-            Remove-Item -Path $installDir -Recurse -Force
-          }
-          New-Item -ItemType Directory -Path $installDir | Out-Null
-
-          Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait -NoNewWindow
-
-          $exePath = Join-Path $installDir 'ControlWeave.exe'
+          # Use the unpacked build directly — the NSIS assisted installer
+          # (oneClick=false, perMachine=false) ignores the /D= directory
+          # override in silent mode, so we cannot reliably control where it
+          # installs.  The win-unpacked directory is the same content the
+          # installer would lay down.
+          $exePath = Join-Path 'electron' 'dist' 'win-unpacked' 'ControlWeave.exe'
           if (-not (Test-Path $exePath)) {
-            $exePath = (Get-ChildItem -Path $installDir -Filter 'ControlWeave.exe' -Recurse | Select-Object -First 1).FullName
-          }
-          if (-not $exePath -or -not (Test-Path $exePath)) {
-            throw 'Installed ControlWeave.exe not found.'
+            throw "ControlWeave.exe not found at $exePath after build."
           }
 
           $process = Start-Process -FilePath $exePath -ArgumentList '--smoke-test' -Wait -PassThru
