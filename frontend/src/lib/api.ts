@@ -1457,6 +1457,17 @@ export const licenseAPI = {
   activate: (licenseKey: string) => api.post('/license/activate', { licenseKey }),
 };
 
+// Update Check API
+// All features are baked into the binary — activating a license unlocks them
+// immediately with no download.  An "update" delivers new features and fixes
+// by pulling the latest build (Docker image / binary / git tag).
+export const updateCheckAPI = {
+  /** Return cached (or live) update status from GitHub Releases. */
+  getStatus: () => api.get('/update-check'),
+  /** Bypass cache and re-query GitHub immediately (called after license activation). */
+  forceCheck: () => api.post('/update-check/force'),
+};
+
 // Help / Documentation API
 export const helpAPI = {
   getIndex: () => api.get('/help'),

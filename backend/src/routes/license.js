@@ -36,6 +36,7 @@ const {
   setLocalPublicKey,
   VALID_TIERS
 } = require('../services/licenseService');
+const { triggerUpdateCheck } = require('../services/updateCheckService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
 const licenseRateLimiter = createRateLimiter({ label: 'license', windowMs: 60 * 1000, max: 10 });
@@ -150,6 +151,12 @@ router.post(
       // Capture features available AFTER the upgrade.
       const afterInfo = getEditionInfo();
       const unlockedFeatures = afterInfo.availableFeatures.filter(f => !beforeKeys.has(f.key));
+
+      // Fire-and-forget: refresh the update-check cache so the post-activation
+      // response (and any immediately-following GET /update-check) reflects
+      // whether this newly-licensed installation has a pending update.
+      // updateRequired becomes true when IS_PRO and a newer version exists.
+      triggerUpdateCheck();
 
       // Persist the key to the database so the upgrade survives restarts.
       let persisted = false;

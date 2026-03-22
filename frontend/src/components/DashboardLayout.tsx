@@ -9,6 +9,7 @@ import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import { WebSocketStatusIndicator } from './WebSocketStatusIndicator';
 import Sidebar from './Sidebar';
 import AICopilot from './AICopilot';
+import ServerUpdateBanner from './ServerUpdateBanner';
 import { getAccessToken } from '@/lib/tokenStore';
 
 export default function DashboardLayout({
@@ -86,13 +87,17 @@ export default function DashboardLayout({
 
   return (
     <WebSocketProvider token={token} enabled={isAuthenticated}>
-      <div className="flex h-screen bg-gray-100">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto px-6 py-8">{children}</div>
-        </main>
-        <AICopilot />
-        <WebSocketStatusIndicator />
+      <div className="flex flex-col h-screen bg-gray-100">
+        {/* Server-side update banner — shown to admins when a newer GitHub release is available */}
+        <ServerUpdateBanner />
+        <div className="flex flex-1 min-h-0">
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto">
+            <div className="container mx-auto px-6 py-8">{children}</div>
+          </main>
+          <AICopilot />
+          <WebSocketStatusIndicator />
+        </div>
       </div>
     </WebSocketProvider>
   );

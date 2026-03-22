@@ -298,6 +298,7 @@ const externalAiKeysRoutes = safeRequire('./routes/externalAiKeys');
 const platformAdminRoutes = safeRequire('./routes/platformAdmin');
 const billingRoutes = safeRequire('./routes/billing');
 const licenseRoutes = require('./routes/license');
+const updateCheckRoutes = require('./routes/updateCheck');
 const policiesRoutes = require('./routes/policies');
 const helpRoutes = require('./routes/help');
 // ── Further paid-tier conditional route imports ──
@@ -377,6 +378,7 @@ if (_absentPaidRoutes.length > 0) {
 }
 
 app.use('/api/v1/license', licenseRoutes);
+app.use('/api/v1/update-check', updateCheckRoutes);
 if (passkeyRoutes) app.use('/api/v1/auth/passkey', passkeyRoutes);
 app.use('/api/v1/auth/totp', totpRoutes);
 app.use('/api/v1/auth', authRoutes);
