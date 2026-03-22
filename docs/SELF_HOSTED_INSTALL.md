@@ -25,7 +25,7 @@ free Community Edition to fully commercial Pro/Enterprise/Gov Cloud deployments.
 
 ### Prerequisites
 
-- Node.js 20.16.0+ and npm
+- Node.js 18+ and npm
 - PostgreSQL 17+
 - Git
 

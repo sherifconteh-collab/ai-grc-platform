@@ -9,6 +9,7 @@ import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import { WebSocketStatusIndicator } from './WebSocketStatusIndicator';
 import Sidebar from './Sidebar';
 import AICopilot from './AICopilot';
+import { getAccessToken } from '@/lib/tokenStore';
 
 export default function DashboardLayout({
   children,
@@ -66,7 +67,7 @@ export default function DashboardLayout({
   // Get access token for WebSocket authentication
   useEffect(() => {
     if (isAuthenticated) {
-      const accessToken = localStorage.getItem('accessToken');
+      const accessToken = getAccessToken();
       setToken(accessToken);
     }
   }, [isAuthenticated]);

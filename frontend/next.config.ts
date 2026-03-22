@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const BACKEND_URL =
-  process.env.BACKEND_ORIGIN || "http://localhost:3001";
+  process.env.BACKEND_ORIGIN || "https://controlweave-pro-production.up.railway.app";
 
 const nextConfig: NextConfig = {
   output: "standalone",

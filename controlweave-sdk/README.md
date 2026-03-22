@@ -35,7 +35,7 @@ await logger.logDecision({
 
 External SDK ingestion and related webhook workflows are available for:
 - `enterprise`
-- `govcloud`
+- `utilities`
 
 If your org is on lower tiers, API key creation/ingestion will be blocked.
 

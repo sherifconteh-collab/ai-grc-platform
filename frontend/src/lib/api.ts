@@ -1,6 +1,8 @@
+'use client';
 // @tier: community
 import axios from 'axios';
 import { getApiBaseUrl } from './apiBase';
+import { getAccessToken, setAccessToken, clearAccessToken } from './tokenStore';
 
 export const API_BASE_URL = getApiBaseUrl();
 
@@ -19,10 +21,10 @@ const AI_REQUEST_TIMEOUT = 180_000; // 3 minutes for individual AI analysis
 const AI_SWARM_TIMEOUT = 300_000;   // 5 minutes for parallel swarm execution
 const UPLOAD_TIMEOUT = 120_000;     // 2 minutes for file uploads/imports
 
-// Request interceptor - add auth token
+// Request interceptor - add auth token from in-memory store (not localStorage)
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -52,14 +54,15 @@ api.interceptors.response.use(
         });
 
         const { accessToken } = response.data.data;
-        localStorage.setItem('accessToken', accessToken);
+        // Store the new access token in memory only, never in localStorage
+        setAccessToken(accessToken);
 
         // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - logout user
-        localStorage.removeItem('accessToken');
+        // Refresh failed - clear tokens and redirect to login
+        clearAccessToken();
         localStorage.removeItem('refreshToken');
         window.location.href = '/login';
         return Promise.reject(refreshError);
