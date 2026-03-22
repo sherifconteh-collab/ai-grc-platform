@@ -33,7 +33,8 @@ const {
   saveLicenseToDb,
   loadLicenseKeyFromDb,
   generateCommunityKey,
-  setLocalPublicKey
+  setLocalPublicKey,
+  VALID_TIERS
 } = require('../services/licenseService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
@@ -144,6 +145,23 @@ router.post(
       } catch (dbErr) {
         // Non-fatal: in-process upgrade already applied; log and continue.
         log('warn', 'license.db_persist_failed', { error: dbErr.message });
+      }
+
+      // When a paid (non-community) license is activated, update the
+      // activating organization's tier so that per-org tier checks (AI
+      // usage limits, help article gating, login response) immediately
+      // reflect the new tier rather than staying at 'community'.
+      if (licenseTier !== 'community' && VALID_TIERS.has(licenseTier) && orgId) {
+        try {
+          await pool.query(
+            `UPDATE organizations SET tier = $1, updated_at = NOW() WHERE id = $2`,
+            [licenseTier, orgId]
+          );
+          log('info', 'license.org_tier_updated', { orgId, tier: licenseTier });
+        } catch (orgErr) {
+          // Non-fatal — edition upgrade already applied; log and continue.
+          log('warn', 'license.org_tier_update_failed', { error: orgErr.message });
+        }
       }
 
       await writeLicenseAuditLog(orgId, userId, 'license_key_activated', {

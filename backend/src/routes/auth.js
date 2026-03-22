@@ -241,7 +241,7 @@ function resolveSessionExpiryTimestamp(isDemoAccount, sessionExpiresAt = null) {
  * @returns {string}
  */
 function buildAccessToken(userId, sessionExpiresAt = null) {
-  const payload = { userId };
+  const payload = { userId, type: 'access' };
   let expiresIn = ACCESS_EXPIRY_SECONDS;
 
   if (sessionExpiresAt) {

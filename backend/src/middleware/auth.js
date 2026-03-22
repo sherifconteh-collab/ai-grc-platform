@@ -83,7 +83,12 @@ const authenticate = async (req, res, next) => {
     }
 
     const result = await pool.query(
-      'SELECT id, email, organization_id, role, is_active FROM users WHERE id = $1',
+      `SELECT u.id, u.email, u.organization_id, u.role, u.is_active,
+              COALESCE(u.is_platform_admin, false) AS is_platform_admin,
+              o.tier AS organization_tier
+       FROM users u
+       LEFT JOIN organizations o ON o.id = u.organization_id
+       WHERE u.id = $1`,
       [decoded.userId]
     );
 
@@ -97,7 +102,9 @@ const authenticate = async (req, res, next) => {
       email: user.email,
       organization_id: user.organization_id,
       role: user.role,
-      organizationId: user.organization_id
+      organizationId: user.organization_id,
+      is_platform_admin: user.is_platform_admin,
+      organization_tier: user.organization_tier
     };
 
     next();
