@@ -5,6 +5,7 @@
  * Provides endpoints for self-hosted community deployments to:
  *   - Query the current edition and license status
  *   - Activate a signed license key at runtime (upgrades in-process edition)
+ *   - Check GitHub for available platform updates
  *
  * License keys are RS256/ES256-signed JWTs issued by ControlWeave sales.
  * Community tier keys confirm a legitimate community installation.
@@ -17,6 +18,8 @@
 
 'use strict';
 
+const axios = require('axios');
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
@@ -36,11 +39,139 @@ const {
   setLocalPublicKey
 } = require('../services/licenseService');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 
 const licenseRateLimiter = createRateLimiter({ label: 'license', windowMs: 60 * 1000, max: 10 });
 // RSA key generation is CPU-intensive — apply a tighter limiter to the
 // generate-community endpoint: 3 generations per hour per IP.
 const licenseGenerateLimiter = createRateLimiter({ label: 'license-generate', windowMs: 60 * 60 * 1000, max: 3 });
+
+// Explicit express-rate-limit instance for the update-check route so that
+// static-analysis tools (CodeQL) recognise the rate-limiting middleware.
+const updateCheckLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
+
+// ─── Update-check cache ─────────────────────────────────────────────────────
+// Avoid hammering GitHub's API — cache the result for a configurable interval.
+// Default: 6 hours. Operators can adjust via UPDATE_CHECK_INTERVAL_HOURS.
+const _rawUpdateIntervalHours = parseFloat(process.env.UPDATE_CHECK_INTERVAL_HOURS || '6');
+const _sanitizedUpdateIntervalHours = Number.isFinite(_rawUpdateIntervalHours) ? _rawUpdateIntervalHours : 6;
+const UPDATE_CHECK_CACHE_MS = Math.max(1, _sanitizedUpdateIntervalHours) * 60 * 60 * 1000;
+
+let _updateCache = null; // { data, fetchedAt }
+
+/**
+ * Compare two semver strings.  Returns:
+ *   -1  if a < b
+ *    0  if a === b
+ *    1  if a > b
+ * Pre-release suffixes (e.g. '-beta.1') and build metadata (e.g. '+20130313')
+ * are stripped before comparison so that '2.5.0-beta.1' compares equal to
+ * '2.5.0' (both treated as the release version for update-check purposes).
+ */
+function compareSemver(a, b) {
+  // Strip leading 'v', pre-release labels (-alpha, -beta.1, etc.), and build metadata (+...)
+  const normalize = (v) =>
+    String(v || '0')
+      .replace(/^v/, '')
+      .replace(/[-+].*$/, '')  // strip pre-release/build metadata
+      .split('.')
+      .map((n) => { const num = parseInt(n, 10); return Number.isNaN(num) ? 0 : num; });
+  const pa = normalize(a);
+  const pb = normalize(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na < nb) return -1;
+    if (na > nb) return 1;
+  }
+  return 0;
+}
+
+/**
+ * Fetch the latest release from the configured GitHub repository.
+ * Returns null on any network or parse error (graceful degradation).
+ *
+ * Repository: UPDATE_CHECK_REPO env var (default: sherifconteh-collab/ai-grc-platform)
+ */
+async function fetchLatestGitHubRelease() {
+  const repo = (process.env.UPDATE_CHECK_REPO || 'sherifconteh-collab/ai-grc-platform').trim();
+  const url = `https://api.github.com/repos/${repo}/releases/latest`;
+
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'ControlWeave-UpdateCheck/1.0',
+        'Accept': 'application/vnd.github+json'
+      },
+      timeout: 8000
+    });
+    const json = response.data;
+    if (json && json.tag_name) {
+      return {
+        tagName: json.tag_name,
+        name: json.name || json.tag_name,
+        htmlUrl: json.html_url || `https://github.com/${repo}/releases/latest`,
+        publishedAt: json.published_at || null,
+        body: (json.body || '').slice(0, 500) // Brief excerpt only
+      };
+    }
+    return null;
+  } catch (error) {
+    log('warn', 'license.update_check.github_fetch_failed', { error: error.message, repo });
+    return null;
+  }
+}
+
+/**
+ * Return update check data, using the in-memory cache when fresh.
+ * currentVersion: the installed package version (e.g. "2.4.3")
+ * minVersion: from the active license JWT (may be null)
+ */
+async function getUpdateCheckData(currentVersion, minVersion) {
+  const now = Date.now();
+  if (_updateCache && (now - _updateCache.fetchedAt) < UPDATE_CHECK_CACHE_MS) {
+    // Return cached data, but recompute flags against current version/license
+    return buildUpdateResult(currentVersion, minVersion, _updateCache.release, _updateCache.fetchedAt);
+  }
+
+  const release = await fetchLatestGitHubRelease();
+  _updateCache = { release, fetchedAt: now };
+  return buildUpdateResult(currentVersion, minVersion, release, now);
+}
+
+function buildUpdateResult(currentVersion, minVersion, release, fetchedAt) {
+  const latestVersion = release ? release.tagName.replace(/^v/, '') : null;
+  const updateAvailable = latestVersion
+    ? compareSemver(currentVersion, latestVersion) < 0
+    : false;
+
+  // A license can embed min_version to signal a required minimum version.
+  // If the current install is below min_version, the update is mandatory.
+  const updateRequired = minVersion
+    ? compareSemver(currentVersion, minVersion) < 0
+    : false;
+
+  return {
+    currentVersion,
+    latestVersion,
+    updateAvailable,
+    updateRequired,
+    minVersionRequired: minVersion || null,
+    releaseUrl: release ? release.htmlUrl : `https://github.com/${(process.env.UPDATE_CHECK_REPO || 'sherifconteh-collab/ai-grc-platform').trim()}/releases/latest`,
+    releaseName: release ? release.name : null,
+    releaseExcerpt: release ? release.body : null,
+    publishedAt: release ? release.publishedAt : null,
+    checkedAt: new Date(fetchedAt).toISOString(),
+    source: release ? 'github' : 'unavailable'
+  };
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -90,6 +221,57 @@ router.get('/', authenticate, requirePermission('settings.manage'), async (req, 
   } catch (err) {
     log('error', 'license.info.failed', { error: err.message });
     return res.status(500).json({ success: false, error: 'Failed to retrieve license information' });
+  }
+});
+
+/**
+ * GET /api/v1/license/update-check
+ * Check whether a newer version of ControlWeave is available on GitHub.
+ *
+ * Compares the installed version (from package.json) against the latest
+ * release published on the public GitHub repository. Results are cached for
+ * UPDATE_CHECK_INTERVAL_HOURS (default 6 h) to stay within GitHub's rate limits.
+ *
+ * If the active license contains a `min_version` field, the response also
+ * indicates when an update is required by that license.
+ *
+ * Requires: authenticated user with settings.manage permission.
+ */
+router.get('/update-check', updateCheckLimiter, authenticate, requirePermission('settings.manage'), async (req, res) => {
+  try {
+    // Read installed version from package.json (relative to this file)
+    let currentVersion = '0.0.0';
+    try {
+      // Expected layout: backend/src/routes/license.js → backend/package.json
+      // __dirname = backend/src/routes  →  ../.. = backend/
+      const pkg = require(path.resolve(__dirname, '../../package.json'));
+      currentVersion = pkg.version || '0.0.0';
+    } catch {
+      // Fallback — non-fatal
+    }
+
+    // Resolve active license to extract min_version if present
+    let minVersion = null;
+    try {
+      const envKey = (process.env.LICENSE_KEY || process.env.CONTROLWEAVE_LICENSE_KEY || '').trim();
+      const { licenseKey: dbKey } = await loadLicenseKeyFromDb(pool);
+      const activeKey = envKey || dbKey || '';
+      if (activeKey) {
+        const licenseResult = validateLicenseKey(activeKey);
+        if (licenseResult.valid && licenseResult.minVersion) {
+          minVersion = licenseResult.minVersion;
+        }
+      }
+    } catch {
+      // Non-fatal — proceed without min_version
+    }
+
+    const result = await getUpdateCheckData(currentVersion, minVersion);
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    log('error', 'license.update_check.failed', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Failed to check for updates' });
   }
 });
 
@@ -276,3 +458,4 @@ router.post(
 );
 
 module.exports = router;
+

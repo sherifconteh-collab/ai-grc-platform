@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: ControlWeave API
   description: GRC platform API for managing compliance frameworks, controls, evidence, and audit logs.
-  version: 2.4.2
+  version: 2.4.3
   contact:
     name: ControlWeave Support
     url: https://controlweave.com

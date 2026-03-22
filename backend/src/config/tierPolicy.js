@@ -5,13 +5,19 @@
  * having unlimited access.  The hosted ControlWeave product enforces
  * tier-based limits; this module provides sensible open defaults so the
  * rest of the codebase can call the same helpers without branching.
+ *
+ * Tier names (post migration 094):
+ *   community  — free self-hosted (index 0)
+ *   pro        — paid tier 1       (index 1)
+ *   enterprise — paid tier 2       (index 2)
+ *   govcloud   — gov cloud tier    (index 3)
  */
 
-const TIER_ORDER = ['free', 'starter', 'professional', 'enterprise'];
+const TIER_ORDER = ['community', 'pro', 'enterprise', 'govcloud'];
 
 function normalizeTier(raw) {
-  const t = String(raw || 'enterprise').trim().toLowerCase();
-  return TIER_ORDER.includes(t) ? t : 'enterprise';
+  const t = String(raw || 'community').trim().toLowerCase();
+  return TIER_ORDER.includes(t) ? t : 'community';
 }
 
 function tierLevel(tier) {

@@ -46,14 +46,16 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(() =>
-        caches.match(request).then((cachedResponse) =>
-          cachedResponse ||
-          new Response('Offline', {
+        caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return new Response('Offline', {
             status: 503,
-            statusText: 'Offline',
+            statusText: 'Service Unavailable',
             headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-          })
-        )
+          });
+        })
       )
   );
 });

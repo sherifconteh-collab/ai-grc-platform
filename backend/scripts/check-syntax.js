@@ -65,7 +65,7 @@ for (const file of files) {
 
     if (result.status !== 0) {
       throw new Error((result.stderr || result.stdout || 'Syntax check failed').trim());
-      }
+    }
   } catch (error) {
     failed = true;
     process.stderr.write(`Syntax check failed: ${path.relative(ROOT, file)}\n`);

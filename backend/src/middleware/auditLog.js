@@ -9,19 +9,11 @@
  */
 
 const { createAuditLog } = require('../services/auditService');
-
-let extractIpFromRequest = (req) => {
-  if (!req) return null;
-  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
-  if (typeof xForwardedFor === 'string' && xForwardedFor.length > 0) {
-    return xForwardedFor.split(',')[0].trim();
-  }
-  return req.ip || req.socket?.remoteAddress || null;
-};
+let extractIpFromRequest;
 try {
   ({ extractIpFromRequest } = require('../services/geolocationService'));
-} catch (_err) {
-  // Optional in the public/community repo.
+} catch (e) {
+  extractIpFromRequest = (req) => req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress || null;
 }
 
 /**

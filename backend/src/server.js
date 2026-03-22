@@ -138,6 +138,26 @@ app.use('/api/v1', apiRateLimiter);
 // Validate edition at startup
 validateEdition();
 
+// Validate required environment variables at startup.
+// Failing early with a clear message is far better than silently misbehaving
+// in production (addresses "no environment variable validation at startup").
+(function validateRequiredEnv() {
+  const hasDatabaseUrl = Boolean(String(process.env.DATABASE_URL || '').trim());
+  const individualDbVars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+  const missingIndividual = individualDbVars.filter((v) => !String(process.env[v] || '').trim());
+  const hasIndividualDbConfig = missingIndividual.length === 0;
+
+  if (!hasDatabaseUrl && !hasIndividualDbConfig) {
+    const msg = `Database connection is not configured. Set DATABASE_URL or provide the missing individual variables: ${missingIndividual.join(', ')}.`;
+    if (SECURITY_CONFIG.isProduction) {
+      // Hard-fail in production to prevent a broken server from starting.
+      throw new Error(msg);
+    } else {
+      log('warn', 'server.startup.missing_db_config', { message: msg });
+    }
+  }
+})();
+
 // Health check
 app.get('/', (req, res) => {
   res.json({

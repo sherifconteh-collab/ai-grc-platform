@@ -9,14 +9,6 @@ const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-const { sendPasswordResetEmail } = require('../services/emailService');
-const { createAuditLog } = require('../services/auditService');
-const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
-const { verifyTOTP } = require('../utils/totp');
-const { decrypt } = require('../utils/encrypt');
-const { log } = require('../utils/logger');
-const { hasPublicColumn } = require('../utils/schema');
-
 let getTrialSeedData = () => ({
   tier: 'community',
   billingStatus: 'community',
@@ -35,7 +27,7 @@ try {
 } catch (_err) {
   // Optional in the public/community repo.
 }
-
+const { sendPasswordResetEmail } = require('../services/emailService');
 let getGeolocationFromRequest = () => ({});
 let extractIpFromRequest = (req) => {
   if (!req) return null;
@@ -50,6 +42,12 @@ try {
 } catch (_err) {
   // Optional in the public/community repo.
 }
+const { createAuditLog } = require('../services/auditService');
+const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
+const { verifyTOTP } = require('../utils/totp');
+const { decrypt } = require('../utils/encrypt');
+const { log } = require('../utils/logger');
+const { hasPublicColumn } = require('../utils/schema');
 
 const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
@@ -243,7 +241,7 @@ function resolveSessionExpiryTimestamp(isDemoAccount, sessionExpiresAt = null) {
  * @returns {string}
  */
 function buildAccessToken(userId, sessionExpiresAt = null) {
-  const payload = { userId };
+  const payload = { userId, type: 'access' };
   let expiresIn = ACCESS_EXPIRY_SECONDS;
 
   if (sessionExpiresAt) {
@@ -626,9 +624,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
 
       // Ensure all seeded frameworks the org is entitled to are adopted.
       // Fire-and-forget — does not block the registration response.
-      void ensureOrgFrameworks(org.id, org.tier).catch(err => {
-        console.error('ensureOrgFrameworks error for org', org.id, err);
-      });
+      ensureOrgFrameworks(org.id, org.tier).catch(err => console.error('ensureOrgFrameworks error:', err));
 
       res.status(201).json({
         success: true,
@@ -829,9 +825,7 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
     // Ensure all seeded frameworks the org is entitled to are adopted.
     // Fire-and-forget — does not block the login response.
     if (user.organization_id && user.organization_tier) {
-      void ensureOrgFrameworks(user.organization_id, user.organization_tier).catch(err => {
-        console.error('ensureOrgFrameworks error for org', user.organization_id, err);
-      });
+      ensureOrgFrameworks(user.organization_id, user.organization_tier).catch(err => console.error('ensureOrgFrameworks error:', err));
     }
 
     res.json({
@@ -880,7 +874,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     }
 
     const userResult = await pool.query(
-      `SELECT id, email, first_name, last_name, is_active
+      `SELECT id, email, first_name, last_name, is_active, organization_id
        FROM users
        WHERE email = $1
        LIMIT 1`,
@@ -905,7 +899,8 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     await sendPasswordResetEmail({
       email: user.email,
       fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-      resetLink
+      resetLink,
+      orgId: user.organization_id || null
     }).catch((error) => {
       console.warn('Failed to send password reset email:', error.message);
     });

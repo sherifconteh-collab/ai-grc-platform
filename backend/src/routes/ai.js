@@ -21,35 +21,11 @@ const aiDecisionWriteLimiter = createOrgRateLimiter({
 });
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
+const UNAVAILABLE_SWARM_ERROR = 'Multi-agent orchestration requires a build that includes enterprise swarm services.';
 const VALID_DECISION_SOURCES = new Set(['platform', 'byok', 'external']);
 const LEGACY_DECISION_SOURCE_MAP = new Map([
   ['mcp_agent', 'platform'],
 ]);
-const UNAVAILABLE_SWARM_ERROR = 'Multi-agent orchestration requires a build that includes enterprise swarm services.';
-
-let orchestrator = {
-  SWARM_CONFIGS: {},
-  getSwarmConfigs: () => [],
-  getSwarmConfig: () => null,
-  executeSwarm: async () => {
-    const err = new Error(UNAVAILABLE_SWARM_ERROR);
-    err.statusCode = 503;
-    throw err;
-  }
-};
-let reasoningMemory = {
-  invalidateCache: () => {}
-};
-try {
-  orchestrator = require('../services/multiAgentOrchestrator');
-} catch (_err) {
-  // Optional in the public/community repo.
-}
-try {
-  reasoningMemory = require('../services/reasoningMemory');
-} catch (_err) {
-  // Optional in the public/community repo.
-}
 
 // All AI routes require authentication
 router.use(authenticate);
@@ -1079,6 +1055,30 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
 }));
 
 // ======================== MULTI-AGENT SWARM ========================
+
+let orchestrator = {
+  SWARM_CONFIGS: {},
+  getSwarmConfigs: () => [],
+  getSwarmConfig: () => null,
+  executeSwarm: async () => {
+    const err = new Error(UNAVAILABLE_SWARM_ERROR);
+    err.statusCode = 503;
+    throw err;
+  }
+};
+let reasoningMemory = {
+  invalidateCache: () => {}
+};
+try {
+  orchestrator = require('../services/multiAgentOrchestrator');
+} catch (_err) {
+  // Optional in the public/community repo.
+}
+try {
+  reasoningMemory = require('../services/reasoningMemory');
+} catch (_err) {
+  // Optional in the public/community repo.
+}
 
 // GET /ai/swarm/configs — list available swarm configurations
 router.get('/swarm/configs', async (req, res) => {

@@ -385,6 +385,9 @@ export default function FrameworksPage() {
             <p className="text-purple-900 font-medium">
               Selected {selectedFrameworks.length} framework/model item(s) with {totalControls} total controls
             </p>
+            <p className="text-purple-700 text-xs mt-1">
+              💾 Your control answers and implementation history are always preserved — removing a framework just hides its controls, it never deletes your data.
+            </p>
           </div>
         )}
 
