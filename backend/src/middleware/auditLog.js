@@ -13,7 +13,7 @@ let extractIpFromRequest;
 try {
   ({ extractIpFromRequest } = require('../services/geolocationService'));
 } catch (e) {
-  extractIpFromRequest = (req) => req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || null;
+  extractIpFromRequest = (req) => req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress || null;
 }
 
 /**

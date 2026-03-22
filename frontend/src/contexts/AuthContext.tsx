@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '@/lib/api';
+import { setAccessToken, clearAccessToken } from '@/lib/tokenStore';
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -51,6 +52,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Rehydrate the in-memory store from localStorage so that the api
+      // interceptor can attach the Authorization header before the /me call.
+      setAccessToken(token);
+
       const response = await authAPI.getCurrentUser();
 
       // /me endpoint returns user data directly in response.data.data, not nested in "user"
@@ -71,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (error) {
       console.error('Auth check failed:', error);
+      clearAccessToken();
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       setUser(null);
@@ -86,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
+      setAccessToken(tokens.accessToken);
 
       await checkAuth();
       router.push('/dashboard');
@@ -101,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithTokens = async (accessToken: string, refreshToken: string) => {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
+    setAccessToken(accessToken);
     await checkAuth();
     router.push('/dashboard');
   };
@@ -120,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
+      setAccessToken(tokens.accessToken);
 
       await checkAuth();
       router.push('/dashboard');
@@ -138,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      clearAccessToken();
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       setUser(null);
@@ -152,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (tokens?.accessToken) {
       localStorage.setItem('accessToken', tokens.accessToken);
+      setAccessToken(tokens.accessToken);
     }
     if (tokens?.refreshToken) {
       localStorage.setItem('refreshToken', tokens.refreshToken);
