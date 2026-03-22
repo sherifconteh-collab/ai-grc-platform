@@ -53,7 +53,7 @@ const updateCheckLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || req.headers['x-forwarded-for'] || 'unknown',
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 
