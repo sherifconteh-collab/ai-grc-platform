@@ -745,7 +745,9 @@ router.post('/decisions', aiDecisionWriteLimiter, requirePermission('assessments
         JSON.stringify(body.bias_flags || []),
         body.reasoning || null,
         body.confidence_score != null ? body.confidence_score : null,
-        body.decision_source || 'mcp_agent'
+        body.decision_source && ['platform', 'byok', 'external', 'mcp_agent'].includes(body.decision_source)
+          ? body.decision_source
+          : 'platform'
       ]
     );
 
