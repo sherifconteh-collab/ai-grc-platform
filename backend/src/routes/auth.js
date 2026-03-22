@@ -874,7 +874,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     }
 
     const userResult = await pool.query(
-      `SELECT id, email, first_name, last_name, is_active
+      `SELECT id, email, first_name, last_name, is_active, organization_id
        FROM users
        WHERE email = $1
        LIMIT 1`,
@@ -899,7 +899,8 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     await sendPasswordResetEmail({
       email: user.email,
       fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-      resetLink
+      resetLink,
+      orgId: user.organization_id || null
     }).catch((error) => {
       console.warn('Failed to send password reset email:', error.message);
     });

@@ -20,6 +20,7 @@
  *     seats: <max-users | -1 for unlimited>,
  *     features: [...optional feature keys...],
  *     maintenance_until: "2027-03-11",   // optional maintenance expiry
+ *     min_version: "2.5.0",              // optional minimum required platform version
  *     iat: <issued-at>,
  *     exp: <optional hard-expiry — omit for true perpetual>
  *   }
@@ -102,12 +103,17 @@ function validateLicenseKey(licenseKey, overridePubKey = null) {
     // but maintenance_until controls access to updates/support)
     const maintenanceUntil = payload.maintenance_until || null;
 
+    // Minimum required platform version (optional — if set, self-hosted instances
+    // below this version will receive a "required update" notification)
+    const minVersion = payload.min_version || null;
+
     return {
       valid: true,
       tier,
       seats,
       licensee: payload.sub || 'unknown',
       maintenanceUntil,
+      minVersion,
       features: Array.isArray(payload.features) ? payload.features : []
     };
   } catch (err) {

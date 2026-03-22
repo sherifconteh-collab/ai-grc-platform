@@ -1123,6 +1123,15 @@ export const settingsAPI = {
     api.post('/settings/account/cancel', data),
   exportAccountData: () =>
     api.get('/settings/account/export', { responseType: 'blob' }),
+  getSmtpConfig: () => api.get('/settings/smtp'),
+  updateSmtpConfig: (data: {
+    smtp_host?: string | null;
+    smtp_port?: string | null;
+    smtp_user?: string | null;
+    smtp_pass?: string | null;
+    smtp_from_email?: string | null;
+  }) => api.put('/settings/smtp', data),
+  testSmtp: (to_email: string) => api.post('/settings/smtp/test', { to_email }),
 };
 
 // Integrations APIs (Splunk evidence connector)
@@ -1455,17 +1464,7 @@ export const billingAPI = {
 export const licenseAPI = {
   getInfo: () => api.get('/license'),
   activate: (licenseKey: string) => api.post('/license/activate', { licenseKey }),
-};
-
-// Update Check API
-// All features are baked into the binary — activating a license unlocks them
-// immediately with no download.  An "update" delivers new features and fixes
-// by pulling the latest build (Docker image / binary / git tag).
-export const updateCheckAPI = {
-  /** Return cached (or live) update status from GitHub Releases. */
-  getStatus: () => api.get('/update-check'),
-  /** Bypass cache and re-query GitHub immediately (called after license activation). */
-  forceCheck: () => api.post('/update-check/force'),
+  checkUpdates: () => api.get('/license/update-check'),
 };
 
 // Help / Documentation API
