@@ -56,6 +56,37 @@ const PRO_FEATURES = Object.freeze({
 });
 
 /**
+ * Human-readable labels for each feature key.
+ * Used by the license API response so the frontend can display
+ * a clear list of what is unlocked/locked without hard-coding
+ * feature names in the UI.
+ */
+const FEATURE_LABELS = Object.freeze({
+  cmdb:                 'CMDB / Asset Inventory',
+  assets:               'Asset Management',
+  vulnerabilities:      'Vulnerability Management',
+  environments:         'Environments',
+  evidence:             'Evidence Collection',
+  reports:              'Reports & Exports',
+  splunk:               'Splunk Integration',
+  sso:                  'Single Sign-On (SSO)',
+  billing:              'Stripe Billing',
+  sbom:                 'Software Bill of Materials (SBOM)',
+  aibom:                'AI Bill of Materials (AI-BOM)',
+  serviceAccounts:      'Service Accounts',
+  threatIntel:          'Threat Intelligence',
+  dataSovereignty:      'Data Sovereignty Controls',
+  siem:                 'SIEM Integration',
+  realtime:             'Real-time Event Streaming',
+  tprm:                 'Third-Party Risk Management (TPRM)',
+  vendorSecurity:       'Vendor Security Assessments',
+  externalAi:           'External AI Connectors',
+  cemcp:                'Code Execution MCP Security',
+  stateAiLaws:          'US State AI Laws Compliance',
+  internationalAiLaws:  'International AI Laws Compliance',
+});
+
+/**
  * Middleware to enforce edition restrictions
  * Use this before tier checks for Pro features
  * 
@@ -112,11 +143,31 @@ function isFeatureAvailable(feature) {
  * @returns {Object} Edition information
  */
 function getEditionInfo() {
+  const available = Object.keys(PRO_FEATURES).filter(f => isFeatureAvailable(f));
+  const locked    = Object.keys(PRO_FEATURES).filter(f => !isFeatureAvailable(f));
+
+  /**
+   * Shape each feature entry as { key, label, requiredTier } so callers
+   * don't need to maintain their own label/tier mappings.
+   */
+  const toDetail = (key) => ({
+    key,
+    label: FEATURE_LABELS[key] || key,
+    requiredTier: PRO_FEATURES[key]
+  });
+
   return {
     edition: EDITION,
     isCommunity: IS_COMMUNITY,
     isPro: IS_PRO,
-    availableFeatures: Object.keys(PRO_FEATURES).filter(f => isFeatureAvailable(f))
+    /**
+     * featureModel explains how feature gating works:
+     *   "baked-in" — all feature code is already present in the binary;
+     *   activating a license immediately unlocks features with no download.
+     */
+    featureModel: 'baked-in',
+    availableFeatures: available.map(toDetail),
+    lockedFeatures:    locked.map(toDetail)
   };
 }
 
@@ -246,5 +297,6 @@ module.exports = {
   EDITION,
   IS_COMMUNITY,
   IS_PRO,
-  PRO_FEATURES
+  PRO_FEATURES,
+  FEATURE_LABELS
 };

@@ -85,7 +85,12 @@ router.get('/', authenticate, requirePermission('settings.manage'), async (req, 
         isPro: info.isPro,
         licenseFingerprint: fingerprint,
         persistedViaEnv: !!envKey.trim(),
-        persistedViaDb: !!dbKey
+        persistedViaDb: !!dbKey,
+        // Feature model: all features are built into the binary;
+        // activating a license immediately unlocks them with no download.
+        featureModel: info.featureModel,
+        availableFeatures: info.availableFeatures,
+        lockedFeatures: info.lockedFeatures
       }
     });
   } catch (err) {
@@ -133,8 +138,18 @@ router.post(
       const orgId = req.user?.organization_id;
       const userId = req.user?.id;
 
+      // Capture features available BEFORE the upgrade so we can report the delta.
+      const beforeInfo = getEditionInfo();
+      const beforeKeys = new Set(beforeInfo.availableFeatures.map(f => f.key));
+
       // Upgrade the in-process edition so features are immediately available.
+      // All feature code is already present in the binary — this is a pure
+      // in-memory flag flip; no package download is required.
       upgradeEdition(effectiveEdition);
+
+      // Capture features available AFTER the upgrade.
+      const afterInfo = getEditionInfo();
+      const unlockedFeatures = afterInfo.availableFeatures.filter(f => !beforeKeys.has(f.key));
 
       // Persist the key to the database so the upgrade survives restarts.
       let persisted = false;
@@ -185,7 +200,13 @@ router.post(
         licensee: licenseResult.licensee || null,
         seats: licenseResult.seats === -1 ? 'unlimited' : licenseResult.seats,
         maintenanceUntil: licenseResult.maintenanceUntil || null,
-        persisted
+        persisted,
+        // Features are baked-in — no download required.
+        // unlockedFeatures lists what just became available after this activation.
+        featureModel: 'baked-in',
+        unlockedFeatures,
+        availableFeatures: afterInfo.availableFeatures,
+        lockedFeatures: afterInfo.lockedFeatures
       };
       if (!persisted) {
         responseData.warning = 'License activated in-process but database persistence failed. The license will be lost on server restart. Check database connectivity and retry activation.';
