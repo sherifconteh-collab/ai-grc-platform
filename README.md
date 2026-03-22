@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-21 | PR #82: fix: bump electron version to 2.4.2 to match release notes -->
+<!-- LAST_UPDATED: 2026-03-22 | PR #83: fix: wire community→paid license upgrade flow end-to-end + sync with ControlWeave public mirror -->
 
 ## 🎯 What is This?
 
