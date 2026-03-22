@@ -13,11 +13,22 @@
 
 > Changes staged but not yet released to production.
 
+---
+
+## [2.4.4] — 2026-03-22
+
+> **Released:** 2026-03-22
+
+### Fixed
+- fix: make Windows Authenticode signing optional when secrets are not configured — unsigned builds now succeed with a warning instead of failing ([#85](https://github.com/sherifconteh-collab/ai-grc-platform/pull/85)) — @Copilot
+- fix: synchronise all package versions to 2.4.4 (electron was behind at 2.4.2) — @Copilot
+
 ### Changed
 - fix: wire community→paid license upgrade flow end-to-end + sync with ControlWeave public mirror ([#83](https://github.com/sherifconteh-collab/ai-grc-platform/pull/83)) — @Copilot
 - fix: bump electron version to 2.4.2 to match release notes ([#82](https://github.com/sherifconteh-collab/ai-grc-platform/pull/82)) — @Copilot
-
 - Sync with ControlWeave public repo — v2.4.2 + add missing dashboard pages ([#79](https://github.com/sherifconteh-collab/ai-grc-platform/pull/79)) — @Copilot
+
+---
 
 ## [2.4.2] — 2026-03-20
 
