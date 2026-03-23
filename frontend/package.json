@@ -23,7 +23,7 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
