@@ -91,7 +91,7 @@
     "pg": "^8.18.0",
     "redis": "^4.7.0",
     "rss-parser": "^3.13.0",
-    "sanitize-html": "^2.17.1",
+    "sanitize-html": "^2.17.2",
     "socket.io": "^4.8.1",
     "stripe": "^17.5.0",
     "xml2js": "^0.6.2",
