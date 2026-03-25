@@ -167,8 +167,9 @@ router.get('/preferences', async (req, res) => {
         [req.user.id]
       );
       for (const row of result.rows) stored[row.type] = row;
-    } catch {
+    } catch (err) {
       // Table may not exist if migration not run — return defaults
+      console.warn('notification_preferences query failed (migration may not be applied):', err.message);
     }
 
     const prefs = NOTIFICATION_TYPES.map(type => ({
@@ -228,7 +229,9 @@ router.get('/email-status', emailStatusRateLimiter, async (req, res) => {
       if (orgResult.rows.length > 0) {
         return res.json({ success: true, data: { configured: true, source: 'database' } });
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('Org SMTP setting lookup failed:', err.message);
+    }
   }
   // Fall back to platform_settings (backward compat for existing deployments)
   try {
@@ -236,7 +239,8 @@ router.get('/email-status', emailStatusRateLimiter, async (req, res) => {
       `SELECT 1 FROM platform_settings WHERE setting_key = 'smtp_host' AND setting_value IS NOT NULL AND setting_value != '' LIMIT 1`
     );
     return res.json({ success: true, data: { configured: result.rows.length > 0, source: result.rows.length > 0 ? 'database' : 'none' } });
-  } catch {
+  } catch (err) {
+    console.warn('platform_settings SMTP lookup failed:', err.message);
     return res.json({ success: true, data: { configured: false, source: 'none' } });
   }
 });

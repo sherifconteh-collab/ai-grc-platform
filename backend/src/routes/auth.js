@@ -521,19 +521,29 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
       });
     }
 
-    // Check existing user (use email_hash for encrypted-email lookup when available)
+    // Check existing user (use email_hash for encrypted-email lookup when available,
+    // with fallback to plain-text email for unmigrated rows)
     if (authEmailHashColumnAvailable === null) {
       authEmailHashColumnAvailable = await hasPublicColumn('users', 'email_hash');
     }
     const emailHash = authEmailHashColumnAvailable === false
       ? null
       : hashForLookup(normalizedEmail);
-    const existingQuery = emailHash
-      ? 'SELECT id FROM users WHERE email_hash = $1'
-      : 'SELECT id FROM users WHERE email = $1';
-    const existing = await pool.query(existingQuery, [emailHash ?? normalizedEmail]);
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ success: false, error: 'Email already registered' });
+    if (emailHash) {
+      // Check by hash first, then also check for unmigrated plain-text rows
+      const existingByHash = await pool.query('SELECT id FROM users WHERE email_hash = $1', [emailHash]);
+      if (existingByHash.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
+      const existingByPlain = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL', [normalizedEmail]);
+      if (existingByPlain.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
+    } else {
+      const existing = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -1312,18 +1322,27 @@ router.post('/accept-invite', validateBody((body) => {
       return res.status(410).json({ success: false, error: 'This invite has expired' });
     }
 
-    // Check email not already registered (use email_hash for encrypted-email lookup when available)
+    // Check email not already registered (use email_hash for encrypted-email lookup when available,
+    // with fallback to plain-text email for unmigrated rows)
     const inviteEmailNorm = invite.email.toLowerCase();
     if (authEmailHashColumnAvailable === null) {
       authEmailHashColumnAvailable = await hasPublicColumn('users', 'email_hash');
     }
     const inviteEmailHash = authEmailHashColumnAvailable !== false ? hashForLookup(inviteEmailNorm) : null;
-    const inviteExistQuery = inviteEmailHash
-      ? 'SELECT id FROM users WHERE email_hash = $1'
-      : 'SELECT id FROM users WHERE LOWER(email) = $1';
-    const existing = await pool.query(inviteExistQuery, [inviteEmailHash ?? inviteEmailNorm]);
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ success: false, error: 'Email already registered' });
+    if (inviteEmailHash) {
+      const existingByHash = await pool.query('SELECT id FROM users WHERE email_hash = $1', [inviteEmailHash]);
+      if (existingByHash.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
+      const existingByPlain = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL', [inviteEmailNorm]);
+      if (existingByPlain.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
+    } else {
+      const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [inviteEmailNorm]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, 12);

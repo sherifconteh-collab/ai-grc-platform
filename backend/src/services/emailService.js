@@ -81,8 +81,9 @@ async function _getTransporterForOrg(orgId) {
       });
       foundOrgConfig = true;
     }
-  } catch {
+  } catch (err) {
     // DB not available — fall through to global config
+    console.warn('Org SMTP config lookup failed:', err.message);
   }
 
   if (!foundOrgConfig) {
@@ -130,8 +131,9 @@ async function _getGlobalTransporter() {
       port = dbSettings.smtp_port;
       user = dbSettings.smtp_user;
       pass = dbSettings.smtp_pass;
-    } catch {
+    } catch (err) {
       // DB not available — stay null
+      console.warn('Global SMTP config lookup failed:', err.message);
     }
   }
 
@@ -172,7 +174,9 @@ async function _getFromEmailForOrg(orgId) {
     if (result.rows.length > 0 && result.rows[0].setting_value) {
       fromEmail = result.rows[0].setting_value;
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('Org from-email lookup failed:', err.message);
+  }
 
   if (!fromEmail) {
     fromEmail = await _getFromEmail();
@@ -192,7 +196,9 @@ async function _getFromEmail() {
     if (result.rows.length > 0 && result.rows[0].setting_value) {
       return result.rows[0].setting_value;
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('Platform from-email lookup failed:', err.message);
+  }
   return process.env.DEFAULT_FROM_EMAIL || 'ControlWeave <noreply@example.com>';
 }
 
