@@ -21,6 +21,7 @@ try {
 router.use(authenticate);
 
 const notificationsRateLimiter = createRateLimiter({ label: 'notifications', windowMs: 60 * 1000, max: 60 });
+router.use(notificationsRateLimiter);
 
 // Explicit express-rate-limit instance for the email-status route so that
 // static-analysis tools (CodeQL) recognise the rate-limiting middleware.

@@ -110,10 +110,16 @@ export default function AICopilot() {
         { role: 'user', content: userContent }
       ];
 
+      const token = getAccessToken();
+      if (!token) {
+        setError('Session expired — please log in again.');
+        return;
+      }
+
       const res = await axios.post(
         AI_CHAT_URL,
         { messages: sendPayload },
-        { headers: { Authorization: `Bearer ${getAccessToken()}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       const assistantMsg: Message = {

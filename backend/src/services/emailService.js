@@ -90,8 +90,13 @@ async function _getTransporterForOrg(orgId) {
     transporter = await _getGlobalTransporter();
   }
 
-  // Cache the resolved transporter (org-specific or global fallback) to avoid repeated DB lookups.
-  _orgTransporterCache.set(orgId, { transporter, valid: true });
+  // Only cache when the org has its own SMTP config. When falling back to
+  // the global transporter we intentionally skip caching so that a later
+  // global SMTP configuration change is picked up without requiring an
+  // explicit per-org cache invalidation.
+  if (foundOrgConfig) {
+    _orgTransporterCache.set(orgId, { transporter, valid: true });
+  }
   return transporter;
 }
 
@@ -188,7 +193,7 @@ async function _getFromEmail() {
       return result.rows[0].setting_value;
     }
   } catch { /* ignore */ }
-  return 'ControlWeave <contehconsulting@gmail.com>';
+  return process.env.DEFAULT_FROM_EMAIL || 'ControlWeave <noreply@example.com>';
 }
 
 // Keep old name as alias for callers that don't have an org context
