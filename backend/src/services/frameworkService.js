@@ -27,6 +27,21 @@ function invalidateFrameworkStatusCache(organizationId) {
  * 
  * @param {string} organizationId
  * @returns {Promise<Object>} Framework status summary with compliance percentages
+ * 
+ * @example
+ * const summary = await getFrameworkStatusSummary(orgId);
+ * // Returns:
+ * // {
+ * //   totalFrameworks: 3,
+ * //   totalControls: 450,
+ * //   implementedControls: 315,
+ * //   overallCompliance: 70.0,
+ * //   frameworks: [
+ * //     { code: 'NIST_800_53', name: 'NIST 800-53', controlCount: 200, implemented: 150, compliance: 75.0 },
+ * //     { code: 'SOC2', name: 'SOC 2', controlCount: 150, implemented: 120, compliance: 80.0 },
+ * //     ...
+ * //   ]
+ * // }
  */
 async function getFrameworkStatusSummary(organizationId) {
   const cacheKey = `${organizationId}:summary`;
@@ -36,6 +51,7 @@ async function getFrameworkStatusSummary(organizationId) {
   }
 
   try {
+    // Get detailed framework status
     const frameworksResult = await pool.query(
       `SELECT f.code, f.name,
               COUNT(fc.id) AS control_count,
@@ -63,8 +79,10 @@ async function getFrameworkStatusSummary(organizationId) {
       compliance: parseFloat(row.compliance) || 0
     }));
 
+    // Calculate overall statistics
     const totalControls = frameworks.reduce((sum, fw) => sum + fw.controlCount, 0);
     const implementedControls = frameworks.reduce((sum, fw) => sum + fw.implemented, 0);
+    // Round to 1 decimal place: multiply by 1000, round, then divide by 10
     const overallCompliance = totalControls > 0 
       ? Math.round((implementedControls / totalControls) * 1000) / 10 
       : 0;
@@ -77,6 +95,7 @@ async function getFrameworkStatusSummary(organizationId) {
       frameworks
     };
 
+    // Cache the result
     frameworkStatusCache.set(cacheKey, { data: summary, timestamp: Date.now() });
     return summary;
   } catch (err) {

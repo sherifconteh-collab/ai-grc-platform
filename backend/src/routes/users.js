@@ -7,11 +7,26 @@ const bcrypt = require('bcryptjs');
 const { authenticate, requireAnyPermission, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
+const {
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_COMPLEXITY_ERROR_MESSAGE,
+  hasRequiredPasswordComplexity
+} = require('../utils/passwordPolicy');
+const { encrypt, decrypt, hashForLookup } = require('../utils/encrypt');
+const { hasPublicColumn } = require('../utils/schema');
 
 router.use(authenticate);
 const ALLOWED_PRIMARY_ROLES = new Set(['admin', 'auditor', 'user']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 12;
+
+// email_hash column availability cache (checked once per process)
+let usersEmailHashColumnAvailable = null;
+async function hasEmailHashCol() {
+  if (usersEmailHashColumnAvailable === null) {
+    usersEmailHashColumnAvailable = await hasPublicColumn('users', 'email_hash');
+  }
+  return usersEmailHashColumnAvailable;
+}
 
 function isValidEmail(email) {
   return EMAIL_REGEX.test(String(email || '').trim());
@@ -82,7 +97,8 @@ router.get('/', requireAnyPermission(['users.read', 'users.manage']), async (req
       ORDER BY u.first_name, u.last_name
     `, [req.user.organization_id]);
 
-    res.json({ success: true, data: result.rows });
+    const rows = result.rows.map((u) => ({ ...u, email: decrypt(u.email) }));
+    res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Users error:', error);
     res.status(500).json({ success: false, error: 'Failed to load users' });
@@ -97,6 +113,8 @@ router.post('/', requirePermission('users.manage'), validateBody((body) => {
   }
   if (body.password && String(body.password).length < MIN_PASSWORD_LENGTH) {
     errors.push(`password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  } else if (body.password && !hasRequiredPasswordComplexity(body.password)) {
+    errors.push(PASSWORD_COMPLEXITY_ERROR_MESSAGE);
   }
   if (body.primary_role && !ALLOWED_PRIMARY_ROLES.has(String(body.primary_role).toLowerCase())) {
     errors.push('primary_role must be one of: admin, auditor, user');
@@ -118,7 +136,19 @@ router.post('/', requirePermission('users.manage'), validateBody((body) => {
     const roleIdsInput = Array.isArray(req.body.role_ids) ? req.body.role_ids : [];
     const autoGenerateAuditorSubroles = req.body.auto_generate_auditor_subroles !== false;
 
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const useEmailHash = await hasEmailHashCol();
+    const emailHash = useEmailHash ? hashForLookup(email) : null;
+    // Check for duplicate email — with fallback for pre-migration rows (email_hash IS NULL)
+    let existing;
+    if (emailHash) {
+      existing = await pool.query('SELECT id FROM users WHERE email_hash = $1', [emailHash]);
+      if (existing.rows.length === 0) {
+        // Fallback: plain-text match for rows not yet migrated
+        existing = await pool.query('SELECT id FROM users WHERE email = $1 AND email_hash IS NULL', [email]);
+      }
+    } else {
+      existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    }
     if (existing.rows.length > 0) {
       return res.status(409).json({ success: false, error: 'Email already registered' });
     }
@@ -130,13 +160,23 @@ router.post('/', requirePermission('users.manage'), validateBody((body) => {
     try {
       await client.query('BEGIN');
 
+      const storedEmail = emailHash ? encrypt(email) : email;
+      const uCols = emailHash
+        ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role, is_active'
+        : 'organization_id, email, password_hash, first_name, last_name, role, is_active';
+      const uVals = emailHash
+        ? [req.user.organization_id, storedEmail, emailHash, passwordHash, firstName, lastName, primaryRole, true]
+        : [req.user.organization_id, email, passwordHash, firstName, lastName, primaryRole, true];
+      const uPlaceholders = uVals.map((_, i) => `$${i + 1}`).join(', ');
       const userResult = await client.query(
-        `INSERT INTO users (organization_id, email, password_hash, first_name, last_name, role, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, true)
+        `INSERT INTO users (${uCols})
+         VALUES (${uPlaceholders})
          RETURNING id, email, first_name, last_name, role, is_active, created_at`,
-        [req.user.organization_id, email, passwordHash, firstName, lastName, primaryRole]
+        uVals
       );
       const createdUser = userResult.rows[0];
+      // Expose plain-text email in response
+      createdUser.email = email;
 
       if (primaryRole === 'auditor' && autoGenerateAuditorSubroles) {
         await ensureAuditorSubroles(client, req.user.organization_id);
@@ -348,10 +388,18 @@ router.post('/invite', requirePermission('users.manage'), validateBody((body) =>
       ? req.body.role_ids.filter((id) => typeof id === 'string' && id.trim().length > 0)
       : [];
 
-    // Check if email already exists as a user
-    const existingUser = await pool.query(
-      'SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [email]
-    );
+    // Check if email already exists as a user (use email_hash when available)
+    const invEmailHash = (await hasEmailHashCol()) ? hashForLookup(email) : null;
+    let existingUser;
+    if (invEmailHash) {
+      existingUser = await pool.query('SELECT id FROM users WHERE email_hash = $1 LIMIT 1', [invEmailHash]);
+      if (existingUser.rows.length === 0) {
+        // Fallback for pre-migration rows
+        existingUser = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL LIMIT 1', [email]);
+      }
+    } else {
+      existingUser = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1', [email]);
+    }
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ success: false, error: 'A user with this email already exists' });
     }

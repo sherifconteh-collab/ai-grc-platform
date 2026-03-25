@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/lib/apiBase';
+import { getAccessToken } from '@/lib/tokenStore';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -112,7 +113,7 @@ export default function AICopilot() {
       const res = await axios.post(
         AI_CHAT_URL,
         { messages: sendPayload },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } }
+        { headers: { Authorization: `Bearer ${getAccessToken()}` } }
       );
 
       const assistantMsg: Message = {

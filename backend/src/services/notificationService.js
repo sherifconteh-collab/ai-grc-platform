@@ -57,7 +57,7 @@ async function maybeEmail(orgId, userId, type, title, message, link) {
     for (const user of users.rows) {
       const prefs = await getUserPreferences(user.id, type);
       if (prefs.email) {
-        await emailService.sendNotificationEmail(user, { title, message, link });
+        await emailService.sendNotificationEmail(user, { title, message, link }, orgId);
       }
     }
   } else {
@@ -74,7 +74,7 @@ async function maybeEmail(orgId, userId, type, title, message, link) {
       const user = userResult.rows[0];
       const prefs = await getUserPreferences(userId, type);
       if (prefs.email) {
-        await emailService.sendNotificationEmail(user, { title, message, link });
+        await emailService.sendNotificationEmail(user, { title, message, link }, orgId);
       }
     }
   }

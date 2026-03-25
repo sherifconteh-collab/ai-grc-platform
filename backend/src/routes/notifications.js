@@ -6,6 +6,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields } = require('../middleware/validate');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 let notificationNew = () => {};
 let notificationRead = () => {};
@@ -17,6 +18,8 @@ try {
 }
 
 router.use(authenticate);
+
+const notificationsRateLimiter = createRateLimiter({ label: 'notifications', windowMs: 60 * 1000, max: 60 });
 
 const NOTIFICATION_TYPES = ['control_due', 'assessment_needed', 'status_change', 'system', 'crosswalk'];
 
@@ -194,12 +197,27 @@ router.put('/preferences', validateBody((body) => requireFields(body, ['type']))
 });
 
 // GET /notifications/email-status — whether SMTP is configured (for UI)
-router.get('/email-status', async (req, res) => {
+router.get('/email-status', notificationsRateLimiter, async (req, res) => {
   // Check env vars first (no DB cost)
   if (process.env.SMTP_HOST) {
     return res.json({ success: true, data: { configured: true, source: 'environment' } });
   }
-  // Fall back to platform_settings
+  // Check org-level settings for the requesting user's organization
+  const orgId = req.user?.organization_id;
+  if (orgId) {
+    try {
+      const orgResult = await pool.query(
+        `SELECT 1 FROM organization_settings
+         WHERE organization_id = $1 AND setting_key = 'smtp_host'
+           AND setting_value IS NOT NULL AND setting_value != '' LIMIT 1`,
+        [orgId]
+      );
+      if (orgResult.rows.length > 0) {
+        return res.json({ success: true, data: { configured: true, source: 'database' } });
+      }
+    } catch { /* ignore */ }
+  }
+  // Fall back to platform_settings (backward compat for existing deployments)
   try {
     const result = await pool.query(
       `SELECT 1 FROM platform_settings WHERE setting_key = 'smtp_host' AND setting_value IS NOT NULL AND setting_value != '' LIMIT 1`

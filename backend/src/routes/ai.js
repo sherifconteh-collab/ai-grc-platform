@@ -21,11 +21,6 @@ const aiDecisionWriteLimiter = createOrgRateLimiter({
 });
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
-const UNAVAILABLE_SWARM_ERROR = 'Multi-agent orchestration requires a build that includes enterprise swarm services.';
-const VALID_DECISION_SOURCES = new Set(['platform', 'byok', 'external']);
-const LEGACY_DECISION_SOURCE_MAP = new Map([
-  ['mcp_agent', 'platform'],
-]);
 
 // All AI routes require authentication
 router.use(authenticate);
@@ -112,15 +107,6 @@ function extractAgentMetadata(req) {
     ...metadata,
     dataLineage: lineageParts.length > 0 ? lineageParts.join(' | ') : null
   };
-}
-
-function normalizeDecisionSource(value, defaultValue = 'platform') {
-  if (value === undefined || value === null || value === '') {
-    return defaultValue;
-  }
-
-  const normalized = String(value).trim().toLowerCase();
-  return LEGACY_DECISION_SOURCE_MAP.get(normalized) || normalized;
 }
 
 // Helper: wrap AI handler with logging
@@ -732,15 +718,6 @@ router.post('/decisions', aiDecisionWriteLimiter, requirePermission('assessments
     if (!VALID_RISK_LEVELS.has(riskLevel)) {
       return res.status(400).json({ success: false, error: `risk_level must be one of: ${[...VALID_RISK_LEVELS].join(', ')}` });
     }
-    const decisionSource = normalizeDecisionSource(body.decision_source);
-    if (!VALID_DECISION_SOURCES.has(decisionSource)) {
-      return res.status(400).json({
-        success: false,
-        error: `decision_source must be one of: ${[...VALID_DECISION_SOURCES].join(', ')}`
-      });
-    }
-    const correlationId = body.correlation_id == null ? null : String(body.correlation_id);
-    const sessionId = body.session_id == null ? null : String(body.session_id);
 
     const result = await pool.query(
       `INSERT INTO ai_decision_log
@@ -763,12 +740,12 @@ router.post('/decisions', aiDecisionWriteLimiter, requirePermission('assessments
         riskLevel,
         body.regulatory_framework || null,
         body.model_version || null,
-        correlationId,
-        sessionId,
+        body.correlation_id || null,
+        body.session_id || null,
         JSON.stringify(body.bias_flags || []),
         body.reasoning || null,
         body.confidence_score != null ? body.confidence_score : null,
-        decisionSource
+        body.decision_source || 'mcp_agent'
       ]
     );
 
@@ -789,16 +766,7 @@ router.get('/decisions', requirePermission('settings.manage'), async (req, res) 
     const reviewedFilter = req.query.reviewed; // 'true' | 'false' | undefined
     const featureFilter = req.query.feature || null;
     const riskFilter = req.query.risk_level || null;
-    const decisionSourceFilter = req.query.decision_source
-      ? normalizeDecisionSource(req.query.decision_source)
-      : null;
-
-    if (decisionSourceFilter && !VALID_DECISION_SOURCES.has(decisionSourceFilter)) {
-      return res.status(400).json({
-        success: false,
-        error: `decision_source must be one of: ${[...VALID_DECISION_SOURCES].join(', ')}`
-      });
-    }
+    const decisionSourceFilter = req.query.decision_source || null;
 
     const params = [orgId];
     let whereConditions = ['organization_id = $1'];

@@ -12,8 +12,7 @@
  *
  * Trade-off: the token is lost on hard page refresh and must be rehydrated
  * via the refresh token (which remains in localStorage for session
- * persistence) by higher-level auth logic (for example, an AuthContext) on
- * mount.
+ * persistence).  The AuthContext handles that rehydration on mount.
  */
 
 let _accessToken: string | null = null;
