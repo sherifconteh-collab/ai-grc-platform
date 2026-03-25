@@ -113,7 +113,7 @@ router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) =>
           const perm = await client.query('SELECT id FROM permissions WHERE name = $1', [permName]);
           if (perm.rows.length > 0) {
             await client.query(
-              'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)',
+              'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
               [req.params.roleId, perm.rows[0].id]
             );
           }
