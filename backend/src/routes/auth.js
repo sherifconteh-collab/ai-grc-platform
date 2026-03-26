@@ -334,7 +334,7 @@ async function getUserByEmail(email) {
     authEmailHashColumnAvailable = await hasPublicColumn('users', 'email_hash');
     if (!authEmailHashColumnAvailable) {
       log('warn', 'auth.email_hash_column_missing', {
-        message: 'email_hash column not present — email field-level encryption inactive. Apply migration 098 to enable.'
+        message: 'email_hash column not present — email field-level encryption inactive. Apply migration 101 to enable.'
       });
     }
   }

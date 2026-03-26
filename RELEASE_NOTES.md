@@ -9,9 +9,25 @@
 
 ---
 
-## [Unreleased]
+## [2.5.0] — 2026-03-25
 
-> Changes staged but not yet released to production.
+> **Released:** 2026-03-25
+
+### Added
+- Field-level AES-256-GCM encryption for user email addresses with HMAC-SHA-384 searchable index (migration 101).
+- Startup-time CNSA Suite 1.0 encryption posture audit; hard-fails in production on compliance violations.
+- Centralized password policy (`passwordPolicy.js`) with minimum length increased to 15 characters and complexity rules.
+- Per-organization SMTP configuration via `organization_settings` table; falls back to env vars → platform settings.
+
+### Changed
+- Email lookups use `email_hash` column (HMAC-SHA-384) for O(1) lookup with lazy backfill on login.
+- All email reads call `decrypt()`, all writes call `encrypt()` + `hashForLookup()`.
+- Notification email sending now passes `orgId` through for per-org SMTP resolution.
+- Frontend register page updated to enforce 15-character minimum password.
+
+### Security
+- CNSA Suite 1.0 compliance: encryption key-length check derives from actual key material.
+- Register and accept-invite endpoints check both HMAC-hashed and unmigrated plain-text email rows to prevent duplicate accounts.
 
 ---
 
