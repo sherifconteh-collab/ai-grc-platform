@@ -9,9 +9,85 @@
 
 ---
 
-## [Unreleased]
+## [2.7.2] — 2026-03-26
 
-> Changes staged but not yet released to production.
+> **Released:** 2026-03-26
+
+### Changed
+- Release-notes auto-generation now strips redundant type-prefix verbs and capitalizes 30+ GRC/tech acronyms.
+- Conventional commit regex synced between release-notes and branch-naming workflows — added `migration` and `test` types.
+
+---
+
+## [2.7.1] — 2026-03-26
+
+> **Released:** 2026-03-26
+
+### Added
+- TEVV-API: 4 new behavioral tests — route `require()` + `.stack` verification, auth middleware import check, `module.exports` verification, frontend `api.ts` client coverage.
+- TEVV-DB: Migration file SQL keyword validation.
+- TEVV-UI: 7 new page-level tests covering `ai-security`, `assets`, `plot4ai`, `organization`, `my-organizations`, `report-issue`, and all 9 CMDB sub-pages.
+
+### Changed
+- Removed duplicate `security-reports-export.yml` and `security-reports-stig-quarterly.yml` workflows.
+- Merged `sync-wiki.yml` and `wiki-health-check.yml` into `docs-pipeline.yml` with preflight routing.
+
+### Fixed
+- `security-pipeline.yml`: CodeQL language identifier corrected (`javascript` → `javascript-typescript`); `npm install` → `npm ci`.
+- `codeql.yml`: Narrowed triggers to `schedule`/`workflow_dispatch` only.
+
+---
+
+## [2.7.0] — 2026-03-26
+
+> **Released:** 2026-03-26
+
+### Added
+- NIST AI 800-4 compliance-layer monitoring with cross-feature navigation cards across 8 dashboard pages.
+- `stateAiLawsAPI` added to frontend `api.ts` closing coverage gap on 4 backend routes.
+- `validateCategorySync()` startup guard comparing DB CHECK constraints against JS constants.
+
+### Fixed
+- AI Monitoring and AI Governance sidebar visibility corrected — wrong `isVisible` gate and permission (`settings.manage` → `ai.use`).
+- Division-by-zero guard added to `coverage_percentage` calculation.
+
+---
+
+## [2.6.0] — 2026-03-26
+
+> **Released:** 2026-03-26
+
+### Added
+- Quantized GGUF model support for Ollama — configurable quantization levels for smaller memory footprints and faster local AI inference.
+
+### Fixed
+- Stale tier names on `/privacy` page.
+- Missing `next/link` import and React type declarations in frontend components.
+
+### Security
+- `picomatch` upgraded to `2.3.2` (HIGH-severity ReDoS); `tinyglobby` updated to `4.0.4` in frontend.
+
+---
+
+## [2.5.0] — 2026-03-25
+
+> **Released:** 2026-03-25
+
+### Added
+- Field-level AES-256-GCM encryption for user email addresses with HMAC-SHA-384 searchable index (migration 101).
+- Startup-time CNSA Suite 1.0 encryption posture audit; hard-fails in production on compliance violations.
+- Centralized password policy (`passwordPolicy.js`) with minimum length increased to 15 characters and complexity rules.
+- Per-organization SMTP configuration via `organization_settings` table; falls back to env vars → platform settings.
+
+### Changed
+- Email lookups use `email_hash` column (HMAC-SHA-384) for O(1) lookup with lazy backfill on login.
+- All email reads call `decrypt()`, all writes call `encrypt()` + `hashForLookup()`.
+- Notification email sending now passes `orgId` through for per-org SMTP resolution.
+- Frontend register page updated to enforce 15-character minimum password.
+
+### Security
+- CNSA Suite 1.0 compliance: encryption key-length check derives from actual key material.
+- Register and accept-invite endpoints check both HMAC-hashed and unmigrated plain-text email rows to prevent duplicate accounts.
 
 ---
 

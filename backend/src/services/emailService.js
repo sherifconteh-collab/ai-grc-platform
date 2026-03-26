@@ -1,33 +1,118 @@
 // @tier: community
 'use strict';
 
+const nodemailer = require('nodemailer');
+
 /**
  * Email notification service — wraps nodemailer.
- * Config priority:
- *   1. Environment variables (SMTP_HOST etc.) — fastest, no DB query
- *   2. Platform settings table (smtp_host etc.) — configured via Platform Admin UI
- * Gracefully disabled if neither source is configured.
+ * Config priority per send call:
+ *   1. Per-org organization_settings (smtp_host etc.) — when orgId is provided
+ *   2. Environment variables (SMTP_HOST etc.) — fastest, no DB query
+ *   3. Platform settings table (smtp_host etc.) — backward compat for existing deployments
+ * Gracefully disabled if none of the sources are configured.
  */
 
-let transporter = null;
-let smtpCacheValid = true; // set to false by invalidateSmtpCache() to force DB re-read
+// Global transporter cache (env vars / platform settings — no org context)
+let _globalTransporter = null;
+let _globalSmtpCacheValid = true;
+
+// Per-org transporter cache: Map<orgId, { transporter, valid }>
+const _orgTransporterCache = new Map();
+
+// Per-org from-email cache: Map<orgId, { fromEmail }>
+const _orgFromEmailCache = new Map();
 
 function invalidateSmtpCache() {
-  transporter = null;
-  smtpCacheValid = false;
+  _globalTransporter = null;
+  _globalSmtpCacheValid = false;
 }
 
-async function getTransporterAsync() {
-  // Return cached transporter if still valid
-  if (transporter && smtpCacheValid) return transporter;
+function invalidateSmtpCacheForOrg(orgId) {
+  if (orgId) {
+    _orgTransporterCache.delete(orgId);
+    _orgFromEmailCache.delete(orgId);
+  } else {
+    invalidateSmtpCache();
+  }
+}
 
-  // 1. Prefer environment variables (zero DB cost)
+/**
+ * Build a nodemailer transporter from a config object.
+ */
+function _createTransporter({ host, port, user, pass }) {
+  return nodemailer.createTransport({
+    host,
+    port: parseInt(port) || 587,
+    secure: parseInt(port) === 465,
+    auth: user ? { user, pass: pass || '' } : undefined
+  });
+}
+
+/**
+ * Get a transporter configured for a specific org.
+ * Reads from organization_settings first, then falls back to global config.
+ */
+async function _getTransporterForOrg(orgId) {
+  const cached = _orgTransporterCache.get(orgId);
+  if (cached && cached.valid) return cached.transporter;
+
+  let transporter = null;
+  let foundOrgConfig = false;
+
+  try {
+    const pool = require('../config/database');
+    const { decrypt } = require('../utils/encrypt');
+    const result = await pool.query(
+      `SELECT setting_key, setting_value, is_encrypted
+       FROM organization_settings
+       WHERE organization_id = $1 AND setting_key = ANY(ARRAY['smtp_host','smtp_port','smtp_user','smtp_pass'])`,
+      [orgId]
+    );
+    const dbSettings = {};
+    for (const row of result.rows) {
+      dbSettings[row.setting_key] = row.is_encrypted ? decrypt(row.setting_value) : row.setting_value;
+    }
+    if (dbSettings.smtp_host) {
+      transporter = _createTransporter({
+        host: dbSettings.smtp_host,
+        port: dbSettings.smtp_port,
+        user: dbSettings.smtp_user,
+        pass: dbSettings.smtp_pass
+      });
+      foundOrgConfig = true;
+    }
+  } catch (err) {
+    // DB not available — fall through to global config
+    console.warn('Org SMTP config lookup failed:', err.message);
+  }
+
+  if (!foundOrgConfig) {
+    // Org has no SMTP config — fall back to global (env vars / platform settings)
+    transporter = await _getGlobalTransporter();
+  }
+
+  // Only cache when the org has its own SMTP config. When falling back to
+  // the global transporter we intentionally skip caching so that a later
+  // global SMTP configuration change is picked up without requiring an
+  // explicit per-org cache invalidation.
+  if (foundOrgConfig) {
+    _orgTransporterCache.set(orgId, { transporter, valid: true });
+  }
+  return transporter;
+}
+
+/**
+ * Get the global (non-org-specific) transporter.
+ * Priority: env vars → platform_settings table.
+ */
+async function _getGlobalTransporter() {
+  if (_globalTransporter && _globalSmtpCacheValid) return _globalTransporter;
+
   let host = process.env.SMTP_HOST;
   let port = process.env.SMTP_PORT;
   let user = process.env.SMTP_USER;
   let pass = process.env.SMTP_PASS;
 
-  // 2. Fall back to platform_settings table
   if (!host) {
     try {
       const pool = require('../config/database');
@@ -46,29 +131,62 @@ async function getTransporterAsync() {
       port = dbSettings.smtp_port;
       user = dbSettings.smtp_user;
       pass = dbSettings.smtp_pass;
-    } catch {
+    } catch (err) {
       // DB not available — stay null
+      console.warn('Global SMTP config lookup failed:', err.message);
     }
   }
 
   if (!host) {
-    transporter = null;
-    smtpCacheValid = true; // mark cache as valid (we checked, nothing is configured)
+    _globalTransporter = null;
+    _globalSmtpCacheValid = true;
     return null;
   }
 
-  const nodemailer = require('nodemailer');
-  transporter = nodemailer.createTransport({
-    host,
-    port: parseInt(port) || 587,
-    secure: parseInt(port) === 465,
-    auth: user ? { user, pass: pass || '' } : undefined
-  });
-  smtpCacheValid = true;
-  return transporter;
+  _globalTransporter = _createTransporter({ host, port, user, pass });
+  _globalSmtpCacheValid = true;
+  return _globalTransporter;
 }
 
-async function getFromEmail() {
+// Keep backward-compat alias used by platformAdmin.js invalidation
+function getTransporterAsync() {
+  return _getGlobalTransporter();
+}
+
+async function _getFromEmailForOrg(orgId) {
+  if (!orgId) {
+    return _getFromEmail();
+  }
+
+  const cached = _orgFromEmailCache.get(orgId);
+  if (cached) {
+    return cached.fromEmail;
+  }
+
+  let fromEmail = null;
+  try {
+    const pool = require('../config/database');
+    const result = await pool.query(
+      `SELECT setting_value FROM organization_settings
+       WHERE organization_id = $1 AND setting_key = 'smtp_from_email' LIMIT 1`,
+      [orgId]
+    );
+    if (result.rows.length > 0 && result.rows[0].setting_value) {
+      fromEmail = result.rows[0].setting_value;
+    }
+  } catch (err) {
+    console.warn('Org from-email lookup failed:', err.message);
+  }
+
+  if (!fromEmail) {
+    fromEmail = await _getFromEmail();
+  }
+
+  _orgFromEmailCache.set(orgId, { fromEmail });
+  return fromEmail;
+}
+
+async function _getFromEmail() {
   if (process.env.FROM_EMAIL) return process.env.FROM_EMAIL;
   try {
     const pool = require('../config/database');
@@ -78,8 +196,15 @@ async function getFromEmail() {
     if (result.rows.length > 0 && result.rows[0].setting_value) {
       return result.rows[0].setting_value;
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('Platform from-email lookup failed:', err.message);
+  }
   return process.env.DEFAULT_FROM_EMAIL || 'ControlWeave <noreply@example.com>';
+}
+
+// Keep old name as alias for callers that don't have an org context
+async function getFromEmail() {
+  return _getFromEmail();
 }
 
 /**
@@ -112,12 +237,13 @@ function safeLinkUrl(url) {
  * Send a notification email to a user.
  * @param {{ email: string, full_name?: string }} user
  * @param {{ title: string, message: string, link?: string|null }} notification
+ * @param {string|null} [orgId] - optional org ID for per-org SMTP lookup
  */
-async function sendNotificationEmail(user, notification) {
-  const transport = await getTransporterAsync();
+async function sendNotificationEmail(user, notification, orgId = null) {
+  const transport = orgId ? await _getTransporterForOrg(orgId) : await _getGlobalTransporter();
   if (!transport) return; // SMTP not configured — silent no-op
 
-  const fromEmail = await getFromEmail();
+  const fromEmail = orgId ? await _getFromEmailForOrg(orgId) : await _getFromEmail();
   const name = escapeHtml(user.full_name || user.email);
   const safeTitle = escapeHtml(notification.title);
   const safeMessage = escapeHtml(notification.message);
@@ -147,11 +273,11 @@ async function sendNotificationEmail(user, notification) {
   });
 }
 
-async function sendPasswordResetEmail({ email, fullName, resetLink }) {
-  const transport = await getTransporterAsync();
+async function sendPasswordResetEmail({ email, fullName, resetLink, orgId = null }) {
+  const transport = orgId ? await _getTransporterForOrg(orgId) : await _getGlobalTransporter();
   if (!transport) return;
 
-  const fromEmail = await getFromEmail();
+  const fromEmail = orgId ? await _getFromEmailForOrg(orgId) : await _getFromEmail();
   const name = escapeHtml(fullName || email);
   const safeResetLink = escapeHtml(safeLinkUrl(resetLink));
   const html = `
@@ -346,5 +472,6 @@ module.exports = {
   sendSalesFollowUpEmail,
   buildDemoAccountDeliveryTemplate,
   buildSalesFollowUpTemplate,
-  invalidateSmtpCache
+  invalidateSmtpCache,
+  invalidateSmtpCacheForOrg
 };

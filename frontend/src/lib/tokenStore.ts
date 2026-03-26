@@ -10,10 +10,9 @@
  * JavaScript context can still access this store or intercept requests, so
  * this is a hardening measure, not a complete defense against XSS.
  *
- * Trade-off: the token is lost on hard page refresh and must be rehydrated
- * via the refresh token (which remains in localStorage for session
- * persistence) by higher-level auth logic (for example, an AuthContext) on
- * mount.
+ * Trade-off: the token is lost on hard page refresh and must be rehydrated.
+ * The AuthContext reads the access token back from localStorage on mount
+ * and calls setAccessToken() to repopulate this store.
  */
 
 let _accessToken: string | null = null;

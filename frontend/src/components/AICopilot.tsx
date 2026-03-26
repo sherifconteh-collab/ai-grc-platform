@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/lib/apiBase';
+import { getAccessToken } from '@/lib/tokenStore';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -109,10 +110,16 @@ export default function AICopilot() {
         { role: 'user', content: userContent }
       ];
 
+      const token = getAccessToken();
+      if (!token) {
+        setError('Session expired — please log in again.');
+        return;
+      }
+
       const res = await axios.post(
         AI_CHAT_URL,
         { messages: sendPayload },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       const assistantMsg: Message = {

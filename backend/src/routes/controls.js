@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { decrypt } = require('../utils/encrypt');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { enqueueWebhookEvent } = require('../services/webhookService');
@@ -37,7 +38,8 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
       return res.status(404).json({ success: false, error: 'Control not found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    const row = result.rows[0];
+    res.json({ success: true, data: { ...row, assigned_to_email: decrypt(row.assigned_to_email) } });
   } catch (error) {
     console.error('Get control error:', error);
     res.status(500).json({ success: false, error: 'Failed to load control' });

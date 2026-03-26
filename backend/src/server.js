@@ -138,6 +138,27 @@ app.use('/api/v1', apiRateLimiter);
 // Validate edition at startup
 validateEdition();
 
+// Audit encryption strength at startup — verifies CNSA Suite 1.0 compliance
+// (CNSA Suite policy: Transition to Stronger Public Key Algorithms).
+// Logs posture to structured log; fails hard if production keys are absent.
+(function auditEncryptionAtStartup() {
+  const { auditEncryptionStrength } = require('./utils/encrypt');
+  const report = auditEncryptionStrength();
+  const level = report.compliant ? 'info' : 'warn';
+  log(level, 'server.startup.encryption_audit', {
+    compliant: report.compliant,
+    cnsa_suite: report.cnsa_suite,
+    summary: report.summary,
+    checks: report.checks
+  });
+  if (!report.compliant) {
+    const failures = report.checks.filter((c) => c.status === 'fail').map((c) => c.detail).join('; ');
+    if (SECURITY_CONFIG.isProduction) {
+      throw new Error(`Encryption audit failed — production cannot start with compliance failures: ${failures}`);
+    }
+  }
+})();
+
 // Validate required environment variables at startup.
 // Failing early with a clear message is far better than silently misbehaving
 // in production (addresses "no environment variable validation at startup").
@@ -732,6 +753,16 @@ ensureLicenseFromDb()
       ensureAssessmentProcedures().catch((err) =>
         log('error', 'assessment.procedures.startup_error', { error: err.message })
       );
+
+      // Verify COMPLIANCE_MONITORING_CATEGORIES in aiMonitoring.js matches the DB
+      // CHECK constraint — warns on drift so migration/constant stay in sync.
+      // The guard checks both safeRequire (may return null) and the export existing
+      // (defensive for older module versions that predate this function).
+      if (aiMonitoringRoutes && aiMonitoringRoutes.validateCategorySync) {
+        aiMonitoringRoutes.validateCategorySync().catch((err) =>
+          log('warn', 'ai_monitoring.category_sync_error', { error: err.message })
+        );
+      }
     });
 
     // Graceful shutdown

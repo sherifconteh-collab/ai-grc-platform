@@ -126,13 +126,21 @@ export default function SecurityPosturePage() {
         )}
 
         {/* Cross-feature linkage */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <Link href="/dashboard/ai-analysis"
             className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors text-xs">
             <span>✨</span>
             <div>
               <div className="font-medium text-purple-800">AI Analysis Hub</div>
               <div className="text-purple-600">Gap analysis & risk heatmap</div>
+            </div>
+          </Link>
+          <Link href="/dashboard/ai-monitoring"
+            className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors text-xs">
+            <span>📊</span>
+            <div>
+              <div className="font-medium text-slate-800">AI Monitoring</div>
+              <div className="text-slate-600">Compliance-layer rules & events</div>
             </div>
           </Link>
           <Link href="/dashboard/threat-intel"

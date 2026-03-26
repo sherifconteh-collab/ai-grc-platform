@@ -1,17 +1,21 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission, requireAnyPermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
 
-router.use(authenticate);
+const rolesRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { success: false, error: 'Too many requests, please try again later' },
+});
+router.use(rolesRateLimiter);
 
-function normalizePermissionNames(permissions) {
-  if (!Array.isArray(permissions)) return [];
-  return [...new Set(permissions.map((perm) => String(perm || '').trim()).filter(Boolean))];
-}
+router.use(authenticate);
 
 // GET /roles
 router.get('/', requirePermission('roles.manage'), async (req, res) => {
@@ -62,13 +66,15 @@ router.post('/', requirePermission('roles.manage'), validateBody((body) => {
       const role = roleResult.rows[0];
 
       if (permissions && permissions.length > 0) {
-        const uniquePerms = normalizePermissionNames(permissions);
-        await client.query(
-          `INSERT INTO role_permissions (role_id, permission_id)
-           SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
-           ON CONFLICT DO NOTHING`,
-          [role.id, uniquePerms]
-        );
+        const uniquePerms = [...new Set(permissions.map((p) => String(p || '').trim()).filter(Boolean))];
+        if (uniquePerms.length > 0) {
+          await client.query(
+            `INSERT INTO role_permissions (role_id, permission_id)
+             SELECT $1, p.id FROM permissions p WHERE p.name = ANY($2::text[])
+             ON CONFLICT DO NOTHING`,
+            [role.id, uniquePerms]
+          );
+        }
       }
 
       await client.query('COMMIT');
@@ -112,7 +118,7 @@ router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) =>
 
       if (permissions) {
         await client.query('DELETE FROM role_permissions WHERE role_id = $1', [req.params.roleId]);
-        const uniquePerms = normalizePermissionNames(permissions);
+        const uniquePerms = [...new Set(permissions.map((p) => String(p || '').trim()).filter(Boolean))];
         if (uniquePerms.length > 0) {
           await client.query(
             `INSERT INTO role_permissions (role_id, permission_id)

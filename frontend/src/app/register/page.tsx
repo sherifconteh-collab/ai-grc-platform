@@ -254,8 +254,8 @@ function RegisterPageInner() {
       return;
     }
 
-    if (password.length < 12) {
-      setError('Password must be at least 12 characters');
+    if (password.length < 15) {
+      setError('Password must be at least 15 characters');
       return;
     }
 
@@ -759,7 +759,7 @@ function RegisterPageInner() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="At least 12 characters"
+                placeholder="At least 15 characters"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Must include uppercase, lowercase, number, and special character

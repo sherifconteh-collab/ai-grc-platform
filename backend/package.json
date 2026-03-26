@@ -1,6 +1,6 @@
 {
   "name": "controlweave-backend",
-  "version": "2.4.4",
+  "version": "2.7.2",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
@@ -41,6 +41,7 @@
     "seed:cmdb-demo": "node scripts/seed-cmdb-data.js",
     "seed:demo:cmdb-tiered": "node scripts/seed-demo-tier-cmdb.js",
     "seed:enterprise-demo": "node scripts/seed-enterprise-demo.js",
+    "seed:self-assessment": "node scripts/seed-controlweave-self-assessment.js",
     "seed:community-test-data": "node scripts/seed-community-test-data.js",
     "seed:pro-test-data": "node scripts/seed-pro-test-data.js",
     "seed:govcloud-test-data": "node scripts/seed-govcloud-test-data.js",
