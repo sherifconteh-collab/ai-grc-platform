@@ -14,8 +14,21 @@ const {
 } = require('../utils/passwordPolicy');
 const { encrypt, decrypt, hashForLookup } = require('../utils/encrypt');
 const { hasPublicColumn } = require('../utils/schema');
+const rateLimit = require('express-rate-limit');
 
 router.use(authenticate);
+
+// Explicit express-rate-limit instance so that static-analysis tools (CodeQL)
+// recognise the rate-limiting middleware.
+const usersRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
+router.use(usersRateLimiter);
 const ALLOWED_PRIMARY_ROLES = new Set(['admin', 'auditor', 'user']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

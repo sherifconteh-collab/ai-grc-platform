@@ -38,13 +38,28 @@ const {
   generateCommunityKey,
   setLocalPublicKey
 } = require('../services/licenseService');
-const { createRateLimiter } = require('../middleware/rateLimit');
 const rateLimit = require('express-rate-limit');
 
-const licenseRateLimiter = createRateLimiter({ label: 'license', windowMs: 60 * 1000, max: 10 });
+// Explicit express-rate-limit instance so that static-analysis tools (CodeQL)
+// recognise the rate-limiting middleware applied via router.use().
+const licenseRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
 // RSA key generation is CPU-intensive — apply a tighter limiter to the
 // generate-community endpoint: 3 generations per hour per IP.
-const licenseGenerateLimiter = createRateLimiter({ label: 'license-generate', windowMs: 60 * 60 * 1000, max: 3 });
+const licenseGenerateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
 
 // Explicit express-rate-limit instance for the update-check route so that
 // static-analysis tools (CodeQL) recognise the rate-limiting middleware.

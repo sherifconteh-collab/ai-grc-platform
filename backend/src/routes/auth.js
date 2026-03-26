@@ -8,6 +8,7 @@ const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
 let getTrialSeedData = () => ({
   tier: 'community',
@@ -88,6 +89,42 @@ const switchOrgLimiter = createRateLimiter({
   label: 'auth-switch-organization',
   keyGenerator: (req) => req.user?.id || req.ip
 });
+
+// Explicit express-rate-limit instances so that static-analysis tools (CodeQL)
+// recognise the rate-limiting middleware on unauthenticated auth endpoints.
+const authRegisterLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
+const authLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
+const authRefreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
+const authGeneralLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
+
 const VALID_INFORMATION_TYPES = new Set([
   'pii',
   'phi',
@@ -467,7 +504,7 @@ async function resolveFrameworkIdsByCode(client, frameworkCodes) {
 }
 
 // POST /auth/register
-router.post('/register', validateBody((body) => requireFields(body, ['email', 'password', 'full_name'])), async (req, res) => {
+router.post('/register', authRegisterLimiter, validateBody((body) => requireFields(body, ['email', 'password', 'full_name'])), async (req, res) => {
   try {
     const {
       email,
@@ -753,7 +790,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
 });
 
 // POST /auth/login
-router.post('/login', validateBody((body) => requireFields(body, ['email', 'password'])), async (req, res) => {
+router.post('/login', authLoginLimiter, validateBody((body) => requireFields(body, ['email', 'password'])), async (req, res) => {
   try {
     const { email, password } = req.body;
     const normalizedEmail = sanitizeInput(String(email || '').trim().toLowerCase());
@@ -1078,7 +1115,7 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
 });
 
 // POST /auth/refresh
-router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToken'])), async (req, res) => {
+router.post('/refresh', authRefreshLimiter, validateBody((body) => requireFields(body, ['refreshToken'])), async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
@@ -1130,7 +1167,7 @@ router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToke
 });
 
 // POST /auth/logout
-router.post('/logout', authenticate, async (req, res) => {
+router.post('/logout', authGeneralLimiter, authenticate, async (req, res) => {
   try {
     // Demo accounts are shared — only delete the caller's session, not all sessions
     if (isDemoEmail(req.user.email)) {
@@ -1157,7 +1194,7 @@ router.post('/logout', authenticate, async (req, res) => {
 });
 
 // GET /auth/me
-router.get('/me', authenticate, async (req, res) => {
+router.get('/me', authGeneralLimiter, authenticate, async (req, res) => {
   try {
     await expireOrganizationTrialIfNeeded({
       organizationId: req.user.organization_id,
@@ -1227,7 +1264,7 @@ router.get('/me', authenticate, async (req, res) => {
 
 // ---------- GET /auth/invite/:token ----------
 // Validate invite token and return pre-configured details (no auth required)
-router.get('/invite/:token', async (req, res) => {
+router.get('/invite/:token', authGeneralLimiter, async (req, res) => {
   try {
     const { token } = req.params;
     const result = await pool.query(`
@@ -1283,7 +1320,7 @@ router.get('/invite/:token', async (req, res) => {
 
 // ---------- POST /auth/accept-invite ----------
 // Invited user completes signup with minimal info (name + password)
-router.post('/accept-invite', validateBody((body) => {
+router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
   const errors = [];
   if (!body.token || typeof body.token !== 'string') errors.push('token is required');
   if (!body.full_name || typeof body.full_name !== 'string' || body.full_name.trim().length < 2) {
