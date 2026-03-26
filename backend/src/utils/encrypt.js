@@ -55,7 +55,7 @@ function getHmacKey() {
     return _cachedHmacKey;
   }
   const buf = Buffer.from(raw, 'hex');
-  if (buf.length < 48) {
+  if (buf.length !== 48) {
     throw new Error('HMAC_KEY must be a 96-character hex string (48 bytes) for CNSA Suite 1.0 compliance');
   }
   _cachedHmacKey = buf;

@@ -90,8 +90,21 @@ const switchOrgLimiter = createRateLimiter({
   keyGenerator: (req) => req.user?.id || req.ip
 });
 
-// Explicit express-rate-limit instances so that static-analysis tools (CodeQL)
-// recognise the rate-limiting middleware on unauthenticated auth endpoints.
+// Broad rate limiter applied via router.use() so that CodeQL can statically
+// verify that every route in this file is rate-limited.  Per-route limiters
+// below impose stricter limits on sensitive endpoints.
+const authBroadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
+router.use(authBroadLimiter);
+
+// Explicit express-rate-limit instances for stricter per-endpoint limits on
+// sensitive auth routes.
 const authRegisterLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
