@@ -1642,6 +1642,7 @@ export const aiMonitoringAPI = {
   getBaseline: (aiAgentId: string) => api.get(`/ai/monitoring/baselines/${aiAgentId}`),
   calculateBaseline: (aiAgentId: string) => api.post(`/ai/monitoring/baselines/${aiAgentId}/calculate`),
   enableContinuousMonitoring: (aibomId: string) => api.post(`/ai/monitoring/aiboms/${aibomId}/enable`),
+  getCoverage: () => api.get('/ai/monitoring/coverage'),
 };
 
 // RAG Knowledge Base API (Professional tier)
@@ -1680,6 +1681,15 @@ export const plot4aiAPI = {
   getCategories: () => api.get('/plot4ai/categories'),
   getFilters: () => api.get('/plot4ai/filters'),
   getStats: () => api.get('/plot4ai/stats'),
+};
+
+// State AI Laws API — Colorado, Illinois, NYC, and other state AI regulations
+export const stateAiLawsAPI = {
+  getJurisdictions: () => api.get('/state-ai-laws/jurisdictions'),
+  getControls: (params?: { jurisdiction?: string; control_type?: string; priority?: string; search?: string }) =>
+    api.get('/state-ai-laws/controls', { params }),
+  getControl: (controlId: string) => api.get(`/state-ai-laws/controls/${controlId}`),
+  getSummary: () => api.get('/state-ai-laws/summary'),
 };
 
 export default api;

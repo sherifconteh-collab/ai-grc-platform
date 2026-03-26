@@ -753,6 +753,16 @@ ensureLicenseFromDb()
       ensureAssessmentProcedures().catch((err) =>
         log('error', 'assessment.procedures.startup_error', { error: err.message })
       );
+
+      // Verify COMPLIANCE_MONITORING_CATEGORIES in aiMonitoring.js matches the DB
+      // CHECK constraint — warns on drift so migration/constant stay in sync.
+      // The guard checks both safeRequire (may return null) and the export existing
+      // (defensive for older module versions that predate this function).
+      if (aiMonitoringRoutes && aiMonitoringRoutes.validateCategorySync) {
+        aiMonitoringRoutes.validateCategorySync().catch((err) =>
+          log('warn', 'ai_monitoring.category_sync_error', { error: err.message })
+        );
+      }
     });
 
     // Graceful shutdown
