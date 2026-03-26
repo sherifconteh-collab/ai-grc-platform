@@ -9,6 +9,14 @@
 
 ---
 
+## [Unreleased]
+
+> Changes staged but not yet released to production.
+
+### Changed
+
+- fix: add explicit express-rate-limit instances and fix dependency vulnerabilities for security checks ([#97](https://github.com/sherifconteh-collab/ai-grc-platform/pull/97)) — @Copilot
+
 ## [2.7.2] — 2026-03-26
 
 > **Released:** 2026-03-26
