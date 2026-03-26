@@ -392,7 +392,7 @@ async function getUserByEmail(email) {
     } else {
       // Fallback: plain-text email for rows not yet migrated (email_hash IS NULL)
       const plainResult = await pool.query(
-        `SELECT ${selectCols} ${joins} WHERE u.email = $1 AND u.email_hash IS NULL`,
+        `SELECT ${selectCols} ${joins} WHERE LOWER(u.email) = $1 AND u.email_hash IS NULL`,
         [email]
       );
       if (plainResult.rows.length > 0) {
@@ -413,9 +413,9 @@ async function getUserByEmail(email) {
       user.email = decrypt(user.email);
     }
   } else {
-    // Migration 098 not yet applied — plain-text lookup
+    // Migration 101 not yet applied — plain-text lookup
     const result = await pool.query(
-      `SELECT ${selectCols} ${joins} WHERE u.email = $1`,
+      `SELECT ${selectCols} ${joins} WHERE LOWER(u.email) = $1`,
       [email]
     );
     user = result.rows[0] || null;
@@ -540,7 +540,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
         return res.status(409).json({ success: false, error: 'Email already registered' });
       }
     } else {
-      const existing = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
+      const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [normalizedEmail]);
       if (existing.rows.length > 0) {
         return res.status(409).json({ success: false, error: 'Email already registered' });
       }
@@ -966,12 +966,12 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     const fpEmailHash = authEmailHashColumnAvailable !== false ? hashForLookup(email) : null;
     const fpQuery = fpEmailHash
       ? `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE email_hash = $1 LIMIT 1`
-      : `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE email = $1 LIMIT 1`;
+      : `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE LOWER(email) = $1 LIMIT 1`;
     let userResult = await pool.query(fpQuery, [fpEmailHash ?? email]);
     // Fallback for rows not yet migrated (email_hash IS NULL)
     if (userResult.rows.length === 0 && fpEmailHash) {
       userResult = await pool.query(
-        `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE email = $1 AND email_hash IS NULL LIMIT 1`,
+        `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL LIMIT 1`,
         [email]
       );
     }

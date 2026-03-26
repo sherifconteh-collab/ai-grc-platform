@@ -144,10 +144,10 @@ router.post('/', requirePermission('users.manage'), validateBody((body) => {
       existing = await pool.query('SELECT id FROM users WHERE email_hash = $1', [emailHash]);
       if (existing.rows.length === 0) {
         // Fallback: plain-text match for rows not yet migrated
-        existing = await pool.query('SELECT id FROM users WHERE email = $1 AND email_hash IS NULL', [email]);
+        existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL', [email]);
       }
     } else {
-      existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+      existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
     }
     if (existing.rows.length > 0) {
       return res.status(409).json({ success: false, error: 'Email already registered' });
