@@ -1167,7 +1167,7 @@ router.post('/refresh', authRefreshLimiter, validateBody((body) => requireFields
 });
 
 // POST /auth/logout
-router.post('/logout', authGeneralLimiter, authenticate, async (req, res) => {
+router.post('/logout', authenticate, authGeneralLimiter, async (req, res) => {
   try {
     // Demo accounts are shared — only delete the caller's session, not all sessions
     if (isDemoEmail(req.user.email)) {
@@ -1194,7 +1194,7 @@ router.post('/logout', authGeneralLimiter, authenticate, async (req, res) => {
 });
 
 // GET /auth/me
-router.get('/me', authGeneralLimiter, authenticate, async (req, res) => {
+router.get('/me', authenticate, authGeneralLimiter, async (req, res) => {
   try {
     await expireOrganizationTrialIfNeeded({
       organizationId: req.user.organization_id,
