@@ -359,7 +359,7 @@ Full RMF lifecycle management without leaving the platform:
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
 | Frameworks | 30+ | 10–15 | 10–20 | 20+ |
 | Auto-Crosswalk | ✅ | ❌ | ❌ | ❌ |
-| Built-in AI Copilot | ✅ (BYOK, community) | ❌ | ❌ | ❌ |
+| Built-in AI Copilot | ✅ BYOK | ❌ | ❌ | ❌ |
 | AI Governance (NIST AI RMF) | ✅ | ❌ | ❌ | ❌ |
 | RMF Lifecycle | ✅ | ❌ | ❌ | ❌ |
 | Passkey / WebAuthn | ✅ | ❌ | ❌ | ❌ |
