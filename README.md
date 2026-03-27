@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-26 | PR #97: fix: add explicit express-rate-limit instances and fix dependency vulnerabilities for security checks -->
+<!-- LAST_UPDATED: 2026-03-27 | README accuracy update: highlight new community tier features -->
 
 ## 🎯 What is This?
 
@@ -69,20 +69,25 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 
 The platform is **fully functional** with a growing feature set. Phase 1 is complete and Phase 2 features are landing:
 
-- 🔐 User authentication (JWT-based with OAuth 2.0, refresh tokens, TOTP 2FA)
-- 📊 Compliance dashboard with real-time metrics
+- 🔐 User authentication (JWT-based with OAuth 2.0, refresh tokens, TOTP 2FA, WebAuthn/passkey)
+- 📊 Compliance dashboard with real-time metrics and dashboard builder
 - 🎯 Framework selection (30+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks)
 - 📜 AU-2 compliant immutable audit logging
-- 🤖 **AI Copilot** — org-aware conversational assistant with 25+ analysis features (gap analysis, compliance forecast, policy generation, remediation playbooks)
+- 🤖 **AI Copilot** — org-aware conversational assistant with 25+ analysis features (gap analysis, compliance forecast, policy generation, remediation playbooks) *(community tier)*
 - 🔄 **RMF Lifecycle** — full NIST SP 800-37 Rev 2 seven-step workflow (Prepare → Categorize → Select → Implement → Assess → Authorize → Monitor)
 - 🛡️ RBAC with Admin, ISSE, Auditor, and Read-Only roles
 - 📎 Evidence management with versioning and PII classification
 - 🏗️ Auditor workspace and assessment workflows
-- 🔒 Enterprise security (Helmet, CORS, rate limiting, bcrypt, field-level encryption)
-- 📡 Webhook and notification system
+- 🔒 Enterprise security (Helmet, CORS, rate limiting, bcrypt, AES-256-GCM field-level PII encryption)
+- 📡 Webhook and notification system (in-app bell icon + email)
 - 📄 Policy management with gap analysis
+- 📰 **Regulatory news feed** — live regulatory updates *(community tier)*
+- 🛡️ **AI Threat Library (PLOT4ai)** — 100+ AI threats with category filtering *(community tier)*
+- 📚 **NIST publication browser** — searchable publication library with control mappings
+- 🏛️ **State AI laws tracker** — jurisdiction-level AI regulation tracking
+- 🔧 **Per-org SMTP** — organization-level email delivery configuration
 
 ## 🚀 Quick Start (Development)
 
@@ -152,8 +157,12 @@ npm run dev                  # starts Next.js on port 3000
 - **MAESTRO** — 16 attack-class controls for AI security
 - **FISCAM** — Federal Information System Controls Audit Manual
 - **FFIEC** — Federal Financial Institutions Examination Council
+- **AIUC-1** — Agentic AI Certification (31 controls across 6 risk domains) with NIST AI RMF, EU AI Act, and ISO 42001 crosswalks
+- **NIST SP 800-207** — Zero Trust Architecture implementation guide
 
 ### Tier 3 — AI & International Standards
+- **ISO/IEC 42001** — AI Management System
+- **ISO/IEC 42005** — AI System Impact Assessment
 - **ISO/IEC 23894** — AI Risk Management
 - **ISO/IEC 38507** — Governance of AI
 - **ISO/IEC 22989** — AI Concepts and Terminology
@@ -177,7 +186,7 @@ npm run dev                  # starts Next.js on port 3000
 
 ### 🤖 AI Platform (BYOK — Bring Your Own Key)
 
-The platform ships with a **built-in AI layer** that any user can activate with their own API key. Self-hosted deployments have no usage limits.
+The platform ships with a **built-in AI layer** that any user can activate with their own API key. Self-hosted deployments have no usage limits. **AI Analysis, Regulatory News, and the AI Threat Library (PLOT4ai) are all available in the community tier.**
 
 - **AI Copilot** — org-aware conversational assistant with 25+ analysis capabilities:
   - Gap analysis comparing current implementation against target baselines
@@ -185,7 +194,10 @@ The platform ships with a **built-in AI layer** that any user can activate with 
   - Policy generation from control requirements
   - Remediation playbook creation
   - Crosswalk optimization suggestions
+  - Audit readiness assessment
+  - Training recommendations
 - **Supported providers**: Anthropic (Claude), OpenAI, Google Gemini, Grok, Groq, Ollama (local)
+- **Quantized GGUF model support** for Ollama — configurable quantization levels for smaller memory footprints and faster local AI inference
 - **Per-framework LLM guardrails** for BYOK configurations
 - **AI Governance module** — dashboard for managing AI risk across your organization
 
@@ -241,11 +253,14 @@ Full RMF lifecycle management without leaving the platform:
 - RBAC with Admin, ISSE, Auditor, and Read-Only roles
 - JWT + OAuth 2.0 authentication with refresh tokens
 - TOTP two-factor authentication
-- Field-level encryption for PII
+- WebAuthn/passkey passwordless authentication
+- AES-256-GCM field-level encryption for PII with HMAC-SHA-384 searchable index
+- 15-character minimum password policy with complexity rules
 - Rate limiting on all public API endpoints
 - Separation of duties enforcement
+- Per-organization SMTP configuration (org settings → env vars → platform settings)
 - Webhook integrations for external systems
-- Notification system (in-app and email)
+- Notification system (in-app bell with unread tracking + email delivery)
 
 ### 📄 Policy Management
 - Policy creation and lifecycle tracking
@@ -253,12 +268,34 @@ Full RMF lifecycle management without leaving the platform:
 - Smart remediation suggestions
 - Exception management workflows
 
+### 📰 Regulatory News & AI Threat Library *(community tier)*
+- Live regulatory news feed with source filtering and read/archive tracking
+- **PLOT4ai AI Threat Library** — browse 100+ AI threats by category, AI type, role, and development phase
+- **State AI laws tracker** — 47 controls covering 12+ US state AI law jurisdictions
+
+### 📚 NIST Publication Browser
+- Searchable NIST publication library with full text
+- Publication-to-control mappings linking publications to framework controls
+- Integrated within the Frameworks section for quick reference
+
+### 🔔 Notification System
+- In-app notification center with bell icon and unread count tracking
+- Notification types: control due, assessment needed, status change, crosswalk, system
+- Mark read / mark all read functionality
+- Email delivery with per-org SMTP configuration
+- User-configurable preferences for in-app vs. email delivery
+
+### 📊 Dashboard Builder
+- Custom dashboard views with configurable widgets
+- Dynamic layout configuration for personalized reporting
+
 ### 🏗️ Developer & Integration Features
 - Full REST API for all operations ([OpenAPI spec](./docs/openapi.yaml))
-- MCP server for AI agent integration
+- MCP server for AI agent integration (21 tools)
 - Webhook system for event-driven integrations
 - ControlWeave SDK for programmatic access
 - Dynamic configuration system
+- WebSocket real-time updates
 
 ## 🎯 What Makes This Different?
 
@@ -277,16 +314,19 @@ Full RMF lifecycle management without leaving the platform:
    - 90%+ similarity threshold ensures defensible mappings
    - Commercial tools make you implement the same control multiple times
 
-3. **Built-in AI Copilot**
+3. **Built-in AI Copilot** *(community tier)*
    - BYOK model — bring your own Anthropic, OpenAI, Gemini, Grok, Groq, or Ollama key
-   - 25+ org-aware analysis features
+   - 25+ org-aware analysis features including gap analysis, regulatory news, and AI threat library
+   - Quantized GGUF model support for Ollama (smaller memory footprint)
    - No separate AI tool subscription needed
 
 4. **AI Governance Focus**
    - Deep NIST AI RMF integration
    - MAESTRO attack-class controls for AI security
-   - ISO/IEC AI standards coverage (23894, 38507, 22989, 23053, 5259, and more)
+   - ISO/IEC AI standards coverage (42001, 42005, 23894, 38507, 22989, 23053, 5259, and more)
    - EU AI Act Article 17 compliance checklist
+   - AIUC-1 Agentic AI Certification (31 controls)
+   - State AI laws tracking (12+ US jurisdictions)
    - Purpose-built for modern AI systems compliance
 
 5. **RMF Lifecycle Management**
@@ -308,7 +348,6 @@ Full RMF lifecycle management without leaving the platform:
 ### What We're NOT Trying to Be:
 - ❌ Not a continuous monitoring tool (use Wiz, Orca, Lacework for that)
 - ❌ Not a pen testing tool (use Cobalt, Pentest, HackerOne)
-- ❌ Not a vendor risk management tool (use SecurityScorecard, BitSight)
 - ✅ We're a **compliance management and evidence organization platform**
 
 ### Comparison:
@@ -320,12 +359,13 @@ Full RMF lifecycle management without leaving the platform:
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
 | Frameworks | 30+ | 10–15 | 10–20 | 20+ |
 | Auto-Crosswalk | ✅ | ❌ | ❌ | ❌ |
-| Built-in AI Copilot | ✅ (BYOK) | ❌ | ❌ | ❌ |
+| Built-in AI Copilot | ✅ (BYOK, community) | ❌ | ❌ | ❌ |
 | AI Governance (NIST AI RMF) | ✅ | ❌ | ❌ | ❌ |
 | RMF Lifecycle | ✅ | ❌ | ❌ | ❌ |
-| SBOM Integration | ✅ | ❌ | ❌ | ❌ |
+| Passkey / WebAuthn | ✅ | ❌ | ❌ | ❌ |
+| SBOM Integration | ✅ (enterprise) | ❌ | ❌ | ❌ |
 | SSP Auto-Generation | ✅ | ❌ | Paid Add-on | Paid Add-on |
-| CMDB Integration | ✅ | Partial | ❌ | Partial |
+| CMDB Integration | ✅ (enterprise) | Partial | ❌ | Partial |
 | MCP/API-First | ✅ | API Only | Limited API | Limited API |
 
 ## 🤖 MCP (Model Context Protocol) Support
@@ -406,20 +446,22 @@ controlweave/
 ├── backend/
 │   ├── src/
 │   │   ├── routes/          # REST API endpoints (auth, controls, frameworks,
-│   │   │                    #   assessments, audit, AI, policies, webhooks, etc.)
+│   │   │                    #   assessments, audit, AI, policies, webhooks,
+│   │   │                    #   notifications, regulatory news, PLOT4ai, etc.)
 │   │   ├── services/        # Business logic (framework, policy, risk scoring,
-│   │   │                    #   audit, notification, remediation, etc.)
+│   │   │                    #   audit, notification, email, LLM, remediation, etc.)
 │   │   ├── middleware/      # Auth, RBAC, audit logging, rate limiting,
-│   │   │                    #   edition gating, validation
+│   │   │                    #   edition gating, validation, separation of duties
 │   │   ├── config/          # Database and security configuration
-│   │   └── utils/           # Logging, encryption, TOTP, AI security
-│   ├── migrations/          # Database migrations
+│   │   └── utils/           # Logging, encryption, TOTP, AI security, password policy
+│   ├── migrations/          # Database migrations (100+)
 │   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
 │   │   ├── app/             # Next.js pages (dashboard, frameworks, controls,
-│   │   │                    #   assessments, audit, AI analysis, settings, etc.)
-│   │   ├── components/      # Sidebar, DashboardLayout, AICopilot
+│   │   │                    #   assessments, audit, AI analysis, settings,
+│   │   │                    #   notifications, regulatory news, PLOT4ai, etc.)
+│   │   ├── components/      # Sidebar, DashboardLayout, AICopilot, NotificationBell
 │   │   └── lib/             # API client, access control, branding, billing
 │   └── public/              # Static assets, branding, PWA manifest
 ├── controlweave-sdk/        # External AI Logger SDK (@controlweave/external-ai-logger)
@@ -435,7 +477,7 @@ controlweave/
 
 ### Core Tables
 - `organizations` — Multi-tenant support
-- `users` — Authentication and profiles with field-level PII encryption
+- `users` — Authentication and profiles with AES-256-GCM PII encryption and HMAC-SHA-384 email hashing
 - `frameworks` — Framework catalog (30+ frameworks)
 - `framework_controls` — Individual controls/requirements
 - `control_implementations` — Org-specific implementation status
@@ -463,8 +505,11 @@ controlweave/
 
 ### Policy & Operations
 - `policies` — Policy lifecycle management
-- `notifications` — In-app notification system
+- `notifications` — In-app notification system with type-based filtering
+- `notification_preferences` — Per-user delivery preferences (in-app vs. email)
 - `webhooks` — External integration events
+- `llm_configurations` — Per-org LLM API key storage (encrypted) for BYOK providers
+- `integrations_hub_connectors` — Integration hub connector templates and instances
 
 ## 🎯 Use Cases
 
@@ -505,11 +550,12 @@ controlweave/
 - **Backend**: Node.js / Express
 - **Database**: PostgreSQL 14+
 - **Frontend**: Next.js (React) with TypeScript and Tailwind CSS
-- **Authentication**: JWT + OAuth 2.0 with TOTP 2FA
-- **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
+- **Authentication**: JWT + OAuth 2.0 with TOTP 2FA and WebAuthn/passkey
+- **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama) with quantized GGUF for local inference
 - **API**: REST with OpenAPI specification
-- **MCP**: Model Context Protocol server
-- **Deployment**: Desktop (Electron) or self-hosted
+- **MCP**: Model Context Protocol server (21 tools)
+- **Real-time**: WebSocket support via Socket.IO
+- **Deployment**: Desktop (Electron with embedded PostgreSQL) or self-hosted
 
 ## 📖 Documentation
 
@@ -519,6 +565,7 @@ controlweave/
 - [Database Architecture](./docs/DATABASE_ARCHITECTURE.md)
 - [Framework Coverage](./docs/FRAMEWORK_COVERAGE.md)
 - [MCP Setup Guide](./docs/MCP_SETUP.md)
+- [Self-Hosted Install Guide](./docs/SELF_HOSTED_INSTALL.md)
 - [GitHub Repository Guide](./docs/GITHUB_REPOSITORY_GUIDE.md)
 - [OpenAPI Specification](./docs/openapi.yaml)
 - [Quick Start Guide](./QUICKSTART.md)
@@ -551,6 +598,14 @@ controlweave/
 - ✅ Notification and webhook systems
 - ✅ POA&M tracking
 - ✅ Security posture dashboard
+- ✅ AI Analysis, Regulatory News, and AI Threat Library (PLOT4ai) in community tier
+- ✅ NIST publication browser with control mappings
+- ✅ Dashboard builder for custom views
+- ✅ Per-org SMTP email configuration
+- ✅ WebAuthn/passkey authentication
+- ✅ AIUC-1 Agentic AI Certification framework
+- ✅ State AI laws tracking (12+ jurisdictions)
+- ✅ Quantized GGUF model support for Ollama
 - 🔄 SBOM integration for AI model supply chain
 - 🔄 SSP auto-generation (NIST 800-171, FedRAMP)
 - 🔄 CMDB (Configuration Management Database)
@@ -583,7 +638,7 @@ By contributing, you agree to the [Contributor License Agreement](./CLA.md). Sig
 
 ## 💎 Want Premium Features?
 
-This community edition gives you a fully functional GRC platform. If you need enterprise-grade capabilities, visit **[ControlWeave.com](https://controlweave.com)** for premium tiers that include:
+This community edition gives you a fully functional GRC platform with AI Copilot, 25+ analysis features, regulatory news, AI threat library, and more. If you need enterprise-grade capabilities, visit **[ControlWeave.com](https://controlweave.com)** for premium tiers that include:
 
 - 🏢 **CMDB** — Full configuration management database with asset lifecycle tracking
 - 🔍 **Vulnerability Management** — Automated scanning and remediation workflows
@@ -593,6 +648,8 @@ This community edition gives you a fully functional GRC platform. If you need en
 - 📊 **Advanced Reporting** — Custom dashboards, executive reports, and analytics
 - 🏗️ **Multi-tenant Management** — Platform administration across organizations
 - 🎯 **Unlimited Frameworks** — No limits on simultaneously active frameworks
+- 🤖 **AI Monitoring** — Real-time AI model monitoring with anomaly detection
+- 🛡️ **Data Governance** — Retention policies and legal hold management
 
 👉 **[Get started at ControlWeave.com](https://controlweave.com/#pricing)**
 
@@ -624,14 +681,14 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Frameworks**: 30+ supported
 - **Controls**: 1,000+ controls in database
 - **Crosswalks**: 80+ cross-framework mappings
-- **AI Features**: 25+ analysis capabilities
+- **AI Features**: 25+ analysis capabilities (community tier with BYOK)
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **Tables**: 140+ database tables
 - **API Routes**: 60+ route modules
 - **Services**: 19 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
-- **Security**: 14-day trial, all 12 audit findings remediated in v2.2.0
+- **Security**: AES-256-GCM PII encryption, HMAC-SHA-384 email hashing, 15-char password policy
 - **Development Status**: Active — community / self-hosted edition of [ControlWeave.com](https://controlweave.com)
 
 ## 🔗 Links
