@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-27 | README accuracy update: highlight new community tier features -->
+<!-- LAST_UPDATED: 2026-03-27 | PR #101: docs: update README for accuracy and highlight new community tier features + bump nodemailer -->
 
 ## 🎯 What is This?
 
