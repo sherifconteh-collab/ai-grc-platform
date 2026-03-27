@@ -69,7 +69,7 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 
 The platform is **fully functional** with a growing feature set. Phase 1 is complete and Phase 2 features are landing:
 
-- 🔐 User authentication (JWT-based with OAuth 2.0, refresh tokens, TOTP 2FA, WebAuthn/passkey)
+- 🔐 User authentication (JWT-based with OAuth 2.0, refresh tokens, TOTP 2FA; WebAuthn/passkey endpoints are present but currently experimental/stubbed in this community build)
 - 📊 Compliance dashboard with real-time metrics and dashboard builder
 - 🎯 Framework selection (30+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
@@ -86,7 +86,7 @@ The platform is **fully functional** with a growing feature set. Phase 1 is comp
 - 📰 **Regulatory news feed** — live regulatory updates *(community tier)*
 - 🛡️ **AI Threat Library (PLOT4ai)** — 100+ AI threats with category filtering *(community tier)*
 - 📚 **NIST publication browser** — searchable publication library with control mappings
-- 🏛️ **State AI laws tracker** — jurisdiction-level AI regulation tracking
+- 🏛️ **State AI laws tracker** — jurisdiction-level AI regulation tracking *(Enterprise / GovCloud only)*
 - 🔧 **Per-org SMTP** — organization-level email delivery configuration
 
 ## 🚀 Quick Start (Development)
@@ -197,7 +197,7 @@ The platform ships with a **built-in AI layer** that any user can activate with 
   - Audit readiness assessment
   - Training recommendations
 - **Supported providers**: Anthropic (Claude), OpenAI, Google Gemini, Grok, Groq, Ollama (local)
-- **Quantized GGUF model support** for Ollama — configurable quantization levels for smaller memory footprints and faster local AI inference
+- **Local model support via Ollama** — run models locally on your own hardware; model and quantization settings are managed directly in Ollama
 - **Per-framework LLM guardrails** for BYOK configurations
 - **AI Governance module** — dashboard for managing AI risk across your organization
 
@@ -253,7 +253,7 @@ Full RMF lifecycle management without leaving the platform:
 - RBAC with Admin, ISSE, Auditor, and Read-Only roles
 - JWT + OAuth 2.0 authentication with refresh tokens
 - TOTP two-factor authentication
-- WebAuthn/passkey passwordless authentication
+- Planned WebAuthn/passkey passwordless authentication (endpoints currently stubbed; not yet available in Community Edition)
 - AES-256-GCM field-level encryption for PII with HMAC-SHA-384 searchable index
 - 15-character minimum password policy with complexity rules
 - Rate limiting on all public API endpoints
@@ -271,7 +271,7 @@ Full RMF lifecycle management without leaving the platform:
 ### 📰 Regulatory News & AI Threat Library *(community tier)*
 - Live regulatory news feed with source filtering and read/archive tracking
 - **PLOT4ai AI Threat Library** — browse 100+ AI threats by category, AI type, role, and development phase
-- **State AI laws tracker** — 47 controls covering 12+ US state AI law jurisdictions
+- **State AI laws tracker** *(Enterprise tier only — not included in Community Edition)* — 47 controls covering 12+ US state AI law jurisdictions
 
 ### 📚 NIST Publication Browser
 - Searchable NIST publication library with full text
@@ -317,7 +317,7 @@ Full RMF lifecycle management without leaving the platform:
 3. **Built-in AI Copilot** *(community tier)*
    - BYOK model — bring your own Anthropic, OpenAI, Gemini, Grok, Groq, or Ollama key
    - 25+ org-aware analysis features including gap analysis, regulatory news, and AI threat library
-   - Quantized GGUF model support for Ollama (smaller memory footprint)
+   - Local model support via Ollama (subject to current in-app LLM configuration options)
    - No separate AI tool subscription needed
 
 4. **AI Governance Focus**
@@ -326,7 +326,7 @@ Full RMF lifecycle management without leaving the platform:
    - ISO/IEC AI standards coverage (42001, 42005, 23894, 38507, 22989, 23053, 5259, and more)
    - EU AI Act Article 17 compliance checklist
    - AIUC-1 Agentic AI Certification (31 controls)
-   - State AI laws tracking (12+ US jurisdictions)
+   - State AI laws tracking (12+ US jurisdictions) *(Enterprise tier)*
    - Purpose-built for modern AI systems compliance
 
 5. **RMF Lifecycle Management**
@@ -362,7 +362,7 @@ Full RMF lifecycle management without leaving the platform:
 | Built-in AI Copilot | ✅ BYOK | ❌ | ❌ | ❌ |
 | AI Governance (NIST AI RMF) | ✅ | ❌ | ❌ | ❌ |
 | RMF Lifecycle | ✅ | ❌ | ❌ | ❌ |
-| Passkey / WebAuthn | ✅ | ❌ | ❌ | ❌ |
+| Passkey / WebAuthn | Planned (not yet available in this build) | ❌ | ❌ | ❌ |
 | SBOM Integration | ✅ (enterprise) | ❌ | ❌ | ❌ |
 | SSP Auto-Generation | ✅ | ❌ | Paid Add-on | Paid Add-on |
 | CMDB Integration | ✅ (enterprise) | Partial | ❌ | Partial |
@@ -550,8 +550,8 @@ controlweave/
 - **Backend**: Node.js / Express
 - **Database**: PostgreSQL 14+
 - **Frontend**: Next.js (React) with TypeScript and Tailwind CSS
-- **Authentication**: JWT + OAuth 2.0 with TOTP 2FA and WebAuthn/passkey
-- **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama) with quantized GGUF for local inference
+- **Authentication**: JWT + OAuth 2.0 with TOTP 2FA (WebAuthn/passkey endpoints stubbed, not yet functional)
+- **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama for local inference via configurable endpoint)
 - **API**: REST with OpenAPI specification
 - **MCP**: Model Context Protocol server (21 tools)
 - **Real-time**: WebSocket support via Socket.IO
@@ -602,10 +602,10 @@ controlweave/
 - ✅ NIST publication browser with control mappings
 - ✅ Dashboard builder for custom views
 - ✅ Per-org SMTP email configuration
-- ✅ WebAuthn/passkey authentication
+- 🔄 WebAuthn/passkey authentication
 - ✅ AIUC-1 Agentic AI Certification framework
-- ✅ State AI laws tracking (12+ jurisdictions)
-- ✅ Quantized GGUF model support for Ollama
+- 🔄 State AI laws tracking (12+ jurisdictions, Enterprise tier — not included in Community Edition)
+- 🔄 Enhanced Ollama support with quantized GGUF model configuration
 - 🔄 SBOM integration for AI model supply chain
 - 🔄 SSP auto-generation (NIST 800-171, FedRAMP)
 - 🔄 CMDB (Configuration Management Database)
