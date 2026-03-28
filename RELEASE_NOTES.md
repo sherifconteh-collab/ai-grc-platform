@@ -18,13 +18,58 @@
 
 - fix: add explicit express-rate-limit instances and fix dependency vulnerabilities for security checks ([#97](https://github.com/sherifconteh-collab/ai-grc-platform/pull/97)) — @Copilot
 
+## [2.8.0] — 2026-03-27
+
+> **Released:** 2026-03-27
+
+### Overview
+- AI-code security hardening, backend ESLint enablement, ReDoS dependency remediation, frontend viewport support, and staging-environment documentation updates.
+
+### New Features
+- Backend ESLint configuration
+- Staging environment documentation
+
+### Added
+- Backend ESLint configuration (`backend/eslint.config.js`) using flat config format with ESLint 9.x and `globals` for Node.js environment declarations.
+- `STAGING_ENVIRONMENT.md` guide covering deployment architecture, environment variables, Docker-based local staging setup, and promotion workflow.
+
+### Fixed
+- Backend linting stays on ESLint 9.x flat config after the initial configuration was corrected during review.
+- `globals` import usage is documented inline for editor-tooling clarity.
+- Staging-environment tables render consistently in Markdown.
+
+### Security
+- `path-to-regexp` bumped to `0.1.13` for Express and `8.4.0` for `router`, resolving HIGH-severity ReDoS advisories in backend routing dependencies.
+- Structured Express error handling now returns explicit client messages for 4xx responses while preventing 5xx internal-detail leakage from `server.js`.
+- Frontend `layout.tsx` now exports mobile viewport metadata for proper scaling on small screens.
+
+## [2.7.3] — 2026-03-26
+
+> **Released:** 2026-03-26
+
+### Overview
+- Restores the missing v2.7.3 release entry and enriches retroactive release-note metadata for traceability and consistency.
+
+### Changed
+- Restored the v2.7.3 entry from a single-line placeholder to a fully detailed retroactive release-note summary.
+- Release dates were added to documentation file headings.
+- Internal release metadata was enriched with tag and release-branch fields for traceability.
+
+---
+
 ## [2.7.2] — 2026-03-26
 
 > **Released:** 2026-03-26
 
+### Overview
+- Improves release-notes automation quality and retroactively cleans up earlier generated entries so they match the detail level of hand-written notes.
+
 ### Changed
 - Release-notes auto-generation now strips redundant type-prefix verbs and capitalizes 30+ GRC/tech acronyms.
+- Auto-generated overview now handles singular/plural wording correctly and uses an Oxford comma when summarizing categories.
+- Auto-generated release titles are derived from change categories and applied consistently to release-note headings.
 - Conventional commit regex synced between release-notes and branch-naming workflows — added `migration` and `test` types.
+- American English normalization applied across workflow files.
 
 ---
 

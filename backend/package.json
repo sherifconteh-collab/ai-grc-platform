@@ -1,12 +1,13 @@
 {
   "name": "controlweave-backend",
-  "version": "2.7.2",
+  "version": "2.8.0",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
   },
   "scripts": {
     "build": "node -e \"console.log('Backend build step complete')\"",
+    "lint": "eslint src/ scripts/",
     "start": "node src/server.js",
     "start:prod": "node -e \"process.env.NODE_ENV = process.env.NODE_ENV || 'production'; require('./src/server.js')\"",
     "start:railway": "npm run start:prod",
@@ -99,6 +100,9 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
+    "eslint-plugin-security": "^4.0.0",
+    "globals": "^17.4.0",
     "nodemon": "^3.0.1"
   },
   "overrides": {
@@ -107,6 +111,12 @@
     "glob": "^11.0.1",
     "hono": "^4.12.7",
     "socket.io-parser": "4.2.6",
-    "yauzl": ">=3.2.1"
+    "yauzl": ">=3.2.1",
+    "express": {
+      "path-to-regexp": "0.1.13"
+    },
+    "router": {
+      "path-to-regexp": "8.4.0"
+    }
   }
 }

@@ -488,9 +488,18 @@ app.use((err, req, res, next) => {
     error: serializeError(err)
   });
 
-  res.status(err.status || 500).json({
+  const rawStatusCode = err.statusCode ?? err.status;
+  const statusCode = (Number.isInteger(rawStatusCode) && rawStatusCode >= 400 && rawStatusCode < 600)
+    ? rawStatusCode
+    : 500;
+  const isClientError = statusCode >= 400 && statusCode < 500;
+  const safeMessage = isClientError
+    ? (err.message || 'Request error')
+    : 'Internal server error';
+
+  res.status(statusCode).json({
     success: false,
-    error: err.message || 'Internal server error',
+    error: safeMessage,
     correlationId,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
