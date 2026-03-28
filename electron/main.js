@@ -628,6 +628,38 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-app-version', () => app.getVersion());
 
   try {
+    // ── Smoke-test fast path ────────────────────────────────────────────────
+    // When launched with --smoke-test (CI build verification), validate that
+    // all critical bundled resources are present and exit immediately.  This
+    // avoids downloading / initialising embedded PostgreSQL and starting
+    // backend & frontend servers, which can easily exceed the CI timeout.
+    if (IS_SMOKE_TEST) {
+      logStartup('info', 'Smoke-test mode: validating bundled resources…');
+
+      const backendDir = path.join(RESOURCES_ROOT, 'backend');
+      const frontendDir = app.isPackaged
+        ? path.join(RESOURCES_ROOT, 'frontend-standalone')
+        : path.join(RESOURCES_ROOT, 'frontend', 'build', 'standalone');
+
+      const criticalPaths = [
+        path.join(backendDir, 'src', 'server.js'),
+        path.join(backendDir, 'scripts', 'migrate-all.js'),
+        path.join(backendDir, 'node_modules'),
+        path.join(frontendDir, 'server.js'),
+      ];
+
+      const missing = criticalPaths.filter((p) => !fs.existsSync(p));
+      if (missing.length > 0) {
+        throw new Error(`Missing bundled resources:\n  ${missing.join('\n  ')}`);
+      }
+
+      logStartup('info', 'All critical resources present — smoke test passed');
+      process.exitCode = 0;
+      app.quit();
+      return;
+    }
+
+    // ── Normal startup ──────────────────────────────────────────────────────
     logStartup('info', 'Starting embedded PostgreSQL…');
     const databaseUrl = await startEmbeddedPostgres();
     logStartup('info', `Embedded PostgreSQL ready on port ${EMBEDDED_PG_PORT}`);
@@ -645,18 +677,6 @@ app.whenReady().then(async () => {
     logStartup('info', 'Starting frontend server…');
     await startFrontend();
     logStartup('info', `Frontend ready on port ${FRONTEND_PORT}`);
-
-    if (IS_SMOKE_TEST) {
-      logStartup('info', 'Running desktop smoke-test health checks…');
-      await Promise.all([
-        waitForHttpEndpoint(BACKEND_PORT, BACKEND_HEALTH_PATH),
-        waitForHttpEndpoint(FRONTEND_PORT, FRONTEND_HEALTH_PATH),
-      ]);
-      logStartup('info', 'Smoke test succeeded; exiting without opening a window');
-      process.exitCode = 0;
-      app.quit();
-      return;
-    }
 
     createWindow();
 

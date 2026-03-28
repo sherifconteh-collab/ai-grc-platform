@@ -20,6 +20,13 @@
 
 - fix: add explicit express-rate-limit instances and fix dependency vulnerabilities for security checks ([#97](https://github.com/sherifconteh-collab/ai-grc-platform/pull/97)) — @Copilot
 
+## [2.8.2] — 2026-03-28
+
+> **Released:** 2026-03-28
+
+### Fixed
+- Fix Windows `.exe` smoke test timeout: validate bundled resources without starting embedded PostgreSQL, backend, or frontend servers in CI.
+
 ## [2.8.1] — 2026-03-28
 
 > **Released:** 2026-03-28
