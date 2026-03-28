@@ -107,6 +107,12 @@
     "glob": "^11.0.1",
     "hono": "^4.12.7",
     "socket.io-parser": "4.2.6",
-    "yauzl": ">=3.2.1"
+    "yauzl": ">=3.2.1",
+    "express": {
+      "path-to-regexp": "0.1.13"
+    },
+    "router": {
+      "path-to-regexp": "8.4.0"
+    }
   }
 }
