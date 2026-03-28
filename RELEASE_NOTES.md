@@ -19,6 +19,13 @@
 
 - fix: add explicit express-rate-limit instances and fix dependency vulnerabilities for security checks ([#97](https://github.com/sherifconteh-collab/ai-grc-platform/pull/97)) — @Copilot
 
+## [2.8.1] — 2026-03-28
+
+> **Released:** 2026-03-28
+
+### Fixed
+- Fix Windows `.exe` desktop build job hanging for 6 hours in CI by adding job-level timeouts (Windows: 30 min, macOS/Linux: 20 min), step-level timeout on smoke test, and script-level 120-second process timeout.
+
 ## [2.8.0] — 2026-03-27
 
 > **Released:** 2026-03-27
