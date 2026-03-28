@@ -488,7 +488,10 @@ app.use((err, req, res, next) => {
     error: serializeError(err)
   });
 
-  const statusCode = err.status || 500;
+  const rawStatusCode = err.statusCode ?? err.status;
+  const statusCode = (Number.isInteger(rawStatusCode) && rawStatusCode >= 400 && rawStatusCode < 600)
+    ? rawStatusCode
+    : 500;
   const isClientError = statusCode >= 400 && statusCode < 500;
   const safeMessage = isClientError
     ? (err.message || 'Request error')
