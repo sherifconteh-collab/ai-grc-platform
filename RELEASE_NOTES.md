@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Fix global Express error handler to honor err.statusCode ([#102](https://github.com/sherifconteh-collab/ai-grc-platform/pull/102)) — @Copilot
 - docs: update README for accuracy and highlight new community tier features + bump nodemailer ([#101](https://github.com/sherifconteh-collab/ai-grc-platform/pull/101)) — @Copilot
 
 - fix: add explicit express-rate-limit instances and fix dependency vulnerabilities for security checks ([#97](https://github.com/sherifconteh-collab/ai-grc-platform/pull/97)) — @Copilot
