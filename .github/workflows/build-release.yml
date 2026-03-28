@@ -78,6 +78,7 @@ jobs:
   build-windows:
     name: Windows Installer (.exe)
     runs-on: windows-latest
+    timeout-minutes: 30
     needs: [check-release]
     # Run when: (a) check-release said yes, (b) check-release was skipped
     # because the trigger wasn't push-to-main (tag / release / dispatch).
@@ -176,6 +177,7 @@ jobs:
         run: node electron/scripts/validate-latest-yml.js
 
       - name: Smoke-test Windows build
+        timeout-minutes: 3
         shell: pwsh
         run: |
           # Use the unpacked build directly — the NSIS assisted installer
@@ -188,7 +190,14 @@ jobs:
             throw "ControlWeave.exe not found at $exePath after build."
           }
 
-          $process = Start-Process -FilePath $exePath -ArgumentList '--smoke-test' -Wait -PassThru
+          $process = Start-Process -FilePath $exePath -ArgumentList '--smoke-test' -PassThru
+          $process | Wait-Process -Timeout 120 -ErrorAction SilentlyContinue
+
+          if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw "Smoke test timed out after 120 seconds — the application likely hung during startup."
+          }
+
           if ($process.ExitCode -ne 0) {
             throw "Smoke test failed with exit code $($process.ExitCode)."
           }
@@ -248,6 +257,7 @@ jobs:
   build-macos:
     name: macOS Installer (.dmg)
     runs-on: macos-latest
+    timeout-minutes: 20
     needs: [check-release]
     if: |
       always() && (
@@ -332,6 +342,7 @@ jobs:
   build-linux:
     name: Linux AppImage
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [check-release]
     if: |
       always() && (
