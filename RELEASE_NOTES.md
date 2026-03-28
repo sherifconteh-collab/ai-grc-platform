@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Fix Windows .exe build job hanging for 6 hours in CI and bump to 2.8.1 ([#103](https://github.com/sherifconteh-collab/ai-grc-platform/pull/103)) — @Copilot
 - Fix global Express error handler to honor err.statusCode ([#102](https://github.com/sherifconteh-collab/ai-grc-platform/pull/102)) — @Copilot
 - docs: update README for accuracy and highlight new community tier features + bump nodemailer ([#101](https://github.com/sherifconteh-collab/ai-grc-platform/pull/101)) — @Copilot
 

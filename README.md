@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v2.8.0-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v2.8.1-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -52,7 +52,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-28 | PR #102: Fix global Express error handler to honor err.statusCode -->
+<!-- LAST_UPDATED: 2026-03-28 | PR #103: Fix Windows .exe build job hanging for 6 hours in CI and bump to 2.8.1 -->
 
 ## 🎯 What is This?
 
