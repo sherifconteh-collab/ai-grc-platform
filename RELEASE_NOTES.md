@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Fix macOS and Linux smoke-test failures in build-release workflow ([#105](https://github.com/sherifconteh-collab/ai-grc-platform/pull/105)) — @Copilot
 - No unreleased changes yet.
 
 ## [2.8.4] — 2026-03-29

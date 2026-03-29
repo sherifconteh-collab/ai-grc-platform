@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-29 | Desktop packaging/runtime stabilization, self-hosted landing/invite fixes, and bump to 2.8.4 -->
+<!-- LAST_UPDATED: 2026-03-29 | PR #105: Fix macOS and Linux smoke-test failures in build-release workflow -->
 
 ## 🎯 What is This?
 
