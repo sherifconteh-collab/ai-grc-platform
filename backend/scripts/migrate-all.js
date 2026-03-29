@@ -5,6 +5,31 @@ const crypto = require('crypto');
 const pool = require('../src/config/database');
 
 const migrationsDir = path.join(__dirname, '../migrations');
+const DESKTOP_RECONCILE_FILENAME = '100_desktop_schema_reconcile.sql';
+
+function sanitizeSqlForNonUtf8Server(sql) {
+  const replacements = new Map([
+    ['\u2010', '-'],
+    ['\u2011', '-'],
+    ['\u2012', '-'],
+    ['\u2013', '-'],
+    ['\u2014', '-'],
+    ['\u2015', '-'],
+    ['\u2018', "'"],
+    ['\u2019', "'"],
+    ['\u201c', '"'],
+    ['\u201d', '"'],
+    ['\u2022', '*'],
+    ['\u2026', '...'],
+    ['\u2192', '->'],
+    ['\u2212', '-'],
+    ['\u00a0', ' '],
+    ['\ufeff', ''],
+  ]);
+
+  const replaced = sql.replace(/[\u00a0\u2010-\u2015\u2018\u2019\u201c\u201d\u2022\u2026\u2192\u2212\ufeff]/g, (char) => replacements.get(char) || char);
+  return replaced.normalize('NFKD').replace(/[^\x00-\x7F]/g, '');
+}
 
 function getChecksum(content) {
   return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
@@ -36,23 +61,32 @@ async function runMigrations() {
   const client = await pool.connect();
   const baselineOnError = (process.env.MIGRATION_BASELINE_ON_ERROR || 'true').toLowerCase() === 'true';
   const allowChecksumDrift = (process.env.MIGRATION_ALLOW_CHECKSUM_DRIFT || 'true').toLowerCase() === 'true';
+  const reconcileFirst = (process.env.DESKTOP_SCHEMA_RECONCILE_FIRST || 'false').toLowerCase() === 'true';
 
   try {
     await ensureMigrationsTable(client);
+    const encodingResult = await client.query('SHOW SERVER_ENCODING');
+    const serverEncoding = String(encodingResult.rows[0]?.server_encoding || '').toUpperCase();
+    const requiresAsciiSql = serverEncoding !== 'UTF8';
 
     const files = fs
       .readdirSync(migrationsDir)
       .filter((file) => /^\d+.*\.sql$/.test(file))
       .sort((a, b) => a.localeCompare(b));
 
-    if (files.length === 0) {
+    const orderedFiles = reconcileFirst && files.includes(DESKTOP_RECONCILE_FILENAME)
+      ? [DESKTOP_RECONCILE_FILENAME, ...files.filter((file) => file !== DESKTOP_RECONCILE_FILENAME)]
+      : files;
+
+    if (orderedFiles.length === 0) {
       console.log('No migration files found.');
       return;
     }
 
-    for (const filename of files) {
+    for (const filename of orderedFiles) {
       const fullPath = path.join(migrationsDir, filename);
       const sql = fs.readFileSync(fullPath, 'utf8');
+      const sqlToExecute = requiresAsciiSql ? sanitizeSqlForNonUtf8Server(sql) : sql;
       const checksum = getChecksum(sql);
 
       const existingResult = await client.query(
@@ -83,7 +117,10 @@ async function runMigrations() {
       console.log(`APPLY ${filename}`);
       try {
         await client.query('BEGIN');
-        await client.query(sql);
+        if (requiresAsciiSql && sqlToExecute !== sql) {
+          console.warn(`WARN ${filename} contained non-ASCII characters; sanitizing SQL for server encoding ${serverEncoding}.`);
+        }
+        await client.query(sqlToExecute);
         await client.query(
           'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)',
           [filename, checksum]

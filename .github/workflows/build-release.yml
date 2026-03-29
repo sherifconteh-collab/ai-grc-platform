@@ -308,6 +308,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Smoke-test macOS build
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          mapfile -t app_bins < <(find electron/dist -path '*/ControlWeave.app/Contents/MacOS/ControlWeave' -type f | sort)
+          if [ ${#app_bins[@]} -eq 0 ]; then
+            echo "No ControlWeave.app binary found under electron/dist" >&2
+            exit 1
+          fi
+
+          for app_bin in "${app_bins[@]}"; do
+            echo "Smoke testing $app_bin"
+            "$app_bin" --smoke-test
+          done
+
       - name: Upload DMG to GitHub Release
         if: >-
           github.event_name == 'release'
@@ -392,6 +407,23 @@ jobs:
         working-directory: electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Smoke-test Linux build
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          shopt -s nullglob
+          appimages=(electron/dist/*.AppImage)
+          if [ ${#appimages[@]} -eq 0 ]; then
+            echo "No AppImage found under electron/dist" >&2
+            exit 1
+          fi
+
+          for appimage in "${appimages[@]}"; do
+            echo "Smoke testing $appimage"
+            chmod +x "$appimage"
+            APPIMAGE_EXTRACT_AND_RUN=1 "$appimage" --smoke-test
+          done
 
       - name: Upload AppImage to GitHub Release
         if: >-

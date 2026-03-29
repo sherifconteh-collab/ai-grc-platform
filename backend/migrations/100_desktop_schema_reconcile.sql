@@ -287,6 +287,120 @@ ALTER TABLE risk_scores
 CREATE INDEX IF NOT EXISTS idx_risk_scores_org_calculated_at
   ON risk_scores(organization_id, calculated_at DESC);
 
+ALTER TABLE IF EXISTS regulatory_impact_assessments
+  ADD COLUMN IF NOT EXISTS framework_code VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS change_type VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS change_title VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS change_description TEXT,
+  ADD COLUMN IF NOT EXISTS impact_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS estimated_effort_hours INTEGER,
+  ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS regulation_effective_date DATE,
+  ADD COLUMN IF NOT EXISTS compliance_deadline DATE,
+  ADD COLUMN IF NOT EXISTS days_to_comply INTEGER,
+  ADD COLUMN IF NOT EXISTS business_impact TEXT,
+  ADD COLUMN IF NOT EXISTS technical_requirements TEXT,
+  ADD COLUMN IF NOT EXISTS gap_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS recommended_actions TEXT,
+  ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS ai_provider VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS confidence_score NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS review_status VARCHAR(20) DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS review_notes TEXT;
+
+ALTER TABLE IF EXISTS remediation_plans
+  ADD COLUMN IF NOT EXISTS actual_start_date DATE,
+  ADD COLUMN IF NOT EXISTS actual_completion_date DATE,
+  ADD COLUMN IF NOT EXISTS remediation_steps JSONB,
+  ADD COLUMN IF NOT EXISTS required_resources TEXT[],
+  ADD COLUMN IF NOT EXISTS dependencies TEXT[],
+  ADD COLUMN IF NOT EXISTS expected_benefits TEXT,
+  ADD COLUMN IF NOT EXISTS roi_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS poam_approval_requests
+  ADD COLUMN IF NOT EXISTS framework_id UUID REFERENCES frameworks(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS supporting_evidence_ids UUID[],
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'poam_approval_requests') THEN
+    UPDATE poam_approval_requests
+    SET created_at = COALESCE(created_at, submitted_at, NOW())
+    WHERE created_at IS NULL;
+  END IF;
+END $$;
+
+ALTER TABLE IF EXISTS policy_monitoring_alerts
+  ADD COLUMN IF NOT EXISTS policy_reference_id UUID REFERENCES policy_references(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS resolution_notes TEXT;
+
+ALTER TABLE IF EXISTS policy_uploads
+  ADD COLUMN IF NOT EXISTS upload_date TIMESTAMP DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'policy_uploads') THEN
+    UPDATE policy_uploads
+    SET upload_date = COALESCE(upload_date, created_at, NOW())
+    WHERE upload_date IS NULL;
+  END IF;
+END $$;
+
+ALTER TABLE IF EXISTS policy_control_gaps
+  ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS review_notes TEXT;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'policy_control_gaps') THEN
+    UPDATE policy_control_gaps
+    SET reviewed = COALESCE(reviewed, FALSE)
+    WHERE reviewed IS NULL;
+  END IF;
+END $$;
+
+ALTER TABLE IF EXISTS regulatory_news_items
+  ADD COLUMN IF NOT EXISTS content TEXT,
+  ADD COLUMN IF NOT EXISTS url TEXT,
+  ADD COLUMN IF NOT EXISTS relevant_frameworks TEXT[],
+  ADD COLUMN IF NOT EXISTS impact_level VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS keywords TEXT[],
+  ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'regulatory_news_items') THEN
+    UPDATE regulatory_news_items
+    SET content = COALESCE(content, body),
+        url = COALESCE(url, source_url, CONCAT('legacy://regulatory-news/', id::text)),
+        keywords = COALESCE(keywords, tags),
+        is_archived = COALESCE(is_archived, FALSE),
+        source = COALESCE(NULLIF(source, ''), category, 'unknown'),
+        published_at = COALESCE(published_at, created_at, NOW()),
+        created_at = COALESCE(created_at, NOW()),
+        updated_at = COALESCE(updated_at, created_at, NOW())
+    WHERE content IS NULL
+       OR url IS NULL
+       OR keywords IS NULL
+       OR is_archived IS NULL
+       OR source IS NULL
+       OR source = ''
+       OR published_at IS NULL
+       OR created_at IS NULL
+       OR updated_at IS NULL;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS ai_reasoning_memory (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

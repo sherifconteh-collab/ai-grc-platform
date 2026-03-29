@@ -38,7 +38,13 @@ const {
   generateCommunityKey,
   setLocalPublicKey
 } = require('../services/licenseService');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+
+function getIpRateLimitKey(req) {
+  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
+  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
+  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
+}
 
 // Explicit express-rate-limit instance so that static-analysis tools (CodeQL)
 // recognise the rate-limiting middleware applied via router.use().
@@ -47,7 +53,7 @@ const licenseRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 // RSA key generation is CPU-intensive — apply a tighter limiter to the
@@ -57,7 +63,7 @@ const licenseGenerateLimiter = rateLimit({
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 
@@ -68,7 +74,7 @@ const updateCheckLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 

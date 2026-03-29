@@ -7,7 +7,13 @@ const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+
+function getIpRateLimitKey(req) {
+  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
+  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
+  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
+}
 
 let notificationNew = () => {};
 let notificationRead = () => {};
@@ -30,7 +36,7 @@ const emailStatusRateLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 

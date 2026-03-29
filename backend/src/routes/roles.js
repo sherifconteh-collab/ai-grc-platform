@@ -1,16 +1,26 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission, requireAnyPermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
 
+function getRolesRateLimitKey(req) {
+  if (req.user?.id) {
+    return `user:${req.user.id}`;
+  }
+
+  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
+  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
+  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
+}
+
 const rolesRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: getRolesRateLimitKey,
   message: { success: false, error: 'Too many requests, please try again later' },
 });
 router.use(rolesRateLimiter);

@@ -8,7 +8,7 @@ const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
 let getTrialSeedData = () => ({
   tier: 'community',
@@ -67,6 +67,11 @@ const AUTH_TOTP_COLUMNS = ['totp_enabled', 'totp_secret', 'totp_backup_codes'];
 let loggedMissingAuthTotpColumns = false;
 // email_hash column availability — checked once per process lifetime for backward compat
 let authEmailHashColumnAvailable = null;
+
+function getIpRateLimitKey(req) {
+  return ipKeyGenerator(extractIpFromRequest(req) || 'unknown');
+}
+
 const forgotPasswordLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 8,
@@ -98,7 +103,7 @@ const authBroadLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 router.use(authBroadLimiter);
@@ -110,7 +115,7 @@ const authRegisterLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 const authLoginLimiter = rateLimit({
@@ -118,7 +123,7 @@ const authLoginLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 const authRefreshLimiter = rateLimit({
@@ -126,7 +131,7 @@ const authRefreshLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 const authGeneralLimiter = rateLimit({
@@ -134,7 +139,7 @@ const authGeneralLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getIpRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 

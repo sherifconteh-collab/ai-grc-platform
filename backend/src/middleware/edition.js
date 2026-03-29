@@ -16,7 +16,7 @@
  * - Returning clear error messages about edition limitations
  */
 
-let EDITION = (process.env.EDITION || 'pro').toLowerCase();
+let EDITION = (process.env.EDITION || 'community').toLowerCase();
 let IS_COMMUNITY = EDITION === 'community';
 let IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
 
@@ -220,7 +220,7 @@ function validateEdition() {
     if (license && license.valid) {
       console.log(`[Edition] Perpetual license detected — licensee: ${license.licensee}, tier: ${license.tier}, seats: ${license.seats === -1 ? 'unlimited' : license.seats}`);
       // Upgrade edition to match license tier
-      const effectiveEdition = LICENSE_TIER_TO_EDITION[license.tier] || 'pro';
+      const effectiveEdition = LICENSE_TIER_TO_EDITION[license.tier] || 'community';
       if (valid.indexOf(effectiveEdition) > valid.indexOf(EDITION)) {
         upgradeEdition(effectiveEdition);
       }

@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v2.8.1-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v2.8.4-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -16,9 +16,11 @@
 
 Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 
+Desktop builds in `v2.8.4` now bundle the backend and standalone frontend runtime dependencies required for packaged startup, reconcile legacy desktop database drift during upgrades, default self-hosted installs to Community Edition, and route self-hosted users into an app-first sign-in or invite flow instead of the public marketing landing page.
+
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
-After installing, launch ControlWeave — the app opens automatically and walks you through creating your first account. Updates are delivered automatically so you always stay on the latest version. Releases are published automatically whenever a version bump is merged to `main`.
+After installing, launch ControlWeave — the app opens directly into the self-hosted sign-in or account-creation flow, and organization invite links land on a dedicated acceptance page. Updates are delivered automatically on packaged release builds, and local unpacked validation runs now skip updater checks cleanly when update metadata is absent. Releases are published automatically whenever a version bump is merged to `main`.
 
 <details>
 <summary>Build from source</summary>
@@ -52,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-28 | PR #103: Fix Windows .exe build job hanging for 6 hours in CI and bump to 2.8.1 -->
+<!-- LAST_UPDATED: 2026-03-29 | Desktop packaging/runtime stabilization, self-hosted landing/invite fixes, and bump to 2.8.4 -->
 
 ## 🎯 What is This?
 

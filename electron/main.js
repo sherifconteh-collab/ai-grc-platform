@@ -23,6 +23,18 @@ if (!embeddedPostgresModule) {
   throw new Error('Failed to load embedded-postgres module — ensure the dependency is installed.');
 }
 const EmbeddedPostgres = embeddedPostgresModule.default || embeddedPostgresModule;
+try {
+  const asyncExitHook = require('async-exit-hook');
+  if (asyncExitHook && typeof asyncExitHook.unhookEvent === 'function') {
+    // embedded-postgres registers an async exit hook, but async-exit-hook invokes
+    // async handlers synchronously for the raw exit event, which yields
+    // "done is not a function" during shutdown. Keep our explicit Electron
+    // cleanup and remove only the broken exit-event binding.
+    asyncExitHook.unhookEvent('exit');
+  }
+} catch (_) {
+  // Ignore: embedded-postgres can still be cleaned up via the explicit quit path.
+}
 const { initAutoUpdater, checkForUpdatesManual } = require('./updater');
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -51,6 +63,99 @@ const NODE_BINARY = process.execPath;
 const RESOURCES_ROOT = app.isPackaged
   ? process.resourcesPath
   : path.join(__dirname, '..');
+
+function getEmbeddedPostgresPlatformPackageName() {
+  switch (process.platform) {
+    case 'darwin':
+      switch (process.arch) {
+        case 'arm64':
+          return 'darwin-arm64';
+        case 'x64':
+          return 'darwin-x64';
+        default:
+          break;
+      }
+      break;
+    case 'linux':
+      switch (process.arch) {
+        case 'arm64':
+          return 'linux-arm64';
+        case 'arm':
+          return 'linux-arm';
+        case 'ia32':
+          return 'linux-ia32';
+        case 'ppc64':
+          return 'linux-ppc64';
+        case 'x64':
+          return 'linux-x64';
+        default:
+          break;
+      }
+      break;
+    case 'win32':
+      if (process.arch === 'x64') {
+        return 'windows-x64';
+      }
+      break;
+    default:
+      break;
+  }
+
+  throw new Error(`Unsupported embedded PostgreSQL platform: ${process.platform}/${process.arch}`);
+}
+
+function getEmbeddedPostgresBinaryPaths() {
+  const executableExtension = process.platform === 'win32' ? '.exe' : '';
+  const packageDir = path.join(
+    app.getAppPath(),
+    'node_modules',
+    '@embedded-postgres',
+    getEmbeddedPostgresPlatformPackageName(),
+    'native',
+    'bin'
+  );
+
+  return {
+    postgres: path.join(packageDir, `postgres${executableExtension}`),
+    initdb: path.join(packageDir, `initdb${executableExtension}`),
+  };
+}
+
+function validateEmbeddedPostgresRuntime() {
+  if (!app.isPackaged) {
+    return;
+  }
+
+  const binaries = getEmbeddedPostgresBinaryPaths();
+  const values = Object.values(binaries);
+  const missing = values.filter((filePath) => !fs.existsSync(filePath));
+
+  if (missing.length > 0) {
+    throw new Error(`Embedded PostgreSQL binaries are missing from the packaged app:\n  ${missing.join('\n  ')}`);
+  }
+
+  const asarPaths = values.filter((filePath) => filePath.includes('.asar'));
+  if (asarPaths.length > 0) {
+    throw new Error(
+      `Embedded PostgreSQL binaries resolve inside app.asar and cannot be spawned:\n  ${asarPaths.join('\n  ')}`
+    );
+  }
+}
+
+function validatePackagedBackendRuntime() {
+  if (!app.isPackaged) {
+    return;
+  }
+
+  const requiredPaths = [
+    path.join(RESOURCES_ROOT, 'backend', 'node_modules', 'dotenv', 'package.json'),
+  ];
+  const missing = requiredPaths.filter((filePath) => !fs.existsSync(filePath));
+
+  if (missing.length > 0) {
+    throw new Error(`Packaged backend runtime dependencies are missing:\n  ${missing.join('\n  ')}`);
+  }
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Globals
@@ -287,6 +392,35 @@ function loadOrCreateJwtSecret() {
   return secret;
 }
 
+function loadOrCreateHexSecret(fileName, byteLength, label) {
+  const secretFile = path.join(app.getPath('userData'), fileName);
+  const expectedLength = byteLength * 2;
+
+  if (fs.existsSync(secretFile)) {
+    try {
+      const stats = fs.statSync(secretFile);
+      if ((stats.mode & GROUP_OTHER_PERMISSIONS_MASK) !== 0) {
+        logStartup('warn', `${label} at ${secretFile} has permissions broader than 0600; tightening them.`);
+        fs.chmodSync(secretFile, 0o600);
+      }
+
+      const secret = fs.readFileSync(secretFile, 'utf8').trim();
+      if (/^[0-9a-f]+$/i.test(secret) && secret.length === expectedLength) {
+        return secret;
+      }
+
+      logStartup('warn', `${label} at ${secretFile} is invalid; regenerating it.`);
+    } catch (error) {
+      logStartup('warn', `${label} at ${secretFile} could not be read (${error.message}); regenerating it.`);
+    }
+  }
+
+  const secret = crypto.randomBytes(byteLength).toString('hex');
+  fs.writeFileSync(secretFile, `${secret}\n`, { mode: 0o600 });
+  fs.chmodSync(secretFile, 0o600);
+  return secret;
+}
+
 function getMaxFileMtime(dirPath) {
   let maxMtime = 0;
   try {
@@ -402,6 +536,7 @@ async function startEmbeddedPostgres() {
     user: creds.user,
     password: creds.password,
     port: EMBEDDED_PG_PORT,
+    initdbFlags: ['--encoding=UTF8'],
     persistent: true,         // keep data between app restarts
   });
 
@@ -449,6 +584,7 @@ async function runMigrations(backendDir, databaseUrl) {
   await runNodeScriptToCompletion(migrateScript, backendDir, {
     NODE_ENV: 'production',
     DATABASE_URL: databaseUrl,
+    DESKTOP_SCHEMA_RECONCILE_FIRST: 'true',
   });
 }
 
@@ -477,6 +613,8 @@ function startBackend(backendDir, databaseUrl) {
   // shipping a known credential that is reachable on the network.
   const generatedPassword = `CW-${crypto.randomBytes(12).toString('base64url')}!1`;
   const jwtSecret = loadOrCreateJwtSecret();
+  const encryptionKey = loadOrCreateHexSecret('encryption-key', 32, 'Desktop encryption key');
+  const hmacKey = loadOrCreateHexSecret('hmac-key', 48, 'Desktop HMAC key');
 
   const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {
     // Allow the frontend origin so CORS is satisfied
@@ -490,6 +628,8 @@ function startBackend(backendDir, databaseUrl) {
     FRONTEND_URL: `http://localhost:${FRONTEND_PORT}`,
     // Auto-provision a platform admin on first desktop launch so the user
     // can sign in immediately without running any CLI seed scripts.
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || encryptionKey,
+    HMAC_KEY: process.env.HMAC_KEY || hmacKey,
     JWT_SECRET: jwtSecret,
     PLATFORM_ADMIN_EMAIL: process.env.PLATFORM_ADMIN_EMAIL || 'admin@controlweave.local',
     PLATFORM_ADMIN_PASSWORD: process.env.PLATFORM_ADMIN_PASSWORD || generatedPassword,
@@ -636,6 +776,11 @@ app.whenReady().then(async () => {
     if (IS_SMOKE_TEST) {
       logStartup('info', 'Smoke-test mode: validating bundled resources…');
 
+      validateEmbeddedPostgresRuntime();
+      logStartup('info', 'Embedded PostgreSQL binaries validated');
+      validatePackagedBackendRuntime();
+      logStartup('info', 'Packaged backend runtime validated');
+
       const backendDir = path.join(RESOURCES_ROOT, 'backend');
       const frontendDir = app.isPackaged
         ? path.join(RESOURCES_ROOT, 'frontend-standalone')
@@ -660,6 +805,11 @@ app.whenReady().then(async () => {
     }
 
     // ── Normal startup ──────────────────────────────────────────────────────
+  validateEmbeddedPostgresRuntime();
+  logStartup('info', 'Embedded PostgreSQL binaries validated');
+    validatePackagedBackendRuntime();
+    logStartup('info', 'Packaged backend runtime validated');
+
     logStartup('info', 'Starting embedded PostgreSQL…');
     const databaseUrl = await startEmbeddedPostgres();
     logStartup('info', `Embedded PostgreSQL ready on port ${EMBEDDED_PG_PORT}`);

@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS poam_approval_requests (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE poam_approval_requests ADD COLUMN IF NOT EXISTS framework_id UUID REFERENCES frameworks(id) ON DELETE SET NULL;
+ALTER TABLE poam_approval_requests ADD COLUMN IF NOT EXISTS supporting_evidence_ids UUID[];
+ALTER TABLE poam_approval_requests ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
+UPDATE poam_approval_requests
+SET created_at = COALESCE(created_at, submitted_at, NOW())
+WHERE created_at IS NULL;
+ALTER TABLE poam_approval_requests ALTER COLUMN created_at SET DEFAULT NOW();
+ALTER TABLE poam_approval_requests ALTER COLUMN created_at SET NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_poam_approval_org
   ON poam_approval_requests(organization_id, submitted_at DESC);
 
@@ -215,6 +224,10 @@ CREATE TABLE IF NOT EXISTS policy_monitoring_alerts (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE policy_monitoring_alerts ADD COLUMN IF NOT EXISTS policy_reference_id UUID REFERENCES policy_references(id) ON DELETE CASCADE;
+ALTER TABLE policy_monitoring_alerts ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP;
+ALTER TABLE policy_monitoring_alerts ADD COLUMN IF NOT EXISTS resolution_notes TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_policy_alerts_org_status
   ON policy_monitoring_alerts(organization_id, resolved, created_at DESC);
 
@@ -244,6 +257,14 @@ CREATE TABLE IF NOT EXISTS policy_uploads (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE policy_uploads ADD COLUMN IF NOT EXISTS upload_date TIMESTAMP;
+ALTER TABLE policy_uploads ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+UPDATE policy_uploads
+SET upload_date = COALESCE(upload_date, created_at, NOW())
+WHERE upload_date IS NULL;
+ALTER TABLE policy_uploads ALTER COLUMN upload_date SET DEFAULT NOW();
+ALTER TABLE policy_uploads ALTER COLUMN upload_date SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_policy_uploads_org
   ON policy_uploads(organization_id, upload_date DESC);
@@ -290,6 +311,15 @@ CREATE TABLE IF NOT EXISTS policy_control_gaps (
   review_notes TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE policy_control_gaps ADD COLUMN IF NOT EXISTS reviewed BOOLEAN;
+ALTER TABLE policy_control_gaps ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+ALTER TABLE policy_control_gaps ADD COLUMN IF NOT EXISTS review_notes TEXT;
+UPDATE policy_control_gaps
+SET reviewed = COALESCE(reviewed, reviewed_by IS NOT NULL)
+WHERE reviewed IS NULL;
+ALTER TABLE policy_control_gaps ALTER COLUMN reviewed SET DEFAULT FALSE;
+ALTER TABLE policy_control_gaps ALTER COLUMN reviewed SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_policy_control_gaps_analysis
   ON policy_control_gaps(gap_analysis_id);

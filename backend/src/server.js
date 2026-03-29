@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const compression = require('compression');
@@ -603,7 +604,22 @@ async function ensureAssessmentProcedures() {
   }
   log('info', 'assessment.procedures.seeding', { status: 'starting' });
   const { spawn } = require('child_process');
-  const scriptPath = path.join(__dirname, '../scripts/seed-assessment-procedures-rich-all.js');
+  const scriptPath = [
+    'seed-assessment-procedures-rich-all.js',
+    'seed-assessment-procedures-summary.js',
+    'seed-assessment-procedures.js',
+  ]
+    .map((filename) => path.join(__dirname, '../scripts', filename))
+    .find((candidatePath) => fs.existsSync(candidatePath));
+
+  if (!scriptPath) {
+    log('warn', 'assessment.procedures.seed_missing', {
+      status: 'skipped',
+      reason: 'No assessment procedure seed script was packaged with this build.'
+    });
+    return;
+  }
+
   const child = spawn(process.execPath, [scriptPath], { env: process.env, stdio: 'inherit' });
   await new Promise((resolve, reject) => {
     child.on('close', (code) => code === 0 ? resolve() : reject(new Error(`Seed exited with code ${code}`)));

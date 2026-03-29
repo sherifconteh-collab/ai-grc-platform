@@ -23,6 +23,22 @@ CREATE TABLE IF NOT EXISTS tprm_evidence (
   uploaded_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE tprm_evidence
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS sbom_parsed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS ai_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS ai_risk_flags JSONB,
+  ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP DEFAULT NOW();
+
+UPDATE tprm_evidence
+SET created_at = COALESCE(created_at, uploaded_at, NOW()),
+    updated_at = COALESCE(updated_at, created_at, NOW()),
+    uploaded_at = COALESCE(uploaded_at, created_at, NOW())
+WHERE created_at IS NULL
+   OR updated_at IS NULL
+   OR uploaded_at IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_tprm_evidence_questionnaire ON tprm_evidence(questionnaire_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_evidence_org ON tprm_evidence(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_evidence_sbom ON tprm_evidence(questionnaire_id) WHERE is_sbom = TRUE;

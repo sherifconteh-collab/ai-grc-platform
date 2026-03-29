@@ -9,8 +9,10 @@
  * can display update notifications.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { ipcMain, dialog } = require('electron');
+const { app, ipcMain, dialog } = require('electron');
 
 let mainWindow = null;
 
@@ -20,6 +22,7 @@ const STARTUP_UPDATE_CHECK_DELAY_MS = 10_000;
 // Whether the current check was triggered explicitly by the user (menu click).
 // When true, we show native dialogs for "no update" and "error" feedback.
 let isManualCheck = false;
+const UPDATE_UNAVAILABLE_MESSAGE = 'Automatic updates are not available for this build.';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -35,6 +38,14 @@ function sendStatusToWindow(data) {
   }
 }
 
+function canCheckForUpdates() {
+  if (!app.isPackaged) {
+    return false;
+  }
+
+  return fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'));
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Public API
 // ──────────────────────────────────────────────────────────────────────────────
@@ -46,6 +57,52 @@ function sendStatusToWindow(data) {
  */
 function initAutoUpdater(win) {
   mainWindow = win;
+
+  // ── IPC handlers (renderer → main) ──────────────────────────────────────
+  ipcMain.handle('check-for-updates', async () => {
+    if (!canCheckForUpdates()) {
+      return { updateAvailable: false, skipped: true, reason: UPDATE_UNAVAILABLE_MESSAGE };
+    }
+
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      if (!result) return { updateAvailable: false };
+      return {
+        updateAvailable: result.updateInfo.version !== autoUpdater.currentVersion.version,
+        version: result.updateInfo.version,
+      };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+
+  ipcMain.handle('download-update', async () => {
+    if (!canCheckForUpdates()) {
+      return { error: UPDATE_UNAVAILABLE_MESSAGE };
+    }
+
+    try {
+      await autoUpdater.downloadUpdate();
+      return { success: true };
+    } catch (err) {
+      return { error: err.message };
+    }
+  });
+
+  ipcMain.handle('install-update', () => {
+    if (!canCheckForUpdates()) {
+      return { error: UPDATE_UNAVAILABLE_MESSAGE };
+    }
+
+    // quitAndInstall(isSilent, isForceRunAfter)
+    autoUpdater.quitAndInstall(false, true);
+    return { success: true };
+  });
+
+  if (!canCheckForUpdates()) {
+    console.log('[Updater] Skipping auto-update initialization because app-update.yml is not present for this build.');
+    return;
+  }
 
   // ── Configuration ────────────────────────────────────────────────────────
   autoUpdater.autoDownload = true;            // download immediately when found
@@ -105,34 +162,6 @@ function initAutoUpdater(win) {
     }
   });
 
-  // ── IPC handlers (renderer → main) ──────────────────────────────────────
-  ipcMain.handle('check-for-updates', async () => {
-    try {
-      const result = await autoUpdater.checkForUpdates();
-      if (!result) return { updateAvailable: false };
-      return {
-        updateAvailable: result.updateInfo.version !== autoUpdater.currentVersion.version,
-        version: result.updateInfo.version,
-      };
-    } catch (err) {
-      return { error: err.message };
-    }
-  });
-
-  ipcMain.handle('download-update', async () => {
-    try {
-      await autoUpdater.downloadUpdate();
-      return { success: true };
-    } catch (err) {
-      return { error: err.message };
-    }
-  });
-
-  ipcMain.handle('install-update', () => {
-    // quitAndInstall(isSilent, isForceRunAfter)
-    autoUpdater.quitAndInstall(false, true);
-  });
-
   // ── Background check on startup ─────────────────────────────────────────
   // Wait so the main window has fully loaded before checking.
   setTimeout(() => {
@@ -147,6 +176,19 @@ function initAutoUpdater(win) {
  * Shows native dialogs if no update is found or an error occurs.
  */
 function checkForUpdatesManual() {
+  if (!canCheckForUpdates()) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Updates Unavailable',
+        message: UPDATE_UNAVAILABLE_MESSAGE,
+        detail: 'Install a packaged release build to enable automatic updates.',
+        buttons: ['OK'],
+      });
+    }
+    return;
+  }
+
   isManualCheck = true;
   autoUpdater.checkForUpdates().catch((err) => {
     isManualCheck = false;

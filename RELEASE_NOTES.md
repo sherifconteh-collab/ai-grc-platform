@@ -14,11 +14,35 @@
 > Changes staged but not yet released to production.
 
 ### Changed
-- Fix Windows .exe build job hanging for 6 hours in CI and bump to 2.8.1 ([#103](https://github.com/sherifconteh-collab/ai-grc-platform/pull/103)) — @Copilot
-- Fix global Express error handler to honor err.statusCode ([#102](https://github.com/sherifconteh-collab/ai-grc-platform/pull/102)) — @Copilot
-- docs: update README for accuracy and highlight new community tier features + bump nodemailer ([#101](https://github.com/sherifconteh-collab/ai-grc-platform/pull/101)) — @Copilot
+- No unreleased changes yet.
 
-- fix: add explicit express-rate-limit instances and fix dependency vulnerabilities for security checks ([#97](https://github.com/sherifconteh-collab/ai-grc-platform/pull/97)) — @Copilot
+## [2.8.4] — 2026-03-29
+
+> **Released:** 2026-03-29
+
+### Fixed
+- Fix self-hosted installs defaulting to Pro by making Community Edition the server default until a valid license is activated.
+- Fix the self-hosted root route opening on the public marketing page by routing unauthenticated users into an app-first sign-in and account-creation experience.
+- Fix organization invite links in self-hosted deployments by adding a dedicated `/invite` acceptance flow that validates the token, creates the user account, and signs the invited user into the app.
+- Fix noisy updater errors in local unpacked desktop validation runs by skipping auto-update checks when `app-update.yml` is not present.
+
+### Changed
+- Registration now follows the edition already active on the self-hosted server instead of presenting hosted Stripe tier selection during community/self-hosted signup.
+
+## [2.8.3] — 2026-03-29
+
+> **Released:** 2026-03-29
+
+### Fixed
+- Fix packaged desktop startup on Windows by shipping embedded PostgreSQL spawn targets outside `app.asar`, packaging backend runtime dependencies, and bundling the standalone Next.js runtime dependencies required by the desktop frontend server.
+- Fix legacy desktop upgrade paths by reconciling older schema variants before normal migrations run, normalizing non-UTF8 migration input for older Windows desktop databases, and aligning TPRM migrations/routes with legacy table shapes.
+- Fix packaged backend startup by generating desktop-scoped `JWT_SECRET`, `ENCRYPTION_KEY`, and `HMAC_KEY` values automatically and by skipping assessment-procedure seeding when no compatible packaged seed script is present.
+- Fix packaged startup warnings from `express-rate-limit` by switching direct route limiters to IPv6-safe key generation.
+
+### Changed
+- Add packaged runtime preflight validation for embedded PostgreSQL binaries and required backend resources before desktop startup continues.
+- Force UTF-8 initialization for new embedded PostgreSQL desktop clusters.
+- Add macOS `.app` and Linux AppImage smoke tests to the desktop release workflow so packaged regressions are caught before GitHub release assets are published.
 
 ## [2.8.2] — 2026-03-28
 

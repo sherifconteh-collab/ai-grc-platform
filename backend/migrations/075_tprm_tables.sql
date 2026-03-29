@@ -26,6 +26,31 @@ CREATE TABLE IF NOT EXISTS tprm_vendors (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE tprm_vendors
+  ADD COLUMN IF NOT EXISTS vendor_website VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS vendor_contact_name VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS vendor_contact_email VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS review_status VARCHAR(30) DEFAULT 'pending_review',
+  ADD COLUMN IF NOT EXISTS last_review_date DATE,
+  ADD COLUMN IF NOT EXISTS notes TEXT,
+  ADD COLUMN IF NOT EXISTS cmdb_asset_id UUID,
+  ADD COLUMN IF NOT EXISTS ai_risk_summary TEXT,
+  ADD COLUMN IF NOT EXISTS ai_risk_score INTEGER,
+  ADD COLUMN IF NOT EXISTS ai_assessed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
+UPDATE tprm_vendors
+SET contact_email = COALESCE(contact_email, vendor_contact_email),
+    contact_name = COALESCE(contact_name, vendor_contact_name),
+    review_status = COALESCE(review_status, 'pending_review'),
+    metadata = COALESCE(metadata, '{}'::jsonb)
+WHERE contact_email IS NULL
+   OR contact_name IS NULL
+   OR review_status IS NULL
+   OR metadata IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_tprm_vendors_org ON tprm_vendors(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_vendors_risk_tier ON tprm_vendors(organization_id, risk_tier);
 CREATE INDEX IF NOT EXISTS idx_tprm_vendors_review_status ON tprm_vendors(organization_id, review_status);
@@ -52,6 +77,15 @@ CREATE TABLE IF NOT EXISTS tprm_questionnaires (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE tprm_questionnaires
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS ai_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS overall_score INTEGER,
+  ADD COLUMN IF NOT EXISTS response_token VARCHAR(128),
+  ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(255);
+
 CREATE INDEX IF NOT EXISTS idx_tprm_questionnaires_org ON tprm_questionnaires(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_questionnaires_vendor ON tprm_questionnaires(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_questionnaires_status ON tprm_questionnaires(organization_id, status);
@@ -74,6 +108,22 @@ CREATE TABLE IF NOT EXISTS tprm_documents (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE tprm_documents
+  ADD COLUMN IF NOT EXISTS title VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS status VARCHAR(30) DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS file_path TEXT,
+  ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
+UPDATE tprm_documents
+SET title = COALESCE(title, document_name),
+    status = COALESCE(status, request_status),
+    file_path = COALESCE(file_path, file_url),
+    metadata = COALESCE(metadata, '{}'::jsonb)
+WHERE title IS NULL
+   OR status IS NULL
+   OR file_path IS NULL
+   OR metadata IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_tprm_documents_org ON tprm_documents(organization_id);
 CREATE INDEX IF NOT EXISTS idx_tprm_documents_vendor ON tprm_documents(vendor_id);

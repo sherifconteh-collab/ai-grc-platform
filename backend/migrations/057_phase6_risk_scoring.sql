@@ -94,6 +94,29 @@ CREATE TABLE IF NOT EXISTS regulatory_impact_assessments (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS framework_code VARCHAR(50);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS change_type VARCHAR(50);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS change_title VARCHAR(500);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS change_description TEXT;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS impact_score NUMERIC(5,2);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS estimated_effort_hours INTEGER;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC(12,2);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS regulation_effective_date DATE;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS compliance_deadline DATE;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS days_to_comply INTEGER;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS business_impact TEXT;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS technical_requirements TEXT;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS gap_analysis TEXT;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS recommended_actions TEXT;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN DEFAULT true;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS ai_provider VARCHAR(50);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS confidence_score NUMERIC(5,2);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS review_status VARCHAR(20) DEFAULT 'pending';
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id);
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+ALTER TABLE regulatory_impact_assessments ADD COLUMN IF NOT EXISTS review_notes TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_regulatory_impact_org_id ON regulatory_impact_assessments(organization_id);
 CREATE INDEX IF NOT EXISTS idx_regulatory_impact_framework ON regulatory_impact_assessments(framework_code);
 CREATE INDEX IF NOT EXISTS idx_regulatory_impact_level ON regulatory_impact_assessments(organization_id, impact_level);
@@ -155,6 +178,15 @@ CREATE TABLE IF NOT EXISTS remediation_plans (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS actual_start_date DATE;
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS actual_completion_date DATE;
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS remediation_steps JSONB;
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS required_resources TEXT[];
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS dependencies TEXT[];
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS expected_benefits TEXT;
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS roi_analysis TEXT;
+ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES users(id);
 
 CREATE INDEX IF NOT EXISTS idx_remediation_plans_org_id ON remediation_plans(organization_id);
 CREATE INDEX IF NOT EXISTS idx_remediation_plans_control_id ON remediation_plans(control_id);

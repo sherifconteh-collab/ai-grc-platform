@@ -14,7 +14,17 @@ const {
 } = require('../utils/passwordPolicy');
 const { encrypt, decrypt, hashForLookup } = require('../utils/encrypt');
 const { hasPublicColumn } = require('../utils/schema');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+
+function getUsersRateLimitKey(req) {
+  if (req.user?.id) {
+    return `user:${req.user.id}`;
+  }
+
+  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
+  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
+  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
+}
 
 router.use(authenticate);
 
@@ -25,7 +35,7 @@ const usersRateLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
+  keyGenerator: getUsersRateLimitKey,
   message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
 });
 router.use(usersRateLimiter);

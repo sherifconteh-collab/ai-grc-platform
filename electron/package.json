@@ -1,6 +1,6 @@
 {
   "name": "controlweave-desktop",
-  "version": "2.8.2",
+  "version": "2.8.4",
   "description": "ControlWeave AI GRC Platform — Desktop Edition",
   "author": "ControlWeave <contehconsulting@gmail.com>",
   "license": "AGPL-3.0",
@@ -27,9 +27,7 @@
       "updater.js",
       "build/**"
     ],
-    "asarUnpack": [
-      "**/node_modules/@embedded-postgres/**"
-    ],
+    "asar": false,
     "extraResources": [
       {
         "from": "../backend",
@@ -53,8 +51,16 @@
         ]
       },
       {
+        "from": "../backend/node_modules",
+        "to": "backend/node_modules"
+      },
+      {
         "from": "../frontend/build/standalone",
         "to": "frontend-standalone"
+      },
+      {
+        "from": "../frontend/build/standalone/node_modules",
+        "to": "frontend-standalone/node_modules"
       },
       {
         "from": "../frontend/build/static",

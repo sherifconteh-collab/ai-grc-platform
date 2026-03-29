@@ -22,7 +22,7 @@ router.get('/summary', async (req, res) => {
       [orgId]
     );
     const pendingResult = await pool.query(
-      `SELECT COUNT(*) AS count FROM tprm_vendors WHERE organization_id = $1 AND review_status = 'pending'`,
+      `SELECT COUNT(*) AS count FROM tprm_vendors WHERE organization_id = $1 AND review_status IN ('pending', 'pending_review')`,
       [orgId]
     );
     res.json({
@@ -99,7 +99,7 @@ router.post('/vendors', async (req, res) => {
       `INSERT INTO tprm_vendors (organization_id, vendor_name, vendor_type, risk_tier, review_status, contact_email, contact_name, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [orgId, vendor_name, vendor_type || null, risk_tier || null, review_status || 'pending', contact_email || null, contact_name || null, metadata ? JSON.stringify(metadata) : null]
+      [orgId, vendor_name, vendor_type || null, risk_tier || null, review_status || 'pending_review', contact_email || null, contact_name || null, metadata ? JSON.stringify(metadata) : null]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -273,10 +273,10 @@ router.post('/questionnaires', async (req, res) => {
     }
     const responseToken = crypto.randomBytes(32).toString('hex');
     const result = await pool.query(
-      `INSERT INTO tprm_questionnaires (organization_id, vendor_id, title, description, questions, due_date, response_token)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO tprm_questionnaires (organization_id, vendor_id, title, description, questions, due_date, response_token, access_token)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [orgId, vendor_id, title, description || null, questions ? JSON.stringify(questions) : null, due_date || null, responseToken]
+      [orgId, vendor_id, title, description || null, questions ? JSON.stringify(questions) : null, due_date || null, responseToken, responseToken]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -345,7 +345,7 @@ router.post('/questionnaires/:id/send', async (req, res) => {
     }
     const result = await pool.query(
       `UPDATE tprm_questionnaires
-       SET status = 'sent', sent_at = NOW(), recipient_email = $1, due_date = COALESCE($2, due_date), updated_at = NOW()
+       SET status = 'sent', sent_at = NOW(), recipient_email = $1, vendor_email = $1, due_date = COALESCE($2, due_date), updated_at = NOW()
        WHERE id = $3 AND organization_id = $4
        RETURNING *`,
       [recipient_email, due_date || null, req.params.id, req.user.organization_id]

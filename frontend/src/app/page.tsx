@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { requiresOrganizationOnboarding } from '@/lib/access';
 import { requiresBillingResolution } from '@/lib/billing';
+import { useDeploymentInfo } from '@/lib/deployment';
 import MarketingNav from '@/components/MarketingNav';
 
 const frameworks = [
@@ -687,12 +688,112 @@ function LandingPage() {
   );
 }
 
+function formatEditionLabel(edition: 'community' | 'pro' | 'enterprise') {
+  if (edition === 'enterprise') return 'Enterprise';
+  if (edition === 'pro') return 'Pro';
+  return 'Community';
+}
+
+function SelfHostedHome({ edition }: { edition: 'community' | 'pro' | 'enterprise' }) {
+  const editionLabel = formatEditionLabel(edition);
+  const editionBadgeClassName =
+    edition === 'community'
+      ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+      : 'border-sky-400/30 bg-sky-400/10 text-sky-100';
+
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_38%),linear-gradient(180deg,#0f172a_0%,#111827_100%)] text-white">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-6 py-16 sm:px-10">
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+          <div>
+            <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold ${editionBadgeClassName}`}>
+              Self-Hosted {editionLabel} Edition
+            </div>
+            <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              ControlWeave opens into the application, not the public storefront.
+            </h1>
+            <p className="mt-4 max-w-2xl text-lg text-slate-300">
+              This installation is configured for internal use. Sign in, create the first admin account,
+              or open an invitation link from your organization administrator.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-semibold text-slate-950 transition hover:bg-slate-100"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:border-white/35 hover:bg-white/10"
+              >
+                Create Account
+              </Link>
+            </div>
+
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <p className="text-sm font-semibold text-white">Community-first</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  New self-hosted installs default to Community Edition and stay there until a valid license is activated.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <p className="text-sm font-semibold text-white">Invite-based access</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  Organization admins can onboard teammates through invite links, and invited users complete setup from a dedicated acceptance page.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <p className="text-sm font-semibold text-white">License aware</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  {edition === 'community'
+                    ? 'Activate a license after sign-in to unlock commercial modules on this installation.'
+                    : `This server is already licensed for ${editionLabel} Edition.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-black/20 p-6 shadow-2xl shadow-black/20 backdrop-blur-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Instance Summary</p>
+            <div className="mt-6 space-y-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Edition</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{editionLabel}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Entry Flow</p>
+                <p className="mt-1 text-sm text-slate-300">Direct access to sign-in, account creation, and invite acceptance.</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Org Invites</p>
+                <p className="mt-1 text-sm text-slate-300">Invite URLs resolve to the in-product acceptance flow at /invite.</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Next Step</p>
+                <p className="mt-1 text-sm text-slate-300">
+                  {edition === 'community'
+                    ? 'Create the first admin account or sign in as an existing admin to manage licensing.'
+                    : 'Sign in to continue with the licensed feature set for this deployment.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const { user, isAuthenticated, loading } = useAuth();
+  const { deploymentInfo, loading: deploymentLoading } = useDeploymentInfo();
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
+    if (!loading && !deploymentLoading && isAuthenticated) {
       const mustCompleteOnboarding = requiresOrganizationOnboarding(user) && !user?.onboardingCompleted;
       if (mustCompleteOnboarding) {
         router.push('/onboarding');
@@ -721,14 +822,18 @@ export default function Home() {
         router.push('/dashboard');
       }
     }
-  }, [user, isAuthenticated, loading, router]);
+  }, [user, isAuthenticated, loading, deploymentLoading, router]);
 
-  if (loading || isAuthenticated) {
+  if (loading || isAuthenticated || deploymentLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
+  }
+
+  if (deploymentInfo.isSelfHosted) {
+    return <SelfHostedHome edition={deploymentInfo.edition} />;
   }
 
   return <LandingPage />;
