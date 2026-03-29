@@ -312,7 +312,10 @@ jobs:
         timeout-minutes: 3
         shell: bash
         run: |
-          mapfile -t app_bins < <(find electron/dist -path '*/ControlWeave.app/Contents/MacOS/ControlWeave' -type f | sort)
+          app_bins=()
+          while IFS= read -r line; do
+            app_bins+=("$line")
+          done < <(find electron/dist -path '*/ControlWeave.app/Contents/MacOS/ControlWeave' -type f | sort)
           if [ ${#app_bins[@]} -eq 0 ]; then
             echo "No ControlWeave.app binary found under electron/dist" >&2
             exit 1
@@ -422,7 +425,7 @@ jobs:
           for appimage in "${appimages[@]}"; do
             echo "Smoke testing $appimage"
             chmod +x "$appimage"
-            APPIMAGE_EXTRACT_AND_RUN=1 "$appimage" --smoke-test
+            APPIMAGE_EXTRACT_AND_RUN=1 "$appimage" --no-sandbox --smoke-test
           done
 
       - name: Upload AppImage to GitHub Release
