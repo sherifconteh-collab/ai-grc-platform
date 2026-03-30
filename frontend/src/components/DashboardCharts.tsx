@@ -42,7 +42,7 @@ export function StatusPieChart({ data, onSliceClick }: StatusPieChartProps) {
           outerRadius={80}
           paddingAngle={2}
           dataKey="value"
-          onClick={(entry) => onSliceClick?.(entry.name)}
+          onClick={(entry) => entry.name != null && onSliceClick?.(String(entry.name))}
           style={{ cursor: onSliceClick ? 'pointer' : undefined }}
         >
           {data.map((d) => (
@@ -81,9 +81,10 @@ export function FrameworkBarChart({ data }: FrameworkBarChartProps) {
         <XAxis type="number" domain={[0, 100]} unit="%" />
         <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
         <Tooltip
-          formatter={(value: number, _name: string, props: { payload?: FrameworkDatum }) =>
-            [`${value}%`, props.payload?.fullName ?? _name]
-          }
+          formatter={(value, _name, item) => {
+            const payload = item.payload as FrameworkDatum | undefined;
+            return [`${value}%`, payload?.fullName ?? String(_name)];
+          }}
         />
         <Bar dataKey="compliance" fill="#7c3aed" radius={[0, 4, 4, 0]} />
       </BarChart>
