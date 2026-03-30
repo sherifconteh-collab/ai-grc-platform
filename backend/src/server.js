@@ -258,7 +258,7 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       database: {
         status: 'disconnected',
-        error: error.message
+        error: 'Database unavailable'
       },
       uptime: Math.floor(process.uptime()) + ' seconds',
       requestId: req.requestId,

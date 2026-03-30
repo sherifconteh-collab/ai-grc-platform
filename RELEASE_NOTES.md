@@ -14,8 +14,25 @@
 > Changes staged but not yet released to production.
 
 ### Changed
-- Fix macOS and Linux smoke-test failures in build-release workflow ([#105](https://github.com/sherifconteh-collab/ai-grc-platform/pull/105)) — @Copilot
 - No unreleased changes yet.
+
+## [2.8.5] — 2026-03-30
+
+> **Released:** 2026-03-30
+
+### Changed
+- Bump axios to ^1.14.0 in both backend and frontend ([#106](https://github.com/sherifconteh-collab/ai-grc-platform/pull/106), [#113](https://github.com/sherifconteh-collab/ai-grc-platform/pull/113))
+- Bump @modelcontextprotocol/sdk to ^1.28.0 in backend ([#112](https://github.com/sherifconteh-collab/ai-grc-platform/pull/112))
+- Bump stripe to ^21.0.1 in backend ([#110](https://github.com/sherifconteh-collab/ai-grc-platform/pull/110))
+- Bump geoip-lite to ^2.0.1 in backend ([#108](https://github.com/sherifconteh-collab/ai-grc-platform/pull/108))
+- Bump lucide-react to ^1.7.0 in frontend ([#111](https://github.com/sherifconteh-collab/ai-grc-platform/pull/111))
+- Bump recharts to ^3.8.1 in frontend with DashboardCharts type fixes ([#114](https://github.com/sherifconteh-collab/ai-grc-platform/pull/114))
+- Bump TypeScript to 6.0.2 in frontend ([#109](https://github.com/sherifconteh-collab/ai-grc-platform/pull/109))
+- Add params support to `getRecentActivity` dashboard API (synced from ControlWeave)
+
+### Fixed
+- Fix auth `getUserById` not decrypting encrypted email fields, causing ciphertext to appear in `/me` responses when PII encryption is active (synced from ControlWeave 2.8.10)
+- Harden health endpoint to return generic "Database unavailable" instead of raw error messages (synced from ControlWeave)
 
 ## [2.8.4] — 2026-03-29
 
