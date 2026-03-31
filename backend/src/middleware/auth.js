@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
+const { decrypt } = require('../utils/encrypt');
 
 // ---------------------------------------------------------------------------
 // Community-edition role → permission mapping (fallback when RBAC tables
@@ -99,7 +100,7 @@ const authenticate = async (req, res, next) => {
     const user = result.rows[0];
     req.user = {
       id: user.id,
-      email: user.email,
+      email: decrypt(user.email),
       organization_id: user.organization_id,
       role: user.role,
       organizationId: user.organization_id,
