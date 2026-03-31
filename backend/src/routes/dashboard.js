@@ -7,8 +7,24 @@ const express = require('express');
 const { authenticate } = require('../middleware/auth');
 const pool = require('../config/database');
 const { decrypt } = require('../utils/encrypt');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 const router = express.Router();
+
+function getIpRateLimitKey(req) {
+  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
+  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
+  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
+}
+
+const dashboardReadRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getIpRateLimitKey,
+  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
+});
 
 async function getDashboardStats(orgId) {
   const overallResult = await pool.query(
@@ -57,8 +73,8 @@ async function getDashboardStats(orgId) {
   );
 
   const frameworks = frameworkResult.rows.map(row => {
-    const applicableControls = parseInt(row.total_controls) - parseInt(row.not_applicable_count || 0);
-    const satisfiedControls = parseInt(row.implemented_count || 0) + parseInt(row.crosswalk_count || 0);
+    const totalApplicable = parseInt(row.total_controls) - parseInt(row.not_applicable_count || 0);
+    const totalSatisfied = parseInt(row.implemented_count || 0) + parseInt(row.crosswalk_count || 0);
 
     return {
       id: row.id,
@@ -72,8 +88,8 @@ async function getDashboardStats(orgId) {
       inProgress: parseInt(row.in_progress_count || 0),
       notStarted: parseInt(row.not_started_count || 0),
       notApplicable: parseInt(row.not_applicable_count || 0),
-      compliancePercentage: applicableControls > 0
-        ? Math.round((satisfiedControls / applicableControls) * 100)
+      compliancePercentage: totalApplicable > 0
+        ? Math.round((totalSatisfied / totalApplicable) * 100)
         : 0
     };
   });
@@ -107,10 +123,16 @@ async function getDashboardStats(orgId) {
 }
 
 async function getDashboardTrend(orgId, days = 30) {
+  const parsedDays = typeof days === 'number'
+    ? days
+    : Number.parseInt(days ?? '', 10);
+  const normalizedDays = Number.isSafeInteger(parsedDays) && parsedDays > 0
+    ? parsedDays
+    : 30;
   const result = await pool.query(
     `WITH date_series AS (
       SELECT generate_series(
-        CURRENT_DATE - INTERVAL '${parseInt(days)} days',
+        CURRENT_DATE - ($2::int * INTERVAL '1 day'),
         CURRENT_DATE,
         INTERVAL '1 day'
       )::date AS date
@@ -142,18 +164,24 @@ async function getDashboardTrend(orgId, days = 30) {
       END as compliance_percentage
     FROM daily_stats
     ORDER BY date ASC`,
-    [orgId]
+    [orgId, normalizedDays]
   );
 
   return result.rows.map(row => ({
     date: row.date,
     totalControls: parseInt(row.total_controls),
     implementedControls: parseInt(row.implemented_count),
-    compliance: parseFloat(row.compliance_percentage)
+    compliancePercentage: parseFloat(row.compliance_percentage)
   }));
 }
 
 async function getDashboardOverviewActivity(orgId, limit = 20) {
+  const parsedLimit = typeof limit === 'number'
+    ? limit
+    : Number.parseInt(limit ?? '', 10);
+  const normalizedLimit = Number.isSafeInteger(parsedLimit) && parsedLimit > 0
+    ? Math.min(parsedLimit, 100)
+    : 20;
   const result = await pool.query(
     `SELECT
       al.id,
@@ -172,7 +200,7 @@ async function getDashboardOverviewActivity(orgId, limit = 20) {
       AND COALESCE(al.details->>'status', al.details->>'new_status', al.details->>'old_status') IS NOT NULL
     ORDER BY al.created_at DESC
     LIMIT $2`,
-    [orgId, parseInt(limit)]
+    [orgId, normalizedLimit]
   );
 
   return result.rows.map((row) => ({
@@ -187,7 +215,7 @@ async function getDashboardOverviewActivity(orgId, limit = 20) {
   }));
 }
 
-router.get('/overview', authenticate, async (req, res) => {
+router.get('/overview', dashboardReadRateLimiter, authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const [stats, activity, trend] = await Promise.all([
@@ -201,7 +229,10 @@ router.get('/overview', authenticate, async (req, res) => {
       data: {
         stats,
         activity,
-        trend,
+        trend: trend.map(({ compliancePercentage, ...row }) => ({
+          ...row,
+          compliance: compliancePercentage
+        })),
         maturity: null
       }
     });
@@ -218,7 +249,7 @@ router.get('/overview', authenticate, async (req, res) => {
  * GET /api/v1/dashboard/stats
  * Get overall compliance statistics for the organization
  */
-router.get('/stats', authenticate, async (req, res) => {
+router.get('/stats', dashboardReadRateLimiter, authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const stats = await getDashboardStats(orgId);
@@ -389,11 +420,7 @@ router.get('/compliance-trend', authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const { days = 30 } = req.query;
-    const rawTrend = await getDashboardTrend(orgId, days);
-    const trend = rawTrend.map(({ compliance, ...row }) => ({
-      ...row,
-      compliancePercentage: compliance
-    }));
+    const trend = await getDashboardTrend(orgId, days);
 
     res.json({
       success: true,
