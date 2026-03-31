@@ -187,7 +187,8 @@ export const dashboardAPI = {
 
   getPriorityActions: () => api.get('/dashboard/priority-actions'),
 
-  getRecentActivity: () => api.get('/dashboard/recent-activity'),
+  getRecentActivity: (params?: { limit?: number }) =>
+    api.get('/dashboard/recent-activity', { params }),
 
   getComplianceTrend: (params: { period: string }) =>
     api.get('/dashboard/compliance-trend', { params }),

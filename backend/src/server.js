@@ -258,7 +258,7 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       database: {
         status: 'disconnected',
-        error: error.message
+        error: 'Database unavailable'
       },
       uptime: Math.floor(process.uptime()) + ' seconds',
       requestId: req.requestId,
@@ -524,9 +524,7 @@ async function ensurePlatformAdmin() {
   const firstName = String(process.env.PLATFORM_ADMIN_FIRST_NAME || 'Platform').trim();
   const lastName  = String(process.env.PLATFORM_ADMIN_LAST_NAME  || 'Admin').trim();
   const orgName   = String(process.env.PLATFORM_ADMIN_ORG        || 'ControlWeave Platform').trim();
-  let   password  = String(process.env.PLATFORM_ADMIN_PASSWORD   || '').trim();
-  const generated = !password;
-  if (generated) password = `CW-${randomBytes(9).toString('base64url')}!1`;
+  let password = String(process.env.PLATFORM_ADMIN_PASSWORD || '').trim();
 
   const client = await pool.connect();
   try {
@@ -547,13 +545,26 @@ async function ensurePlatformAdmin() {
       orgId = orgRes.rows[0].id;
     }
 
-    const hash = await bcrypt.hash(password, 12);
+    const existingUser = await client.query(
+      'SELECT id FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    );
+    const isExistingUser = existingUser.rows.length > 0;
+    const shouldGeneratePassword = !password && !isExistingUser;
+    const shouldUpdatePassword = Boolean(password) || shouldGeneratePassword;
+
+    if (shouldGeneratePassword) {
+      password = `CW-${randomBytes(9).toString('base64url')}!1`;
+    }
+
+    const hash = shouldUpdatePassword ? await bcrypt.hash(password, 12) : null;
     const result = await client.query(
       `INSERT INTO users
          (organization_id, email, password_hash, first_name, last_name, role, is_active, is_platform_admin)
        VALUES ($1,$2,$3,$4,$5,'admin',true,true)
        ON CONFLICT (email) DO UPDATE SET
-         organization_id=EXCLUDED.organization_id, password_hash=EXCLUDED.password_hash,
+         organization_id=EXCLUDED.organization_id,
+         password_hash=COALESCE(EXCLUDED.password_hash, users.password_hash),
          first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name,
          role='admin', is_active=true, is_platform_admin=true
        RETURNING id, email, (xmax=0) AS inserted`,
@@ -577,8 +588,10 @@ async function ensurePlatformAdmin() {
 
     const mode = result.rows[0].inserted ? 'created' : 'updated';
     log('info', 'platform.admin.provisioned', { email, status: mode, org: orgName });
-    if (generated) {
+    if (shouldGeneratePassword) {
       log('info', 'platform.admin.generated_password', { email, password });
+    } else if (!password && isExistingUser) {
+      log('info', 'platform.admin.password_preserved', { email });
     }
   } catch (err) {
     await client.query('ROLLBACK');

@@ -496,7 +496,11 @@ async function getUserById(userId) {
     [userId]
   );
 
-  return result.rows[0] || null;
+  const user = result.rows[0] || null;
+  if (user) {
+    user.email = decrypt(user.email);
+  }
+  return user;
 }
 
 async function resolveFrameworkIdsByCode(client, frameworkCodes) {
