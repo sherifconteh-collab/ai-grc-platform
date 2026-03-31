@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v2.8.4-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v2.8.5-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-29 | PR #105: Fix macOS and Linux smoke-test failures in build-release workflow -->
+<!-- LAST_UPDATED: 2026-03-31 | PR #115: chore(deps): resolve dependabot PRs and sync ControlWeave upstream fixes -->
 
 ## 🎯 What is This?
 
