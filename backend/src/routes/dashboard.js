@@ -272,7 +272,7 @@ router.get('/stats', dashboardReadRateLimiter, authenticate, async (req, res) =>
  * GET /api/v1/dashboard/priority-actions
  * Get high-priority controls that need attention
  */
-router.get('/priority-actions', authenticate, async (req, res) => {
+router.get('/priority-actions', dashboardReadRateLimiter, authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const { limit = 10 } = req.query;
@@ -348,7 +348,7 @@ router.get('/priority-actions', authenticate, async (req, res) => {
  * GET /api/v1/dashboard/recent-activity
  * Get recent activity feed for the organization
  */
-router.get('/recent-activity', authenticate, async (req, res) => {
+router.get('/recent-activity', dashboardReadRateLimiter, authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const { limit = 20 } = req.query;
@@ -416,7 +416,7 @@ router.get('/recent-activity', authenticate, async (req, res) => {
  * GET /api/v1/dashboard/compliance-trend
  * Get compliance percentage trend over time
  */
-router.get('/compliance-trend', authenticate, async (req, res) => {
+router.get('/compliance-trend', dashboardReadRateLimiter, authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
     const { days = 30 } = req.query;
@@ -443,7 +443,7 @@ router.get('/compliance-trend', authenticate, async (req, res) => {
  * GET /api/v1/dashboard/crosswalk-impact
  * Get statistics on crosswalk satisfaction impact
  */
-router.get('/crosswalk-impact', authenticate, async (req, res) => {
+router.get('/crosswalk-impact', dashboardReadRateLimiter, authenticate, async (req, res) => {
   try {
     const orgId = req.user.organizationId;
 
