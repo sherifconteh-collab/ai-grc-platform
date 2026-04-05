@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-03-31 | PR #115: chore(deps): resolve dependabot PRs and sync ControlWeave upstream fixes -->
+<!-- LAST_UPDATED: 2026-04-05 | PR #117: chore: incorporate dependency PRs, fix security vulnerabilities, add CI code quality -->
 
 ## 🎯 What is This?
 

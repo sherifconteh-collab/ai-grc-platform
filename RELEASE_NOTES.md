@@ -14,8 +14,10 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore: incorporate dependency PRs, fix security vulnerabilities, add CI code quality ([#117](https://github.com/sherifconteh-collab/ai-grc-platform/pull/117)) — @Copilot
 - chore(deps): resolve dependabot PRs and sync ControlWeave upstream fixes ([#115](https://github.com/sherifconteh-collab/ai-grc-platform/pull/115)) — @Copilot
-- No unreleased changes yet.
+- Sync ControlWeave dashboard overview support into the community backend so the existing dashboard page can load its combined stats/activity/trend payload.
+- Decrypt middleware-hydrated user email values so authenticated backend code paths and dashboard activity responses no longer surface encrypted email envelopes.
 
 ## [2.8.5] — 2026-03-30
 
