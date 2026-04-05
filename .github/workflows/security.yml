@@ -36,6 +36,29 @@ jobs:
           npm ci
           npm audit --audit-level=moderate
 
+  code-quality:
+    name: Code Quality (Typecheck & Syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Backend - syntax check
+        run: |
+          cd backend
+          npm ci
+          npm run check:syntax
+
+      - name: Frontend - typecheck
+        run: |
+          cd frontend
+          npm ci
+          npm run typecheck
+
   secret-scanning:
     name: Scan for Hardcoded Secrets
     runs-on: ubuntu-latest
