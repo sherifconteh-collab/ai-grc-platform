@@ -67,7 +67,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
-    "@modelcontextprotocol/sdk": "^1.28.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.14.0",
