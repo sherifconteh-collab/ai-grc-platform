@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-04-05 | PR #117: chore: incorporate dependency PRs, fix security vulnerabilities, add CI code quality -->
+<!-- LAST_UPDATED: 2026-04-06 | PRs #107 #119–#126: apply all open dependency PRs — Express 5, Next.js 16.2.2, ESLint 10, zod 4, stripe 22, @modelcontextprotocol/sdk 1.29 -->
 
 ## 🎯 What is This?
 
@@ -549,9 +549,9 @@ controlweave/
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Node.js / Express
+- **Backend**: Node.js / Express 5
 - **Database**: PostgreSQL 14+
-- **Frontend**: Next.js (React) with TypeScript and Tailwind CSS
+- **Frontend**: Next.js 16.2.2 (React) with TypeScript and Tailwind CSS
 - **Authentication**: JWT + OAuth 2.0 with TOTP 2FA (WebAuthn/passkey endpoints stubbed, not yet functional)
 - **AI**: BYOK multi-provider support (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama for local inference via configurable endpoint)
 - **API**: REST with OpenAPI specification
