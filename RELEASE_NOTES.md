@@ -14,6 +14,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Update code based on latest release notes, sync with main, and apply all open dependency PRs ([#116](https://github.com/sherifconteh-collab/ai-grc-platform/pull/116)) — @Copilot
 - chore(deps): apply all open dependency PRs — Express 4→5, stripe 21→22, zod 3→4, @modelcontextprotocol/sdk 1.28→1.29, next 16.2.1→16.2.2, eslint-config-next 16.2.1→16.2.2, @types/node ^22→^25.5.2, eslint 9→10, @xmldom/xmldom 0.8.11→0.8.12 ([#107](https://github.com/sherifconteh-collab/ai-grc-platform/pull/107), [#119](https://github.com/sherifconteh-collab/ai-grc-platform/pull/119), [#120](https://github.com/sherifconteh-collab/ai-grc-platform/pull/120), [#121](https://github.com/sherifconteh-collab/ai-grc-platform/pull/121), [#122](https://github.com/sherifconteh-collab/ai-grc-platform/pull/122), [#123](https://github.com/sherifconteh-collab/ai-grc-platform/pull/123), [#124](https://github.com/sherifconteh-collab/ai-grc-platform/pull/124), [#125](https://github.com/sherifconteh-collab/ai-grc-platform/pull/125), [#126](https://github.com/sherifconteh-collab/ai-grc-platform/pull/126)) — @Copilot
 - chore: incorporate dependency PRs, fix security vulnerabilities, add CI code quality ([#117](https://github.com/sherifconteh-collab/ai-grc-platform/pull/117)) — @Copilot
 - chore(deps): resolve dependabot PRs and sync ControlWeave upstream fixes ([#115](https://github.com/sherifconteh-collab/ai-grc-platform/pull/115)) — @Copilot

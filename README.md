@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-04-06 | PRs #107 #119–#126: apply all open dependency PRs — Express 5, Next.js 16.2.2, ESLint 10, zod 4, stripe 22, @modelcontextprotocol/sdk 1.29 -->
+<!-- LAST_UPDATED: 2026-04-08 | PR #116: Update code based on latest release notes, sync with main, and apply all open dependency PRs -->
 
 ## 🎯 What is This?
 
