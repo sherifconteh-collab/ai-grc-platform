@@ -17,7 +17,7 @@
     "axios": "^1.14.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.7.0",
-    "next": "16.2.1",
+    "next": "16.2.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
@@ -25,11 +25,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.1",
+    "eslint": "^10.2.0",
+    "eslint-config-next": "^16.2.2",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.2.2",
     "typescript": "6.0.2"
