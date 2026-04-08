@@ -425,7 +425,8 @@ jobs:
           for appimage in "${appimages[@]}"; do
             echo "Smoke testing $appimage"
             chmod +x "$appimage"
-            APPIMAGE_EXTRACT_AND_RUN=1 "$appimage" --no-sandbox --smoke-test
+            APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a --server-args='-screen 0 1280x720x24' \
+              "$appimage" --no-sandbox --disable-gpu --smoke-test
           done
 
       - name: Upload AppImage to GitHub Release
