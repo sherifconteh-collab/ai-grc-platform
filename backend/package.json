@@ -94,7 +94,7 @@
     "rss-parser": "^3.13.0",
     "sanitize-html": "^2.17.2",
     "socket.io": "^4.8.1",
-    "stripe": "^22.0.0",
+    "stripe": "^22.0.1",
     "xml2js": "^0.6.2",
     "zod": "^4.3.6"
   },
