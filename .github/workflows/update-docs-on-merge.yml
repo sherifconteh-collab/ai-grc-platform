@@ -27,7 +27,7 @@ jobs:
 
       - name: Look up merged PR metadata
         id: pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             // Find the PR that was merged by this push (the commit SHA is the merge commit).
