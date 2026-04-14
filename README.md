@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-04-08 | PR #116: Update code based on latest release notes, sync with main, and apply all open dependency PRs -->
+<!-- LAST_UPDATED: 2026-04-14 | PR #128: Fix Linux AppImage smoke test, consolidate safe dependency PR updates, and clear security audit failures -->
 
 ## 🎯 What is This?
 
