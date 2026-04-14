@@ -12,7 +12,7 @@ function normalizeEmail(value) {
 }
 
 function buildReplacementEmail(userId) {
-  const compactId = String(userId || '').replace(/-/g, '').slice(0, 12) || 'user';
+  const compactId = String(userId ?? '').trim().replace(/-/g, '').slice(0, 12) || 'user';
   return `duplicate+${compactId}@${TOMBSTONE_DOMAIN}`;
 }
 

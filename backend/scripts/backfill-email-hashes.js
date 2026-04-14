@@ -25,7 +25,7 @@ async function backfillEmailHashes() {
        ORDER BY created_at ASC, id ASC`
     );
 
-    const usersToBackfill = result.rows.filter((row) => !String(row.email_hash || '').trim());
+    const usersToBackfill = result.rows.filter((row) => !row.email_hash?.trim());
 
     if (usersToBackfill.length === 0) {
       console.log('No users require email hash backfill.');
