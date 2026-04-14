@@ -56,6 +56,8 @@
     "seed:aiuc1": "node scripts/seed-aiuc1-framework.js",
     "seed:assessment-rich-all": "node scripts/seed-assessment-procedures-rich-all.js",
     "seed:assessment-remaining": "node scripts/seed-assessment-procedures-remaining.js",
+    "backfill:email-hashes": "node scripts/backfill-email-hashes.js",
+    "cleanup:dedupe-user-emails": "node scripts/dedupe-users-by-email.js",
     "security:generate-jwt-secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
     "audit:check": "npm audit --audit-level=moderate",
     "qa:e2e:enterprise": "node scripts/qa-enterprise-demo.js",
