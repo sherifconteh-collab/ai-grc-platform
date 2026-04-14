@@ -78,7 +78,7 @@
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "hono": "^4.12.7",
+    "hono": "^4.12.12",
     "ioredis": "^5.10.1",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -108,7 +108,7 @@
     "express-rate-limit": "8.2.2",
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
-    "hono": "^4.12.7",
+    "hono": "^4.12.12",
     "socket.io-parser": "4.2.6",
     "yauzl": ">=3.2.1",
     "@xmldom/xmldom": ">=0.8.12",
@@ -117,6 +117,7 @@
     },
     "router": {
       "path-to-regexp": "8.4.0"
-    }
+    },
+    "follow-redirects": "^1.16.0"
   }
 }

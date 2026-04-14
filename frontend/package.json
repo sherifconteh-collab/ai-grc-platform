@@ -36,6 +36,7 @@
   },
   "overrides": {
     "minimatch": "^10.2.3",
-    "socket.io-parser": "4.2.6"
+    "socket.io-parser": "4.2.6",
+    "follow-redirects": "^1.16.0"
   }
 }
