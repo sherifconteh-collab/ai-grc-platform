@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.2.2",
-    "axios": "^1.14.0",
+    "axios": "^1.15.0",
     "date-fns": "^4.1.0",
-    "lucide-react": "^1.7.0",
-    "next": "16.2.2",
+    "lucide-react": "^1.8.0",
+    "next": "16.2.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
@@ -29,13 +29,14 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^10.2.0",
-    "eslint-config-next": "^16.2.2",
+    "eslint-config-next": "^16.2.3",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.2.2",
     "typescript": "6.0.2"
   },
   "overrides": {
     "minimatch": "^10.2.3",
-    "socket.io-parser": "4.2.6"
+    "socket.io-parser": "4.2.6",
+    "follow-redirects": "^1.16.0"
   }
 }
