@@ -1,0 +1,36 @@
+[
+  {
+    "input": {
+      "control": "CM-3 — Configuration Change Control",
+      "framework": "NIST 800-53 Rev. 5"
+    },
+    "output": {
+      "objective": "Verify that changes to in-scope production systems are approved, tested, and documented per CM-3.",
+      "scope": "All change tickets closed in the prior 90 days for the customer-facing application stack.",
+      "steps": [
+        { "order": 1, "procedure": "Walkthrough the change management workflow with the platform engineering lead.", "method": "walkthrough", "pass_criteria": "Lead can articulate approval gates and rollback expectations." },
+        { "order": 2, "procedure": "Inspect a sample of 25 change tickets for required CAB approval, test evidence, and back-out plan.", "method": "inspection", "pass_criteria": "All sampled tickets contain approval, test, and back-out artifacts.", "fail_criteria": "Any sampled ticket missing one of the three artifacts." },
+        { "order": 3, "procedure": "Re-perform the deployment of one selected change in a non-production environment.", "method": "re-performance", "pass_criteria": "Deployment matches documented procedure end-to-end." }
+      ],
+      "sample_size": "25 of 312 closed change tickets (random)",
+      "frequency": "Annual"
+    }
+  },
+  {
+    "input": {
+      "control": "AC-2 — Account Management",
+      "framework": "NIST 800-53 Rev. 5"
+    },
+    "output": {
+      "objective": "Validate provisioning, modification, and deprovisioning of user accounts comply with AC-2.",
+      "scope": "All user accounts created, modified, or terminated in the prior fiscal quarter.",
+      "steps": [
+        { "order": 1, "procedure": "Inquire about the joiner/mover/leaver process with HR and IT.", "method": "inquiry", "pass_criteria": "Documented JML procedure exists and is current." },
+        { "order": 2, "procedure": "Inspect 15 hire and 15 termination tickets to verify timing of account creation and disablement.", "method": "inspection", "pass_criteria": "Account created on or before start date; disabled within 24 hours of termination.", "fail_criteria": "Any account active beyond 24 hours after termination." },
+        { "order": 3, "procedure": "Observe a privileged access request fulfillment from submission to provisioning.", "method": "observation", "pass_criteria": "Request approved by manager and asset owner before access is granted." }
+      ],
+      "sample_size": "30 tickets (15 hire + 15 termination)",
+      "frequency": "Quarterly"
+    }
+  }
+]

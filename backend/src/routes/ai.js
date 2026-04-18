@@ -7,6 +7,7 @@ const llm = require('../services/llmService');
 const auditService = require('../services/auditService');
 const pool = require('../config/database');
 const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
+const llmSchemas = require('../services/llmSchemas');
 
 const aiOrgRateLimiter = createOrgRateLimiter({
   windowMs: 60 * 1000,
@@ -109,6 +110,30 @@ function extractAgentMetadata(req) {
   };
 }
 
+// Helper: try to extract a JSON object/array from a possibly-mixed text response.
+// Models sometimes wrap JSON in ```json fences or surrounding prose. We strip
+// the most common wrappers; if no parseable JSON is found we return null.
+function _tryParseJson(text) {
+  if (text == null) return null;
+  if (typeof text === 'object') return text;
+  if (typeof text !== 'string') return null;
+  let s = text.trim();
+  // Strip code fences
+  const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(s);
+  if (fence) s = fence[1].trim();
+  // Try direct parse first
+  try { return JSON.parse(s); } catch (_e) { /* fall through */ }
+  // Find first { or [ ... last } or ]
+  const firstObj = s.indexOf('{');
+  const firstArr = s.indexOf('[');
+  let start = firstObj;
+  if (firstArr !== -1 && (firstObj === -1 || firstArr < firstObj)) start = firstArr;
+  if (start === -1) return null;
+  const last = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
+  if (last <= start) return null;
+  try { return JSON.parse(s.substring(start, last + 1)); } catch (_e) { return null; }
+}
+
 // Helper: wrap AI handler with logging
 function aiHandler(feature, fn, opts = {}) {
   return async (req, res) => {
@@ -124,13 +149,72 @@ function aiHandler(feature, fn, opts = {}) {
     };
     try {
       params = await getAIParams(req);
+
+      // v3.0.0: resolve task profile + temperature; pass through params so
+      // feature functions that build their own LLM calls can honor it.
+      const profileResolution = llm.resolveModelAndTemperature({
+        featureKey: feature,
+        provider: params.provider,
+        callerOverrides: {
+          model: req.body?.model || req.query?.model,
+          temperature: typeof req.body?.temperature === 'number' ? req.body.temperature : undefined,
+        },
+        orgDefaults: { model: params.model },
+      });
+      params.temperature = profileResolution.temperature;
+      // Force JSON mode for features with a registered structured schema.
+      const schema = llmSchemas.getSchemaForFeature(feature);
+      if (schema) params.jsonMode = true;
+      params.taskProfile = profileResolution.profile;
+
       const tracked = await llm.withAITrackingContext(() => fn(req, params));
-      const result = tracked?.result;
+      let result = tracked?.result;
       const durationMs = Date.now() - startMs;
-      const tracking = tracked?.tracking || null;
-      const resolvedProvider = tracking?.usedProvider || params.provider;
-      const resolvedModel = tracking?.usedModel || params.model;
-      const fallbackUsed = !!tracking?.fallbackUsed;
+      let tracking = tracked?.tracking || null;
+      let resolvedProvider = tracking?.usedProvider || params.provider;
+      let resolvedModel = tracking?.usedModel || params.model;
+      let fallbackUsed = !!tracking?.fallbackUsed;
+
+      // v3.0.0: structured-output validation + one-shot retry.
+      // If the feature has a registered schema, parse + validate the result.
+      // On failure, set req._aiCorrectionHint and retry once. If retry also
+      // fails, return the original (best-effort) result with structured=null.
+      let structured = null;
+      let qualityErrors = null;
+      if (schema) {
+        const parsed = _tryParseJson(result);
+        const validation = parsed ? llmSchemas.validate(schema, parsed) : { valid: false, errors: [{ instancePath: '/', message: 'response was not valid JSON' }] };
+        if (validation.valid) {
+          structured = parsed;
+        } else {
+          // One-shot retry with error context
+          req._aiCorrectionHint = llmSchemas.formatErrorsForRetry(validation.errors);
+          try {
+            const retried = await llm.withAITrackingContext(() => fn(req, params));
+            const retryResult = retried?.result;
+            const retryParsed = _tryParseJson(retryResult);
+            const retryValidation = retryParsed ? llmSchemas.validate(schema, retryParsed) : { valid: false, errors: validation.errors };
+            if (retryValidation.valid) {
+              structured = retryParsed;
+              result = retryResult;
+              // Update tracking metadata to reflect the retry attempt that
+              // actually produced the response we're returning.
+              tracking = retried?.tracking || tracking;
+              if (tracking) {
+                resolvedProvider = tracking.usedProvider || resolvedProvider;
+                resolvedModel = tracking.usedModel || resolvedModel;
+                fallbackUsed = !!tracking.fallbackUsed;
+              }
+            } else {
+              qualityErrors = retryValidation.errors;
+            }
+          } catch (_retryErr) {
+            qualityErrors = validation.errors;
+          } finally {
+            delete req._aiCorrectionHint;
+          }
+        }
+      }
 
       // Capture text output for high-stakes decision logging
       if (typeof result === 'string') resultText = result;
@@ -155,6 +239,7 @@ function aiHandler(feature, fn, opts = {}) {
         resourceType: opts.resourceType ? (typeof opts.resourceType === 'function' ? opts.resourceType(req) : opts.resourceType) : null,
         resourceId: opts.resourceId ? (typeof opts.resourceId === 'function' ? opts.resourceId(req) : opts.resourceId) : null,
         dataLineage: agentMetadata.dataLineage,
+        structured,
       }).catch(() => {});
 
       if (fallbackUsed) {
@@ -176,7 +261,19 @@ function aiHandler(feature, fn, opts = {}) {
         }).catch(() => {});
       }
 
-      res.json({ success: true, data: { result, feature, provider: resolvedProvider, model: resolvedModel, fallbackUsed } });
+      res.json({
+        success: true,
+        data: {
+          result,
+          structured,           // v3.0.0: validated JSON object (or null when invalid / no schema)
+          feature,
+          provider: resolvedProvider,
+          model: resolvedModel,
+          taskProfile: params.taskProfile,
+          fallbackUsed,
+          qualityErrors,        // null when valid; array of {instancePath, message} otherwise
+        }
+      });
     } catch (err) {
       const durationMs = Date.now() - startMs;
       console.error(`AI ${feature} error:`, err);

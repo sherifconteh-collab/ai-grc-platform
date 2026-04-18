@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { requiresOrganizationOnboarding, hasPermission } from '@/lib/access';
-import { requiresBillingResolution } from '@/lib/billing';
+import { requiresBillingResolution, readValidPendingPlan } from '@/lib/billing';
 import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import { WebSocketStatusIndicator } from './WebSocketStatusIndicator';
 import Sidebar from './Sidebar';
@@ -63,11 +63,12 @@ export default function DashboardLayout({
       return;
     }
 
-    // Check for a pending billing plan that hasn't been completed via Stripe
-    const pendingPlan = typeof window !== 'undefined'
-      ? String(localStorage.getItem('pendingPlan') || '')
-      : '';
-    if (pendingPlan.length > 0) {
+    // Check for a pending billing plan that hasn't been completed via Stripe.
+    // readValidPendingPlan() validates against VALID_BILLING_PLANS and auto-clears
+    // any stale/malformed value so we never redirect the user to checkout with
+    // a SKU Stripe will reject.
+    const pendingPlan = readValidPendingPlan();
+    if (pendingPlan) {
       setRedirectingToCheckout(true);
       router.push(`/billing/checkout?plan=${encodeURIComponent(pendingPlan)}`);
       return;

@@ -1,0 +1,38 @@
+[
+  {
+    "input": {
+      "framework": "SOC 2",
+      "control": "CC6.1",
+      "observation": "3 of 25 sampled terminations had user accounts active 4+ days after termination."
+    },
+    "output": {
+      "criteria": "SOC 2 CC6.1 requires the entity to implement logical access security software, infrastructure, and architectures over protected information assets to protect them from security events.",
+      "condition": "During testing of the joiner/mover/leaver process, 3 of 25 sampled terminations (12%) had user accounts that remained active for 4 or more days after the documented termination date.",
+      "cause": "The HR-to-IAM termination notification depends on a manual ticket. Two of the three exceptions traced back to the requesting manager forgetting to file the ticket; the third was filed but not actioned for 6 days due to lack of an SLA.",
+      "effect": "Active accounts of terminated personnel could be used to access customer data, undermining CC6.1 and increasing the risk of unauthorized access incidents and audit findings.",
+      "recommendation": "Implement an automated HRIS-to-IAM disablement integration with a 24-hour SLA, monitored by a daily exception report routed to the SecOps team.",
+      "management_response_placeholder": "[Awaiting management response]",
+      "related_controls": ["AC-2(3)", "AC-2(13)"],
+      "repeat_finding": false,
+      "finding_id_hint": "F-2026-CC6.1-01"
+    }
+  },
+  {
+    "input": {
+      "framework": "ISO/IEC 27001:2022",
+      "control": "A.8.16",
+      "observation": "Audit logs from the customer database are not reviewed."
+    },
+    "output": {
+      "criteria": "ISO/IEC 27001:2022 Annex A.8.16 requires monitoring of networks, systems, and applications for anomalous behavior with appropriate actions taken to evaluate potential information security incidents.",
+      "condition": "Database audit logs are forwarded to the SIEM but no review cadence, alerting rule, or evidence of review exists for the customer-data database cluster.",
+      "cause": "The detection engineering backlog deprioritized this work after a re-org; no owner was reassigned.",
+      "effect": "Anomalous queries against customer data could go undetected, prolonging incident dwell time and increasing breach impact.",
+      "recommendation": "Assign an owner, build alerting rules for high-volume export and admin-credential queries, and document a weekly review cadence with sign-off.",
+      "management_response_placeholder": "[Awaiting management response]",
+      "related_controls": ["A.8.15", "A.5.25"],
+      "repeat_finding": true,
+      "finding_id_hint": "F-2026-A8.16-02"
+    }
+  }
+]

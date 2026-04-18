@@ -180,7 +180,7 @@ function initializeWebSocket(httpServer) {
       }
 
       // Verify JWT token
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
 
       // Fetch user from database
       const userResult = await pool.query(

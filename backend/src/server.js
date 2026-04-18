@@ -352,6 +352,7 @@ const ragRoutes = safeRequire('./routes/rag');
 const rmfRoutes = safeRequire('./routes/rmf');
 const stateAiLawsRoutes = safeRequire('./routes/stateAiLaws');
 const totpRoutes = require('./routes/totp');
+const pushTokensRoutes = require('./routes/pushTokens');
 
 // ── Community-mirror startup diagnostic ──
 // Routes loaded via safeRequire() are absent when this process runs from the
@@ -401,6 +402,7 @@ if (_absentPaidRoutes.length > 0) {
 app.use('/api/v1/license', licenseRoutes);
 if (passkeyRoutes) app.use('/api/v1/auth/passkey', passkeyRoutes);
 app.use('/api/v1/auth/totp', totpRoutes);
+app.use('/api/v1/push-tokens', pushTokensRoutes);
 app.use('/api/v1/auth', authRoutes);
 if (ssoRoutes) app.use('/api/v1/sso', ssoRoutes);
 if (siemRoutes) app.use('/api/v1/siem', siemRoutes);

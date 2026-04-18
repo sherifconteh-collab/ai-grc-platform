@@ -10,6 +10,47 @@ const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middl
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
+
+// ---------------------------------------------------------------------------
+// Security constants — raised in v3.0.0
+// ---------------------------------------------------------------------------
+// bcrypt cost factor for new password hashes. Existing hashes at lower cost
+// continue to verify successfully; on a successful login we re-hash lazily
+// so the user is silently upgraded to the new cost.
+const BCRYPT_COST = 14;
+
+// JWT verification is pinned to HS256 only. Tokens signed with any other
+// algorithm are rejected (defends against algorithm-confusion attacks).
+const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: ['HS256'] });
+
+/**
+ * Returns the bcrypt cost embedded in a hash string, or null if it cannot be
+ * determined. bcrypt hashes have the form `$2a$<cost>$...`.
+ */
+function getBcryptCost(hash) {
+  if (typeof hash !== 'string') return null;
+  const m = /^\$2[abxy]\$(\d{2})\$/.exec(hash);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * If the stored hash is below the current BCRYPT_COST, transparently re-hash
+ * the password and update the user's row. Errors are swallowed so an upgrade
+ * failure can never block a legitimate login.
+ */
+async function maybeUpgradePasswordHash(userId, plaintext, currentHash) {
+  try {
+    const cost = getBcryptCost(currentHash);
+    if (cost !== null && cost >= BCRYPT_COST) return;
+    const newHash = await bcrypt.hash(plaintext, BCRYPT_COST);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, password_cost = $2 WHERE id = $3',
+      [newHash, BCRYPT_COST, userId]
+    );
+  } catch (_e) {
+    // intentional no-op: upgrade is best-effort
+  }
+}
 let getTrialSeedData = () => ({
   tier: 'community',
   billingStatus: 'community',
@@ -605,7 +646,7 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
       }
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
     const nameParts = normalizedFullName.split(/\s+/);
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -656,11 +697,11 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
 
       const storedEmail = emailHash ? encrypt(normalizedEmail) : normalizedEmail;
       const insertCols = emailHash
-        ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role, country_code, region'
-        : 'organization_id, email, password_hash, first_name, last_name, role, country_code, region';
+        ? 'organization_id, email, email_hash, password_hash, password_cost, first_name, last_name, role, country_code, region'
+        : 'organization_id, email, password_hash, password_cost, first_name, last_name, role, country_code, region';
       const insertVals = emailHash
-        ? [org.id, storedEmail, emailHash, passwordHash, firstName, lastName, selectedRole, countryCode, region]
-        : [org.id, normalizedEmail, passwordHash, firstName, lastName, selectedRole, countryCode, region];
+        ? [org.id, storedEmail, emailHash, passwordHash, BCRYPT_COST, firstName, lastName, selectedRole, countryCode, region]
+        : [org.id, normalizedEmail, passwordHash, BCRYPT_COST, firstName, lastName, selectedRole, countryCode, region];
       const insertPlaceholders = insertVals.map((_, i) => `$${i + 1}`).join(', ');
       const userResult = await client.query(
         `INSERT INTO users (${insertCols})
@@ -861,6 +902,9 @@ router.post('/login', authLoginLimiter, validateBody((body) => requireFields(bod
       }
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
+
+    // Lazily upgrade legacy password hashes to current BCRYPT_COST. Best-effort.
+    maybeUpgradePasswordHash(user.id, password, user.password_hash);
 
     // Reset lockout on successful password check and update region
     const geo = getGeolocationFromRequest(req);
@@ -1101,17 +1145,18 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
       return res.status(403).json({ success: false, error: 'Password reset is not available for demo accounts' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(
         `UPDATE users
          SET password_hash = $1,
+             password_cost = $2,
              failed_login_attempts = 0,
              locked_until = NULL
-         WHERE id = $2`,
-        [passwordHash, resetTokenRow.user_id]
+         WHERE id = $3`,
+        [passwordHash, BCRYPT_COST, resetTokenRow.user_id]
       );
       await client.query(
         'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1',
@@ -1141,7 +1186,7 @@ router.post('/refresh', authRefreshLimiter, validateBody((body) => requireFields
   try {
     const { refreshToken } = req.body;
 
-    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    const decoded = jwt.verify(refreshToken, JWT_SECRET, JWT_VERIFY_OPTIONS);
     if (decoded.type !== 'refresh') {
       return res.status(401).json({ success: false, error: 'Invalid token type' });
     }
@@ -1404,7 +1449,7 @@ router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
       }
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
     const nameParts = normalizedFullName.split(/\s+/).filter(Boolean);
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -1416,11 +1461,11 @@ router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
       // Create user in the invite's organization
       const inviteStoredEmail = inviteEmailHash ? encrypt(inviteEmailNorm) : invite.email;
       const inviteInsertCols = inviteEmailHash
-        ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role'
-        : 'organization_id, email, password_hash, first_name, last_name, role';
+        ? 'organization_id, email, email_hash, password_hash, password_cost, first_name, last_name, role'
+        : 'organization_id, email, password_hash, password_cost, first_name, last_name, role';
       const inviteInsertVals = inviteEmailHash
-        ? [invite.organization_id, inviteStoredEmail, inviteEmailHash, passwordHash, firstName, lastName, invite.primary_role]
-        : [invite.organization_id, invite.email, passwordHash, firstName, lastName, invite.primary_role];
+        ? [invite.organization_id, inviteStoredEmail, inviteEmailHash, passwordHash, BCRYPT_COST, firstName, lastName, invite.primary_role]
+        : [invite.organization_id, invite.email, passwordHash, BCRYPT_COST, firstName, lastName, invite.primary_role];
       const inviteInsertPlaceholders = inviteInsertVals.map((_, i) => `$${i + 1}`).join(', ');
       const userResult = await client.query(
         `INSERT INTO users (${inviteInsertCols})

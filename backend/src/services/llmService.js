@@ -73,6 +73,103 @@ let _lastCallMeta = { usedProvider: null, usedModel: null };
 let _cache = {};
 
 // ---------------------------------------------------------------------------
+// Task profiles (v3.0.0) — model tiering by task type.
+//
+// Resolution order for model/temperature:
+//   1. explicit caller override (params.model / params.temperature)
+//   2. organization BYOK override (default_model from llm_configurations,
+//      honored only when BYOK policy permits)
+//   3. profile default
+// ---------------------------------------------------------------------------
+const TASK_PROFILES = Object.freeze({
+  reasoning: {
+    temperature: 0.4,
+    models: { anthropic: 'claude-sonnet-4-20250514', openai: 'gpt-4o' },
+  },
+  extraction: {
+    temperature: 0.2,
+    models: { anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4o-mini' },
+  },
+  ideation: {
+    temperature: 0.7,
+    models: { anthropic: 'claude-sonnet-4-20250514', openai: 'gpt-4o' },
+  },
+  chat: {
+    temperature: 0.3,
+    models: { anthropic: 'claude-sonnet-4-20250514', openai: 'gpt-4o' },
+  },
+});
+
+// 25 feature keys mapped to a profile.
+const FEATURE_TASK_PROFILE = Object.freeze({
+  // reasoning
+  gap_analysis: 'reasoning',
+  remediation_playbook: 'reasoning',
+  vulnerability_remediation: 'reasoning',
+  finding: 'reasoning',
+  audit_finding_draft: 'reasoning',
+  compliance_forecast: 'reasoning',
+  executive_report: 'reasoning',
+  incident_response: 'reasoning',
+  vendor_risk: 'reasoning',
+  audit_readiness: 'reasoning',
+  copilot_session: 'reasoning',
+  risk_heatmap: 'reasoning',
+  ai_governance: 'reasoning',
+  // extraction
+  evidence_suggestion: 'extraction',
+  evidence_suggest: 'extraction',
+  test_procedures: 'extraction',
+  control_mapping: 'extraction',
+  asset_control_mapping: 'extraction',
+  control_narrative_draft: 'extraction',
+  control_analysis: 'extraction',
+  audit_pbc_draft: 'extraction',
+  audit_workpaper_draft: 'extraction',
+  // ideation
+  policy_generator: 'ideation',
+  roadmap_generation: 'ideation',
+  tabletop_scenario: 'ideation',
+  // chat
+  chat: 'chat',
+  compliance_query: 'chat',
+});
+
+function getTaskProfile(featureKey) {
+  const name = FEATURE_TASK_PROFILE[featureKey] || 'reasoning';
+  return { name, ...TASK_PROFILES[name] };
+}
+
+// Normalize provider aliases (claude→anthropic, xai→grok) so downstream
+// per-provider lookups (TASK_PROFILES.models, PROVIDER_MODELS) hit the
+// canonical key.
+const PROVIDER_ALIASES = Object.freeze({
+  claude: 'anthropic',
+  xai: 'grok',
+});
+function _canonicalProvider(p) {
+  const k = (p || '').toLowerCase();
+  return PROVIDER_ALIASES[k] || k;
+}
+
+/**
+ * Resolve provider/model/temperature for a feature call following the
+ * documented resolution order. callerOverrides take priority; orgDefaults
+ * fill in when caller did not specify; profile defaults are the floor.
+ */
+function resolveModelAndTemperature({ featureKey, provider, callerOverrides = {}, orgDefaults = {} }) {
+  const profile = getTaskProfile(featureKey);
+  const p = _canonicalProvider(provider || DEFAULT_PROVIDER);
+  const profileModel = profile.models[p] || (PROVIDER_MODELS[p] ? PROVIDER_MODELS[p][0] : null);
+  const model = callerOverrides.model || orgDefaults.model || profileModel;
+  const temperature =
+    typeof callerOverrides.temperature === 'number' ? callerOverrides.temperature
+      : (typeof orgDefaults.temperature === 'number' ? orgDefaults.temperature
+        : profile.temperature);
+  return { profile: profile.name, model, temperature };
+}
+
+// ---------------------------------------------------------------------------
 // Encryption helpers  (AES-256-GCM,  iv:authTag:ciphertext  hex)
 // ---------------------------------------------------------------------------
 
@@ -273,38 +370,46 @@ async function withAITrackingContext(fn) {
 // Provider-specific call implementations
 // ---------------------------------------------------------------------------
 
-async function callAnthropic(apiKey, model, systemPrompt, messages) {
+async function callAnthropic(apiKey, model, systemPrompt, messages, opts = {}) {
   if (!Anthropic) throw new Error('Anthropic SDK not installed');
   const client = new Anthropic({ apiKey });
   const mappedMessages = messages.map(m => ({
     role: m.role === 'system' ? 'user' : m.role,
     content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
   }));
-  const resp = await client.messages.create({
+  const req = {
     model: model || PROVIDER_MODELS.anthropic[0],
     max_tokens: 4096,
     system: systemPrompt || undefined,
     messages: mappedMessages,
-  });
+  };
+  if (typeof opts.temperature === 'number') req.temperature = opts.temperature;
+  // Note: Claude stays on the schema+retry guard (Anthropic's structured-output
+  // equivalent requires tool_use rewiring; the validate-and-retry loop in
+  // aiHandler() catches drift).
+  const resp = await client.messages.create(req);
   const text = resp.content.map(b => b.type === 'text' ? b.text : '').join('');
   return text;
 }
 
-async function callOpenAI(apiKey, model, systemPrompt, messages) {
+async function callOpenAI(apiKey, model, systemPrompt, messages, opts = {}) {
   if (!OpenAI) throw new Error('OpenAI SDK not installed');
   const client = new OpenAI({ apiKey });
   const allMessages = [];
   if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
   allMessages.push(...messages);
-  const resp = await client.chat.completions.create({
+  const req = {
     model: model || PROVIDER_MODELS.openai[0],
     messages: allMessages,
-  });
+  };
+  if (typeof opts.temperature === 'number') req.temperature = opts.temperature;
+  if (opts.jsonMode) req.response_format = { type: 'json_object' };
+  const resp = await client.chat.completions.create(req);
   if (!resp.choices?.[0]?.message) throw new Error('Unexpected OpenAI response format');
   return resp.choices[0].message.content;
 }
 
-async function callGemini(apiKey, model, systemPrompt, messages) {
+async function callGemini(apiKey, model, systemPrompt, messages, opts = {}) {
   if (!axios) throw new Error('axios not installed');
   const m = model || PROVIDER_MODELS.gemini[0];
   const userText = messages.map(msg => msg.content).join('\n\n');
@@ -314,6 +419,11 @@ async function callGemini(apiKey, model, systemPrompt, messages) {
   if (systemPrompt) {
     body.systemInstruction = { parts: [{ text: systemPrompt }] };
   }
+  const generationConfig = {};
+  if (typeof opts.temperature === 'number') generationConfig.temperature = opts.temperature;
+  if (opts.jsonMode) generationConfig.responseMimeType = 'application/json';
+  if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
   const resp = await axios.post(url, body, {
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -326,15 +436,18 @@ async function callGemini(apiKey, model, systemPrompt, messages) {
   return '';
 }
 
-async function callGroq(apiKey, model, systemPrompt, messages) {
+async function callGroq(apiKey, model, systemPrompt, messages, opts = {}) {
   if (!axios) throw new Error('axios not installed');
   const allMessages = [];
   if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
   allMessages.push(...messages);
-  const resp = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+  const body = {
     model: model || PROVIDER_MODELS.groq[0],
     messages: allMessages,
-  }, {
+  };
+  if (typeof opts.temperature === 'number') body.temperature = opts.temperature;
+  if (opts.jsonMode) body.response_format = { type: 'json_object' };
+  const resp = await axios.post('https://api.groq.com/openai/v1/chat/completions', body, {
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     timeout: PROVIDER_TIMEOUT_MS.groq,
   });
@@ -342,15 +455,18 @@ async function callGroq(apiKey, model, systemPrompt, messages) {
   return resp.data.choices[0].message.content;
 }
 
-async function callGrok(apiKey, model, systemPrompt, messages) {
+async function callGrok(apiKey, model, systemPrompt, messages, opts = {}) {
   if (!axios) throw new Error('axios not installed');
   const allMessages = [];
   if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
   allMessages.push(...messages);
-  const resp = await axios.post('https://api.x.ai/v1/chat/completions', {
+  const body = {
     model: model || PROVIDER_MODELS.grok[0],
     messages: allMessages,
-  }, {
+  };
+  if (typeof opts.temperature === 'number') body.temperature = opts.temperature;
+  if (opts.jsonMode) body.response_format = { type: 'json_object' };
+  const resp = await axios.post('https://api.x.ai/v1/chat/completions', body, {
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     timeout: PROVIDER_TIMEOUT_MS.grok,
   });
@@ -358,17 +474,55 @@ async function callGrok(apiKey, model, systemPrompt, messages) {
   return resp.data.choices[0].message.content;
 }
 
-async function callOllama(baseUrl, model, systemPrompt, messages) {
+// Parsed once at module load to avoid re-splitting on every request.
+const _OLLAMA_HOST_ALLOWLIST = (process.env.OLLAMA_BASE_URL_ALLOWLIST || '')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+// Validate the configured Ollama base URL before issuing a request. The
+// org-admin-set value is treated as untrusted: enforce http(s) scheme, no
+// embedded credentials, and (when OLLAMA_BASE_URL_ALLOWLIST is set) require
+// the hostname to be on the allowlist. localhost remains the safe default
+// because Ollama is designed to run on the same host.
+function _sanitizeOllamaBaseUrl(raw) {
+  let input = raw || 'http://localhost:11434';
+  // Strip trailing slashes without a regex (avoids ReDoS on long inputs).
+  while (input.length > 1 && input.charCodeAt(input.length - 1) === 47 /* '/' */) {
+    input = input.slice(0, -1);
+  }
+  let parsed;
+  try {
+    parsed = new URL(input);
+  } catch (_e) {
+    throw new Error('Invalid OLLAMA base URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Unsupported OLLAMA URL scheme: ${parsed.protocol}`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('OLLAMA URL must not contain credentials');
+  }
+  if (_OLLAMA_HOST_ALLOWLIST.length > 0 && !_OLLAMA_HOST_ALLOWLIST.includes(parsed.hostname.toLowerCase())) {
+    throw new Error(`OLLAMA host not in allowlist: ${parsed.hostname}`);
+  }
+  // Reconstruct a normalized URL — drops any path/query/fragment from the
+  // configured base so callers can append `/api/chat` deterministically.
+  return `${parsed.protocol}//${parsed.host}`;
+}
+
+async function callOllama(baseUrl, model, systemPrompt, messages, opts = {}) {
   if (!axios) throw new Error('axios not installed');
-  const url = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  const url = _sanitizeOllamaBaseUrl(baseUrl);
   const allMessages = [];
   if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
   allMessages.push(...messages);
-  const resp = await axios.post(`${url}/api/chat`, {
+  const body = {
     model: model || PROVIDER_MODELS.ollama[0],
     messages: allMessages,
     stream: false,
-  }, { timeout: PROVIDER_TIMEOUT_MS.ollama });
+  };
+  if (typeof opts.temperature === 'number') body.options = { temperature: opts.temperature };
+  if (opts.jsonMode) body.format = 'json';
+  const resp = await axios.post(`${url}/api/chat`, body, { timeout: PROVIDER_TIMEOUT_MS.ollama });
   return resp.data.message ? resp.data.message.content : (resp.data.response || '');
 }
 
@@ -376,19 +530,19 @@ async function callOllama(baseUrl, model, systemPrompt, messages) {
 // Unified call dispatcher
 // ---------------------------------------------------------------------------
 
-function callProvider(provider, apiKey, model, systemPrompt, messages) {
+function callProvider(provider, apiKey, model, systemPrompt, messages, opts = {}) {
   const p = (provider || '').toLowerCase();
   switch (p) {
     case 'anthropic':
     case 'claude':
-      return callAnthropic(apiKey, model, systemPrompt, messages);
-    case 'openai': return callOpenAI(apiKey, model, systemPrompt, messages);
-    case 'gemini': return callGemini(apiKey, model, systemPrompt, messages);
-    case 'groq': return callGroq(apiKey, model, systemPrompt, messages);
+      return callAnthropic(apiKey, model, systemPrompt, messages, opts);
+    case 'openai': return callOpenAI(apiKey, model, systemPrompt, messages, opts);
+    case 'gemini': return callGemini(apiKey, model, systemPrompt, messages, opts);
+    case 'groq': return callGroq(apiKey, model, systemPrompt, messages, opts);
     case 'grok':
     case 'xai':
-      return callGrok(apiKey, model, systemPrompt, messages);
-    case 'ollama': return callOllama(apiKey, model, systemPrompt, messages);
+      return callGrok(apiKey, model, systemPrompt, messages, opts);
+    case 'ollama': return callOllama(apiKey, model, systemPrompt, messages, opts);
     default: throw new Error(`Unsupported provider: ${provider}`);
   }
 }
@@ -404,24 +558,30 @@ async function callLLM(params, systemPrompt, userPrompt) {
   _lastCallMeta = { usedProvider: provider, usedModel: model };
 
   const messages = params.messages || [{ role: 'user', content: userPrompt }];
-  return callProvider(provider, key, model, systemPrompt, messages);
+  const opts = {};
+  if (typeof params.temperature === 'number') opts.temperature = params.temperature;
+  if (params.jsonMode) opts.jsonMode = true;
+  return callProvider(provider, key, model, systemPrompt, messages, opts);
 }
 
 // ---------------------------------------------------------------------------
 // Chat & streaming
 // ---------------------------------------------------------------------------
 
-async function chat({ provider, model, organizationId, messages, systemPrompt }) {
+async function chat({ provider, model, organizationId, messages, systemPrompt, temperature, jsonMode }) {
   const p = (provider || DEFAULT_PROVIDER).toLowerCase();
   const m = model || (PROVIDER_MODELS[p] ? PROVIDER_MODELS[p][0] : null);
   const { key } = await resolveApiKey(p, organizationId);
   if (!key) throw new Error(`No API key configured for provider: ${p}`);
 
   _lastCallMeta = { usedProvider: p, usedModel: m };
-  return callProvider(p, key, m, systemPrompt, messages);
+  const opts = {};
+  if (typeof temperature === 'number') opts.temperature = temperature;
+  if (jsonMode) opts.jsonMode = true;
+  return callProvider(p, key, m, systemPrompt, messages, opts);
 }
 
-async function* chatStream({ provider, model, organizationId, messages, systemPrompt }) {
+async function* chatStream({ provider, model, organizationId, messages, systemPrompt, temperature, jsonMode }) {
   const p = (provider || DEFAULT_PROVIDER).toLowerCase();
   const m = model || (PROVIDER_MODELS[p] ? PROVIDER_MODELS[p][0] : null);
   const { key } = await resolveApiKey(p, organizationId);
@@ -435,11 +595,14 @@ async function* chatStream({ provider, model, organizationId, messages, systemPr
     const allMessages = [];
     if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
     allMessages.push(...messages);
-    const stream = await client.chat.completions.create({
+    const req = {
       model: m,
       messages: allMessages,
       stream: true,
-    });
+    };
+    if (typeof temperature === 'number') req.temperature = temperature;
+    if (jsonMode) req.response_format = { type: 'json_object' };
+    const stream = await client.chat.completions.create(req);
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) yield delta;
@@ -453,12 +616,14 @@ async function* chatStream({ provider, model, organizationId, messages, systemPr
       role: msg.role === 'system' ? 'user' : msg.role,
       content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
     }));
-    const stream = await client.messages.stream({
+    const req = {
       model: m,
       max_tokens: 4096,
       system: systemPrompt || undefined,
       messages: mappedMessages,
-    });
+    };
+    if (typeof temperature === 'number') req.temperature = temperature;
+    const stream = await client.messages.stream(req);
     for await (const event of stream) {
       if (event.type === 'content_block_delta' && event.delta && event.delta.text) {
         yield event.delta.text;
@@ -468,7 +633,10 @@ async function* chatStream({ provider, model, organizationId, messages, systemPr
   }
 
   // Fallback: non-streaming call, yield entire result
-  const result = await callProvider(p, key, m, systemPrompt, messages);
+  const opts = {};
+  if (typeof temperature === 'number') opts.temperature = temperature;
+  if (jsonMode) opts.jsonMode = true;
+  const result = await callProvider(p, key, m, systemPrompt, messages, opts);
   yield result;
 }
 
@@ -565,12 +733,20 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
   const normalizeId = (v) => (v == null ? null : String(v));
   const correlationId = normalizeId(meta.correlation_id ?? meta.correlationId);
   const sessionId = normalizeId(meta.session_id ?? meta.sessionId);
+  // v3.0.0: when the feature has a registered schema, persist the validated
+  // JSON payload alongside the hashed text so downstream consumers can render
+  // structured cards/tables/checklists without re-parsing the model output.
+  const structuredPayload = meta.structured ?? meta.structured_payload ?? null;
+  const structuredJson = structuredPayload != null
+    ? (typeof structuredPayload === 'string' ? structuredPayload : JSON.stringify(structuredPayload))
+    : null;
   await _exec(
     `INSERT INTO ai_decision_log
        (organization_id, feature, input_hash, output_hash, model_version,
         correlation_id, session_id,
-        data_lineage, risk_level, human_reviewed, bias_flags, bias_reviewed)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        data_lineage, risk_level, human_reviewed, bias_flags, bias_reviewed,
+        structured)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       orgId, feature, inputHash, outputHash,
       meta.model_version || meta.modelVersion || null,
@@ -581,6 +757,7 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
       meta.human_reviewed || meta.humanReviewed || false,
       meta.bias_flags ? JSON.stringify(meta.bias_flags || meta.biasFlags) : null,
       meta.bias_reviewed || meta.biasReviewed || false,
+      structuredJson,
     ]
   );
 }
@@ -904,6 +1081,12 @@ module.exports = {
   buildPersonalizedSystem,
   invalidateAICache,
   getLLMService,
+
+  // v3.0.0 task-profile tiering
+  TASK_PROFILES,
+  FEATURE_TASK_PROFILE,
+  getTaskProfile,
+  resolveModelAndTemperature,
 
   // AI feature functions
   generateGapAnalysis,

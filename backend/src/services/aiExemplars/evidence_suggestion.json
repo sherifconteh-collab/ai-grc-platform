@@ -1,0 +1,36 @@
+[
+  {
+    "input": {
+      "control": "CC6.1 — Logical and physical access controls",
+      "framework": "SOC 2"
+    },
+    "output": {
+      "control_title": "CC6.1 — Logical and physical access controls",
+      "framework": "SOC 2",
+      "evidence_items": [
+        { "name": "Identity provider user export with role assignments", "format": "CSV", "cadence": "Quarterly", "source_system": "Okta", "notes": "Filter to in-scope production groups." },
+        { "name": "MFA enrollment status report", "format": "PDF", "cadence": "Quarterly", "source_system": "Okta", "notes": "Must include 100% enrollment for privileged users." },
+        { "name": "Server room access badge log", "format": "CSV", "cadence": "Monthly", "source_system": "Brivo", "notes": "If applicable; otherwise mark colo provider SOC 2 report as compensating." }
+      ],
+      "collection_notes": "Capture screenshots of system configuration that drives each export.",
+      "estimated_collection_hours": 6
+    }
+  },
+  {
+    "input": {
+      "control": "AC-2 — Account Management",
+      "framework": "NIST 800-53 Rev. 5"
+    },
+    "output": {
+      "control_title": "AC-2 — Account Management",
+      "framework": "NIST 800-53 Rev. 5",
+      "evidence_items": [
+        { "name": "Joiner/Mover/Leaver workflow documentation", "format": "Confluence page export", "cadence": "Annual", "source_system": "Confluence" },
+        { "name": "Termination tickets sample with disablement timestamps", "format": "Jira export", "cadence": "Quarterly", "source_system": "Jira" },
+        { "name": "Quarterly access review attestations", "format": "PDF with signatures", "cadence": "Quarterly", "source_system": "Drive" }
+      ],
+      "collection_notes": "Cross-reference termination tickets with HR feed to identify any missed disablements.",
+      "estimated_collection_hours": 8
+    }
+  }
+]

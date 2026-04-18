@@ -1,6 +1,6 @@
 {
   "name": "controlweave-frontend",
-  "version": "2.8.5",
+  "version": "3.1.0",
   "license": "AGPL-3.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,8 @@
     "start": "node -e \"const fs=require('fs');if(fs.existsSync('server.js')){require('./server.js')}else{const c=require('child_process');const cmd=process.platform==='win32'?'npx.cmd':'npx';const p=c.spawn(cmd,['next','start'],{stdio:'inherit'});p.on('exit',code=>process.exit(code??1));}\"",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install --with-deps chromium",
     "generate:api-types": "openapi-typescript ../docs/openapi.yaml -o src/lib/generated/api-types.ts",
     "postinstall": "node scripts/postinstall-ajv-compat.js && node scripts/patch-eslint-ajv.js"
   },
@@ -17,7 +19,7 @@
     "axios": "^1.15.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.8.0",
-    "next": "16.2.3",
+    "next": "16.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
@@ -28,9 +30,10 @@
     "@types/node": "^25.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "eslint": "^10.2.0",
-    "eslint-config-next": "^16.2.3",
+    "eslint": "^9.37.0",
+    "eslint-config-next": "^16.2.4",
     "openapi-typescript": "^7.10.1",
+    "@playwright/test": "^1.55.2",
     "tailwindcss": "^4.2.2",
     "typescript": "6.0.2"
   },
