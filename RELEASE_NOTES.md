@@ -13,7 +13,18 @@
 
 > Changes staged but not yet released to production.
 
+## [2.8.6] — 2026-04-18
+
+> **Released:** 2026-04-18
+
+### Security
+- Bump `hono` to ^4.12.14 in backend dependencies and overrides to address GHSA-458j-xx4x-4375 (improper JSX attribute name handling allowing HTML injection in `hono/jsx` SSR).
+- Bump `sanitize-html` to ^2.17.3 in backend to address GHSA-9mrh-v2v3-xpfm (allowedTags bypass via entity-decoded text in nonTextTags elements).
+
 ### Changed
+- Bump `pdfkit` to ^0.18.0 in backend.
+- Bump `@anthropic-ai/sdk` to ^0.90.0 in backend (verified against existing `Anthropic`/`messages.create` usage in `services/llmService.js`).
+- Bump `next` to 16.2.4 and `eslint-config-next` to ^16.2.4 in frontend.
 - Fix Linux AppImage smoke test, consolidate safe dependency PR updates, and clear security audit failures ([#128](https://github.com/sherifconteh-collab/ai-grc-platform/pull/128)) — @Copilot
 - Update code based on latest release notes, sync with main, and apply all open dependency PRs ([#116](https://github.com/sherifconteh-collab/ai-grc-platform/pull/116)) — @Copilot
 - chore(deps): apply all open dependency PRs — Express 4→5, stripe 21→22, zod 3→4, @modelcontextprotocol/sdk 1.28→1.29, next 16.2.1→16.2.2, eslint-config-next 16.2.1→16.2.2, @types/node ^22→^25.5.2, eslint 9→10, @xmldom/xmldom 0.8.11→0.8.12 ([#107](https://github.com/sherifconteh-collab/ai-grc-platform/pull/107), [#119](https://github.com/sherifconteh-collab/ai-grc-platform/pull/119), [#120](https://github.com/sherifconteh-collab/ai-grc-platform/pull/120), [#121](https://github.com/sherifconteh-collab/ai-grc-platform/pull/121), [#122](https://github.com/sherifconteh-collab/ai-grc-platform/pull/122), [#123](https://github.com/sherifconteh-collab/ai-grc-platform/pull/123), [#124](https://github.com/sherifconteh-collab/ai-grc-platform/pull/124), [#125](https://github.com/sherifconteh-collab/ai-grc-platform/pull/125), [#126](https://github.com/sherifconteh-collab/ai-grc-platform/pull/126)) — @Copilot
@@ -21,6 +32,9 @@
 - chore(deps): resolve dependabot PRs and sync ControlWeave upstream fixes ([#115](https://github.com/sherifconteh-collab/ai-grc-platform/pull/115)) — @Copilot
 - Sync ControlWeave dashboard overview support into the community backend so the existing dashboard page can load its combined stats/activity/trend payload.
 - Decrypt middleware-hydrated user email values so authenticated backend code paths and dashboard activity responses no longer surface encrypted email envelopes.
+
+### Removed
+- Delete duplicate documentation files `QUICK_START.md` and `GITHUB_SETUP.md` (consolidated into `QUICKSTART.md` and `GITHUB_SETUP_GUIDE.md` respectively); update README links accordingly.
 
 ## [2.8.5] — 2026-03-30
 

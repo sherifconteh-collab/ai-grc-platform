@@ -1,6 +1,6 @@
 {
   "name": "controlweave-backend",
-  "version": "2.8.5",
+  "version": "2.8.6",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
@@ -66,7 +66,7 @@
     "qa:demo:repair-account": "node scripts/repair-demo-account-via-api.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
+    "@anthropic-ai/sdk": "^0.90.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
@@ -78,7 +78,7 @@
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "hono": "^4.12.12",
+    "hono": "^4.12.14",
     "ioredis": "^5.10.1",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -88,11 +88,11 @@
     "openai": "^6.32.0",
     "openid-client": "^5.7.1",
     "pdf-parse": "^2.4.5",
-    "pdfkit": "^0.17.2",
+    "pdfkit": "^0.18.0",
     "pg": "^8.18.0",
     "redis": "^5.11.0",
     "rss-parser": "^3.13.0",
-    "sanitize-html": "^2.17.2",
+    "sanitize-html": "^2.17.3",
     "socket.io": "^4.8.1",
     "stripe": "^22.0.1",
     "xml2js": "^0.6.2",
@@ -108,7 +108,7 @@
     "express-rate-limit": "8.2.2",
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
-    "hono": "^4.12.12",
+    "hono": "^4.12.14",
     "socket.io-parser": "4.2.6",
     "yauzl": ">=3.2.1",
     "@xmldom/xmldom": ">=0.8.12",

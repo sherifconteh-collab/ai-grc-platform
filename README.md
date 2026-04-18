@@ -138,7 +138,7 @@ npm run dev                  # starts Next.js on port 3000
 
 **First login:** Visit http://localhost:3000/register to create your account!
 
-> 💡 For detailed setup including environment variables and advanced configuration, see [QUICKSTART.md](./QUICKSTART.md) and [QUICK_START.md](./QUICK_START.md).
+> 💡 For detailed setup including environment variables and advanced configuration, see [QUICKSTART.md](./QUICKSTART.md).
 
 ## 📚 Supported Frameworks
 
@@ -571,7 +571,6 @@ controlweave/
 - [GitHub Repository Guide](./docs/GITHUB_REPOSITORY_GUIDE.md)
 - [OpenAPI Specification](./docs/openapi.yaml)
 - [Quick Start Guide](./QUICKSTART.md)
-- [API Testing Guide](./QUICK_START.md)
 - [Release Notes](./RELEASE_NOTES.md)
 - [Phase 2 Roadmap](./PHASE_2_ROADMAP.md)
 - [Project Status](./PROJECT_STATUS.md)
