@@ -1,0 +1,44 @@
+[
+  {
+    "input": {
+      "control": "IA-2(1) — Multi-factor Authentication for Privileged Accounts",
+      "current_state": "Only password authentication for AWS console; no MFA for break-glass accounts."
+    },
+    "output": {
+      "objective": "Roll out phishing-resistant MFA for all privileged AWS console and IAM Identity Center accounts within 30 days.",
+      "prerequisites": [
+        "Inventory of privileged accounts complete",
+        "FIDO2 security keys procured for break-glass accounts",
+        "Communication plan approved by IT leadership"
+      ],
+      "steps": [
+        { "order": 1, "action": "Enable MFA enforcement on the AWS Organizations management account.", "owner": "Cloud Platform Lead", "estimated_hours": 2 },
+        { "order": 2, "action": "Distribute and enroll FIDO2 keys for break-glass accounts; store backup keys in dual-control safe.", "owner": "IT Operations", "estimated_hours": 6 },
+        { "order": 3, "action": "Configure IAM Identity Center to require MFA on every sign-in and on session refresh.", "owner": "IAM Engineer", "estimated_hours": 3 },
+        { "order": 4, "action": "Run a force-reauth event and capture CloudTrail evidence of MFA challenges.", "owner": "IAM Engineer", "estimated_hours": 2 },
+        { "order": 5, "action": "Update runbooks and onboarding checklist to include MFA enrollment.", "owner": "Security PM", "estimated_hours": 4 }
+      ],
+      "tools": ["AWS IAM Identity Center", "YubiKey 5C NFC", "CloudTrail"],
+      "artifacts": ["MFA enforcement policy JSON", "Enrollment attestation log", "Break-glass key custody form"],
+      "estimated_total_hours": 17
+    }
+  },
+  {
+    "input": {
+      "control": "AU-6 — Audit Record Review",
+      "current_state": "Logs are centralized but never reviewed."
+    },
+    "output": {
+      "objective": "Establish weekly audit log review covering authentication, privileged action, and data export events.",
+      "prerequisites": ["Centralized SIEM ingest verified", "On-call rotation defined"],
+      "steps": [
+        { "order": 1, "action": "Define event taxonomy and severity matrix.", "owner": "Detection Engineer", "estimated_hours": 4 },
+        { "order": 2, "action": "Build saved searches for the three review domains.", "owner": "Detection Engineer", "estimated_hours": 6 },
+        { "order": 3, "action": "Schedule weekly review meeting and capture sign-off in ticketing.", "owner": "SecOps Manager", "estimated_hours": 2 }
+      ],
+      "tools": ["Splunk", "Jira"],
+      "artifacts": ["Saved-search export", "Weekly review meeting minutes"],
+      "estimated_total_hours": 12
+    }
+  }
+]

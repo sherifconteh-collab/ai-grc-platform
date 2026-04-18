@@ -2,6 +2,12 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 const { decrypt } = require('../utils/encrypt');
 
+// JWT verification is pinned to HS256. Tokens signed with any other algorithm
+// are rejected. This prevents algorithm-confusion attacks where an attacker
+// could supply a token signed with `none`, RS256-with-pubkey-as-secret, etc.
+// See: RELEASE_NOTES.md [3.0.0] Security.
+const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: ['HS256'] });
+
 // ---------------------------------------------------------------------------
 // Community-edition role → permission mapping (fallback when RBAC tables
 // such as user_roles, roles, role_permissions, permissions do not exist).
@@ -77,7 +83,7 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'Access token required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, JWT_VERIFY_OPTIONS);
 
     if (decoded.type !== 'access') {
       return res.status(401).json({ success: false, error: 'Invalid token type' });

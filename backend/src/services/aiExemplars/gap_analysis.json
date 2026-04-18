@@ -1,0 +1,75 @@
+[
+  {
+    "_meta": "Scanner directive: do not include this object in prompt composition (no `output` field).",
+    "framework": "NIST 800-53 Rev. 5",
+    "scope": "AC family"
+  },
+  {
+    "input": {
+      "framework": "NIST 800-53 Rev. 5",
+      "scope": "Access Control (AC) family for a 250-employee SaaS company at IL2 readiness target."
+    },
+    "output": {
+      "readiness_score": 62,
+      "summary": "Organization has baseline IAM with SSO and unique IDs but lacks formalized access reviews, automated provisioning evidence, and session lock enforcement on shared workstations.",
+      "gaps": [
+        {
+          "control": "AC-2(3)",
+          "severity": "high",
+          "description": "Inactive accounts are not disabled within 35 days; 12 accounts identified with last login > 90 days.",
+          "evidence_required": ["Quarterly access review report", "Disable script run-log"],
+          "estimated_effort_days": 4
+        },
+        {
+          "control": "AC-6(9)",
+          "severity": "medium",
+          "description": "Use of privileged accounts is logged but not reviewed on a defined cadence.",
+          "evidence_required": ["Privileged account usage review minutes"],
+          "estimated_effort_days": 3
+        },
+        {
+          "control": "AC-11",
+          "severity": "low",
+          "description": "Session lock GPO not applied to contractor laptops.",
+          "evidence_required": ["GPO export", "Sample workstation screenshot"],
+          "estimated_effort_days": 1
+        }
+      ],
+      "recommended_roadmap": [
+        "Q1: Implement HRIS-driven deprovisioning integration to satisfy AC-2(3).",
+        "Q1: Stand up monthly privileged account usage review with sign-off.",
+        "Q2: Extend session lock GPO scope to all managed endpoints."
+      ]
+    }
+  },
+  {
+    "input": {
+      "framework": "ISO/IEC 27001:2022",
+      "scope": "Annex A.5 Organizational controls for a Series A fintech."
+    },
+    "output": {
+      "readiness_score": 48,
+      "summary": "Information security policies exist but are not reviewed annually; supplier security clauses are absent from 4 of 7 vendor contracts in scope.",
+      "gaps": [
+        {
+          "control": "A.5.1",
+          "severity": "high",
+          "description": "Information security policy last reviewed 19 months ago; missing executive approval signature.",
+          "evidence_required": ["Signed policy", "Review minutes"],
+          "estimated_effort_days": 2
+        },
+        {
+          "control": "A.5.19",
+          "severity": "high",
+          "description": "Supplier agreements lack security and confidentiality clauses for 4 critical SaaS vendors.",
+          "evidence_required": ["Updated MSAs / DPAs"],
+          "estimated_effort_days": 10
+        }
+      ],
+      "recommended_roadmap": [
+        "Month 1: Refresh and re-approve information security policy.",
+        "Months 2-3: Renegotiate or amend the 4 missing supplier agreements."
+      ]
+    }
+  }
+]
