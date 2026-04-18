@@ -12,7 +12,13 @@ import { Buffer } from 'node:buffer';
  * The release page requires no auth so this test intentionally bypasses the
  * project `baseURL` and hits github.com directly.
  */
-const RELEASES_URL = 'https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest';
+// The repo can be overridden via env (e.g. for forks or staging) — defaults
+// to the upstream Community repo. `RELEASES_URL` wins; otherwise fall back to
+// `GITHUB_REPOSITORY` (set automatically by GitHub Actions).
+const DEFAULT_REPO = 'sherifconteh-collab/ai-grc-platform';
+const RELEASES_URL =
+  process.env.RELEASES_URL
+  || `https://github.com/${process.env.GITHUB_REPOSITORY || DEFAULT_REPO}/releases/latest`;
 const FILENAME_PATTERN = /^ControlWeave\.Setup\..*\.exe$/i;
 
 test.describe('release downloads', () => {

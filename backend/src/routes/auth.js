@@ -43,7 +43,10 @@ async function maybeUpgradePasswordHash(userId, plaintext, currentHash) {
     const cost = getBcryptCost(currentHash);
     if (cost !== null && cost >= BCRYPT_COST) return;
     const newHash = await bcrypt.hash(plaintext, BCRYPT_COST);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, password_cost = $2 WHERE id = $3',
+      [newHash, BCRYPT_COST, userId]
+    );
   } catch (_e) {
     // intentional no-op: upgrade is best-effort
   }
@@ -694,11 +697,11 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
 
       const storedEmail = emailHash ? encrypt(normalizedEmail) : normalizedEmail;
       const insertCols = emailHash
-        ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role, country_code, region'
-        : 'organization_id, email, password_hash, first_name, last_name, role, country_code, region';
+        ? 'organization_id, email, email_hash, password_hash, password_cost, first_name, last_name, role, country_code, region'
+        : 'organization_id, email, password_hash, password_cost, first_name, last_name, role, country_code, region';
       const insertVals = emailHash
-        ? [org.id, storedEmail, emailHash, passwordHash, firstName, lastName, selectedRole, countryCode, region]
-        : [org.id, normalizedEmail, passwordHash, firstName, lastName, selectedRole, countryCode, region];
+        ? [org.id, storedEmail, emailHash, passwordHash, BCRYPT_COST, firstName, lastName, selectedRole, countryCode, region]
+        : [org.id, normalizedEmail, passwordHash, BCRYPT_COST, firstName, lastName, selectedRole, countryCode, region];
       const insertPlaceholders = insertVals.map((_, i) => `$${i + 1}`).join(', ');
       const userResult = await client.query(
         `INSERT INTO users (${insertCols})
@@ -1149,10 +1152,11 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
       await client.query(
         `UPDATE users
          SET password_hash = $1,
+             password_cost = $2,
              failed_login_attempts = 0,
              locked_until = NULL
-         WHERE id = $2`,
-        [passwordHash, resetTokenRow.user_id]
+         WHERE id = $3`,
+        [passwordHash, BCRYPT_COST, resetTokenRow.user_id]
       );
       await client.query(
         'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1',
@@ -1457,11 +1461,11 @@ router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
       // Create user in the invite's organization
       const inviteStoredEmail = inviteEmailHash ? encrypt(inviteEmailNorm) : invite.email;
       const inviteInsertCols = inviteEmailHash
-        ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role'
-        : 'organization_id, email, password_hash, first_name, last_name, role';
+        ? 'organization_id, email, email_hash, password_hash, password_cost, first_name, last_name, role'
+        : 'organization_id, email, password_hash, password_cost, first_name, last_name, role';
       const inviteInsertVals = inviteEmailHash
-        ? [invite.organization_id, inviteStoredEmail, inviteEmailHash, passwordHash, firstName, lastName, invite.primary_role]
-        : [invite.organization_id, invite.email, passwordHash, firstName, lastName, invite.primary_role];
+        ? [invite.organization_id, inviteStoredEmail, inviteEmailHash, passwordHash, BCRYPT_COST, firstName, lastName, invite.primary_role]
+        : [invite.organization_id, invite.email, passwordHash, BCRYPT_COST, firstName, lastName, invite.primary_role];
       const inviteInsertPlaceholders = inviteInsertVals.map((_, i) => `$${i + 1}`).join(', ');
       const userResult = await client.query(
         `INSERT INTO users (${inviteInsertCols})

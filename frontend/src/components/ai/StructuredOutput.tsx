@@ -16,7 +16,7 @@
  * screen readers announce row counts correctly.
  */
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low' | string;
 
@@ -140,6 +140,7 @@ function RemediationPlaybook({ data }: { data: any }) {
 function TestProcedures({ data }: { data: any }) {
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const toggle = (i: number) => setChecked(c => ({ ...c, [i]: !c[i] }));
+  const idPrefix = useId();
 
   return (
     <div>
@@ -150,7 +151,7 @@ function TestProcedures({ data }: { data: any }) {
           <h4 className="mt-3 mb-1 text-sm font-semibold">Procedures</h4>
           <ul role="list" className="space-y-2">
             {data.steps.map((s: any, i: number) => {
-              const id = `tp-step-${i}`;
+              const id = `${idPrefix}-tp-step-${i}`;
               return (
                 <li key={i} role="listitem" className="flex items-start gap-2 rounded border border-zinc-200 p-3 dark:border-zinc-700">
                   <input

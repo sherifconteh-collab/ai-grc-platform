@@ -140,6 +140,18 @@ function getTaskProfile(featureKey) {
   return { name, ...TASK_PROFILES[name] };
 }
 
+// Normalize provider aliases (claude→anthropic, xai→grok) so downstream
+// per-provider lookups (TASK_PROFILES.models, PROVIDER_MODELS) hit the
+// canonical key.
+const PROVIDER_ALIASES = Object.freeze({
+  claude: 'anthropic',
+  xai: 'grok',
+});
+function _canonicalProvider(p) {
+  const k = (p || '').toLowerCase();
+  return PROVIDER_ALIASES[k] || k;
+}
+
 /**
  * Resolve provider/model/temperature for a feature call following the
  * documented resolution order. callerOverrides take priority; orgDefaults
@@ -147,7 +159,7 @@ function getTaskProfile(featureKey) {
  */
 function resolveModelAndTemperature({ featureKey, provider, callerOverrides = {}, orgDefaults = {} }) {
   const profile = getTaskProfile(featureKey);
-  const p = (provider || DEFAULT_PROVIDER).toLowerCase();
+  const p = _canonicalProvider(provider || DEFAULT_PROVIDER);
   const profileModel = profile.models[p] || (PROVIDER_MODELS[p] ? PROVIDER_MODELS[p][0] : null);
   const model = callerOverrides.model || orgDefaults.model || profileModel;
   const temperature =
@@ -462,9 +474,38 @@ async function callGrok(apiKey, model, systemPrompt, messages, opts = {}) {
   return resp.data.choices[0].message.content;
 }
 
+// Validate the configured Ollama base URL before issuing a request. The
+// org-admin-set value is treated as untrusted: enforce http(s) scheme, no
+// embedded credentials, and (when OLLAMA_BASE_URL_ALLOWLIST is set) require
+// the hostname to be on the allowlist. localhost remains the safe default
+// because Ollama is designed to run on the same host.
+function _sanitizeOllamaBaseUrl(raw) {
+  const input = (raw || 'http://localhost:11434').replace(/\/+$/, '');
+  let parsed;
+  try {
+    parsed = new URL(input);
+  } catch (_e) {
+    throw new Error('Invalid OLLAMA base URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Unsupported OLLAMA URL scheme: ${parsed.protocol}`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('OLLAMA URL must not contain credentials');
+  }
+  const allowlist = (process.env.OLLAMA_BASE_URL_ALLOWLIST || '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (allowlist.length > 0 && !allowlist.includes(parsed.hostname.toLowerCase())) {
+    throw new Error(`OLLAMA host not in allowlist: ${parsed.hostname}`);
+  }
+  // Reconstruct a normalized URL — drops any path/query/fragment from the
+  // configured base so callers can append `/api/chat` deterministically.
+  return `${parsed.protocol}//${parsed.host}`;
+}
+
 async function callOllama(baseUrl, model, systemPrompt, messages, opts = {}) {
   if (!axios) throw new Error('axios not installed');
-  const url = (baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  const url = _sanitizeOllamaBaseUrl(baseUrl);
   const allMessages = [];
   if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
   allMessages.push(...messages);
@@ -686,12 +727,20 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
   const normalizeId = (v) => (v == null ? null : String(v));
   const correlationId = normalizeId(meta.correlation_id ?? meta.correlationId);
   const sessionId = normalizeId(meta.session_id ?? meta.sessionId);
+  // v3.0.0: when the feature has a registered schema, persist the validated
+  // JSON payload alongside the hashed text so downstream consumers can render
+  // structured cards/tables/checklists without re-parsing the model output.
+  const structuredPayload = meta.structured ?? meta.structured_payload ?? null;
+  const structuredJson = structuredPayload != null
+    ? (typeof structuredPayload === 'string' ? structuredPayload : JSON.stringify(structuredPayload))
+    : null;
   await _exec(
     `INSERT INTO ai_decision_log
        (organization_id, feature, input_hash, output_hash, model_version,
         correlation_id, session_id,
-        data_lineage, risk_level, human_reviewed, bias_flags, bias_reviewed)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        data_lineage, risk_level, human_reviewed, bias_flags, bias_reviewed,
+        structured)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       orgId, feature, inputHash, outputHash,
       meta.model_version || meta.modelVersion || null,
@@ -702,6 +751,7 @@ async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}
       meta.human_reviewed || meta.humanReviewed || false,
       meta.bias_flags ? JSON.stringify(meta.bias_flags || meta.biasFlags) : null,
       meta.bias_reviewed || meta.biasReviewed || false,
+      structuredJson,
     ]
   );
 }

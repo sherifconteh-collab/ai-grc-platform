@@ -297,13 +297,19 @@ function RegisterPageInner() {
 
     try {
       const candidatePlan = `${selectedTier}_${billingCadence}`;
-      if (!isSelfHosted && organizationIsRequired && effectiveSelectedTier !== 'community' && VALID_BILLING_PLANS.has(candidatePlan)) {
-        localStorage.setItem('pendingPlan', candidatePlan);
-      } else {
-        // Either we don't need a paid plan, or the tier/cadence combo isn't a
-        // Stripe checkout SKU (e.g. `govcloud_*` is sales-led).  Clear any
-        // stale value so downstream redirects don't bounce to a 400.
-        localStorage.removeItem('pendingPlan');
+      try {
+        if (!isSelfHosted && organizationIsRequired && effectiveSelectedTier !== 'community' && VALID_BILLING_PLANS.has(candidatePlan)) {
+          localStorage.setItem('pendingPlan', candidatePlan);
+        } else {
+          // Either we don't need a paid plan, or the tier/cadence combo isn't a
+          // Stripe checkout SKU (e.g. `govcloud_*` is sales-led).  Clear any
+          // stale value so downstream redirects don't bounce to a 400.
+          localStorage.removeItem('pendingPlan');
+        }
+      } catch {
+        // localStorage may throw in private mode or when storage is disabled.
+        // Registration must not fail because of a storage exception — the
+        // dashboard pendingPlan helper re-validates on read.
       }
 
       await register(

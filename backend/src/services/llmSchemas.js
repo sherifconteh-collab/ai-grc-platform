@@ -219,6 +219,16 @@ function validate(schema, value, path = '') {
         }
       }
     }
+    // additionalProperties: false → reject keys not declared in `properties`.
+    // Default (true / omitted) leaves extras alone.
+    if (schema.additionalProperties === false) {
+      const declared = schema.properties ? Object.keys(schema.properties) : [];
+      for (const k of Object.keys(value)) {
+        if (!declared.includes(k)) {
+          errors.push({ instancePath: path || '/', message: `unexpected additional property "${k}"` });
+        }
+      }
+    }
   }
 
   if (schema.type === 'array' && Array.isArray(value) && schema.items) {

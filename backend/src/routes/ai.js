@@ -170,10 +170,10 @@ function aiHandler(feature, fn, opts = {}) {
       const tracked = await llm.withAITrackingContext(() => fn(req, params));
       let result = tracked?.result;
       const durationMs = Date.now() - startMs;
-      const tracking = tracked?.tracking || null;
-      const resolvedProvider = tracking?.usedProvider || params.provider;
-      const resolvedModel = tracking?.usedModel || params.model;
-      const fallbackUsed = !!tracking?.fallbackUsed;
+      let tracking = tracked?.tracking || null;
+      let resolvedProvider = tracking?.usedProvider || params.provider;
+      let resolvedModel = tracking?.usedModel || params.model;
+      let fallbackUsed = !!tracking?.fallbackUsed;
 
       // v3.0.0: structured-output validation + one-shot retry.
       // If the feature has a registered schema, parse + validate the result.
@@ -197,6 +197,14 @@ function aiHandler(feature, fn, opts = {}) {
             if (retryValidation.valid) {
               structured = retryParsed;
               result = retryResult;
+              // Update tracking metadata to reflect the retry attempt that
+              // actually produced the response we're returning.
+              tracking = retried?.tracking || tracking;
+              if (tracking) {
+                resolvedProvider = tracking.usedProvider || resolvedProvider;
+                resolvedModel = tracking.usedModel || resolvedModel;
+                fallbackUsed = !!tracking.fallbackUsed;
+              }
             } else {
               qualityErrors = retryValidation.errors;
             }
@@ -231,6 +239,7 @@ function aiHandler(feature, fn, opts = {}) {
         resourceType: opts.resourceType ? (typeof opts.resourceType === 'function' ? opts.resourceType(req) : opts.resourceType) : null,
         resourceId: opts.resourceId ? (typeof opts.resourceId === 'function' ? opts.resourceId(req) : opts.resourceId) : null,
         dataLineage: agentMetadata.dataLineage,
+        structured,
       }).catch(() => {});
 
       if (fallbackUsed) {
