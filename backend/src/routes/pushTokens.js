@@ -69,7 +69,7 @@ function _normMeta(v) {
 }
 
 // POST /api/v1/push-tokens — register or refresh a device push token.
-router.post('/', validateBody(_validateRegisterBody), async (req, res) => {
+router.post('/', pushTokenWriteLimiter, validateBody(_validateRegisterBody), async (req, res) => {
   try {
     const userId = req.user.id;
     const orgId = req.user.organization_id;
@@ -106,7 +106,7 @@ router.post('/', validateBody(_validateRegisterBody), async (req, res) => {
 // DELETE /api/v1/push-tokens/:token — unregister a device push token.
 // Only the current owner can delete; tokens owned by other users return 404
 // so we don't leak existence information.
-router.delete('/:token', async (req, res) => {
+router.delete('/:token', pushTokenWriteLimiter, async (req, res) => {
   try {
     const userId = req.user.id;
     const { token } = req.params;

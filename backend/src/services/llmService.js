@@ -480,7 +480,11 @@ async function callGrok(apiKey, model, systemPrompt, messages, opts = {}) {
 // the hostname to be on the allowlist. localhost remains the safe default
 // because Ollama is designed to run on the same host.
 function _sanitizeOllamaBaseUrl(raw) {
-  const input = (raw || 'http://localhost:11434').replace(/\/+$/, '');
+  let input = raw || 'http://localhost:11434';
+  // Strip trailing slashes without a regex (avoids ReDoS on long inputs).
+  while (input.length > 1 && input.charCodeAt(input.length - 1) === 47 /* '/' */) {
+    input = input.slice(0, -1);
+  }
   let parsed;
   try {
     parsed = new URL(input);
