@@ -19,6 +19,36 @@ export const VALID_BILLING_PLANS = new Set([
   'enterprise_monthly', 'enterprise_annual',
 ]);
 
+/**
+ * Reads the `pendingPlan` value from localStorage and returns it only if it
+ * matches a known checkout SKU.  Anything else (empty, malformed, stale tier
+ * names, manually-tampered values) is auto-cleared so we never redirect the
+ * user to `/billing/checkout?plan=…` with a value Stripe will reject.
+ *
+ * Safe to call from server-rendered code paths — returns `null` when `window`
+ * is undefined.
+ */
+export function readValidPendingPlan(): string | null {
+  if (typeof window === 'undefined') return null;
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem('pendingPlan');
+  } catch {
+    // localStorage unavailable (private mode, disabled storage) — treat as none
+    return null;
+  }
+  if (!raw) return null;
+  const plan = String(raw).trim().toLowerCase();
+  if (VALID_BILLING_PLANS.has(plan)) return plan;
+  // Invalid / stale value — clear so we don't bounce the user to checkout in a loop
+  try {
+    window.localStorage.removeItem('pendingPlan');
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 interface BillingUser {
   organizationTier?: string;
   billingStatus?: string;

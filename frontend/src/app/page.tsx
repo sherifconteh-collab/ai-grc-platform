@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { requiresOrganizationOnboarding } from '@/lib/access';
-import { requiresBillingResolution } from '@/lib/billing';
+import { requiresBillingResolution, readValidPendingPlan } from '@/lib/billing';
 import { useDeploymentInfo } from '@/lib/deployment';
 import MarketingNav from '@/components/MarketingNav';
 
@@ -800,11 +800,11 @@ export default function Home() {
         return;
       }
 
-      // If there's a pending billing plan, go directly to checkout
-      const pendingPlan = typeof window !== 'undefined'
-        ? String(localStorage.getItem('pendingPlan') || '')
-        : '';
-      if (pendingPlan.length > 0) {
+      // If there's a pending billing plan, go directly to checkout.
+      // readValidPendingPlan() validates against VALID_BILLING_PLANS and
+      // auto-clears stale/malformed values to prevent redirect loops.
+      const pendingPlan = readValidPendingPlan();
+      if (pendingPlan) {
         router.push(`/billing/checkout?plan=${encodeURIComponent(pendingPlan)}`);
         return;
       }
