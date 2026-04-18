@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v2.8.5-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v3.1.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -16,7 +16,7 @@
 
 Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 
-Desktop builds in `v2.8.4` now bundle the backend and standalone frontend runtime dependencies required for packaged startup, reconcile legacy desktop database drift during upgrades, default self-hosted installs to Community Edition, and route self-hosted users into an app-first sign-in or invite flow instead of the public marketing landing page.
+Desktop builds in `v3.1.0` include mobile push token support, Claude DX tooling, Playwright e2e scaffolding, the v3.0.0 security hardening (bcrypt cost 14, JWT HS256 pin, AI output quality overhaul), and all prior packaging improvements: bundled backend and Next.js runtime dependencies, legacy desktop database reconciliation, Community Edition defaulting, and the app-first sign-in/invite flow.
 
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-04-14 | PR #128: Fix Linux AppImage smoke test, consolidate safe dependency PR updates, and clear security audit failures -->
+<!-- LAST_UPDATED: 2026-04-18 | v3.1.0: Mobile push backend, Claude DX bundle, Playwright e2e scaffold, v3.0.0 security hardening (bcrypt cost 14, JWT HS256 pin), AI output quality overhaul -->
 
 ## 🎯 What is This?
 
