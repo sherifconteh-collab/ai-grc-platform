@@ -474,6 +474,10 @@ async function callGrok(apiKey, model, systemPrompt, messages, opts = {}) {
   return resp.data.choices[0].message.content;
 }
 
+// Parsed once at module load to avoid re-splitting on every request.
+const _OLLAMA_HOST_ALLOWLIST = (process.env.OLLAMA_BASE_URL_ALLOWLIST || '')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
 // Validate the configured Ollama base URL before issuing a request. The
 // org-admin-set value is treated as untrusted: enforce http(s) scheme, no
 // embedded credentials, and (when OLLAMA_BASE_URL_ALLOWLIST is set) require
@@ -497,9 +501,7 @@ function _sanitizeOllamaBaseUrl(raw) {
   if (parsed.username || parsed.password) {
     throw new Error('OLLAMA URL must not contain credentials');
   }
-  const allowlist = (process.env.OLLAMA_BASE_URL_ALLOWLIST || '')
-    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  if (allowlist.length > 0 && !allowlist.includes(parsed.hostname.toLowerCase())) {
+  if (_OLLAMA_HOST_ALLOWLIST.length > 0 && !_OLLAMA_HOST_ALLOWLIST.includes(parsed.hostname.toLowerCase())) {
     throw new Error(`OLLAMA host not in allowlist: ${parsed.hostname}`);
   }
   // Reconstruct a normalized URL — drops any path/query/fragment from the
