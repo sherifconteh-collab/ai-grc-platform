@@ -56,8 +56,12 @@ function _scoreLength(text, minChars) {
 function _detectCitations(text) {
   const matches = new Set();
   for (const re of FRAMEWORK_PREFIX_PATTERNS) {
-    const ms = text.match(re);
-    if (ms) ms.forEach(m => matches.add(m.trim()));
+    // Use matchAll with a global-flag clone so we capture every occurrence
+    // and avoid the capture-group entries returned by String.match without g.
+    const reG = re.global ? re : new RegExp(re.source, re.flags + 'g');
+    for (const m of text.matchAll(reG)) {
+      if (m && m[0]) matches.add(m[0].trim());
+    }
   }
   return Array.from(matches);
 }

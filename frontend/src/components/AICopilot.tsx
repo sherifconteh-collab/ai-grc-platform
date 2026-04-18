@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/lib/apiBase';
 import { getAccessToken } from '@/lib/tokenStore';
+import MarkdownContent from '@/components/ai/MarkdownContent';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -229,7 +230,9 @@ export default function AICopilot() {
                     : 'bg-white border border-gray-200 text-gray-800'
                 }`}
               >
-                <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                {msg.role === 'assistant'
+                  ? <MarkdownContent className="leading-relaxed">{msg.content}</MarkdownContent>
+                  : <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>}
                 {msg.role === 'assistant' && (
                   <button
                     onClick={() => navigator.clipboard.writeText(msg.content)}

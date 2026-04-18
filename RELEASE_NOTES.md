@@ -13,6 +13,69 @@
 
 > Changes staged but not yet released to production.
 
+## [3.1.0] — 2026-04-18
+
+> **Released:** 2026-04-18
+>
+> Mobile push backend (Community-safe subset), Claude DX upgrades, and Playwright e2e scaffolding. Builds on the v3.0.0 security + AI quality foundation in the same PR.
+
+### Added
+- **Mobile push token lifecycle.** `POST /api/v1/push-tokens` and `DELETE /api/v1/push-tokens/:token` for iOS/Android device registration. Backed by migration `104_device_push_tokens.sql` with `UNIQUE(token)` and ownership-reassignment UPSERT semantics (security: prevents stale cross-account push delivery on shared devices).
+- **Optional push provider deps.** `apn` and `firebase-admin` declared as `optionalDependencies` so the routes work in deployments where iOS or Android push is configured. Native iOS / Android source remains excluded (Pro-only).
+- **Claude DX bundle.** New `CLAUDE.md` operating manual, 10 conventions in `.github/../.claude/rules/`, and 8 reusable playbooks in `.claude/commands/` (add-ai-feature, bump-version, add-migration, add-route, update-deps, investigate-ci-failure, verify-release-build, security-review).
+- **Playwright e2e scaffold.** `frontend/playwright.config.ts`, `frontend/e2e/auth.spec.ts`, and `frontend/e2e/download.spec.ts` (post-release `.exe` download verification with `MZ` magic-byte check). Manual `workflow_dispatch` job in `.github/workflows/e2e.yml`.
+
+### Security
+- Pin `apn → jsonwebtoken ^9.0.2` via nested override to keep the optional push dep clear of GHSA-qwph-4952-7xr6 (algorithm-confusion in `jwt.verify`).
+- Pin `node-forge >= 1.4.0` via override to clear GHSA-5m6q-g25r-mvwx and GHSA-ppp5-5v6c-4jwp from the `firebase-admin` transitive chain.
+
+### Excluded (Pro-only)
+- RevenueCat IAP, AdMob, native iOS/Android source (Info.plist, PrivacyInfo.xcprivacy), `/billing/mobile-upgrade`, and the four Pro dashboard pages remain out of this Community fork.
+
+---
+
+## [3.0.0] — 2026-04-18
+
+> **Released:** 2026-04-18
+>
+> **MAJOR — breaking changes.** bcrypt cost increase, JWT algorithm pin, and a new `data.structured` field in every AI response envelope.
+
+### Security (BREAKING)
+- **bcrypt cost 12 → 14** at all three hash sites in `backend/src/routes/auth.js` (registration, password reset, password change). Existing user hashes are upgraded **lazily on next successful login** via `maybeUpgradePasswordHash()` — no forced password reset required, no admin action required. Migration `103_bcrypt_cost_tracking.sql` adds an optional `users.password_cost` column for observability.
+- **JWT algorithm pin to HS256** at all three `jwt.verify(...)` call sites: `middleware/auth.js`, `routes/auth.js`, `services/websocketService.js`. Eliminates the algorithm-confusion attack class (none / RS256 forgery against an HMAC verifier).
+
+### Added — AI output quality overhaul
+- `services/llmSchemas.js` — 5 JSON Schemas (gap_analysis, remediation_playbook, evidence_suggestion, test_procedures, finding) with a recursive `validate()` walker that descends into nested objects and array items. Feature-key aliases registered: `evidence_suggest → evidence_suggestion`, `audit_finding_draft → finding`.
+- `services/aiQualityGate.js` — `runQualityGate()` scores responses on length, control citations, framework IDs, and PII presence. Citation regex correctly handles `§` (HIPAA) and `Art.` (GDPR) prefixes (no `\b` anchor, which previously dropped these entirely).
+- `services/aiExemplars/` — 5 curated `{input, output}` JSON exemplar files plus `buildFewShotBlock()` with a 5-step chain-of-thought instruction (scope → assumptions → key controls → evidence expectations → final output). `loadExemplars()` filters scanner-directive entries that lack an `output` field.
+- `TASK_PROFILES` (reasoning / extraction / ideation / chat) and `FEATURE_TASK_PROFILE` (25 keys) in `llmService.js`. Resolution order: explicit caller override → org BYOK default → profile default. Exposed via `resolveModelAndTemperature()`.
+- Resolved temperature now flows through `chat()` / `chatStream()` and into every provider (Claude, OpenAI, Grok, Gemini, Groq, Ollama) for both streaming and non-streaming calls.
+- One-shot retry with Ajv-style error injection in `aiHandler()`. On schema validation failure the formatted error list is exposed to the feature function via `req._aiCorrectionHint` and the call is retried once.
+- Forced provider JSON mode when a feature has a registered schema: OpenAI / Grok / Groq use `response_format: { type: 'json_object' }`; Gemini uses `responseMimeType: 'application/json'`; Ollama uses `format: 'json'`. Claude stays on the schema+retry guard.
+
+### Changed (BREAKING)
+- AI response envelope now includes `data.structured` (the validated JSON object, or `null` when the response failed schema validation), `data.taskProfile`, and `data.qualityErrors`. Existing `data.result` and `data.feature` / `data.provider` / `data.model` fields are unchanged.
+
+### Added — Frontend safe rendering
+- `frontend/src/components/ai/MarkdownContent.tsx` — pure-JSX markdown renderer. **Never** uses `dangerouslySetInnerHTML`. URL allow-list restricted to `http`, `https`, `mailto`, `tel`; other schemes render as plain text. Supports headings, bold/italic/code, ordered + unordered lists, fenced code blocks, and links.
+- `frontend/src/components/ai/StructuredOutput.tsx` — semantic, accessible renderer for the new `data.structured` field. Readiness progress bar (a11y `role="progressbar"`), severity-chipped gap cards, numbered playbook steps, interactive test-procedure checklist, structured finding (criteria/condition/cause/effect/recommendation). Uses `<ul role="list">` / `<li role="listitem">` so screen readers announce row counts.
+- Migrated `AICopilot.tsx` to render assistant messages via `MarkdownContent`.
+
+### Added — Database migrations
+- `102_ai_response_structured.sql` — adds `ai_decision_log.structured JSONB` for persisting the validated structured envelope alongside the raw result hash.
+- `103_bcrypt_cost_tracking.sql` — adds `users.password_cost SMALLINT` for observability of the lazy bcrypt rehash rollout.
+- `104_device_push_tokens.sql` — `device_push_tokens` table with `UNIQUE(token)` from the start (security: prevents the `(user_id, token)` dual-key class of cross-account leak).
+
+### Added — Test scaffolding
+- Backend Jest scaffold (`jest.config.js`, `__tests__/`). Initial 23-test suite covers schema validator, quality gate (with the §/Art. regex bug fix), exemplar loader, JWT HS256 pin, and bcrypt cost detection. The full upstream 62-test suite will be ported in batches.
+
+### Migration guide for v3.0.0
+- **bcrypt cost** — no admin action required. Hashes upgrade on login. The first 90 days of CPU usage will tick up by ~2–3% on the auth path; this is expected.
+- **JWT pin** — no client changes required. Tokens issued by this server have always been HS256; the pin only affects accept-side behavior.
+- **Response envelope** — clients that destructure `data.result` continue to work. Clients that want structured rendering should switch to `data.structured` and fall back to `data.result` when it is `null`.
+
+---
+
 ## [2.8.6] — 2026-04-18
 
 > **Released:** 2026-04-18
