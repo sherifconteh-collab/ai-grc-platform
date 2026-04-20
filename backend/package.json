@@ -76,7 +76,7 @@
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
+    "dotenv": "^17.4.2",
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
