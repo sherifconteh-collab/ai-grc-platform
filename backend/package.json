@@ -88,7 +88,7 @@
     "multer": "^2.1.1",
     "nodemailer": "^8.0.5",
     "openai": "^6.32.0",
-    "openid-client": "^5.7.1",
+    "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.18.0",
     "pg": "^8.18.0",
