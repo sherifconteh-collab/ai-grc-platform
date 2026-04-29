@@ -68,7 +68,7 @@
     "qa:demo:repair-account": "node scripts/repair-demo-account-via-api.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
