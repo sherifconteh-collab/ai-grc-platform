@@ -68,15 +68,15 @@
     "qa:demo:repair-account": "node scripts/repair-demo-account-via-api.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
-    "axios": "^1.15.0",
+    "axios": "^1.15.2",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
+    "dotenv": "^17.4.2",
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
@@ -88,7 +88,7 @@
     "multer": "^2.1.1",
     "nodemailer": "^8.0.5",
     "openai": "^6.32.0",
-    "openid-client": "^5.7.1",
+    "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.18.0",
     "pg": "^8.18.0",
@@ -96,12 +96,12 @@
     "rss-parser": "^3.13.0",
     "sanitize-html": "^2.17.3",
     "socket.io": "^4.8.1",
-    "stripe": "^22.0.1",
+    "stripe": "^22.1.0",
     "xml2js": "^0.6.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "eslint": "^9.39.4",
+    "eslint": "^10.2.1",
     "eslint-plugin-security": "^4.0.0",
     "globals": "^17.4.0",
     "jest": "^30.2.0",
@@ -129,6 +129,7 @@
     "router": {
       "path-to-regexp": "8.4.0"
     },
-    "follow-redirects": "^1.16.0"
+    "follow-redirects": "^1.16.0",
+    "uuid": "^14.0.0"
   }
 }

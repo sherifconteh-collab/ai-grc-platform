@@ -10,4 +10,4 @@
 ## Frontend
 
 - TypeScript is at v6; openapi-typescript@7 has a peer-dep conflict resolved by `frontend/.npmrc` (`legacy-peer-deps=true`).
-- ESLint cannot be upgraded past v9.7 because `eslint-plugin-react` (via `eslint-config-next`) caps at v9.
+- ESLint is at v10; `eslint-config-next@^16.2.4` (Next.js 16) supports ESLint 10. `legacy-peer-deps=true` in `.npmrc` handles any residual peer-dep conflicts.

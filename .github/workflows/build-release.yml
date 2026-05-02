@@ -229,7 +229,7 @@ jobs:
           || startsWith(github.ref, 'refs/tags/v')
           || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
           || needs.check-release.outputs.should_release == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
           name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
@@ -332,7 +332,7 @@ jobs:
           || startsWith(github.ref, 'refs/tags/v')
           || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
           || needs.check-release.outputs.should_release == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
           name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
@@ -435,7 +435,7 @@ jobs:
           || startsWith(github.ref, 'refs/tags/v')
           || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
           || needs.check-release.outputs.should_release == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
           name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
