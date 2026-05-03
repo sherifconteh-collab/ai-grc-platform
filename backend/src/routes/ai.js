@@ -8,6 +8,7 @@ const auditService = require('../services/auditService');
 const pool = require('../config/database');
 const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
 const llmSchemas = require('../services/llmSchemas');
+const { runQualityGate } = require('../services/aiQualityGate');
 
 const aiOrgRateLimiter = createOrgRateLimiter({
   windowMs: 60 * 1000,
@@ -220,6 +221,13 @@ function aiHandler(feature, fn, opts = {}) {
       if (typeof result === 'string') resultText = result;
       else if (result && typeof result === 'object') resultText = JSON.stringify(result);
 
+      // Run quality gate on the final output (sync, non-blocking on failure).
+      let qualityScore = null;
+      try {
+        const qgResult = runQualityGate({ output: structured ?? result });
+        qualityScore = qgResult.score;
+      } catch (_qgErr) { /* non-fatal */ }
+
       // Log usage with extended context
       await llm.logAIUsage(params.organizationId, req.user.id, feature, resolvedProvider, resolvedModel, {
         success: true,
@@ -272,6 +280,7 @@ function aiHandler(feature, fn, opts = {}) {
           taskProfile: params.taskProfile,
           fallbackUsed,
           qualityErrors,        // null when valid; array of {instancePath, message} otherwise
+          qualityScore,         // 0-100 score from aiQualityGate (null when gate didn't run)
         }
       });
     } catch (err) {

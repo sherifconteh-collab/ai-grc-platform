@@ -146,6 +146,7 @@ const FEATURE_SCHEMAS = {
   evidence_suggestion: EVIDENCE_SUGGESTION_SCHEMA,
   evidence_suggest: EVIDENCE_SUGGESTION_SCHEMA, // alias
   finding: FINDING_SCHEMA,
+  finding_analysis: FINDING_SCHEMA, // alias
   audit_finding_draft: FINDING_SCHEMA, // alias
 };
 
