@@ -163,13 +163,16 @@ validateEdition();
 // Validate required environment variables at startup.
 // Failing early with a clear message is far better than silently misbehaving
 // in production (addresses "no environment variable validation at startup").
+let databaseConfigured = false;
 (function validateRequiredEnv() {
   const hasDatabaseUrl = Boolean(String(process.env.DATABASE_URL || '').trim());
   const individualDbVars = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
   const missingIndividual = individualDbVars.filter((v) => !String(process.env[v] || '').trim());
   const hasIndividualDbConfig = missingIndividual.length === 0;
 
-  if (!hasDatabaseUrl && !hasIndividualDbConfig) {
+  databaseConfigured = hasDatabaseUrl || hasIndividualDbConfig;
+
+  if (!databaseConfigured) {
     const msg = `Database connection is not configured. Set DATABASE_URL or provide the missing individual variables: ${missingIndividual.join(', ')}.`;
     if (SECURITY_CONFIG.isProduction) {
       // Hard-fail in production to prevent a broken server from starting.
@@ -201,6 +204,43 @@ app.get('/edition', attachEditionInfo, (req, res) => {
 });
 
 app.get('/health', async (req, res) => {
+  if (!databaseConfigured) {
+    const redisStatus = getRedisAdapterStatus();
+    const memory = process.memoryUsage();
+    const health = {
+      status: 'degraded',
+      timestamp: new Date().toISOString(),
+      database: {
+        status: 'not_configured'
+      },
+      memory: {
+        rss: Math.round(memory.rss / 1024 / 1024) + ' MB',
+        heapUsed: Math.round(memory.heapUsed / 1024 / 1024) + ' MB'
+      },
+      uptime: Math.floor(process.uptime()) + ' seconds',
+      requestId: req.requestId,
+      realtime: {
+        websocket: {
+          adapter: redisStatus.mode,
+          redis: {
+            status: redisStatus.status,
+            required: redisStatus.required,
+            configured: redisStatus.configured,
+            ...(redisStatus.error ? { error: redisStatus.error } : {})
+          }
+        }
+      }
+    };
+    if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+      health.railway = {
+        environment: process.env.RAILWAY_ENVIRONMENT_NAME,
+        serviceId: process.env.RAILWAY_SERVICE_ID || null,
+        deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null
+      };
+    }
+    return res.json(health);
+  }
+
   try {
     const start = process.hrtime.bigint();
     await pool.query('SELECT 1');
@@ -782,17 +822,15 @@ ensureLicenseFromDb()
       initializeWebSocket(server);
 
       // Start background jobs only after the HTTP server is reachable.
-      stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
+      if (databaseConfigured) {
+        stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
 
-      // Auto-provision platform admin if env vars are present
-      ensurePlatformAdmin().catch((err) =>
-        log('error', 'platform.admin.startup_error', { error: err.message })
-      );
-
-      // Auto-seed assessment procedures if table is empty
-      ensureAssessmentProcedures().catch((err) =>
-        log('error', 'assessment.procedures.startup_error', { error: err.message })
-      );
+        ensureAssessmentProcedures()
+          .then(() => ensurePlatformAdmin())
+          .catch((err) => log('error', 'startup.seed_error', { error: err.message }));
+      } else {
+        log('info', 'server.startup.db_tasks_skipped', { reason: 'database_not_configured' });
+      }
 
       // Verify COMPLIANCE_MONITORING_CATEGORIES in aiMonitoring.js matches the DB
       // CHECK constraint — warns on drift so migration/constant stay in sync.
