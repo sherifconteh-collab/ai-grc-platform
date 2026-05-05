@@ -826,8 +826,9 @@ ensureLicenseFromDb()
         stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
 
         ensureAssessmentProcedures()
-          .then(() => ensurePlatformAdmin())
-          .catch((err) => log('error', 'startup.seed_error', { error: err.message }));
+          .catch((err) => log('error', 'startup.assessment_seed_error', { error: err.message }));
+        ensurePlatformAdmin()
+          .catch((err) => log('error', 'startup.admin_seed_error', { error: err.message }));
       } else {
         log('info', 'server.startup.db_tasks_skipped', { reason: 'database_not_configured' });
       }
