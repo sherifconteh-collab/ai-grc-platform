@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const pool = require('../src/config/database');
+const { getNumberedMigrationEntries, validateMigrationDirectory } = require('./lib/migrationValidation');
 
 const migrationsDir = path.join(__dirname, '../migrations');
 const DESKTOP_RECONCILE_FILENAME = '100_desktop_schema_reconcile.sql';
@@ -59,20 +60,31 @@ async function ensureMigrationsTable(client) {
 
 async function runMigrations() {
   const client = await pool.connect();
-  const baselineOnError = (process.env.MIGRATION_BASELINE_ON_ERROR || 'true').toLowerCase() === 'true';
-  const allowChecksumDrift = (process.env.MIGRATION_ALLOW_CHECKSUM_DRIFT || 'true').toLowerCase() === 'true';
+  const baselineOnError = (process.env.MIGRATION_BASELINE_ON_ERROR || 'false').toLowerCase() === 'true';
+  const allowChecksumDrift = (process.env.MIGRATION_ALLOW_CHECKSUM_DRIFT || 'false').toLowerCase() === 'true';
   const reconcileFirst = (process.env.DESKTOP_SCHEMA_RECONCILE_FIRST || 'false').toLowerCase() === 'true';
 
   try {
+    const validation = validateMigrationDirectory(migrationsDir);
+
+    if (validation.unsupportedFiles.length > 0) {
+      throw new Error(`Unsupported migration files detected: ${validation.unsupportedFiles.join(', ')}`);
+    }
+
+    if (validation.duplicateBodies.length > 0) {
+      const duplicatePairs = validation.duplicateBodies
+        .map(([first, second]) => `${first} = ${second}`)
+        .join('; ');
+      throw new Error(`Duplicate migration bodies detected: ${duplicatePairs}`);
+    }
+
     await ensureMigrationsTable(client);
     const encodingResult = await client.query('SHOW SERVER_ENCODING');
     const serverEncoding = String(encodingResult.rows[0]?.server_encoding || '').toUpperCase();
     const requiresAsciiSql = serverEncoding !== 'UTF8';
 
-    const files = fs
-      .readdirSync(migrationsDir)
-      .filter((file) => /^\d+.*\.sql$/.test(file))
-      .sort((a, b) => a.localeCompare(b));
+    const files = getNumberedMigrationEntries(migrationsDir)
+      .filter((file) => /^\d+.*\.sql$/.test(file));
 
     const orderedFiles = reconcileFirst && files.includes(DESKTOP_RECONCILE_FILENAME)
       ? [DESKTOP_RECONCILE_FILENAME, ...files.filter((file) => file !== DESKTOP_RECONCILE_FILENAME)]

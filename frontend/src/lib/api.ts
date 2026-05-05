@@ -198,6 +198,10 @@ export const dashboardAPI = {
   getCrosswalkedControls: () => api.get('/dashboard/crosswalked-controls'),
 
   getMaturityScore: () => api.get('/dashboard/maturity-score'),
+
+  getControlHealthSummary: () => api.get('/control-health'),
+
+  getComplianceSummary: () => api.get('/dashboard/stats'),
 };
 
 // Organization APIs

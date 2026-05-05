@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { decrypt } = require('../utils/encrypt');
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
@@ -169,9 +170,10 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       ? await dynamicFieldsService.getCustomFieldValues(auditLogIds)
       : {};
 
-    // Merge custom fields into the audit log entries
+    // Merge custom fields and decrypt stored user emails before returning
     const logsWithCustomFields = result.rows.map(log => ({
       ...log,
+      user_email: log.user_email ? decrypt(log.user_email) : null,
       custom_fields: customFields[log.id] || {}
     }));
 

@@ -57,10 +57,7 @@ const navigationSections: NavigationSection[] = [
   {
     label: 'AI & Intelligence',
     items: [
-      { name: 'AI Analysis', href: '/dashboard/ai-analysis', icon: '✨', requiredPermissions: ['ai.use'] },
-      { name: 'AI Security', href: '/dashboard/ai-security', icon: '🔐', requiredPermissions: ['ai.use'], minTier: 'enterprise' },
-      { name: 'AI Monitoring', href: '/dashboard/ai-monitoring', icon: '🤖', requiredPermissions: ['ai.use'], minTier: 'pro' },
-      { name: 'AI Governance', href: '/dashboard/ai-governance', icon: '🏛️', requiredPermissions: ['organizations.read'], minTier: 'enterprise' },
+      { name: 'AI Insights', href: '/dashboard/ai-insights', icon: '✨', requiredPermissions: ['ai.use'] },
       { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'] },
       { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'], minTier: 'enterprise' },
       { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },

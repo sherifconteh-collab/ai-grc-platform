@@ -18,10 +18,12 @@ const STATUS_FILTER_MAP: Record<string, string> = {
 const DASHBOARD_SECTIONS = [
   'stats',
   'maturity',
+  'controlHealth',
   'charts',
   'trend',
   'crosswalk',
   'frameworkProgress',
+  'complianceSummary',
   'recentActivity',
 ] as const;
 type DashboardSectionKey = typeof DASHBOARD_SECTIONS[number];
@@ -29,10 +31,12 @@ type DashboardSectionKey = typeof DASHBOARD_SECTIONS[number];
 const DASHBOARD_SECTION_LABELS: Record<DashboardSectionKey, string> = {
   stats: 'Top KPI Cards',
   maturity: 'Maturity Score',
+  controlHealth: 'Control Health Overview',
   charts: 'Status & Framework Charts',
   trend: 'Compliance Trend',
   crosswalk: 'Auto-Crosswalk Highlight',
   frameworkProgress: 'Framework Progress',
+  complianceSummary: 'Per-Framework Compliance Summary',
   recentActivity: 'Recent Activity Feed',
 };
 
@@ -73,6 +77,28 @@ interface CrosswalkedControl {
   updated_at: string | null;
 }
 
+interface ControlHealthSummary {
+  total: number;
+  strong: number;
+  good: number;
+  watch: number;
+  weak: number;
+  avg_score: number;
+}
+
+interface ComplianceSummaryFramework {
+  id: string;
+  code: string;
+  name: string;
+  totalControls: number;
+  implemented: number;
+  satisfiedViaCrosswalk: number;
+  inProgress: number;
+  notStarted: number;
+  notApplicable: number;
+  compliancePercentage: number;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -91,6 +117,8 @@ export default function DashboardPage() {
   const [crosswalkedControls, setCrosswalkedControls] = useState<CrosswalkedControl[]>([]);
   const [crosswalkLoading, setCrosswalkLoading] = useState(false);
   const [crosswalkError, setCrosswalkError] = useState('');
+  const [controlHealthSummary, setControlHealthSummary] = useState<ControlHealthSummary | null>(null);
+  const [complianceSummaryData, setComplianceSummaryData] = useState<{ overall: { totalControls: number; implemented: number; satisfiedViaCrosswalk: number; inProgress: number; notStarted: number; compliancePercentage: number }; frameworks: ComplianceSummaryFramework[] } | null>(null);
 
   const gapSig = stats ? `${stats.implementedControls}-${stats.totalControls}-${stats.frameworks?.length}` : '';
   const gapAnalysis = useAutoAIResult({
@@ -171,8 +199,15 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       setError('');
-      const response = await dashboardAPI.getOverview({ period: '30d' });
-      const payload = response.data?.data || {};
+      const [overviewRes, healthRes, summaryRes] = await Promise.allSettled([
+        dashboardAPI.getOverview({ period: '30d' }),
+        dashboardAPI.getControlHealthSummary(),
+        dashboardAPI.getComplianceSummary(),
+      ]);
+
+      if (overviewRes.status === 'rejected') throw overviewRes.reason;
+
+      const payload = overviewRes.value.data?.data || {};
       const backendData = payload.stats || null;
 
       if (!backendData) {
@@ -198,6 +233,14 @@ export default function DashboardPage() {
       setActivity(Array.isArray(payload.activity) ? payload.activity : []);
       setTrendData(Array.isArray(payload.trend) ? payload.trend : []);
       setMaturity(payload.maturity || null);
+
+      if (healthRes.status === 'fulfilled') {
+        setControlHealthSummary((healthRes.value.data?.data?.summary as ControlHealthSummary) ?? null);
+      }
+
+      if (summaryRes.status === 'fulfilled') {
+        setComplianceSummaryData(summaryRes.value.data?.data ?? null);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load dashboard');
       console.error('Dashboard error:', err);
@@ -428,6 +471,49 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {/* Control Health Overview */}
+            {isSectionVisible('controlHealth') && controlHealthSummary && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-900">Control Health Overview</h2>
+                  <a href="/dashboard/security-posture" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                    View Security Posture →
+                  </a>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                  {([
+                    { label: 'Strong', count: controlHealthSummary.strong, color: 'text-green-700 bg-green-50 border-green-200' },
+                    { label: 'Good', count: controlHealthSummary.good, color: 'text-blue-700 bg-blue-50 border-blue-200' },
+                    { label: 'Watch', count: controlHealthSummary.watch, color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+                    { label: 'Weak', count: controlHealthSummary.weak, color: 'text-red-700 bg-red-50 border-red-200' },
+                    { label: 'Total', count: controlHealthSummary.total, color: 'text-gray-700 bg-gray-50 border-gray-200' },
+                  ] as const).map(({ label, count, color }) => (
+                    <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
+                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-xs font-medium mt-0.5">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600 flex-shrink-0">Avg Health Score</span>
+                  <div
+                    className="flex-1 bg-gray-200 rounded-full h-2"
+                    aria-label={`Average health score: ${controlHealthSummary.avg_score}`}
+                  >
+                    <div
+                      className={`h-2 rounded-full transition-all duration-500 ${
+                        controlHealthSummary.avg_score >= 80 ? 'bg-green-500' :
+                        controlHealthSummary.avg_score >= 60 ? 'bg-blue-500' :
+                        controlHealthSummary.avg_score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${controlHealthSummary.avg_score}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold text-gray-700 flex-shrink-0">{controlHealthSummary.avg_score}/100</span>
+                </div>
+              </div>
+            )}
+
             {/* Charts Row */}
             {isSectionVisible('charts') && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -557,6 +643,69 @@ export default function DashboardPage() {
                   )}
                 </div>
               )}
+              </div>
+            )}
+
+            {/* Per-Framework Compliance Summary */}
+            {isSectionVisible('complianceSummary') && (complianceSummaryData?.frameworks?.length ?? 0) > 0 && (
+              <div className="bg-white rounded-lg shadow-md p-6 overflow-x-auto">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Per-Framework Compliance Summary</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 uppercase border-b">
+                      <th className="pb-2 pr-4">Framework</th>
+                      <th className="pb-2 pr-3 text-right">Total</th>
+                      <th className="pb-2 pr-3 text-right">Implemented</th>
+                      <th className="pb-2 pr-3 text-right">In Progress</th>
+                      <th className="pb-2 pr-3 text-right">Crosswalked</th>
+                      <th className="pb-2 pr-3 text-right">Not Started</th>
+                      <th className="pb-2 text-right">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {complianceSummaryData!.frameworks.map((fw) => (
+                      <tr key={fw.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 pr-4">
+                          <span className="font-medium text-gray-900">{fw.code}</span>
+                          <span className="text-xs text-gray-500 ml-1 hidden sm:inline">· {fw.name}</span>
+                        </td>
+                        <td className="py-2 pr-3 text-right text-gray-600">{fw.totalControls}</td>
+                        <td className="py-2 pr-3 text-right text-gray-600">{fw.implemented}</td>
+                        <td className="py-2 pr-3 text-right text-gray-600">{fw.inProgress}</td>
+                        <td className="py-2 pr-3 text-right text-gray-600">{fw.satisfiedViaCrosswalk}</td>
+                        <td className="py-2 pr-3 text-right text-gray-600">{fw.notStarted}</td>
+                        <td className="py-2 text-right">
+                          <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${
+                            fw.compliancePercentage >= 80 ? 'bg-green-100 text-green-700' :
+                            fw.compliancePercentage >= 50 ? 'bg-blue-100 text-blue-700' :
+                            fw.compliancePercentage >= 25 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {fw.compliancePercentage}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {complianceSummaryData!.overall && (
+                      <tr className="border-t-2 border-gray-200 font-semibold bg-gray-50">
+                        <td className="py-2 pr-4 text-gray-700">Overall</td>
+                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.totalControls}</td>
+                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.implemented}</td>
+                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.inProgress}</td>
+                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.satisfiedViaCrosswalk}</td>
+                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.notStarted}</td>
+                        <td className="py-2 text-right">
+                          <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${
+                            complianceSummaryData!.overall.compliancePercentage >= 80 ? 'bg-green-100 text-green-700' :
+                            complianceSummaryData!.overall.compliancePercentage >= 50 ? 'bg-blue-100 text-blue-700' :
+                            complianceSummaryData!.overall.compliancePercentage >= 25 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {complianceSummaryData!.overall.compliancePercentage}%
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
 

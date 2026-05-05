@@ -1,6 +1,6 @@
 {
   "name": "controlweave-desktop",
-  "version": "3.1.0",
+  "version": "3.3.0",
   "description": "ControlWeave AI GRC Platform — Desktop Edition",
   "author": "ControlWeave <contehconsulting@gmail.com>",
   "license": "AGPL-3.0",
@@ -123,6 +123,9 @@
       "owner": "sherifconteh-collab",
       "repo": "ai-grc-platform"
     }
+  },
+  "overrides": {
+    "@xmldom/xmldom": ">=0.8.13"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",

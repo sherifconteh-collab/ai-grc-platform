@@ -13,6 +13,26 @@
 
 > Changes staged but not yet released to production.
 
+---
+
+## [3.3.0] — 2026-05-02
+
+> **Released:** 2026-05-02
+
+### Added
+- Local DB-backed integration harness at `backend/scripts/qa-local-integration.js` for exact postcondition checks across framework adoption, control implementation, notifications, audit writes, org LLM settings, and cross-org isolation.
+
+### Changed
+- Hardened legacy backend QA scripts so they assert persisted behavior and current route contracts instead of allowing ambiguous `200 or 403` outcomes.
+- RBAC QA now verifies evidence upload behavior, control-write persistence, audit-log access via `/api/v1/audit/logs`, and org LLM setting persistence.
+- Endpoint smoke tests now derive tier-gating expectations from the authenticated org tier rather than treating both blocked and allowed responses as passing.
+- Hardened the backend migration toolchain by rejecting unsupported migration files, rejecting duplicate SQL bodies, and defaulting checksum drift plus automatic baseline-on-error to off.
+- Replaced the broken configuration-management migration with a UUID-safe SQL migration and removed duplicated TPRM schema replays from fresh installs.
+- Backend startup now skips license DB lookup, reminder sweeps, AI-monitoring sync, and seed jobs when database config is intentionally absent in development, and `/health` reports a fast degraded `database:not_configured` status instead of cascading connection/auth errors.
+- Passkey and SSO session rows now honor the configured refresh-token lifetime instead of hardcoding seven days, and the SSO callback now returns tokens in the URL fragment so they do not leak through query-string logging or referrers.
+- Platform-admin overview now requires platform-owner authentication, audit log responses decrypt stored user emails before returning them to the UI, and QA coverage now asserts passkey email lookup, org switching session rotation, and the SSO callback fragment contract.
+- Dependency updates: `@anthropic-ai/sdk` → 0.91.1, `dotenv` → 17.4.2, `openid-client` → 6.8.3, `stripe` → 22.1.0, `axios` → 1.15.2, `eslint` → 10.2.1, `lucide-react` → 1.11.0, `tailwindcss` → 4.2.4, `typescript` → 6.0.3. Added `uuid ^14.0.0` and `postcss ^8.5.10` overrides to clear moderate advisories. GitHub Actions: `softprops/action-gh-release` v3, `actions/github-script` v9.
+
 ## [3.1.0] — 2026-04-18
 
 > **Released:** 2026-04-18
