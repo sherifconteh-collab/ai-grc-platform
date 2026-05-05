@@ -15,6 +15,10 @@
 
 ---
 
+### Changed
+
+- chore(deps): apply all 14 open Dependabot PRs (#158) ([#159](https://github.com/sherifconteh-collab/ai-grc-platform/pull/159)) — @sherifconteh-collab
+
 ## [3.3.0] — 2026-05-02
 
 > **Released:** 2026-05-02

@@ -6,7 +6,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v3.1.0-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v3.3.0-green.svg)](./RELEASE_NOTES.md)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
 ---
@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-04-18 | v3.1.0: Mobile push backend, Claude DX bundle, Playwright e2e scaffold, v3.0.0 security hardening (bcrypt cost 14, JWT HS256 pin), AI output quality overhaul -->
+<!-- LAST_UPDATED: 2026-05-05 | PR #159: chore(deps): apply all 14 open Dependabot PRs (#158) -->
 
 ## 🎯 What is This?
 
@@ -686,7 +686,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **Tables**: 140+ database tables
 - **API Routes**: 60+ route modules
-- **Services**: 19 service modules
+- **Services**: 21 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Security**: AES-256-GCM PII encryption, HMAC-SHA-384 email hashing, 15-char password policy
