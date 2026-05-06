@@ -113,6 +113,7 @@
   },
   "overrides": {
     "express-rate-limit": "8.2.2",
+    "ip-address": ">=10.1.1",
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
     "hono": "^4.12.14",
