@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-05 | PR #159: chore(deps): apply all 14 open Dependabot PRs (#158) -->
+<!-- LAST_UPDATED: 2026-05-06 | PR #160: chore(frontend): sync package-lock.json version to 3.3.0 -->
 
 ## 🎯 What is This?
 

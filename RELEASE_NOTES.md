@@ -16,6 +16,7 @@
 ---
 
 ### Changed
+- chore(frontend): sync package-lock.json version to 3.3.0 ([#160](https://github.com/sherifconteh-collab/ai-grc-platform/pull/160)) — @sherifconteh-collab
 
 - chore(deps): apply all 14 open Dependabot PRs (#158) ([#159](https://github.com/sherifconteh-collab/ai-grc-platform/pull/159)) — @sherifconteh-collab
 
