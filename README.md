@@ -54,7 +54,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-06 | PR #160: chore(frontend): sync package-lock.json version to 3.3.0 -->
+<!-- LAST_UPDATED: 2026-05-08 | PR #161: fix(ci): add --ignore-npm-errors to frontend SBOM generation -->
 
 ## 🎯 What is This?
 
