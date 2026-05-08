@@ -53,6 +53,7 @@ jobs:
         run: |
           cyclonedx-npm \
             --package-lock-only \
+            --ignore-npm-errors \
             --output-format JSON \
             --output-file sbom-output/sbom-frontend.cdx.json \
             frontend/package.json
