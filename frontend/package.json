@@ -31,7 +31,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^10.2.1",
-    "eslint-config-next": "^16.2.4",
+    "eslint-config-next": "^16.2.6",
     "openapi-typescript": "^7.10.1",
     "@playwright/test": "^1.55.2",
     "tailwindcss": "^4.2.4",
