@@ -87,7 +87,7 @@
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.5",
-    "openai": "^6.32.0",
+    "openai": "^6.37.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.18.0",
