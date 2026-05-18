@@ -7,8 +7,25 @@ const compression = require('compression');
 const pool = require('./config/database');
 const { attachRequestContext } = require('./middleware/requestContext');
 const { createRateLimiter } = require('./middleware/rateLimit');
-const { log, requestLogger, serializeError } = require('./utils/logger');
+const { log, requestLogger, serializeError, setSentryClient } = require('./utils/logger');
 const { performanceTracker } = require('./middleware/performanceMonitoring');
+
+// Sentry must be initialized before any other instrumented modules
+let _sentry = null;
+if (process.env.SENTRY_DSN) {
+  try {
+    _sentry = require('@sentry/node');
+    _sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development'
+    });
+    setSentryClient(_sentry);
+  } catch (_err) {
+    // @sentry/node is optional — silently skip if not installed
+    _sentry = null;
+  }
+}
+
 // safeRequire is defined here (before any conditional imports) so it can be used
 // for services and routes that are absent in the community/public-mirror build.
 function safeRequire(modulePath) {
@@ -520,6 +537,11 @@ if (rmfRoutes) app.use('/api/v1/rmf', rmfRoutes);
 if (stateAiLawsRoutes) app.use('/api/v1/state-ai-laws', stateAiLawsRoutes);
 
 // Error handling middleware
+// Sentry error handler must precede all other error handlers
+if (_sentry) {
+  _sentry.setupExpressErrorHandler(app);
+}
+
 app.use((err, req, res, next) => {
   const correlationId = req.requestId;
   log('error', 'request.failed', {
@@ -825,6 +847,15 @@ ensureLicenseFromDb()
       if (databaseConfigured) {
         stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
 
+        // Start scheduled database backups if enabled.
+        // In PM2 cluster mode pm_id is set per-worker (0-indexed); only worker 0
+        // runs the scheduler to avoid duplicate concurrent pg_dump processes.
+        const _backupScheduler = safeRequire('./services/backupScheduler');
+        const _isPrimaryWorker = !process.env.pm_id || process.env.pm_id === '0';
+        if (_backupScheduler && process.env.BACKUP_ENABLED === 'true' && _isPrimaryWorker) {
+          _backupScheduler.start();
+        }
+
         ensureAssessmentProcedures()
           .catch((err) => log('error', 'startup.assessment_seed_error', { error: err.message }));
         ensurePlatformAdmin()
@@ -848,6 +879,8 @@ ensureLicenseFromDb()
     function shutdown(signal) {
       log('warn', 'server.shutdown.requested', { signal });
       stopReminders();
+      const _bs = safeRequire('./services/backupScheduler');
+      if (_bs) _bs.stop();
       server.close(() => {
         log('info', 'server.http.closed');
         pool.end(() => {

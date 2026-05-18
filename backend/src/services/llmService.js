@@ -23,10 +23,10 @@ try { axios = require('axios'); } catch (_e) { axios = null; }
 const USAGE_LIMITS = { community: -1, pro: -1, enterprise: -1, govcloud: -1 };
 
 const PROVIDER_MODELS = {
-  anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'],
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
-  gemini: ['gemini-2.0-flash', 'gemini-1.5-pro'],
-  groq: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'],
+  anthropic: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'],
+  openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+  gemini: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'],
+  groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
   grok: ['grok-3', 'grok-3-mini'],
   ollama: ['llama3.2', 'mistral', 'codellama'],
 };
@@ -84,19 +84,19 @@ let _cache = {};
 const TASK_PROFILES = Object.freeze({
   reasoning: {
     temperature: 0.4,
-    models: { anthropic: 'claude-sonnet-4-20250514', openai: 'gpt-4o' },
+    models: { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1' },
   },
   extraction: {
     temperature: 0.2,
-    models: { anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4o-mini' },
+    models: { anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4.1-mini' },
   },
   ideation: {
     temperature: 0.7,
-    models: { anthropic: 'claude-sonnet-4-20250514', openai: 'gpt-4o' },
+    models: { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1' },
   },
   chat: {
     temperature: 0.3,
-    models: { anthropic: 'claude-sonnet-4-20250514', openai: 'gpt-4o' },
+    models: { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1' },
   },
 });
 

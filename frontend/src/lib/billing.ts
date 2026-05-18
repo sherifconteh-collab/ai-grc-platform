@@ -28,6 +28,11 @@ export const VALID_BILLING_PLANS = new Set([
  * Safe to call from server-rendered code paths — returns `null` when `window`
  * is undefined.
  */
+// getStoredPendingBillingPlan always returns a string (empty when no plan stored).
+export function getStoredPendingBillingPlan(): string {
+  return readValidPendingPlan() ?? '';
+}
+
 export function readValidPendingPlan(): string | null {
   if (typeof window === 'undefined') return null;
   let raw: string | null = null;

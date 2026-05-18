@@ -69,6 +69,27 @@ api.interceptors.response.use(
       }
     }
 
+    // AI quota exceeded — fire a global event so AiQuotaModal can respond
+    if (error.response?.status === 429 && (error.response?.data as { upgradeRequired?: boolean })?.upgradeRequired) {
+      const { used = 0, limit = 0, currentTier = 'community' } = (error.response?.data || {}) as {
+        used?: number;
+        limit?: number;
+        currentTier?: string;
+      };
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('ai:quota-exceeded', { detail: { used, limit, currentTier } })
+        );
+      }
+    }
+
+    // No AI provider configured — prompt the user to add their own API key
+    if (error.response?.status === 422 && (error.response?.data as { code?: string })?.code === 'NO_PROVIDER_CONFIGURED') {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ai:no-provider'));
+      }
+    }
+
     return Promise.reject(error);
   }
 );

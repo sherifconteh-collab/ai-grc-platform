@@ -1,6 +1,6 @@
 {
   "name": "controlweave-backend",
-  "version": "3.3.0",
+  "version": "3.5.0",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
@@ -69,6 +69,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
+    "@sentry/node": "^8.55.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
@@ -86,6 +87,7 @@
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
+    "node-cron": "^3.0.3",
     "nodemailer": "^8.0.5",
     "openai": "^6.32.0",
     "openid-client": "^6.8.3",

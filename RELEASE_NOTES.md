@@ -9,17 +9,52 @@
 
 ---
 
-## [Unreleased]
+## [3.5.0] — 2026-05-18
 
-> Changes staged but not yet released to production.
+> **Released:** 2026-05-18
+
+### Added
+- AI model catalog expansion: Claude 4.x (`claude-opus-4-7`, `claude-sonnet-4-6`), GPT-4.1 family (`gpt-4.1`, `gpt-4.1-mini`, `o3`, `o4-mini`), Gemini 2.0 Flash Lite, and additional Groq models.
+- BYOK-required enforcement: AI routes now require each organization to supply their own API key via Settings → LLM Configuration. No platform-shared keys; community and free-tier usage goes through org-owned Gemini, Groq, or Ollama keys.
+- `AiProviderSetupModal` frontend component: surfaced automatically (via `ai:no-provider` browser event) when a 422 `NO_PROVIDER_CONFIGURED` response is received, directing users to configure a free provider.
+- `AiQuotaModal` frontend component: surfaced automatically (via `ai:quota-exceeded` browser event) when a 429 `upgradeRequired` response is received, showing usage vs. limit and offering upgrade/BYOK CTAs.
+- Global Axios interceptors dispatch `ai:quota-exceeded` (429+upgradeRequired) and `ai:no-provider` (422+NO_PROVIDER_CONFIGURED) browser CustomEvents for decoupled modal triggering.
+
+### Changed
+- TASK_PROFILES defaults updated: reasoning/chat/ideation → `claude-sonnet-4-6` / `gpt-4.1`; extraction → `claude-3-5-haiku-20241022` / `gpt-4.1-mini`.
+- `checkAIUsage` middleware simplified: removes tier/quota counting; resolves org API key via `llm.resolveApiKey` and returns 422 with `freeProviders` hint when no key is found.
+- `DashboardLayout` wires AI event listeners and renders quota/provider modals at the layout level.
+- Billing pending-plan guard uses `getStoredPendingBillingPlan()` (validated against known SKUs, auto-clears stale values).
 
 ---
 
-### Changed
-- fix(ci): add --ignore-npm-errors to frontend SBOM generation ([#161](https://github.com/sherifconteh-collab/ai-grc-platform/pull/161)) — @sherifconteh-collab
-- chore(frontend): sync package-lock.json version to 3.3.0 ([#160](https://github.com/sherifconteh-collab/ai-grc-platform/pull/160)) — @sherifconteh-collab
+## [3.4.0] — 2026-05-16
 
-- chore(deps): apply all 14 open Dependabot PRs (#158) ([#159](https://github.com/sherifconteh-collab/ai-grc-platform/pull/159)) — @sherifconteh-collab
+> **Released:** 2026-05-16
+
+### Added
+- **Redis distributed rate limiting**: `middleware/rateLimit.js` rewritten with Lua atomic INCR+EXPIRE; falls back transparently to in-memory Map when Redis is unavailable. Both `createRateLimiter` and `createOrgRateLimiter` API unchanged.
+- **Redis response cache**: new `utils/redisCache.js` with `getCached(key, ttlSeconds, fn)`, `invalidateCached(key)`, `invalidateCachedPattern(pattern)`. Silently no-ops when Redis is not configured.
+- **PostgreSQL Row-Level Security** (migration `105_row_level_security.sql`): enables `FORCE ROW SECURITY` on `controls`, `control_implementations`, `evidence`, `audit_engagements`, `audit_logs`, and `users`. Policy is permissive when `app.org_id` is unset; restricts rows to matching `organization_id` when set.
+- **`withOrgContext(orgId, fn)`** in `config/database.js`: wraps a callback in a transaction with `SET LOCAL app.org_id = $1` for defense-in-depth multi-tenant isolation.
+- **Automated DB backup scheduler** (`services/backupScheduler.js`): uses `node-cron` to spawn `db-backup.js` on a configurable cron schedule (`BACKUP_CRON_SCHEDULE`, default `0 2 * * *`). Audit trail written to new `backup_logs` table (migration `106_backup_logs.sql`). PM2-cluster-aware — only runs on primary worker.
+- **Sentry integration**: optional `@sentry/node` init in `server.js` when `SENTRY_DSN` is set; `utils/logger.js` forwards error-level events via `captureException`/`captureMessage`.
+- **Refresh token rotation**: `POST /auth/refresh` issues a new `{ accessToken, refreshToken }` pair and updates the session row in-place, invalidating the previous refresh token.
+- **Concurrent session limits**: after successful login, sessions exceeding `MAX_CONCURRENT_SESSIONS` (default 10) are evicted oldest-first.
+- Incoming webhook signature verification: `webhookService.verifyIncomingWebhook(secret, signature, body)` using HMAC-SHA256 + `crypto.timingSafeEqual`.
+- `isDatabaseConfigured`, `pool.isConfigured`, `pool.missingConfig` exports from `config/database.js` for startup health checks.
+
+### Changed
+- `server.js` activates backup scheduler after DB confirmation; adds graceful-shutdown hook.
+- `backend/package.json` adds `@sentry/node ^8.55.0` and `node-cron ^3.0.3` to `dependencies`.
+
+### Security
+- RLS policies provide row-level org isolation at the PostgreSQL layer, complementing application-level `WHERE organization_id = $1` guards.
+- Refresh token rotation prevents replay attacks on stolen refresh tokens.
+- Concurrent session cap limits credential-stuffing blast radius.
+- Timing-safe webhook signature comparison prevents timing-oracle attacks.
+
+---
 
 ## [3.3.0] — 2026-05-02
 

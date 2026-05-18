@@ -229,8 +229,26 @@ async function processPendingWebhookDeliveries({ organizationId = null, limit = 
   };
 }
 
+// verifyIncomingWebhook validates HMAC signatures on incoming webhook callbacks.
+// Pass the raw request body string (req.rawBody) when available, not the parsed
+// object — JSON.stringify on a parsed object is fragile (key order, whitespace).
+function verifyIncomingWebhook(secret, signature, body) {
+  if (!secret || !signature) return false;
+  const payload = typeof body === 'string' ? body : JSON.stringify(body);
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(signature.replace(/^sha256=/, '')),
+      Buffer.from(expected)
+    );
+  } catch (_err) {
+    return false;
+  }
+}
+
 module.exports = {
   validateWebhookTargetUrl,
   enqueueWebhookEvent,
-  processPendingWebhookDeliveries
+  processPendingWebhookDeliveries,
+  verifyIncomingWebhook
 };

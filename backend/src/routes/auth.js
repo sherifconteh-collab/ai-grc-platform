@@ -988,6 +988,26 @@ router.post('/login', authLoginLimiter, validateBody((body) => requireFields(bod
       );
     }
 
+    // Enforce concurrent session limit for non-demo accounts.
+    // Evicts the oldest active sessions when the limit is reached.
+    const maxConcurrentSessions = parseInt(process.env.MAX_CONCURRENT_SESSIONS || '10', 10);
+    if (maxConcurrentSessions > 0 && !isDemoAccount) {
+      const sessionCountResult = await pool.query(
+        'SELECT COUNT(*)::int AS count FROM sessions WHERE user_id = $1 AND expires_at > NOW()',
+        [user.id]
+      );
+      const activeCount = sessionCountResult.rows[0].count;
+      if (activeCount >= maxConcurrentSessions) {
+        await pool.query(
+          `DELETE FROM sessions WHERE id IN (
+            SELECT id FROM sessions WHERE user_id = $1 AND expires_at > NOW()
+            ORDER BY created_at ASC LIMIT $2
+          )`,
+          [user.id, activeCount - maxConcurrentSessions + 1]
+        );
+      }
+    }
+
     await pool.query(
       'INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',
       [user.id, hashRefreshToken(refreshToken), sessionExpiresAt]
@@ -1224,9 +1244,20 @@ router.post('/refresh', authRefreshLimiter, validateBody((body) => requireFields
       );
     }
 
-    const accessToken = buildAccessToken(decoded.userId, demoSessionExpiresAt);
+    // Rotate refresh token: issue new token and invalidate the old one.
+    const isDemoRefresh = Boolean(demoSessionExpiresAt);
+    const { accessToken, refreshToken: newRefreshToken, sessionExpiresAt: newExpiresAt } =
+      generateSessionTokens(decoded.userId, {
+        isDemoAccount: isDemoRefresh,
+        sessionExpiresAt: demoSessionExpiresAt
+      });
 
-    res.json({ success: true, data: { accessToken } });
+    await pool.query(
+      'UPDATE sessions SET refresh_token = $1, expires_at = $2 WHERE id = $3',
+      [hashRefreshToken(newRefreshToken), newExpiresAt, session.rows[0].id]
+    );
+
+    res.json({ success: true, data: { accessToken, refreshToken: newRefreshToken } });
   } catch (error) {
     console.error('Refresh error:', error);
     res.status(401).json({ success: false, error: 'Token refresh failed' });
