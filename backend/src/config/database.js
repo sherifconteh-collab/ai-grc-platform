@@ -24,7 +24,7 @@ if (useConnectionString) {
   poolOptions.connectionString = process.env.DATABASE_URL;
 } else {
   poolOptions.host = process.env.DB_HOST;
-  poolOptions.port = process.env.DB_PORT;
+  poolOptions.port = process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined;
   poolOptions.database = process.env.DB_NAME;
   poolOptions.user = process.env.DB_USER;
   poolOptions.password = process.env.DB_PASSWORD;
@@ -49,7 +49,7 @@ async function withOrgContext(orgId, fn) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('SET LOCAL app.org_id = $1', [String(orgId)]);
+    await client.query('SET LOCAL app.org_id = $1', [orgId ? String(orgId) : '']);
     const result = await fn(client);
     await client.query('COMMIT');
     return result;
