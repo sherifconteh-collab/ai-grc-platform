@@ -9,6 +9,14 @@
 
 ---
 
+## [Unreleased]
+
+> Changes staged but not yet released to production.
+
+### Changed
+
+- feat: sync ControlWeave v3.4.0 + v3.5.0 functionality ([#173](https://github.com/sherifconteh-collab/ai-grc-platform/pull/173)) — @sherifconteh-collab
+
 ## [3.5.0] — 2026-05-18
 
 > **Released:** 2026-05-18
