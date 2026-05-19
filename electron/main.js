@@ -805,8 +805,8 @@ app.whenReady().then(async () => {
     }
 
     // ── Normal startup ──────────────────────────────────────────────────────
-  validateEmbeddedPostgresRuntime();
-  logStartup('info', 'Embedded PostgreSQL binaries validated');
+    validateEmbeddedPostgresRuntime();
+    logStartup('info', 'Embedded PostgreSQL binaries validated');
     validatePackagedBackendRuntime();
     logStartup('info', 'Packaged backend runtime validated');
 

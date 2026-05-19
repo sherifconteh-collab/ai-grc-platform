@@ -112,7 +112,7 @@ jobs:
                   "bom-ref":    "ai:anthropic-claude",
                   "name":       "Claude",
                   "supplier":   "Anthropic",
-                  "version":    "claude-3-5-sonnet, claude-3-opus, claude-3-haiku (BYOK, version set by operator)",
+                  "version":    "claude-opus-4-7, claude-sonnet-4-6, claude-sonnet-4-20250514, claude-3-5-haiku-20241022 (BYOK, version set by operator)",
                   "description": (
                       "Anthropic Claude LLM accessed via @anthropic-ai/sdk (BYOK). "
                       "Used for gap analysis, policy generation, compliance forecasting, "
@@ -138,7 +138,7 @@ jobs:
                   "bom-ref":    "ai:openai-gpt",
                   "name":       "GPT Models",
                   "supplier":   "OpenAI",
-                  "version":    "gpt-4o, gpt-4-turbo, gpt-3.5-turbo (BYOK, version set by operator)",
+                  "version":    "gpt-4.1, gpt-4.1-mini, o3, o4-mini, gpt-4o, gpt-4o-mini, gpt-4-turbo (BYOK, version set by operator)",
                   "description": (
                       "OpenAI GPT models accessed via the `openai` npm package (BYOK). "
                       "Used for all AI analysis features as an alternative provider."
@@ -162,7 +162,7 @@ jobs:
                   "bom-ref":    "ai:google-gemini",
                   "name":       "Gemini",
                   "supplier":   "Google",
-                  "version":    "gemini-1.5-pro, gemini-1.5-flash (BYOK, version set by operator)",
+                  "version":    "gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-pro (BYOK, version set by operator)",
                   "description": (
                       "Google Gemini accessed via Google AI REST API (BYOK). "
                       "Used as an alternative LLM provider for all AI analysis features."
@@ -202,7 +202,7 @@ jobs:
                   "bom-ref":    "ai:groq-inference",
                   "name":       "Groq (LLM Inference)",
                   "supplier":   "Groq",
-                  "version":    "llama3-70b, mixtral-8x7b (BYOK, version set by operator)",
+                  "version":    "llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768 (BYOK, version set by operator)",
                   "description": (
                       "Groq LPU inference service accessed via REST API (BYOK). "
                       "Provides high-speed inference for open-weight models as an alternative provider."
