@@ -1,4 +1,10 @@
 // @tier: community
+let _sentryClient = null;
+
+function setSentryClient(sentry) {
+  _sentryClient = sentry;
+}
+
 function serializeError(err) {
   if (!err) return null;
   return {
@@ -20,6 +26,14 @@ function log(level, message, meta = {}) {
 
   if (level === 'error') {
     console.error(line);
+    if (_sentryClient) {
+      const err = meta instanceof Error ? meta : (meta.error instanceof Error ? meta.error : null);
+      if (err) {
+        _sentryClient.captureException(err);
+      } else {
+        _sentryClient.captureMessage(message, 'error');
+      }
+    }
     return;
   }
 
@@ -54,5 +68,6 @@ function requestLogger(req, res, next) {
 module.exports = {
   log,
   serializeError,
-  requestLogger
+  requestLogger,
+  setSentryClient
 };

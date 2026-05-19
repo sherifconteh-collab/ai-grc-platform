@@ -6,7 +6,7 @@ const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const llm = require('../services/llmService');
 const auditService = require('../services/auditService');
 const pool = require('../config/database');
-const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
+const { log } = require('../utils/logger');
 const llmSchemas = require('../services/llmSchemas');
 const { runQualityGate } = require('../services/aiQualityGate');
 
@@ -33,42 +33,26 @@ router.use(aiOrgRateLimiter);
 async function checkAIUsage(req, res, next) {
   try {
     const params = await getAIParams(req);
-    const tier = normalizeTier(req.user.organization_tier);
-    const limit = llm.getUsageLimit(tier);
-    const enforceByokLimits = shouldEnforceAiLimitForByok(tier);
 
-    if (!enforceByokLimits) {
-      const resolvedKey = await llm.resolveApiKey(params.provider, req.user.organization_id);
-      if (resolvedKey.source === 'organization') {
-        req.aiUsageRemaining = 'unlimited';
-        req.aiUsageByok = true;
-        req.aiUsageKeySource = resolvedKey.source;
-        return next();
-      }
+    // Each org must provide their own API key (BYOK). No platform-shared keys.
+    const resolvedKey = await llm.resolveApiKey(params.provider, req.user.organization_id);
+    if (resolvedKey.source === 'organization') {
+      req.aiUsageByok = true;
+      req.aiUsageRemaining = 'unlimited';
+      req.aiUsageKeySource = 'organization';
+      return next();
     }
 
-    // -1 means unlimited
-    if (limit === -1) return next();
-
-    const used = await llm.getUsageCount(req.user.organization_id);
-    if (used >= limit) {
-      return res.status(429).json({
-        success: false,
-        error: 'AI usage limit reached',
-        message: `Your ${tier} tier allows ${limit} AI requests per month. You've used ${used}. Upgrade for more.`,
-        currentTier: tier,
-        used,
-        limit,
-        upgradeRequired: true
-      });
-    }
-
-    req.aiUsageRemaining = limit - used;
-    req.aiUsageByok = false;
-    req.aiUsageKeySource = null;
-    next();
+    // No key configured for any provider — prompt the user to set one up.
+    return res.status(422).json({
+      success: false,
+      error: 'No AI provider configured.',
+      code: 'NO_PROVIDER_CONFIGURED',
+      message: 'Add a free API key for Gemini or Groq in Settings → LLM Configuration to get started.',
+      freeProviders: ['gemini', 'groq', 'ollama']
+    });
   } catch (err) {
-    console.error('AI usage check error:', err);
+    log('error', 'ai.usage_check', { error: err.message });
     next();
   }
 }

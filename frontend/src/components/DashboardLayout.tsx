@@ -4,13 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { requiresOrganizationOnboarding, hasPermission } from '@/lib/access';
-import { requiresBillingResolution, readValidPendingPlan } from '@/lib/billing';
+import { requiresBillingResolution, getStoredPendingBillingPlan } from '@/lib/billing';
 import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import { WebSocketStatusIndicator } from './WebSocketStatusIndicator';
 import Sidebar from './Sidebar';
 import AICopilot from './AICopilot';
 import { getAccessToken } from '@/lib/tokenStore';
 import { licenseAPI } from '@/lib/api';
+import AiQuotaModal from './AiQuotaModal';
+import AiProviderSetupModal from './AiProviderSetupModal';
 
 interface UpdateCheckData {
   currentVersion: string;
@@ -36,8 +38,19 @@ export default function DashboardLayout({
   const [updateData, setUpdateData] = useState<UpdateCheckData | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
+  // AI quota exceeded modal state
+  const [quotaModal, setQuotaModal] = useState<{
+    open: boolean;
+    used: number;
+    limit: number;
+    currentTier: string;
+  }>({ open: false, used: 0, limit: 0, currentTier: 'community' });
+
+  // No provider configured modal state
+  const [setupModalOpen, setSetupModalOpen] = useState(false);
+
   const canManageSettings = hasPermission(user, 'settings.manage');
-  
+
   const mustCompleteOnboarding = Boolean(
     user && requiresOrganizationOnboarding(user) && !user.onboardingCompleted
   );
@@ -63,12 +76,9 @@ export default function DashboardLayout({
       return;
     }
 
-    // Check for a pending billing plan that hasn't been completed via Stripe.
-    // readValidPendingPlan() validates against VALID_BILLING_PLANS and auto-clears
-    // any stale/malformed value so we never redirect the user to checkout with
-    // a SKU Stripe will reject.
-    const pendingPlan = readValidPendingPlan();
-    if (pendingPlan) {
+    // Check for a pending billing plan that hasn't been completed via Stripe
+    const pendingPlan = getStoredPendingBillingPlan();
+    if (pendingPlan.length > 0) {
       setRedirectingToCheckout(true);
       router.push(`/billing/checkout?plan=${encodeURIComponent(pendingPlan)}`);
       return;
@@ -90,6 +100,27 @@ export default function DashboardLayout({
       setToken(accessToken);
     }
   }, [isAuthenticated]);
+
+  // Listen for AI events dispatched by the global API interceptor
+  useEffect(() => {
+    function handleQuotaExceeded(e: Event) {
+      const { used = 0, limit = 0, currentTier = 'community' } = ((e as CustomEvent).detail || {}) as {
+        used?: number;
+        limit?: number;
+        currentTier?: string;
+      };
+      setQuotaModal({ open: true, used, limit, currentTier });
+    }
+    function handleNoProvider() {
+      setSetupModalOpen(true);
+    }
+    window.addEventListener('ai:quota-exceeded', handleQuotaExceeded);
+    window.addEventListener('ai:no-provider', handleNoProvider);
+    return () => {
+      window.removeEventListener('ai:quota-exceeded', handleQuotaExceeded);
+      window.removeEventListener('ai:no-provider', handleNoProvider);
+    };
+  }, []);
 
   // Fetch update check data once when the user has settings.manage access.
   // Required updates always re-surface even if a prior optional banner was dismissed.
@@ -113,7 +144,7 @@ export default function DashboardLayout({
         }
       })
       .catch(() => { /* non-fatal — banner simply won't show */ });
-  }, [isAuthenticated, canManageSettings]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, canManageSettings]);
 
   if (loading) {
     return (
@@ -183,6 +214,17 @@ export default function DashboardLayout({
         <AICopilot />
         <WebSocketStatusIndicator />
       </div>
+      <AiQuotaModal
+        open={quotaModal.open}
+        onClose={() => setQuotaModal((s) => ({ ...s, open: false }))}
+        used={quotaModal.used}
+        limit={quotaModal.limit}
+        currentTier={quotaModal.currentTier}
+      />
+      <AiProviderSetupModal
+        open={setupModalOpen}
+        onClose={() => setSetupModalOpen(false)}
+      />
     </WebSocketProvider>
   );
 }
