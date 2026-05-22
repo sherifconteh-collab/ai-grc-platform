@@ -10,9 +10,9 @@ const { authenticate, requirePermission, requireTier } = require('../middleware/
 const SSO_TIER = 'pro'; // SSO available on pro+
 const sso = require('../services/ssoService');
 const auditService = require('../services/auditService');
-const { JWT_SECRET } = require('../config/security');
+const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
 const { validateBody, requireFields } = require('../middleware/validate');
-const { hashForLookup } = require('../utils/encrypt');
+const { hashForLookup, hashToken } = require('../utils/encrypt');
 const { hasPublicColumn } = require('../utils/schema');
 const { resolveExpiryTimestampFromNow } = require('../utils/sessionExpiry');
 
@@ -27,8 +27,8 @@ function escapeLike(str) {
 }
 
 function issueTokens(userId) {
-  const accessToken = jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_EXPIRY });
-  const refreshToken = jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_EXPIRY });
+  const accessToken = jwt.sign({ userId }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: ACCESS_EXPIRY });
+  const refreshToken = jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: REFRESH_EXPIRY });
   return { accessToken, refreshToken };
 }
 
@@ -41,8 +41,10 @@ async function hasSsoEmailHashCol() {
   return ssoEmailHashColumnAvailable;
 }
 
+// SHA-384 (CNSA Suite 1.0). The shared /auth/refresh lookup accepts the legacy
+// SHA-256 digest so pre-cutover sessions keep working until they expire.
 function hashRefreshToken(token) {
-  return crypto.createHash('sha256').update(String(token)).digest('hex');
+  return hashToken(token);
 }
 
 async function storeSession(userId, refreshToken) {

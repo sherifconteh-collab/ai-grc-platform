@@ -177,7 +177,7 @@ async function provisionUser(organizationId, email, name, role, provider, provid
     } else {
       // Auto-provision new user
       const { firstName, lastName } = splitFullName(name, email);
-      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 14);
       const newUser = await client.query(
         `INSERT INTO users (email, first_name, last_name, organization_id, role, is_active, password_hash)
          VALUES ($1, $2, $3, $4, $5, true, $6)

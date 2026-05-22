@@ -609,9 +609,9 @@ function detectXmlScanType(xmlDoc) {
   return 'unknown_xml';
 }
 
-async function computeFileSha256(filePath) {
+async function computeFileHash(filePath) {
   return new Promise((resolve, reject) => {
-    const hash = createHash('sha256');
+    const hash = createHash('sha384');
     const stream = fs.createReadStream(filePath);
     stream.on('error', reject);
     stream.on('data', (chunk) => hash.update(chunk));
@@ -1161,7 +1161,7 @@ router.post('/import', requirePermission('evidence.write'), scanUpload.single('f
 
     const tagsArray = parseTagsInput(req.body?.tags);
     const retentionUntil = normalizeRetentionDate(req.body?.retention_until || req.body?.retentionUntil);
-    const integrityHash = await computeFileSha256(req.file.path);
+    const integrityHash = await computeFileHash(req.file.path);
 
     // Always store the raw artifact as evidence first (even if parsing is unsupported).
     const evidenceResult = await pool.query(`

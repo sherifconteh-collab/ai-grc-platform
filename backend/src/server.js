@@ -576,7 +576,7 @@ async function ensurePlatformAdmin() {
       password = `CW-${randomBytes(9).toString('base64url')}!1`;
     }
 
-    const hash = shouldUpdatePassword ? await bcrypt.hash(password, 12) : null;
+    const hash = shouldUpdatePassword ? await bcrypt.hash(password, 14) : null;
     const result = await client.query(
       `INSERT INTO users
          (organization_id, email, password_hash, first_name, last_name, role, is_active, is_platform_admin)

@@ -72,7 +72,20 @@ function setLocalPublicKey(pem) {
  * @returns {{ valid: boolean, tier?: string, seats?: number, licensee?: string,
  *             maintenanceUntil?: string, features?: string[], error?: string }}
  */
-function validateLicenseKey(licenseKey, overridePubKey = null) {
+// A CNSA 2.0 hybrid license is a base64(JSON) envelope { v, jwt, pqc:{alg,sig} }.
+// A legacy license is a raw RS256 JWT. Returns the parsed envelope or null.
+function _parseHybridLicense(licenseKey) {
+  try {
+    const decoded = Buffer.from(licenseKey.trim(), 'base64').toString('utf8');
+    if (decoded.startsWith('{')) {
+      const obj = JSON.parse(decoded);
+      if (obj && typeof obj.jwt === 'string') return obj;
+    }
+  } catch (_err) { /* not an envelope — treat as raw JWT */ }
+  return null;
+}
+
+function validateLicenseKey(licenseKey, overridePubKey = null, overridePqcPubKey = null) {
   if (!licenseKey || typeof licenseKey !== 'string' || licenseKey.trim().length === 0) {
     return { valid: false, error: 'No license key provided' };
   }
@@ -83,12 +96,27 @@ function validateLicenseKey(licenseKey, overridePubKey = null) {
     return { valid: false, error: 'License verification public key not configured (CONTROLWEAVE_LICENSE_PUBKEY)' };
   }
 
+  const hybrid = _parseHybridLicense(licenseKey);
+  const classicalJwt = hybrid ? hybrid.jwt : licenseKey.trim();
+
   try {
-    const payload = jwt.verify(licenseKey.trim(), pubKey, {
+    const payload = jwt.verify(classicalJwt, pubKey, {
       algorithms: ['RS256', 'ES256'],
       issuer: 'controlweave',
       audience: 'controlweave-license'
     });
+
+    // CNSA 2.0: when the license carries a post-quantum signature and a PQC
+    // public key is configured, the ML-DSA-65 signature must also verify.
+    if (hybrid && hybrid.pqc && hybrid.pqc.sig) {
+      const pqcPubKey = overridePqcPubKey || process.env.CONTROLWEAVE_LICENSE_PQC_PUBKEY || null;
+      if (pqcPubKey) {
+        const { mldsaVerify } = require('../utils/pqc');
+        if (!mldsaVerify(classicalJwt, hybrid.pqc.sig, pqcPubKey)) {
+          return { valid: false, error: 'License post-quantum (ML-DSA-65) signature is invalid' };
+        }
+      }
+    }
 
     // Validate tier
     const tier = String(payload.tier || '').toLowerCase();
@@ -339,8 +367,9 @@ async function heartbeatCheck(licenseKey) {
 async function generateCommunityKey(licensee = 'community', seats = -1) {
   const generateKeyPair = promisify(crypto.generateKeyPair);
 
+  // RSA-3072 meets the CNSA Suite 1.0 asymmetric floor (≥3072-bit).
   const { privateKey, publicKey } = await generateKeyPair('rsa', {
-    modulusLength: 2048,
+    modulusLength: 3072,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
   });
@@ -364,9 +393,22 @@ async function generateCommunityKey(licensee = 'community', seats = -1) {
     // No exp — true perpetual
   };
 
-  const licenseKey = jwt.sign(payload, privateKey, { algorithm: 'RS256' });
+  const innerJwt = jwt.sign(payload, privateKey, { algorithm: 'RS256' });
 
-  return { licenseKey, publicKey };
+  // CNSA 2.0 hybrid: attach a detached ML-DSA-65 (post-quantum) signature over
+  // the classical JWT. The license is a base64 envelope carrying both signatures;
+  // verification requires the classical RS256 signature and, when a PQC public
+  // key is configured, the ML-DSA-65 signature too. Legacy raw-JWT licenses
+  // (no envelope) continue to validate against the classical key alone.
+  const { mldsaKeygen, mldsaSign, PQC_ALG } = require('../utils/pqc');
+  const pqc = mldsaKeygen();
+  const pqcSig = mldsaSign(innerJwt, pqc.secretKey);
+  const licenseKey = Buffer.from(
+    JSON.stringify({ v: 2, jwt: innerJwt, pqc: { alg: PQC_ALG, sig: pqcSig } }),
+    'utf8'
+  ).toString('base64');
+
+  return { licenseKey, publicKey, pqcPublicKey: pqc.publicKey };
 }
 
 module.exports = {

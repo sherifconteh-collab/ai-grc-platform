@@ -103,6 +103,10 @@ async function getRegistrationOptions(user) {
       residentKey: 'preferred',
       userVerification: 'preferred',
     },
+    // Prefer ES384 (P-384, COSE -35) to satisfy CNSA Suite 1.0, but keep ES256
+    // (-7), EdDSA (-8) and RS256 (-257) so hardware/platform authenticators that
+    // do not implement P-384 still work (documented CNSA exception).
+    supportedAlgorithmIDs: [-35, -7, -8, -257],
   });
 
   await saveChallenge(user.id, options.challenge, 'registration');

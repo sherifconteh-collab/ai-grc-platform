@@ -38,13 +38,16 @@ async function verifyTprmSignature(req, res, next) {
   }
 
   const body = req.rawBody || JSON.stringify(req.body || '');
-  const expected = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
-
+  // Prefer HMAC-SHA-384 (CNSA 1.0); accept legacy SHA-256 signers transitionally.
   let valid = false;
-  try {
-    valid = timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch (_err) {
-    valid = false;
+  for (const alg of ['sha384', 'sha256']) {
+    const expected = `${alg}=${createHmac(alg, secret).update(body).digest('hex')}`;
+    try {
+      if (timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+        valid = true;
+        break;
+      }
+    } catch (_err) { /* length mismatch — try next algorithm */ }
   }
 
   if (!valid) {

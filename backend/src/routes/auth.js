@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { createHash, randomBytes } = require('crypto');
+const { randomBytes } = require('crypto');
 const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
@@ -19,7 +19,7 @@ const { getGeolocationFromRequest, extractIpFromRequest } = require('../services
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
-const { decrypt, encrypt, hashForLookup } = require('../utils/encrypt');
+const { decrypt, encrypt, hashForLookup, hashToken, tokenHashCandidates } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
 const { hasPublicColumn } = require('../utils/schema');
 const {
@@ -263,12 +263,14 @@ function generateSessionTokens(userId, { isDemoAccount = false, sessionExpiresAt
   return { accessToken, refreshToken, sessionExpiresAt: resolvedSessionExpiresAt };
 }
 
+// SHA-384 (CNSA Suite 1.0). Lookups accept the legacy SHA-256 digest via
+// tokenHashCandidates() so tokens issued before the cutover keep working.
 function hashRefreshToken(token) {
-  return createHash('sha256').update(String(token)).digest('hex');
+  return hashToken(token);
 }
 
 function hashPasswordResetToken(token) {
-  return createHash('sha256').update(String(token)).digest('hex');
+  return hashToken(token);
 }
 
 function isValidEmail(email) {
@@ -1028,16 +1030,15 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
       return res.status(400).json({ success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
     }
 
-    const tokenHash = hashPasswordResetToken(token);
     const tokenResult = await pool.query(
       `SELECT prt.id, prt.user_id, u.email AS user_email
        FROM password_reset_tokens prt
        JOIN users u ON u.id = prt.user_id
-       WHERE prt.token_hash = $1
+       WHERE prt.token_hash = ANY($1)
          AND prt.used_at IS NULL
          AND prt.expires_at > NOW()
        LIMIT 1`,
-      [tokenHash]
+      [tokenHashCandidates(token)]
     );
     if (tokenResult.rows.length === 0) {
       return res.status(400).json({ success: false, error: 'Invalid or expired reset token' });
@@ -1112,8 +1113,8 @@ router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToke
        FROM sessions
        WHERE user_id = $1
          AND expires_at > NOW()
-         AND (refresh_token = $2 OR refresh_token = $3)`,
-      [decoded.userId, refreshTokenHash, refreshToken]
+         AND (refresh_token = ANY($2) OR refresh_token = $3)`,
+      [decoded.userId, tokenHashCandidates(refreshToken), refreshToken]
     );
 
     if (session.rows.length === 0) {

@@ -70,6 +70,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@noble/post-quantum": "^0.6.1",
     "@sentry/node": "^8.55.0",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
@@ -104,6 +105,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@babel/preset-env": "^7.29.5",
     "eslint": "^10.2.1",
     "eslint-plugin-security": "^4.0.0",
     "globals": "^17.4.0",

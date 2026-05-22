@@ -3,29 +3,32 @@ const crypto = require('crypto');
 const net = require('net');
 const pool = require('../config/database');
 
+// Outbound HMAC signature — HMAC-SHA-384 (CNSA Suite 1.0). The signature header
+// carries a `sha384=` prefix so receivers can identify the algorithm.
 function createSignature(secret, payload) {
   if (!secret) return null;
-  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.createHmac('sha384', secret).update(payload).digest('hex');
 }
 
 // verifyIncomingWebhook validates HMAC signatures on incoming webhook callbacks.
-// Matches the pattern used in openclawWebhook.js (timingSafeEqual, sha256 hex).
-// Returns true if the signature is valid, false otherwise.
+// Accepts HMAC-SHA-384 (CNSA 1.0) and, transitionally, legacy HMAC-SHA-256 so
+// existing senders are not broken until they are upgraded.
 // IMPORTANT: pass the raw request body string (req.rawBody) when available, not the
 // parsed object. JSON.stringify on a parsed object is fragile (key order, whitespace).
-// Usage: if (!verifyIncomingWebhook(secret, req.headers['x-grc-signature'], req.rawBody || JSON.stringify(req.body))) ...
 function verifyIncomingWebhook(secret, signature, body) {
   if (!secret || !signature) return false;
   const payload = typeof body === 'string' ? body : JSON.stringify(body);
-  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(signature.replace(/^sha256=/, '')),
-      Buffer.from(expected)
-    );
-  } catch (_err) {
-    return false;
+  const provided = String(signature).replace(/^sha(256|384)=/, '');
+  for (const alg of ['sha384', 'sha256']) {
+    const expected = crypto.createHmac(alg, secret).update(payload).digest('hex');
+    try {
+      if (provided.length === expected.length &&
+          crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
+        return true;
+      }
+    } catch (_err) { /* try next algorithm */ }
   }
+  return false;
 }
 
 function isPrivateIpv4(ip) {

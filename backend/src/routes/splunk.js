@@ -194,7 +194,7 @@ router.post('/splunk/import-evidence', requirePermission('evidence.write'), vali
     };
 
     const fileBody = Buffer.from(JSON.stringify(evidencePayload, null, 2), 'utf8');
-    const fileHash = createHash('sha256').update(fileBody).digest('hex');
+    const fileHash = createHash('sha384').update(fileBody).digest('hex');
     const fileNameRoot = sanitizeFileName(req.body.title || `splunk-${Date.now()}`);
     const fileName = `${fileNameRoot}.json`;
     const diskName = `${Date.now()}-${Math.round(Math.random() * 1E9)}-splunk.json`;

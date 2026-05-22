@@ -3,28 +3,29 @@
 
 const express = require('express');
 const router = express.Router();
-const { createHash } = require('crypto');
 const jwt = require('jsonwebtoken');
 const { authenticate, requireTier } = require('../middleware/auth');
 const PASSKEY_TIER = 'enterprise'; // Passkeys available on Enterprise+
 const passkey = require('../services/passkeyService');
 const pool = require('../config/database');
-const { JWT_SECRET } = require('../config/security');
+const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
 const { validateBody, requireFields } = require('../middleware/validate');
-const { decrypt } = require('../utils/encrypt');
+const { decrypt, hashToken } = require('../utils/encrypt');
 const { resolveExpiryTimestampFromNow } = require('../utils/sessionExpiry');
 
 const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 
 function issueTokens(userId) {
-  const accessToken = jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_EXPIRY });
-  const refreshToken = jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_EXPIRY });
+  const accessToken = jwt.sign({ userId }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: ACCESS_EXPIRY });
+  const refreshToken = jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: REFRESH_EXPIRY });
   return { accessToken, refreshToken };
 }
 
+// SHA-384 (CNSA Suite 1.0). The shared /auth/refresh lookup accepts the legacy
+// SHA-256 digest so pre-cutover sessions keep working until they expire.
 function hashRefreshToken(token) {
-  return createHash('sha256').update(String(token)).digest('hex');
+  return hashToken(token);
 }
 
 // ─── Registration (requires existing login) ──────────────────────────────────

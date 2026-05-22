@@ -183,8 +183,8 @@ async function sendToWebhook(cfg, eventType, payload) {
     ...toPlainObject(cfg.webhook_headers),
   };
   if (cfg.webhook_secret) {
-    const sig = crypto.createHmac('sha256', cfg.webhook_secret).update(body).digest('hex');
-    headers['X-ControlWeave-Signature'] = `sha256=${sig}`;
+    const sig = crypto.createHmac('sha384', cfg.webhook_secret).update(body).digest('hex');
+    headers['X-ControlWeave-Signature'] = `sha384=${sig}`;
   }
   return httpPost(cfg.endpoint_url, body, headers);
 }

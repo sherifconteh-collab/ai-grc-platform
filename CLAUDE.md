@@ -25,7 +25,7 @@ Skim this file before any non-trivial change. Detailed conventions live under
 
 ## Non-negotiables
 
-1. **Never** weaken security defaults: `bcrypt` cost stays ≥ 14, `jwt.verify` always passes `algorithms: ['HS256']`.
+1. **Never** weaken security defaults: `bcrypt` cost stays ≥ 14, and `jwt.verify` always passes an explicit `algorithms` allow-list. Per CNSA Suite 1.0, tokens are signed **HS384**; the verify allow-list is `['HS384','HS256']` only during the rotation window (legacy HS256 acceptance is dropped once pre-cutover tokens expire).
 2. **Never** introduce `dangerouslySetInnerHTML` in the frontend; use `MarkdownContent` for AI output rendering.
 3. **Never** add raw SQL string interpolation in routes; use parameterized queries via `pool.query`.
 4. **Never** commit secrets; pull from env or `llm_configurations` (encrypted).

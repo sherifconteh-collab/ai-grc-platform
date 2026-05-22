@@ -206,9 +206,9 @@ const upload = multer({
   }
 });
 
-function computeFileSha256(filePath) {
+function computeFileHash(filePath) {
   return new Promise((resolve, reject) => {
-    const hash = createHash('sha256');
+    const hash = createHash('sha384');
     const stream = createUploadReadStream(filePath);
     stream.on('error', reject);
     stream.on('data', (chunk) => hash.update(chunk));
@@ -303,7 +303,7 @@ router.post('/upload', createRateLimiter({ label: 'evidence-upload', windowMs: 6
 
     const { description, tags } = req.body;
     const tagsArray = tags ? (typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags) : [];
-    const integrityHash = await computeFileSha256(req.file.path);
+    const integrityHash = await computeFileHash(req.file.path);
     const retentionUntil = normalizeRetentionDate(req.body.retention_until || req.body.retentionUntil);
     const safeOriginalName = path.basename(String(req.file.originalname || 'evidence'));
 
@@ -513,7 +513,7 @@ router.post('/bulk-upload', createRateLimiter({ label: 'evidence-bulk-upload', w
     try {
       const safeOriginalName = path.basename(String(file.originalname || 'evidence'));
       const ext = path.extname(safeOriginalName).toLowerCase();
-      const integrityHash = await computeFileSha256(file.path);
+      const integrityHash = await computeFileHash(file.path);
 
       // Synchronous file-content AI classification (so we can return results to caller)
       let filePiiClass    = basePiiClass;
@@ -639,7 +639,7 @@ router.get('/:id/integrity-check', requirePermission('evidence.read'), async (re
       return res.status(404).json({ success: false, error: 'File not found on disk' });
     }
 
-    const currentHash = await computeFileSha256(evidence.file_path);
+    const currentHash = await computeFileHash(evidence.file_path);
     const matches = Boolean(evidence.integrity_hash_sha256) && currentHash === evidence.integrity_hash_sha256;
 
     if (evidenceColumns.has('integrity_verified_at')) {

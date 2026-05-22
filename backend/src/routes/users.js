@@ -154,7 +154,7 @@ router.post('/', requirePermission('users.manage'), validateBody((body) => {
     }
 
     const { firstName, lastName } = splitFullName(fullName);
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 14);
 
     const client = await pool.connect();
     try {

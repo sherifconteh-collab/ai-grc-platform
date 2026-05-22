@@ -41,15 +41,20 @@ function verifySignature(req, res, next) {
     return res.status(401).json({ success: false, error: 'Missing signature' });
   }
 
-  if (!/^[a-fA-F0-9]{64}$/.test(signature)) {
+  // SHA-384 = 96 hex chars (CNSA 1.0); legacy SHA-256 = 64 hex chars accepted
+  // transitionally until senders are upgraded.
+  if (!/^([a-fA-F0-9]{64}|[a-fA-F0-9]{96})$/.test(signature)) {
     return res.status(401).json({ success: false, error: 'Invalid signature' });
   }
 
-  const expected = crypto.createHmac('sha256', secret).update(getRawBodyBuffer(req)).digest();
   const provided = Buffer.from(signature, 'hex');
+  const rawBody = getRawBodyBuffer(req);
+  const valid = ['sha384', 'sha256'].some((alg) => {
+    const expected = crypto.createHmac(alg, secret).update(rawBody).digest();
+    return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+  });
 
-  if (provided.length !== expected.length ||
-      !crypto.timingSafeEqual(provided, expected)) {
+  if (!valid) {
     return res.status(401).json({ success: false, error: 'Invalid signature' });
   }
 

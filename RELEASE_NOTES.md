@@ -27,10 +27,29 @@
 - Billing is removed: checkout returns `410 Gone` and the dashboard no longer redirects to
   billing resolution.
 
+### Security
+
+- **CNSA cryptographic alignment.** Classical CNSA Suite 1.0: integrity/token
+  hashing moved SHA-256 → **SHA-384** (`utils/encrypt.js` `sha384`/`hashToken`);
+  JWT session tokens signed **HS384** (verify allow-list `['HS384','HS256']`
+  during rotation so existing sessions are not invalidated); community license
+  keygen RSA-2048 → **RSA-3072**; bcrypt cost standardized to 14; webhook HMAC
+  signatures upgraded to **HMAC-SHA-384**; WebAuthn prefers ES384 (P-384) with
+  ES256 fallback.
+- **CNSA Suite 2.0 (post-quantum).** License signing is now **hybrid
+  RSA-3072 + ML-DSA-65** (FIPS-204) via `@noble/post-quantum`; verification
+  enforces the ML-DSA-65 signature when a PQC public key
+  (`CONTROLWEAVE_LICENSE_PQC_PUBKEY`) is configured. The `encrypt.js` self-audit
+  reports CNSA 1.0 + 2.0 posture.
+- **Breaking (webhooks):** outbound webhook signatures now use the `sha384=`
+  prefix (HMAC-SHA-384). Receivers that validate signatures must update; inbound
+  verification still accepts legacy SHA-256 during transition.
+
 ### Migrations
 
 - `107` AI monitoring compliance layer, `108` configuration management tables, `109` control
-  response depth, `110` findings↔controls junction, `111` open-source de-tier data backfill.
+  response depth, `110` findings↔controls junction, `111` open-source de-tier data backfill,
+  `112` widen integrity-hash columns to hold SHA-384 (CNSA 1.0).
 
 ### Licensing
 

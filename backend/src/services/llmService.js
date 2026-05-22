@@ -2714,8 +2714,8 @@ function detectBiasFlags(feature, outputText) {
 async function logAIDecision(organizationId, feature, inputText, outputText, opts = {}) {
   if (!HIGH_STAKES_FEATURES.has(feature)) return;
   try {
-    const inputHash  = crypto.createHash('sha256').update(inputText  || '').digest('hex');
-    const outputHash = crypto.createHash('sha256').update(outputText || '').digest('hex');
+    const inputHash  = crypto.createHash('sha384').update(inputText  || '').digest('hex');
+    const outputHash = crypto.createHash('sha384').update(outputText || '').digest('hex');
     const riskLevel  = ['incident_response', 'remediation_playbook'].includes(feature) ? 'high' : 'limited';
     const regulatoryFramework = inferRegulatoryFramework(feature);
     const biasFlags = detectBiasFlags(feature, outputText);

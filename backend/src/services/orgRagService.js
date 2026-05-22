@@ -139,7 +139,7 @@ async function indexDocument({ organizationId, text, sourceType, sourceId, sourc
   if (!text || text.trim().length === 0) throw new Error('Document text is empty');
 
   const effectiveSourceId = sourceId || crypto.randomUUID();
-  const fileHash = crypto.createHash('sha256').update(text).digest('hex');
+  const fileHash = crypto.createHash('sha384').update(text).digest('hex');
 
   // Check if already indexed with same hash
   const existing = await pool.query(

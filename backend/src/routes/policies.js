@@ -914,7 +914,7 @@ router.post('/upload', requirePermission('controls.write'), upload.single('polic
     
     // Calculate file hash
     const fileBuffer = fs.readFileSync(req.file.path);
-    const hash = createHash('sha256').update(fileBuffer).digest('hex');
+    const hash = createHash('sha384').update(fileBuffer).digest('hex');
     
     // Check for duplicate
     const duplicateCheck = await pool.query(

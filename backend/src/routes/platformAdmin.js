@@ -481,7 +481,7 @@ router.post('/bootstrap-account', platformAdminBootstrapLimiter, authenticate, r
       });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 14);
 
     // Use email_hash for conflict resolution when field-level encryption is active.
     // For pre-migration rows (email_hash IS NULL), fall back to plain email lookup.
