@@ -23,9 +23,16 @@ function getRank(rankMap, value) {
 async function extractTextForRag(filePath, originalName) {
   const ext = path.extname(originalName || '').toLowerCase();
   const safeFilePath = resolveSafeUploadPath(filePath);
-  if (ext === '.txt' || ext === '.md' || ext === '.csv') return readUploadTextFile(safeFilePath);
-  if (ext === '.pdf') { const pdfParse = require('pdf-parse'); return (await pdfParse(readUploadBuffer(safeFilePath))).text; }
-  if (ext === '.doc' || ext === '.docx') { const mammoth = require('mammoth'); return (await mammoth.extractRawText({ path: safeFilePath })).value; }
+  // Parsing is best-effort: a missing parser dep or a corrupt file must not
+  // throw and block the upload / RAG indexing pipeline.
+  try {
+    if (ext === '.txt' || ext === '.md' || ext === '.csv') return readUploadTextFile(safeFilePath);
+    if (ext === '.pdf') { const pdfParse = require('pdf-parse'); return (await pdfParse(readUploadBuffer(safeFilePath))).text; }
+    if (ext === '.doc' || ext === '.docx') { const mammoth = require('mammoth'); return (await mammoth.extractRawText({ path: safeFilePath })).value; }
+  } catch (err) {
+    console.warn(`[evidence] RAG text extraction failed for ${ext || 'file'}: ${err.message}`);
+    return '';
+  }
   return '';
 }
 

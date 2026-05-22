@@ -776,7 +776,14 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
     // Lazy rehash: upgrade stored bcrypt cost to BCRYPT_ROUNDS on next successful login
     // without forcing a password reset. Fire-and-forget — never blocks the login response.
     if (validPassword && !isDemoAccount) {
-      const storedRounds = bcrypt.getRounds(user.password_hash);
+      // getRounds throws on a malformed/non-bcrypt hash; treat that as "needs
+      // upgrade" rather than letting it surface as a login error.
+      let storedRounds = 0;
+      try {
+        storedRounds = bcrypt.getRounds(user.password_hash);
+      } catch (err) {
+        log('warn', 'auth.rehash.getrounds_failed', { userId: user.id, error: err.message });
+      }
       if (storedRounds < BCRYPT_ROUNDS) {
         bcrypt.hash(password, BCRYPT_ROUNDS)
           .then(newHash => pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]))

@@ -2,6 +2,9 @@
 const { log } = require('../utils/logger');
 
 const REDIS_PREFIX = process.env.REDIS_RATE_LIMIT_PREFIX || 'ratelimit';
+// On a transient command error we cool down (fall back to memory) and re-probe
+// Redis after this window, rather than permanently disabling the primary path.
+const REDIS_COOLDOWN_MS = 30000;
 
 // Lua script: atomic INCR + conditional EXPIRE, returns [count, ttl]
 const LUA_INCR_EXPIRE = `
@@ -15,6 +18,7 @@ const LUA_INCR_EXPIRE = `
 let redisClient = null;
 let redisAvailable = false;
 let redisInitStarted = false;
+let redisCooldownUntil = 0;
 
 function buildRedisConfig() {
   const port = parseInt(process.env.REDIS_PORT || '6379', 10);
@@ -131,14 +135,16 @@ function createRateLimiter(options = {}) {
     const rawKey = keyGenerator(req);
     let count, resetAt, remaining;
 
-    if (redisAvailable && redisClient) {
+    if (redisClient && redisAvailable && Date.now() >= redisCooldownUntil) {
       try {
         const fullKey = `${REDIS_PREFIX}:${label}:${rawKey}`;
         const windowSeconds = Math.ceil(windowMs / 1000);
         ({ count, resetAt, remaining } = await checkRedisLimit(fullKey, windowSeconds, max));
       } catch (err) {
         log('warn', 'ratelimit.redis.request_error', { error: err.message });
-        redisAvailable = false;
+        // Transient command error: cool down to in-memory, then re-probe Redis
+        // after REDIS_COOLDOWN_MS instead of disabling the primary path forever.
+        redisCooldownUntil = Date.now() + REDIS_COOLDOWN_MS;
         ({ count, resetAt, remaining } = checkMemoryLimit(`${label}:${rawKey}`));
       }
     } else {

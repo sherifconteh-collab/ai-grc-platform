@@ -411,51 +411,6 @@ const stateAiLawsRoutes = safeRequire('./routes/stateAiLaws');
 const totpRoutes = require('./routes/totp');
 const pushTokensRoutes = require('./routes/pushTokens');
 
-// ── Community-mirror startup diagnostic ──
-// Routes loaded via safeRequire() are absent when this process runs from the
-// public/community mirror build (files not present on disk).  A license key
-// upgrade (upgradeEdition) updates tier-gate middleware at runtime, but it
-// cannot register route handlers that were never mounted at startup.
-// If any paid routes are absent, log a single informational notice so that
-// operators understand why paid APIs return 404 even after a license key is
-// entered.  To unlock paid features the operator must deploy the commercial
-// build, not the community mirror.
-const _absentPaidRoutes = [
-  ['dashboard',        dashboardRoutes],
-  ['evidence',         evidenceRoutes],
-  ['cmdb',             cmdbRoutes],
-  ['assets',           assetsRoutes],
-  ['environments',     environmentsRoutes],
-  ['serviceAccounts',  serviceAccountsRoutes],
-  ['orgSettings',      orgSettingsRoutes],
-  ['reports',          reportsRoutes],
-  ['splunk',           splunkRoutes],
-  ['vulnerabilities',  vulnerabilitiesRoutes],
-  ['sbom',             sbomRoutes],
-  ['integrationsHub',  integrationsHubRoutes],
-  ['dataGovernance',   dataGovernanceRoutes],
-  ['passkeys',         passkeyRoutes],
-  ['sso',              ssoRoutes],
-  ['siem',             siemRoutes],
-  ['externalAi',       externalAiRoutes],
-  ['externalAiKeys',   externalAiKeysRoutes],
-  ['platformAdmin',    platformAdminRoutes],
-  ['billing',          billingRoutes],
-].filter(([, mod]) => mod === null).map(([name]) => name);
-
-if (_absentPaidRoutes.length > 0) {
-  log('info', 'server.community_mirror', {
-    message:
-      'Community mirror build detected — the following paid-tier route modules are ' +
-      'absent from this installation and will not be served: ' +
-      _absentPaidRoutes.join(', ') + '. ' +
-      'Activating a license key upgrades edition tier-checks at runtime but cannot register ' +
-      'route handlers that were never mounted. To unlock paid API features, deploy the ' +
-      'commercial build of ControlWeave.',
-    absentRoutes: _absentPaidRoutes
-  });
-}
-
 app.use('/api/v1/license', licenseRoutes);
 if (passkeyRoutes) app.use('/api/v1/auth/passkey', passkeyRoutes);
 app.use('/api/v1/auth/totp', totpRoutes);

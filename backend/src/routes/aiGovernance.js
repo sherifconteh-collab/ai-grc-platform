@@ -205,7 +205,7 @@ router.post('/incidents', requirePermission('ai.write'), async (req, res) => {
       `INSERT INTO ai_vendor_incidents
          (organization_id, vendor_assessment_id, title, description, severity, incident_type, incident_date)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [orgId, vendor_assessment_id || null, title, description || null, severity, incident_type || null, incident_date || new Date()]
+      [orgId, vendor_assessment_id || null, title, description || null, severity, incident_type || null, incident_date || null]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {

@@ -339,7 +339,7 @@ async function parseSbomBuffer(buffer, fileName, mimeType) {
 
 function buildStableFindingKey(parts) {
   const base = parts.filter(Boolean).join('|');
-  const digest = createHash('sha1').update(base).digest('hex');
+  const digest = createHash('sha384').update(base).digest('hex');
   return digest.slice(0, 40);
 }
 
