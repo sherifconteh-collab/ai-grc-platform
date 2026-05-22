@@ -1,7 +1,7 @@
 // @tier: community
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
-const { JWT_SECRET } = require('../config/security');
+const { JWT_SECRET, JWT_VERIFY_OPTIONS } = require('../config/security');
 const { decrypt } = require('../utils/encrypt');
 const {
   TIER_LEVELS,
@@ -128,7 +128,7 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.substring(7);
 
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
 
       const includeFeatureOverrides = await hasOrgFeatureOverridesColumn();
       const featureOverridesSelect = includeFeatureOverrides

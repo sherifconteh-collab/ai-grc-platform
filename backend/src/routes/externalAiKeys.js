@@ -22,7 +22,7 @@ function generateAlphanumericToken(length = 32) {
 }
 
 function hashApiKey(value) {
-  return crypto.createHash('sha256').update(String(value || ''), 'utf8').digest('hex');
+  return crypto.createHash('sha384').update(value != null ? String(value) : '', 'utf8').digest('hex');
 }
 
 router.use(authenticate);

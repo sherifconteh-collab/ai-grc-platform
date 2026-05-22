@@ -193,7 +193,7 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
     };
 
     const fileBody = Buffer.from(JSON.stringify(evidencePayload, null, 2), 'utf8');
-    const fileHash = createHash('sha256').update(fileBody).digest('hex');
+    const fileHash = createHash('sha384').update(fileBody).digest('hex');
     const stamp = Date.now();
     const safeName = sanitizeRuleName(rule.name);
     const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
@@ -279,7 +279,7 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
   };
 
   const fileBody = Buffer.from(JSON.stringify(evidencePayload, null, 2), 'utf8');
-  const fileHash = createHash('sha256').update(fileBody).digest('hex');
+  const fileHash = createHash('sha384').update(fileBody).digest('hex');
   const stamp = Date.now();
   const safeName = sanitizeRuleName(rule.name);
   const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;

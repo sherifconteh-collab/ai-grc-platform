@@ -37,8 +37,8 @@ const keyStateGcInterval = setInterval(() => {
 }, 60 * 1000);
 if (typeof keyStateGcInterval.unref === 'function') keyStateGcInterval.unref();
 
-function sha256(value) {
-  return crypto.createHash('sha256').update(String(value || ''), 'utf8').digest('hex');
+function sha384(value) {
+  return crypto.createHash('sha384').update(value != null ? String(value) : '', 'utf8').digest('hex');
 }
 
 function parseApiKey(req) {
@@ -112,8 +112,8 @@ router.post('/decisions', externalIngestLimiter, authenticateExternalApiKey, asy
     const outputData = body.output_data || body.output || {};
     const inputText = JSON.stringify(inputData);
     const outputText = JSON.stringify(outputData);
-    const inputHash = sha256(inputText);
-    const outputHash = sha256(outputText);
+    const inputHash = sha384(inputText);
+    const outputHash = sha384(outputText);
     const processingTimestamp = body.processing_timestamp ? new Date(body.processing_timestamp) : new Date();
     const modelVersion = body.model_version || body.external_model || null;
     const riskLevel = String(body.risk_level || 'limited').toLowerCase();

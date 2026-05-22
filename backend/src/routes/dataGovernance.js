@@ -15,9 +15,9 @@ function parseDate(value) {
   return dt.toISOString();
 }
 
-function computeSha256(filePath) {
+function computeSha384(filePath) {
   return new Promise((resolve, reject) => {
-    const hash = createHash('sha256');
+    const hash = createHash('sha384');
     const stream = fs.createReadStream(filePath);
     stream.on('error', reject);
     stream.on('data', (chunk) => hash.update(chunk));
@@ -210,12 +210,12 @@ router.post('/evidence/:id/sign', requirePermission('evidence.read'), async (req
       return res.status(404).json({ success: false, error: 'Evidence file missing on disk' });
     }
 
-    const digest = ev.integrity_hash_sha256 || await computeSha256(ev.file_path);
+    const digest = ev.integrity_hash_sha256 || await computeSha384(ev.file_path);
     const insert = await pool.query(
       `INSERT INTO artifact_signatures (
          organization_id, resource_type, resource_id, algorithm, digest, signed_by
        )
-       VALUES ($1, 'evidence', $2, 'sha256', $3, $4)
+       VALUES ($1, 'evidence', $2, 'sha384', $3, $4)
        RETURNING *`,
       [orgId, evidenceId, digest, req.user.id]
     );
