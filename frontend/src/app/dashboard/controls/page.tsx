@@ -6,9 +6,26 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { organizationAPI, controlsAPI } from '@/lib/api';
+import { organizationAPI, controlsAPI, implementationsAPI } from '@/lib/api';
 import { groupByControlFamily } from '@/lib/controlFamilies';
 import { hasPermission } from '@/lib/access';
+
+interface InlineTestDraft {
+  testResult: string;
+  testNotes: string;
+  loaded: boolean;
+  loading: boolean;
+  saving: boolean;
+  message: string | null;
+  implementationId: string | null;
+}
+
+const TEST_RESULT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'not_assessed', label: 'Not Tested' },
+  { value: 'satisfied', label: 'Compliant' },
+  { value: 'other_than_satisfied', label: 'Non-compliant' },
+  { value: 'not_applicable', label: 'N/A' },
+];
 
 interface Control {
   id: string;
@@ -44,7 +61,17 @@ export default function ControlsPage() {
   const crosswalkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expandedControl, setExpandedControl] = useState<string | null>(null);
   const [statusSaving, setStatusSaving] = useState<string | null>(null);
+  const [testDrafts, setTestDrafts] = useState<Record<string, InlineTestDraft>>({});
+  const testMessageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const canWrite = hasPermission(user, 'implementations.write');
+  const canWriteAssessments = hasPermission(user, 'assessments.write');
+
+  useEffect(() => {
+    const timers = testMessageTimers.current;
+    return () => {
+      Object.values(timers).forEach((t) => clearTimeout(t));
+    };
+  }, []);
 
   useEffect(() => {
     return () => { if (crosswalkTimer.current) clearTimeout(crosswalkTimer.current); };
@@ -239,6 +266,138 @@ export default function ControlsPage() {
     }));
   };
 
+  const loadInlineTestDraft = useCallback(async (controlId: string) => {
+    if (!canWriteAssessments) return;
+    setTestDrafts((prev) => {
+      const existing = prev[controlId];
+      if (existing?.loaded || existing?.loading) return prev;
+      return {
+        ...prev,
+        [controlId]: {
+          testResult: 'not_assessed',
+          testNotes: '',
+          loaded: false,
+          loading: true,
+          saving: false,
+          message: null,
+          implementationId: null,
+        },
+      };
+    });
+    try {
+      const listRes = await implementationsAPI.getAll({ controlId });
+      const implList = listRes.data?.data;
+      let impl = implList && implList.length > 0 ? implList[0] : null;
+      if (!impl && canWrite) {
+        const ensured = await implementationsAPI.ensureForControl(controlId);
+        impl = ensured.data?.data;
+      }
+      if (impl?.id) {
+        const detail = await implementationsAPI.getById(impl.id);
+        const full = detail.data?.data;
+        setTestDrafts((prev) => ({
+          ...prev,
+          [controlId]: {
+            testResult: full?.test_result || 'not_assessed',
+            testNotes: full?.test_notes || '',
+            loaded: true,
+            loading: false,
+            saving: false,
+            message: null,
+            implementationId: full?.id || impl.id,
+          },
+        }));
+      } else {
+        setTestDrafts((prev) => ({
+          ...prev,
+          [controlId]: {
+            testResult: 'not_assessed',
+            testNotes: '',
+            loaded: true,
+            loading: false,
+            saving: false,
+            message: null,
+            implementationId: null,
+          },
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to load inline test draft:', err);
+      setTestDrafts((prev) => ({
+        ...prev,
+        [controlId]: {
+          testResult: 'not_assessed',
+          testNotes: '',
+          loaded: true,
+          loading: false,
+          saving: false,
+          message: 'Failed to load testing data',
+          implementationId: null,
+        },
+      }));
+    }
+  }, [canWrite, canWriteAssessments]);
+
+  const updateTestDraft = (controlId: string, patch: Partial<InlineTestDraft>) => {
+    setTestDrafts((prev) => {
+      const existing = prev[controlId] || {
+        testResult: 'not_assessed',
+        testNotes: '',
+        loaded: true,
+        loading: false,
+        saving: false,
+        message: null,
+        implementationId: null,
+      };
+      return { ...prev, [controlId]: { ...existing, ...patch } };
+    });
+  };
+
+  const saveInlineTestResult = async (controlId: string) => {
+    const draft = testDrafts[controlId];
+    if (!draft || !canWriteAssessments) return;
+    updateTestDraft(controlId, { saving: true, message: null });
+    try {
+      let implementationId = draft.implementationId;
+      if (!implementationId) {
+        if (!canWrite) {
+          updateTestDraft(controlId, {
+            saving: false,
+            message: 'This control must have an implementation record before test results can be saved. Ask a user with implementation-write permission to open this control first.',
+          });
+          return;
+        }
+        const ensured = await implementationsAPI.ensureForControl(controlId);
+        implementationId = ensured.data?.data?.id || null;
+      }
+      if (!implementationId) {
+        throw new Error('No implementation available to save against');
+      }
+      await implementationsAPI.updateTestResult(implementationId, {
+        test_result: draft.testResult,
+        test_notes: draft.testNotes || undefined,
+      });
+      updateTestDraft(controlId, { saving: false, message: 'Saved', implementationId });
+      if (testMessageTimers.current[controlId]) {
+        clearTimeout(testMessageTimers.current[controlId]);
+      }
+      testMessageTimers.current[controlId] = setTimeout(() => {
+        delete testMessageTimers.current[controlId];
+        setTestDrafts((prev) => {
+          const curr = prev[controlId];
+          if (!curr || curr.message !== 'Saved') return prev;
+          return { ...prev, [controlId]: { ...curr, message: null } };
+        });
+      }, 2000);
+    } catch (err: any) {
+      console.error('Failed to save test result:', err);
+      updateTestDraft(controlId, {
+        saving: false,
+        message: err.response?.data?.error || err.message || 'Failed to save',
+      });
+    }
+  };
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'implemented':
@@ -276,11 +435,11 @@ export default function ControlsPage() {
 
         {/* AI cross-feature linkage */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Link href="/dashboard/ai-analysis"
+          <Link href="/dashboard/ai-insights"
             className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors text-xs">
             <span>✨</span>
             <div>
-              <div className="font-medium text-purple-800">AI Analysis</div>
+              <div className="font-medium text-purple-800">AI Insights</div>
               <div className="text-purple-600">Gap analysis & crosswalk</div>
             </div>
           </Link>
@@ -561,6 +720,9 @@ export default function ControlsPage() {
                                   setExpandedControl(null);
                                 } else {
                                   setExpandedControl(control.id);
+                                  if (canWriteAssessments) {
+                                    loadInlineTestDraft(control.id);
+                                  }
                                 }
                               }}>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -630,12 +792,16 @@ export default function ControlsPage() {
                               {/* Inline expanded detail panel */}
                               {isExpanded && (
                                 <tr>
-                                  <td colSpan={6} className="px-6 py-4 bg-purple-50/40 border-l-4 border-purple-400">
+                                  <td
+                                    colSpan={6}
+                                    className="px-6 py-4 bg-purple-50/40 border-l-4 border-purple-400"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                     <div className="space-y-3">
                                       {/* Description */}
                                       <div>
                                         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description</div>
-                                        <p className="text-sm text-gray-700">{control.description || 'No description available.'}</p>
+                                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{control.description || 'No description available.'}</p>
                                       </div>
                                       {/* Quick Status Update */}
                                       {canWrite && (
@@ -656,6 +822,59 @@ export default function ControlsPage() {
                                           {statusSaving === control.id && <span className="text-xs text-gray-500">Saving…</span>}
                                         </div>
                                       )}
+                                      {/* Testing Notes / Test Result */}
+                                      {canWriteAssessments && (() => {
+                                        const draft = testDrafts[control.id];
+                                        return (
+                                          <div className="bg-white rounded-md border border-gray-200 p-3">
+                                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Testing Notes & Result</div>
+                                            {!draft || draft.loading ? (
+                                              <div className="text-xs text-gray-500">Loading testing data…</div>
+                                            ) : (
+                                              <div className="space-y-2">
+                                                <div className="flex items-center gap-3 flex-wrap">
+                                                  <label className="text-xs font-medium text-gray-700">Test Result:</label>
+                                                  <select
+                                                    value={draft.testResult}
+                                                    onChange={(e) => updateTestDraft(control.id, { testResult: e.target.value })}
+                                                    disabled={draft.saving}
+                                                    className="px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                  >
+                                                    {TEST_RESULT_OPTIONS.map((opt) => (
+                                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                    ))}
+                                                  </select>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">Testing Notes</label>
+                                                  <textarea
+                                                    value={draft.testNotes}
+                                                    onChange={(e) => updateTestDraft(control.id, { testNotes: e.target.value })}
+                                                    rows={3}
+                                                    placeholder="Observations, methodology, rationale…"
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm resize-none"
+                                                  />
+                                                </div>
+                                                <div className="flex items-center justify-end gap-3">
+                                                  {draft.message && (
+                                                    <span className={`text-xs ${draft.message === 'Saved' ? 'text-green-700' : 'text-red-600'}`}>
+                                                      {draft.message}
+                                                    </span>
+                                                  )}
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); saveInlineTestResult(control.id); }}
+                                                    disabled={draft.saving}
+                                                    className="px-3 py-1.5 text-xs font-medium bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                                                  >
+                                                    {draft.saving ? 'Saving…' : 'Save Test Result'}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                       {/* Sub-controls / Enhancements */}
                                       {subs.length > 0 && (
                                         <div>

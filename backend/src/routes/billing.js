@@ -1,84 +1,53 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
-const { authenticate } = require('../middleware/auth');
-const { createOrgRateLimiter } = require('../middleware/rateLimit');
+const { authenticate, requirePermission } = require('../middleware/auth');
 
-router.use(authenticate);
-router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 60, label: 'billing-route' }));
+const OPEN_SOURCE_RESPONSE = {
+  tier: 'open',
+  billing_status: 'open_source',
+  billing_enabled: false,
+  message: 'ControlWeaver is open source — no subscription required.'
+};
 
-router.post('/checkout', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: { url: null, message: 'Billing not yet configured. Please contact support.' }
-    });
-  } catch (error) {
-    console.error('Billing checkout error:', error);
-    res.status(500).json({ success: false, error: 'Failed to create checkout session' });
-  }
+router.get('/config', authenticate, (_req, res) => {
+  res.json({ success: true, data: { stripe_publishable_key: null, billing_enabled: false } });
 });
 
-router.post('/portal', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: { url: null, message: 'Billing portal not yet configured' }
-    });
-  } catch (error) {
-    console.error('Billing portal error:', error);
-    res.status(500).json({ success: false, error: 'Failed to create portal session' });
-  }
+router.get('/subscription', authenticate, (_req, res) => {
+  res.json({ success: true, data: OPEN_SOURCE_RESPONSE });
 });
 
-router.get('/subscription', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM billing_subscriptions WHERE organization_id = $1',
-      [req.user.organization_id]
-    );
-    res.json({ success: true, data: result.rows[0] || null });
-  } catch (error) {
-    console.error('Get subscription error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch subscription' });
-  }
+router.post('/downgrade-to-free', authenticate, (_req, res) => {
+  res.json({ success: true, message: 'All features are free — no downgrade needed.' });
 });
 
-router.post('/change-plan', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: { message: 'Plan change not yet configured' }
-    });
-  } catch (error) {
-    console.error('Change plan error:', error);
-    res.status(500).json({ success: false, error: 'Failed to change plan' });
-  }
+router.post('/checkout', authenticate, (_req, res) => {
+  res.status(410).json({ success: false, error: 'Billing is not available. ControlWeaver is open source.' });
 });
 
-router.post('/cancel', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: { message: 'Cancellation not yet configured' }
-    });
-  } catch (error) {
-    console.error('Cancel subscription error:', error);
-    res.status(500).json({ success: false, error: 'Failed to cancel subscription' });
-  }
+router.post('/portal', authenticate, (_req, res) => {
+  res.status(410).json({ success: false, error: 'Billing is not available. ControlWeaver is open source.' });
 });
 
-router.post('/downgrade-to-free', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: { message: 'Downgrade not yet configured' }
-    });
-  } catch (error) {
-    console.error('Downgrade error:', error);
-    res.status(500).json({ success: false, error: 'Failed to downgrade subscription' });
-  }
+router.post('/cancel', authenticate, requirePermission('settings.manage'), (_req, res) => {
+  res.json({ success: true, message: 'No active subscription to cancel.' });
+});
+
+router.post('/change-plan', authenticate, (_req, res) => {
+  res.status(410).json({ success: false, error: 'Billing is not available. ControlWeaver is open source.' });
+});
+
+router.post('/activate-license', authenticate, requirePermission('settings.manage'), (_req, res) => {
+  res.json({ success: true, message: 'ControlWeaver is open source — all features are unlocked.' });
+});
+
+router.post('/mobile-upgrade', authenticate, (_req, res) => {
+  res.status(410).json({ success: false, error: 'Billing is not available. ControlWeaver is open source.' });
+});
+
+router.post('/webhook', (_req, res) => {
+  res.json({ received: true });
 });
 
 module.exports = router;

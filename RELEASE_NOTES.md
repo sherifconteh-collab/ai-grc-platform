@@ -1,13 +1,40 @@
-# ControlWeave Community Edition — Release Notes
+# ControlWeave — Release Notes
 
-> This document contains release notes for features available on the **Community tier** of ControlWeave.
-> Premium-only features (CMDB, Vulnerability Management, Threat Intelligence, Vendor Risk,
-> Enterprise Integrations, etc.) are excluded.
->
-> For the full changelog see the private repository. For upgrade information visit
-> [controlweave.com/#pricing](https://controlweave.com/#pricing).
+> ControlWeave is fully open source. Every feature is available in this build —
+> there are no tier-gated or premium-only capabilities.
 
 ---
+
+## [4.0.0] — 2026-05-22
+
+### Added
+
+- Full feature parity with upstream ControlWeave 4.0: CMDB (configuration items, baselines,
+  change control, audits, dependency map, hardware/software/service-accounts/password-vaults/
+  AI-agents/environments), Asset inventory, Vulnerability management, Threat Intelligence,
+  Third-Party Risk Management, SBOM, Vendor Security, RMF, Reports, Evidence auto-collection &
+  pending review, Data Governance, AI Monitoring compliance layer, SSO, Integrations Hub, and
+  the platform administration suite.
+- Backend services for threat-intel feeds (NVD, CISA KEV, MITRE, AlienVault), realtime events,
+  SSO, passkeys, push notifications, RAG, SBOM, SIEM/Splunk, and multi-agent orchestration.
+- Public auth flows: forgot-password / reset-password.
+
+### Changed
+
+- **Open source release:** all tier-based feature gating removed. Every organization has full
+  access to all features; `requireTier`/`requireProEdition`/`hasTierAtLeast` are no-ops and the
+  edition reports as `open`.
+- Billing is removed: checkout returns `410 Gone` and the dashboard no longer redirects to
+  billing resolution.
+
+### Migrations
+
+- `107` AI monitoring compliance layer, `108` configuration management tables, `109` control
+  response depth, `110` findings↔controls junction, `111` open-source de-tier data backfill.
+
+### Licensing
+
+- Relicensed to the ControlWeave dual license (AGPL-3.0 + commercial).
 
 ## [Unreleased]
 

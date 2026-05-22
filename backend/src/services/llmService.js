@@ -1,608 +1,903 @@
 // @tier: community
-'use strict';
-
+const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 const crypto = require('crypto');
+const { AsyncLocalStorage } = require('async_hooks');
 const pool = require('../config/database');
-
-let log;
-try {
-  ({ log } = require('../utils/logger'));
-} catch (_e) {
-  log = (level, msg, meta) => console[level === 'error' ? 'error' : 'log'](`[${level}] ${msg}`, meta || '');
-}
-
-let Anthropic, OpenAI, axios;
-try { Anthropic = require('@anthropic-ai/sdk'); } catch (_e) { Anthropic = null; }
-try { OpenAI = require('openai'); } catch (_e) { OpenAI = null; }
-try { axios = require('axios'); } catch (_e) { axios = null; }
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const USAGE_LIMITS = { community: -1, pro: -1, enterprise: -1, govcloud: -1 };
-
-const PROVIDER_MODELS = {
-  anthropic: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'],
-  openai: ['gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
-  gemini: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'],
-  groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
-  grok: ['grok-3', 'grok-3-mini'],
-  ollama: ['llama3.2', 'mistral', 'codellama'],
+const { getAiUsageLimit } = require('../config/tierPolicy');
+const { buildOrgContext, buildFrameworkGuardrails } = require('./orgContextService');
+const { hasFeatureSchema } = require('./llmSchemas');
+let _orgRagService = null;
+const buildRagContext = (...args) => {
+  if (!_orgRagService) _orgRagService = require('./orgRagService');
+  return _orgRagService.buildRagContext(...args);
 };
-// Alias: ai.js uses 'claude' for Anthropic
-PROVIDER_MODELS.claude = PROVIDER_MODELS.anthropic;
-PROVIDER_MODELS.xai = PROVIDER_MODELS.grok;
-
-const PROVIDER_KEY_COLUMNS = {
-  anthropic: 'anthropic_api_key_enc',
-  openai: 'openai_api_key_enc',
-  gemini: 'gemini_api_key_enc',
-  grok: 'xai_api_key_enc',
-  groq: 'groq_api_key_enc',
-};
-PROVIDER_KEY_COLUMNS.claude = PROVIDER_KEY_COLUMNS.anthropic;
-PROVIDER_KEY_COLUMNS.xai = PROVIDER_KEY_COLUMNS.grok;
-
-const PROVIDER_ENV_VARS = {
-  anthropic: 'ANTHROPIC_API_KEY',
-  openai: 'OPENAI_API_KEY',
-  gemini: 'GEMINI_API_KEY',
-  grok: 'XAI_API_KEY',
-  groq: 'GROQ_API_KEY',
-  ollama: 'OLLAMA_BASE_URL',
-};
-PROVIDER_ENV_VARS.claude = PROVIDER_ENV_VARS.anthropic;
-PROVIDER_ENV_VARS.xai = PROVIDER_ENV_VARS.grok;
-
-const DEFAULT_PROVIDER = 'anthropic';
-
-const PROVIDER_TIMEOUT_MS = {
-  anthropic: 60000,
-  openai: 60000,
-  gemini: 60000,
-  groq: 60000,
-  grok: 60000,
-  ollama: 120000,
-};
-
-// Module-level tracking state
-let _lastCallMeta = { usedProvider: null, usedModel: null };
-
-// Simple in-memory cache
-let _cache = {};
+const { decrypt } = require('../utils/encrypt');
+const aiSecurity = require('../utils/aiSecurity');
+const path = require('path');
 
 // ---------------------------------------------------------------------------
-// Task profiles (v3.0.0) — model tiering by task type.
-//
-// Resolution order for model/temperature:
-//   1. explicit caller override (params.model / params.temperature)
-//   2. organization BYOK override (default_model from llm_configurations,
-//      honored only when BYOK policy permits)
-//   3. profile default
+// Few-shot exemplar loader
+// Loads curated examples from services/aiExemplars/ JSON files.
+// Each file contains 2-3 examples that are injected into AI prompts to set
+// the quality bar and guide output structure.
 // ---------------------------------------------------------------------------
-const TASK_PROFILES = Object.freeze({
-  reasoning: {
-    temperature: 0.4,
-    models: { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1' },
-  },
-  extraction: {
-    temperature: 0.2,
-    models: { anthropic: 'claude-3-5-haiku-20241022', openai: 'gpt-4.1-mini' },
-  },
-  ideation: {
-    temperature: 0.7,
-    models: { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1' },
-  },
-  chat: {
-    temperature: 0.3,
-    models: { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1' },
-  },
-});
+const EXEMPLAR_CACHE = new Map();
 
-// 25 feature keys mapped to a profile.
-const FEATURE_TASK_PROFILE = Object.freeze({
-  // reasoning
-  gap_analysis: 'reasoning',
-  remediation_playbook: 'reasoning',
-  vulnerability_remediation: 'reasoning',
-  finding: 'reasoning',
-  audit_finding_draft: 'reasoning',
-  compliance_forecast: 'reasoning',
-  executive_report: 'reasoning',
-  incident_response: 'reasoning',
-  vendor_risk: 'reasoning',
-  audit_readiness: 'reasoning',
-  copilot_session: 'reasoning',
-  risk_heatmap: 'reasoning',
-  ai_governance: 'reasoning',
-  // extraction
-  evidence_suggestion: 'extraction',
-  evidence_suggest: 'extraction',
-  test_procedures: 'extraction',
-  control_mapping: 'extraction',
-  asset_control_mapping: 'extraction',
-  control_narrative_draft: 'extraction',
-  control_analysis: 'extraction',
-  audit_pbc_draft: 'extraction',
-  audit_workpaper_draft: 'extraction',
-  // ideation
-  policy_generator: 'ideation',
-  roadmap_generation: 'ideation',
-  tabletop_scenario: 'ideation',
-  // chat
-  chat: 'chat',
-  compliance_query: 'chat',
-});
-
-function getTaskProfile(featureKey) {
-  const name = FEATURE_TASK_PROFILE[featureKey] || 'reasoning';
-  return { name, ...TASK_PROFILES[name] };
-}
-
-// Normalize provider aliases (claude→anthropic, xai→grok) so downstream
-// per-provider lookups (TASK_PROFILES.models, PROVIDER_MODELS) hit the
-// canonical key.
-const PROVIDER_ALIASES = Object.freeze({
-  claude: 'anthropic',
-  xai: 'grok',
-});
-function _canonicalProvider(p) {
-  const k = (p || '').toLowerCase();
-  return PROVIDER_ALIASES[k] || k;
-}
-
-/**
- * Resolve provider/model/temperature for a feature call following the
- * documented resolution order. callerOverrides take priority; orgDefaults
- * fill in when caller did not specify; profile defaults are the floor.
- */
-function resolveModelAndTemperature({ featureKey, provider, callerOverrides = {}, orgDefaults = {} }) {
-  const profile = getTaskProfile(featureKey);
-  const p = _canonicalProvider(provider || DEFAULT_PROVIDER);
-  const profileModel = profile.models[p] || (PROVIDER_MODELS[p] ? PROVIDER_MODELS[p][0] : null);
-  const model = callerOverrides.model || orgDefaults.model || profileModel;
-  const temperature =
-    typeof callerOverrides.temperature === 'number' ? callerOverrides.temperature
-      : (typeof orgDefaults.temperature === 'number' ? orgDefaults.temperature
-        : profile.temperature);
-  return { profile: profile.name, model, temperature };
-}
-
-// ---------------------------------------------------------------------------
-// Encryption helpers  (AES-256-GCM,  iv:authTag:ciphertext  hex)
-// ---------------------------------------------------------------------------
-
-function _getEncryptionKey() {
-  if (process.env.LLM_ENCRYPTION_KEY) {
-    const raw = process.env.LLM_ENCRYPTION_KEY;
-    return Buffer.from(raw.length === 64 ? raw : crypto.createHash('sha256').update(raw).digest('hex'), 'hex');
-  }
-  if (process.env.JWT_SECRET) {
-    // HKDF derivation from JWT_SECRET
-    const ikm = Buffer.from(process.env.JWT_SECRET, 'utf8');
-    const salt = Buffer.alloc(32, 0);
-    const prk = crypto.createHmac('sha256', salt).update(ikm).digest();
-    const info = Buffer.from('llm-key-encryption', 'utf8');
-    const t1 = crypto.createHmac('sha256', prk).update(Buffer.concat([info, Buffer.from([1])])).digest();
-    return t1;
-  }
-  log('error', 'No LLM_ENCRYPTION_KEY or JWT_SECRET set – cannot encrypt/decrypt API keys');
-  throw new Error('LLM encryption key not configured. Set LLM_ENCRYPTION_KEY or JWT_SECRET.');
-}
-
-function encryptKey(plaintext) {
-  if (!plaintext) return null;
-  const key = _getEncryptionKey();
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
-}
-
-function decryptKey(ciphertext) {
-  if (!ciphertext) return null;
-  const parts = ciphertext.split(':');
-  if (parts.length !== 3) return null;
+function loadExemplars(feature) {
+  if (EXEMPLAR_CACHE.has(feature)) return EXEMPLAR_CACHE.get(feature);
   try {
-    const key = _getEncryptionKey();
-    const iv = Buffer.from(parts[0], 'hex');
-    const authTag = Buffer.from(parts[1], 'hex');
-    const encrypted = Buffer.from(parts[2], 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
-    return decipher.update(encrypted, undefined, 'utf8') + decipher.final('utf8');
-  } catch (err) {
-    log('error', 'Failed to decrypt API key', { error: err.message });
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Database helpers
-// ---------------------------------------------------------------------------
-
-async function _queryOne(sql, params) {
-  try {
-    const { rows } = await pool.query(sql, params);
-    return rows[0] || null;
-  } catch (err) {
-    log('error', 'DB query failed', { error: err.message, sql: sql.slice(0, 80) });
-    return null;
-  }
-}
-
-async function _queryAll(sql, params) {
-  try {
-    const { rows } = await pool.query(sql, params);
-    return rows;
-  } catch (err) {
-    log('error', 'DB query failed', { error: err.message, sql: sql.slice(0, 80) });
+    const filePath = path.join(__dirname, 'aiExemplars', `${feature}.json`);
+    const data = JSON.parse(require('fs').readFileSync(filePath, 'utf8'));
+    // Filter out non-exemplar entries (e.g. metadata entries used to carry
+    // IP-hygiene scanner directives). Real exemplars must have an `output` field.
+    const exemplars = (Array.isArray(data) ? data : [])
+      .filter(e => e && typeof e === 'object' && 'output' in e);
+    EXEMPLAR_CACHE.set(feature, exemplars);
+    return exemplars;
+  } catch {
+    EXEMPLAR_CACHE.set(feature, []);
     return [];
   }
 }
 
-async function _exec(sql, params) {
-  try {
-    await pool.query(sql, params);
-  } catch (err) {
-    log('error', 'DB exec failed', { error: err.message, sql: sql.slice(0, 80) });
-  }
+/**
+ * Build a few-shot exemplar block to prepend to the user message.
+ * Includes a chain-of-thought reasoning instruction before output.
+ *
+ * @param {string} feature - Feature key (must match an aiExemplars/*.json file)
+ * @param {number} [maxExemplars=2] - How many examples to include
+ * @returns {string} Formatted exemplar + CoT block, or empty string if no exemplars
+ */
+function buildFewShotBlock(feature, maxExemplars = 2) {
+  const exemplars = loadExemplars(feature).slice(0, maxExemplars);
+  if (exemplars.length === 0) return '';
+
+  const exampleLines = exemplars.map((ex, i) => {
+    const outputStr = typeof ex.output === 'object'
+      ? JSON.stringify(ex.output, null, 2)
+      : String(ex.output);
+    return `--- EXAMPLE ${i + 1} ---\nContext: ${ex.description || ex.input_summary || ''}\nHigh-quality output:\n${outputStr}`;
+  }).join('\n\n');
+
+  return `\n\n## Quality Exemplars\nThe following are examples of high-quality outputs for this type of analysis. Use them to calibrate your response quality, depth, and structure — do NOT copy them verbatim.\n\n${exampleLines}\n\n## Reasoning Approach\nBefore writing your response, think through:\n1. Scope and boundaries of the analysis\n2. Key assumptions about the organization's maturity\n3. Control intent and why gaps create real risk\n4. Priority ordering by business impact and remediation effort\n5. What specific evidence an auditor would need to close each gap\n\nThen produce your structured output.\n`;
 }
 
-// ---------------------------------------------------------------------------
-// Core Infrastructure
-// ---------------------------------------------------------------------------
+// Set PHI_REDACT_ONLY=true to redact PHI inline instead of blocking the request.
+// WARNING: PHI_REDACT_ONLY=true may not satisfy all HIPAA requirements — use only
+// when routing exclusively to HIPAA-BAA-covered providers.
+const PHI_REDACT_ONLY = process.env.PHI_REDACT_ONLY === 'true';
 
-function getUsageLimit(tier) {
-  const key = (tier || 'community').toLowerCase();
-  return USAGE_LIMITS[key] !== undefined ? USAGE_LIMITS[key] : USAGE_LIMITS.community;
-}
+const GEMINI_API_BASE = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
+const XAI_API_BASE = process.env.XAI_API_BASE || 'https://api.x.ai/v1';
+const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
 
-async function getUsageCount(orgId) {
-  const row = await _queryOne(
-    `SELECT COUNT(*)::int AS cnt FROM ai_usage_log
-     WHERE organization_id = $1
-       AND created_at >= date_trunc('month', CURRENT_TIMESTAMP)`,
-    [orgId]
-  );
-  return row ? row.cnt : 0;
-}
+// ---------- Provider + task-profile configuration (extracted to ./ai/providerConfig) ----------
+const {
+  PROVIDERS,
+  TASK_PROFILES,
+  FEATURE_TASK_PROFILE,
+  resolveTaskModel,
+} = require('./ai/providerConfig');
 
-async function resolveApiKey(provider, orgId) {
-  const p = (provider || DEFAULT_PROVIDER).toLowerCase();
 
-  // 1. Organization-level config
-  if (orgId && PROVIDER_KEY_COLUMNS[p]) {
-    const col = PROVIDER_KEY_COLUMNS[p];
-    const row = await _queryOne(
-      `SELECT ${col} AS enc_key FROM llm_configurations WHERE organization_id = $1`,
-      [orgId]
-    );
-    if (row && row.enc_key) {
-      const key = decryptKey(row.enc_key);
-      if (key) return { key, source: 'organization' };
-    }
-  }
-  // Ollama uses base_url instead of key
-  if (p === 'ollama' && orgId) {
-    const row = await _queryOne(
-      'SELECT ollama_base_url FROM llm_configurations WHERE organization_id = $1',
-      [orgId]
-    );
-    if (row && row.ollama_base_url) return { key: row.ollama_base_url, source: 'organization' };
-  }
-
-  // 2. Platform defaults
-  const platform = await _queryOne(
-    "SELECT setting_value FROM platform_settings WHERE setting_key = 'llm_defaults'",
-    []
-  );
-  if (platform && platform.setting_value) {
-    let pv;
-    try {
-      pv = typeof platform.setting_value === 'string'
-        ? JSON.parse(platform.setting_value)
-        : platform.setting_value;
-    } catch (_jsonErr) {
-      log('error', 'Failed to parse platform LLM defaults', { error: _jsonErr.message });
-      pv = {};
-    }
-    const platformKey = pv[`${p}_api_key`] || pv[PROVIDER_ENV_VARS[p]];
-    if (platformKey) return { key: platformKey, source: 'platform' };
-  }
-
-  // 3. Dynamic config entries
-  if (orgId) {
-    const dynRow = await _queryOne(
-      `SELECT config_value FROM dynamic_config_entries
-       WHERE organization_id = $1 AND config_domain = 'llm_config' AND config_key = $2`,
-      [orgId, `${p}_api_key`]
-    );
-    if (dynRow && dynRow.config_value) {
-      const val = typeof dynRow.config_value === 'object' ? dynRow.config_value.value : dynRow.config_value;
-      if (val) return { key: val, source: 'organization' };
-    }
-  }
-
-  // 4. Environment variables
-  const envVar = PROVIDER_ENV_VARS[p];
-  if (envVar && process.env[envVar]) {
-    return { key: process.env[envVar], source: 'environment' };
-  }
-
-  return { key: null, source: 'none' };
-}
-
-function getProviderStatus(orgKeys, platformKeys) {
-  const result = {};
-  for (const [provider, models] of Object.entries(PROVIDER_MODELS)) {
-    const hasOrgKey = orgKeys && orgKeys[provider];
-    const hasPlatformKey = platformKeys && platformKeys[provider];
-    const hasEnvKey = PROVIDER_ENV_VARS[provider] && !!process.env[PROVIDER_ENV_VARS[provider]];
-    result[provider] = {
-      available: !!(hasOrgKey || hasPlatformKey || hasEnvKey),
-      models,
-    };
-  }
-  return result;
-}
+// ---------- Org default provider ----------
+const VALID_PROVIDERS = new Set(['claude', 'openai', 'gemini', 'grok', 'groq', 'ollama']);
+const PROVIDER_SETTING_KEY_MAP = {
+  claude: 'anthropic_api_key',
+  openai: 'openai_api_key',
+  gemini: 'gemini_api_key',
+  grok: 'xai_api_key',
+  groq: 'groq_api_key',
+  ollama: 'ollama_base_url'
+};
+const SETTING_KEY_PROVIDER_MAP = Object.fromEntries(
+  Object.entries(PROVIDER_SETTING_KEY_MAP).map(([provider, settingKey]) => [settingKey, provider])
+);
+const PLATFORM_API_KEYS_CACHE_KEY = 'platform:all';
+const PROVIDER_FALLBACK_ORDER = ['claude', 'openai', 'grok', 'gemini', 'groq', 'ollama'];
+const aiTrackingStorage = new AsyncLocalStorage();
 
 async function withAITrackingContext(fn) {
-  _lastCallMeta = { usedProvider: null, usedModel: null };
-  const tracking = { usedProvider: null, usedModel: null, fallbackUsed: false, attempts: 0 };
-  try {
+  const base = {
+    attempts: [],
+    usedProvider: null,
+    usedModel: null,
+    fallbackUsed: false
+  };
+  return aiTrackingStorage.run(base, async () => {
     const result = await fn();
-    tracking.usedProvider = _lastCallMeta.usedProvider;
-    tracking.usedModel = _lastCallMeta.usedModel;
-    tracking.attempts = 1;
-    return { result, tracking };
-  } catch (err) {
-    tracking.usedProvider = _lastCallMeta.usedProvider;
-    tracking.usedModel = _lastCallMeta.usedModel;
-    tracking.attempts = 1;
+    const tracking = aiTrackingStorage.getStore() || base;
+    return {
+      result,
+      tracking: {
+        ...tracking,
+        attempts: Array.isArray(tracking.attempts) ? [...tracking.attempts] : []
+      }
+    };
+  });
+}
+
+function getAITrackingContext() {
+  return aiTrackingStorage.getStore() || null;
+}
+
+function recordAIAttempt(provider, model, available = true) {
+  const ctx = aiTrackingStorage.getStore();
+  if (!ctx) return;
+  ctx.attempts.push({
+    provider,
+    model: model || null,
+    available: !!available,
+    at: new Date().toISOString()
+  });
+}
+
+function markAISuccess(provider, model, requestedProvider) {
+  const ctx = aiTrackingStorage.getStore();
+  if (!ctx) return;
+  ctx.usedProvider = provider;
+  ctx.usedModel = model || null;
+  ctx.fallbackUsed = !!requestedProvider && provider !== requestedProvider;
+}
+
+function getDefaultModelForProvider(provider) {
+  if (provider === 'claude') return 'claude-haiku-4-5-20251001';
+  if (provider === 'openai') return 'gpt-4o-mini';
+  if (provider === 'grok') return 'grok-3-latest';
+  if (provider === 'gemini') return 'gemini-2.5-flash';
+  if (provider === 'groq') return 'llama-3.3-70b-versatile';
+  if (provider === 'ollama') return 'llama3.2';
+  return null;
+}
+
+async function getOrgDefaultProvider(organizationId) {
+  try {
+    const result = await pool.query(
+      `SELECT setting_value FROM organization_settings
+       WHERE organization_id = $1 AND setting_key = 'default_provider' LIMIT 1`,
+      [organizationId]
+    );
+    const value = result.rows[0]?.setting_value;
+    if (VALID_PROVIDERS.has(value)) {
+      return value;
+    }
+    return 'claude';
+  } catch {
+    return 'claude';
+  }
+}
+
+async function getPlatformDefaultProvider() {
+  try {
+    const result = await pool.query(
+      `SELECT setting_value FROM platform_settings
+       WHERE setting_key = 'default_provider'
+       LIMIT 1`
+    );
+    const value = result.rows[0]?.setting_value;
+    return VALID_PROVIDERS.has(value) ? value : 'claude';
+  } catch {
+    return 'claude';
+  }
+}
+
+/**
+ * Returns the configured default model for an organization, falling back to
+ * the platform-level default model setting, then null (provider built-in default).
+ * @param {string} organizationId
+ * @returns {Promise<string|null>}
+ */
+async function getOrgDefaultModel(organizationId) {
+  try {
+    if (organizationId) {
+      const orgResult = await pool.query(
+        `SELECT setting_value FROM organization_settings
+         WHERE organization_id = $1 AND setting_key = 'default_model' LIMIT 1`,
+        [organizationId]
+      );
+      const orgModel = orgResult.rows[0]?.setting_value;
+      if (orgModel) return orgModel;
+    }
+
+    const platformResult = await pool.query(
+      `SELECT setting_value FROM platform_settings
+       WHERE setting_key = 'default_model' LIMIT 1`
+    );
+    const platformModel = platformResult.rows[0]?.setting_value;
+    return platformModel || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * In-memory cache for API keys with 5-minute TTL
+ * Reduces database queries for frequently accessed keys
+ */
+const apiKeyCache = new Map();
+const API_KEY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Clears API key cache for an organization (call on key updates)
+ * @param {string} organizationId
+ */
+function invalidateApiKeyCache(organizationId) {
+  for (const provider of Object.keys(PROVIDER_SETTING_KEY_MAP)) {
+    const cacheKey = `${organizationId}:${provider}`;
+    apiKeyCache.delete(cacheKey);
+  }
+  apiKeyCache.delete(`${organizationId}:all`);
+}
+
+function invalidatePlatformApiKeyCache() {
+  apiKeyCache.delete(PLATFORM_API_KEYS_CACHE_KEY);
+  for (const provider of Object.keys(PROVIDER_SETTING_KEY_MAP)) {
+    apiKeyCache.delete(`platform:${provider}`);
+  }
+}
+
+/**
+ * Get all API keys for an organization in a single batched query
+ * Returns a map of provider -> decrypted API key
+ * @param {string} organizationId
+ * @returns {Promise<Object>} Map of provider names to API keys
+ */
+async function getAllOrgApiKeys(organizationId) {
+  const cacheKey = `${organizationId}:all`;
+  const cached = apiKeyCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < API_KEY_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+  
+  const settingKeys = Object.keys(SETTING_KEY_PROVIDER_MAP);
+  const result = await pool.query(
+    'SELECT setting_key, setting_value, is_encrypted FROM organization_settings WHERE organization_id = $1 AND setting_key = ANY($2)',
+    [organizationId, settingKeys]
+  );
+
+  const apiKeys = {};
+  for (const row of result.rows) {
+    const provider = SETTING_KEY_PROVIDER_MAP[row.setting_key];
+    if (provider) {
+      apiKeys[provider] = row.is_encrypted ? decrypt(row.setting_value) : row.setting_value;
+    }
+  }
+
+  // Cache the result
+  apiKeyCache.set(cacheKey, { data: apiKeys, timestamp: Date.now() });
+  return apiKeys;
+}
+
+async function getAllPlatformApiKeys() {
+  const cached = apiKeyCache.get(PLATFORM_API_KEYS_CACHE_KEY);
+  if (cached && (Date.now() - cached.timestamp < API_KEY_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  try {
+    const settingKeys = Object.keys(SETTING_KEY_PROVIDER_MAP);
+    const result = await pool.query(
+      'SELECT setting_key, setting_value, is_encrypted FROM platform_settings WHERE setting_key = ANY($1)',
+      [settingKeys]
+    );
+
+    const apiKeys = {};
+    for (const row of result.rows) {
+      const provider = SETTING_KEY_PROVIDER_MAP[row.setting_key];
+      if (provider) {
+        apiKeys[provider] = row.is_encrypted ? decrypt(row.setting_value) : row.setting_value;
+      }
+    }
+
+    apiKeyCache.set(PLATFORM_API_KEYS_CACHE_KEY, { data: apiKeys, timestamp: Date.now() });
+    return apiKeys;
+  } catch {
+    return {};
+  }
+}
+
+async function getPlatformApiKey(provider) {
+  if (!PROVIDER_SETTING_KEY_MAP[provider]) return null;
+
+  const cacheKey = `platform:${provider}`;
+  const cached = apiKeyCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < API_KEY_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  const allKeys = await getAllPlatformApiKeys();
+  const apiKey = allKeys[provider] || null;
+  apiKeyCache.set(cacheKey, { data: apiKey, timestamp: Date.now() });
+  return apiKey;
+}
+
+// ---------- BYOK: Fetch user-provided keys from org settings ----------
+async function getOrgApiKey(organizationId, provider) {
+  // Check cache first
+  const cacheKey = `${organizationId}:${provider}`;
+  const cached = apiKeyCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < API_KEY_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  const settingKey = PROVIDER_SETTING_KEY_MAP[provider];
+  if (!settingKey) return null;
+
+  const result = await pool.query(
+    'SELECT setting_value, is_encrypted FROM organization_settings WHERE organization_id = $1 AND setting_key = $2',
+    [organizationId, settingKey]
+  );
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  // Decrypt if the value was stored with AES-256-GCM encryption.
+  // decrypt() gracefully returns plain-text for legacy unencrypted rows.
+  const apiKey = row.is_encrypted ? decrypt(row.setting_value) : row.setting_value;
+  
+  // Cache the result
+  apiKeyCache.set(cacheKey, { data: apiKey, timestamp: Date.now() });
+  return apiKey;
+}
+
+async function resolveApiKey(provider, organizationId) {
+  if (!PROVIDER_SETTING_KEY_MAP[provider]) {
+    return { key: null, source: null };
+  }
+
+  if (organizationId) {
+    const orgKey = await getOrgApiKey(organizationId, provider);
+    if (orgKey) {
+      return { key: orgKey, source: 'organization' };
+    }
+  }
+
+  return { key: null, source: null };
+}
+
+function getClient(provider, orgApiKey) {
+  if (provider === 'claude') {
+    if (!orgApiKey) return null;
+    return new Anthropic.default({ apiKey: orgApiKey });
+  }
+  if (provider === 'openai') {
+    if (!orgApiKey) return null;
+    return new OpenAI.default({ apiKey: orgApiKey });
+  }
+  if (provider === 'grok') {
+    if (!orgApiKey) return null;
+    return new OpenAI.default({ apiKey: orgApiKey, baseURL: XAI_API_BASE });
+  }
+  if (provider === 'gemini') {
+    return orgApiKey ? { apiKey: orgApiKey } : null;
+  }
+  if (provider === 'groq') {
+    if (!orgApiKey) return null;
+    return new OpenAI.default({ apiKey: orgApiKey, baseURL: GROQ_API_BASE });
+  }
+  if (provider === 'ollama') {
+    if (!orgApiKey) return null;
+    // orgApiKey is the base URL for Ollama; Ollama ignores the Authorization header
+    return new OpenAI.default({ apiKey: 'ollama', baseURL: orgApiKey });
+  }
+  return null;
+}
+
+function buildProviderAttemptChain(primaryProvider) {
+  const chain = [];
+  const seen = new Set();
+
+  if (primaryProvider && VALID_PROVIDERS.has(primaryProvider)) {
+    chain.push(primaryProvider);
+    seen.add(primaryProvider);
+  }
+
+  for (const provider of PROVIDER_FALLBACK_ORDER) {
+    if (seen.has(provider)) continue;
+    chain.push(provider);
+    seen.add(provider);
+  }
+
+  return chain;
+}
+
+function isRetryableProviderError(err) {
+  const message = (err && err.message ? String(err.message) : '').toLowerCase();
+  return (
+    message.includes('quota exceeded') ||
+    message.includes('rate limit') ||
+    message.includes('too many requests') ||
+    message.includes('temporarily unavailable') ||
+    message.includes('timed out') ||
+    message.includes('status 429') ||
+    message.includes('status 503')
+  );
+}
+
+function buildNoKeyError(provider) {
+  const err = new Error(`No API key configured for ${provider}. Add one in Settings > LLM Configuration.`);
+  err.statusCode = 400;
+  return err;
+}
+
+async function executeProviderChat({ provider, client, model, messages, systemPrompt, maxTokens, temperature, jsonMode = false }) {
+  if (provider === 'claude') {
+    const resp = await client.messages.create({
+      model: model || getDefaultModelForProvider('claude'),
+      max_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      system: systemPrompt || 'You are an expert GRC (Governance, Risk, and Compliance) analyst.',
+      messages
+    });
+    return resp.content[0].text;
+  }
+
+  if (provider === 'openai') {
+    const oaiMessages = [];
+    if (systemPrompt) oaiMessages.push({ role: 'system', content: systemPrompt });
+    oaiMessages.push(...messages);
+    const resp = await client.chat.completions.create({
+      model: model || getDefaultModelForProvider('openai'),
+      max_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      messages: oaiMessages
+    });
+    return resp.choices[0].message.content;
+  }
+
+  if (provider === 'grok') {
+    const grokMessages = [];
+    if (systemPrompt) grokMessages.push({ role: 'system', content: systemPrompt });
+    grokMessages.push(...messages);
+    const resp = await client.chat.completions.create({
+      model: model || getDefaultModelForProvider('grok'),
+      max_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      messages: grokMessages
+    });
+    return resp.choices[0].message.content;
+  }
+
+  if (provider === 'gemini') {
+    const chosenModel = model || getDefaultModelForProvider('gemini');
+    const contents = messages.map((message) => {
+      // Flatten content to a plain string — array blocks would produce "[object Object]" via String()
+      let text;
+      if (typeof message.content === 'string') {
+        text = message.content;
+      } else if (Array.isArray(message.content)) {
+        text = message.content.map(b => {
+          if (typeof b === 'string') return b.trim();
+          if (b && typeof b.text === 'string') return b.text.trim();
+          return '';
+        }).filter(s => s).join(' ');
+      } else {
+        text = message.content != null ? String(message.content) : '';
+      }
+      return {
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text }]
+      };
+    });
+
+    const payload = {
+      contents,
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        ...(typeof temperature === 'number' ? { temperature } : {}),
+        ...(jsonMode ? { responseMimeType: 'application/json' } : {})
+      }
+    };
+
+    if (systemPrompt) {
+      payload.systemInstruction = { parts: [{ text: systemPrompt }] };
+    }
+
+    const response = await fetch(
+      `${GEMINI_API_BASE}/models/${encodeURIComponent(chosenModel)}:generateContent?key=${client.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    if (!response.ok) {
+      let errorText = `Gemini request failed with status ${response.status}`;
+      try {
+        const errorBody = await response.json();
+        if (errorBody?.error?.message) {
+          errorText = errorBody.error.message;
+        }
+      } catch {
+      }
+      throw new Error(errorText);
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text)
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+
+    if (!text) {
+      throw new Error('Gemini returned an empty response');
+    }
+
+    return text;
+  }
+
+  if (provider === 'groq') {
+    const groqMessages = [];
+    if (systemPrompt) groqMessages.push({ role: 'system', content: systemPrompt });
+    groqMessages.push(...messages);
+    const resp = await client.chat.completions.create({
+      model: model || getDefaultModelForProvider('groq'),
+      max_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      messages: groqMessages
+    });
+    return resp.choices[0].message.content;
+  }
+
+  if (provider === 'ollama') {
+    const ollamaMessages = [];
+    if (systemPrompt) ollamaMessages.push({ role: 'system', content: systemPrompt });
+    ollamaMessages.push(...messages);
+    const resp = await client.chat.completions.create({
+      model: model || getDefaultModelForProvider('ollama'),
+      max_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      messages: ollamaMessages
+    });
+    return resp.choices[0].message.content;
+  }
+
+  throw new Error('Unsupported provider');
+}
+
+// ---------- Retry utilities ----------
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const AI_MAX_RETRIES = Math.max(0, parseInt(process.env.AI_MAX_RETRIES || '2', 10));
+const AI_RETRY_BASE_DELAY_MS = Math.max(100, parseInt(process.env.AI_RETRY_BASE_DELAY_MS || '1000', 10));
+
+// ---------- AIDEFEND shared pipeline helpers ----------
+
+/**
+ * Sanitize all user-role messages in an LLM messages array.
+ * Enforces per-message input size limits and handles string, array-block,
+ * and other content types consistently for both sync and streaming paths.
+ *
+ * @param {Array}  messages      - Raw messages array
+ * @param {string} organizationId - Used in audit log warnings
+ * @returns {Array} Sanitized messages (non-user messages are returned unchanged)
+ */
+function sanitizeUserMessages(messages, organizationId) {
+  return messages.map(msg => {
+    if (msg.role !== 'user') return msg;
+
+    if (typeof msg.content === 'string') {
+      const { text, truncated } = aiSecurity.sanitizeInput(msg.content);
+      if (truncated) {
+        console.warn(`[aiSecurity] User message truncated to ${aiSecurity.MAX_INPUT_CHARS} chars (org=${organizationId})`);
+      }
+      return { ...msg, content: text };
+    }
+
+    if (Array.isArray(msg.content)) {
+      const sanitizedBlocks = msg.content.map(block => {
+        if (typeof block === 'string') {
+          const { text, truncated } = aiSecurity.sanitizeInput(block);
+          if (truncated) {
+            console.warn(`[aiSecurity] User content block truncated to ${aiSecurity.MAX_INPUT_CHARS} chars (org=${organizationId})`);
+          }
+          return text;
+        }
+        if (block && typeof block.text === 'string') {
+          const { text, truncated } = aiSecurity.sanitizeInput(block.text);
+          if (truncated) {
+            console.warn(`[aiSecurity] User content block truncated to ${aiSecurity.MAX_INPUT_CHARS} chars (org=${organizationId})`);
+          }
+          return truncated ? { ...block, text } : block;
+        }
+        return block;
+      });
+      return { ...msg, content: sanitizedBlocks };
+    }
+
+    if (msg.content != null) {
+      const { text, truncated } = aiSecurity.sanitizeInput(String(msg.content));
+      if (truncated) {
+        console.warn(`[aiSecurity] User message (non-string content) truncated to ${aiSecurity.MAX_INPUT_CHARS} chars (org=${organizationId})`);
+      }
+      return { ...msg, content: text };
+    }
+
+    return msg;
+  });
+}
+
+/**
+ * AIDEFEND: Privacy Controls — apply PII/PHI detection, blocking, and redaction
+ * to a set of already-sanitized messages and an optional system prompt.
+ *
+ * For user messages:
+ *   - PHI triggers a hard block (HTTP 422) unless PHI_REDACT_ONLY is set.
+ *   - PII (and PHI when PHI_REDACT_ONLY=true) is redacted inline.
+ *
+ * For the system prompt:
+ *   - Always redacted (never blocked) since it is platform-authored content.
+ *
+ * @param {Array}  sanitizedMessages - Already input-sanitized messages array
+ * @param {string} systemPrompt      - Optional system prompt text
+ * @param {string} organizationId    - Used in audit log warnings/errors
+ * @returns {{ messages: Array, systemPrompt: string }}
+ * @throws If PHI is detected and PHI_REDACT_ONLY is false
+ */
+function applyPrivacyControls(sanitizedMessages, systemPrompt, organizationId) {
+  // Scan user messages for PII and PHI
+  const piiPhiScan = aiSecurity.scanMessagesForPiiPhi(sanitizedMessages);
+
+  if (piiPhiScan.hasPhi && !PHI_REDACT_ONLY) {
+    const types = piiPhiScan.phiTypes.join(', ');
+    console.error(`[aiSecurity] PHI detected in LLM input — request blocked (org=${organizationId}, types=${types})`);
+    const err = new Error(
+      `Request contains Protected Health Information (PHI): ${types}. ` +
+      'Transmitting PHI to external AI providers is not permitted. ' +
+      'Remove all health-related identifiers before querying the AI assistant.'
+    );
+    err.status = 422;
+    err.statusCode = 422;
+    err.code = 'PHI_DETECTED';
     throw err;
   }
-}
 
-// ---------------------------------------------------------------------------
-// Provider-specific call implementations
-// ---------------------------------------------------------------------------
+  let messages = sanitizedMessages;
+  if (piiPhiScan.hasPii || (piiPhiScan.hasPhi && PHI_REDACT_ONLY)) {
+    const { messages: redacted, piiTypes, phiTypes } = aiSecurity.redactMessagesForPiiPhi(sanitizedMessages);
+    messages = redacted;
+    if (piiTypes.length > 0) {
+      console.warn(`[aiSecurity] PII redacted before LLM dispatch (org=${organizationId}, types=${piiTypes.join(', ')})`);
+    }
+    if (phiTypes.length > 0) {
+      console.warn(`[aiSecurity] PHI redacted before LLM dispatch (org=${organizationId}, types=${phiTypes.join(', ')})`);
+    }
+  }
 
-async function callAnthropic(apiKey, model, systemPrompt, messages, opts = {}) {
-  if (!Anthropic) throw new Error('Anthropic SDK not installed');
-  const client = new Anthropic({ apiKey });
-  const mappedMessages = messages.map(m => ({
-    role: m.role === 'system' ? 'user' : m.role,
-    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-  }));
-  const req = {
-    model: model || PROVIDER_MODELS.anthropic[0],
-    max_tokens: 4096,
-    system: systemPrompt || undefined,
-    messages: mappedMessages,
-  };
-  if (typeof opts.temperature === 'number') req.temperature = opts.temperature;
-  // Note: Claude stays on the schema+retry guard (Anthropic's structured-output
-  // equivalent requires tool_use rewiring; the validate-and-retry loop in
-  // aiHandler() catches drift).
-  const resp = await client.messages.create(req);
-  const text = resp.content.map(b => b.type === 'text' ? b.text : '').join('');
-  return text;
-}
-
-async function callOpenAI(apiKey, model, systemPrompt, messages, opts = {}) {
-  if (!OpenAI) throw new Error('OpenAI SDK not installed');
-  const client = new OpenAI({ apiKey });
-  const allMessages = [];
-  if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
-  allMessages.push(...messages);
-  const req = {
-    model: model || PROVIDER_MODELS.openai[0],
-    messages: allMessages,
-  };
-  if (typeof opts.temperature === 'number') req.temperature = opts.temperature;
-  if (opts.jsonMode) req.response_format = { type: 'json_object' };
-  const resp = await client.chat.completions.create(req);
-  if (!resp.choices?.[0]?.message) throw new Error('Unexpected OpenAI response format');
-  return resp.choices[0].message.content;
-}
-
-async function callGemini(apiKey, model, systemPrompt, messages, opts = {}) {
-  if (!axios) throw new Error('axios not installed');
-  const m = model || PROVIDER_MODELS.gemini[0];
-  const userText = messages.map(msg => msg.content).join('\n\n');
-  const body = {
-    contents: [{ parts: [{ text: userText }] }],
-  };
+  // Scan systemPrompt for PII/PHI — platform-authored but may include RAG/org context
+  // containing sensitive data. Always redact (never block) since this is not user input.
+  // Call redactPiiPhi() directly and use its `redacted` flag to avoid scanning twice.
+  let safeSystemPrompt = systemPrompt;
   if (systemPrompt) {
-    body.systemInstruction = { parts: [{ text: systemPrompt }] };
+    const { text: redactedSp, redacted, piiTypes: spPii, phiTypes: spPhi } = aiSecurity.redactPiiPhi(systemPrompt);
+    if (redacted) {
+      safeSystemPrompt = redactedSp;
+      const all = [...spPii, ...spPhi].join(', ');
+      console.warn(`[aiSecurity] PII/PHI redacted from systemPrompt before LLM dispatch (org=${organizationId}, types=${all})`);
+    }
   }
-  const generationConfig = {};
-  if (typeof opts.temperature === 'number') generationConfig.temperature = opts.temperature;
-  if (opts.jsonMode) generationConfig.responseMimeType = 'application/json';
-  if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
-  const resp = await axios.post(url, body, {
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    timeout: PROVIDER_TIMEOUT_MS.gemini,
-  });
-  const candidates = resp.data.candidates || [];
-  if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts) {
-    return candidates[0].content.parts.map(p => p.text || '').join('');
-  }
-  return '';
+  return { messages, systemPrompt: safeSystemPrompt };
 }
 
-async function callGroq(apiKey, model, systemPrompt, messages, opts = {}) {
-  if (!axios) throw new Error('axios not installed');
-  const allMessages = [];
-  if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
-  allMessages.push(...messages);
-  const body = {
-    model: model || PROVIDER_MODELS.groq[0],
-    messages: allMessages,
-  };
-  if (typeof opts.temperature === 'number') body.temperature = opts.temperature;
-  if (opts.jsonMode) body.response_format = { type: 'json_object' };
-  const resp = await axios.post('https://api.groq.com/openai/v1/chat/completions', body, {
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    timeout: PROVIDER_TIMEOUT_MS.groq,
-  });
-  if (!resp.data?.choices?.[0]?.message) throw new Error('Unexpected Groq response format');
-  return resp.data.choices[0].message.content;
-}
-
-async function callGrok(apiKey, model, systemPrompt, messages, opts = {}) {
-  if (!axios) throw new Error('axios not installed');
-  const allMessages = [];
-  if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
-  allMessages.push(...messages);
-  const body = {
-    model: model || PROVIDER_MODELS.grok[0],
-    messages: allMessages,
-  };
-  if (typeof opts.temperature === 'number') body.temperature = opts.temperature;
-  if (opts.jsonMode) body.response_format = { type: 'json_object' };
-  const resp = await axios.post('https://api.x.ai/v1/chat/completions', body, {
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    timeout: PROVIDER_TIMEOUT_MS.grok,
-  });
-  if (!resp.data?.choices?.[0]?.message) throw new Error('Unexpected Grok response format');
-  return resp.data.choices[0].message.content;
-}
-
-// Parsed once at module load to avoid re-splitting on every request.
-const _OLLAMA_HOST_ALLOWLIST = (process.env.OLLAMA_BASE_URL_ALLOWLIST || '')
-  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-
-// Validate the configured Ollama base URL before issuing a request. The
-// org-admin-set value is treated as untrusted: enforce http(s) scheme, no
-// embedded credentials, and (when OLLAMA_BASE_URL_ALLOWLIST is set) require
-// the hostname to be on the allowlist. localhost remains the safe default
-// because Ollama is designed to run on the same host.
-function _sanitizeOllamaBaseUrl(raw) {
-  let input = raw || 'http://localhost:11434';
-  // Strip trailing slashes without a regex (avoids ReDoS on long inputs).
-  while (input.length > 1 && input.charCodeAt(input.length - 1) === 47 /* '/' */) {
-    input = input.slice(0, -1);
+// ---------- Core chat function ----------
+// Default maxTokens reduced from 4096 to 2048 for token optimization
+async function chat({ provider = 'claude', model, messages, systemPrompt, organizationId, maxTokens = 2048, feature = null, temperature: callerTemperature, jsonMode: callerJsonMode }) {
+  // Apply task-profile model tiering when no explicit model is supplied.
+  // The caller can pass `feature` (e.g. 'gap_analysis') to get the right
+  // model tier for the task without hard-coding model names in every function.
+  // `temperature` is ALWAYS resolved from the task profile when a feature is
+  // supplied, even when the model is overridden — a custom model still
+  // benefits from the right temperature for the task type.
+  let resolvedTemperature = typeof callerTemperature === 'number' ? callerTemperature : undefined;
+  if (feature) {
+    const orgModel = await getOrgDefaultModel(organizationId).catch(() => null);
+    const resolved = resolveTaskModel(provider, feature, model || null, orgModel);
+    if (!model && resolved.model) {
+      model = resolved.model;
+    }
+    if (resolvedTemperature === undefined && typeof resolved.temperature === 'number') {
+      resolvedTemperature = resolved.temperature;
+    }
   }
-  let parsed;
-  try {
-    parsed = new URL(input);
-  } catch (_e) {
-    throw new Error('Invalid OLLAMA base URL');
+  // Force JSON output on providers that support response_format / responseMimeType
+  // when the feature has a registered schema (Phase 1.2). Claude does not set a
+  // response_format — the schema + retry guard in aiHandler() handles Claude.
+  const jsonMode = typeof callerJsonMode === 'boolean'
+    ? callerJsonMode
+    : hasFeatureSchema(feature);
+  // ── AIDEFEND: Adversarial Input Defense ─────────────────────────────────
+  // Validate messages array before processing (prevents TypeError on non-array input).
+  if (!Array.isArray(messages)) {
+    const err = new Error('messages must be an array');
+    err.statusCode = 400;
+    throw err;
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`Unsupported OLLAMA URL scheme: ${parsed.protocol}`);
+
+  // Enforce per-message input size limits (Privacy and Information Controls).
+  // Sanitize/truncate BEFORE injection scanning to bound CPU cost and avoid
+  // scanning attacker-supplied oversized payloads.
+  const sanitizedMessages = sanitizeUserMessages(messages, organizationId);
+
+  // Scan sanitized messages for prompt injection / adversarial patterns
+  const injectionScan = aiSecurity.scanMessages(sanitizedMessages);
+  if (injectionScan.detected) {
+    const labels = [...new Set(injectionScan.threats.map(t => t.label))].join(', ');
+    console.warn(`[aiSecurity] Prompt injection detected (org=${organizationId}, types=${labels})`);
   }
-  if (parsed.username || parsed.password) {
-    throw new Error('OLLAMA URL must not contain credentials');
+
+  // ── AIDEFEND: Privacy Controls — PII/PHI Detection & Redaction ──────────
+  // Scan for PII and PHI before any data leaves the platform boundary.
+  // PHI triggers a hard block by default (HIPAA §164.514 safe-harbour).
+  // Set PHI_REDACT_ONLY=true in env to redact PHI inline instead of blocking.
+  const { messages: messagesToSend, systemPrompt: safeSystemPrompt } =
+    applyPrivacyControls(sanitizedMessages, systemPrompt, organizationId);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const providerChain = buildProviderAttemptChain(provider);
+  let lastError = null;
+  let noKeyError = null;
+
+  for (const candidateProvider of providerChain) {
+    const candidateModel = candidateProvider === provider ? model : null;
+    const resolved = await resolveApiKey(candidateProvider, organizationId);
+    const client = getClient(candidateProvider, resolved.key);
+
+    if (!client || (candidateProvider === 'gemini' && !client.apiKey)) {
+      recordAIAttempt(candidateProvider, candidateModel, false);
+      noKeyError = buildNoKeyError(candidateProvider);
+      continue;
+    }
+
+    // Per-provider retry loop with exponential backoff
+    for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt++) {
+      try {
+        recordAIAttempt(candidateProvider, candidateModel, true);
+        const effectiveModel = candidateModel || getDefaultModelForProvider(candidateProvider);
+        const responseText = await executeProviderChat({
+          provider: candidateProvider,
+          client,
+          model: candidateModel,
+          messages: messagesToSend,
+          systemPrompt: safeSystemPrompt,
+          maxTokens,
+          temperature: resolvedTemperature,
+          jsonMode
+        });
+        markAISuccess(candidateProvider, effectiveModel, provider);
+
+        // ── AIDEFEND: Output Hardening & Sanitization ────────────────────────
+        const { text: safeOutput, redacted } = aiSecurity.sanitizeOutput(responseText);
+        if (redacted) {
+          console.warn(`[aiSecurity] Sensitive data pattern redacted from AI output (org=${organizationId}, provider=${candidateProvider})`);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        return safeOutput;
+      } catch (err) {
+        lastError = err;
+        if (!isRetryableProviderError(err)) {
+          throw err;
+        }
+        if (attempt < AI_MAX_RETRIES) {
+          const delay = AI_RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+          console.warn(`[LLM] ${candidateProvider} failed (retryable, attempt ${attempt + 1}/${AI_MAX_RETRIES}): ${err.message}; retrying in ${delay}ms`);
+          await sleep(delay);
+        } else {
+          console.warn(`[LLM] ${candidateProvider} exhausted ${AI_MAX_RETRIES} retries: ${err.message}; moving to next provider`);
+        }
+      }
+    }
   }
-  if (_OLLAMA_HOST_ALLOWLIST.length > 0 && !_OLLAMA_HOST_ALLOWLIST.includes(parsed.hostname.toLowerCase())) {
-    throw new Error(`OLLAMA host not in allowlist: ${parsed.hostname}`);
+
+  // Try configured fallback provider if set and not already in chain
+  const fallbackProvider = process.env.AI_FALLBACK_PROVIDER || null;
+  if (fallbackProvider && VALID_PROVIDERS.has(fallbackProvider) && !providerChain.includes(fallbackProvider)) {
+    console.warn(`[LLM] All providers in chain failed, trying env fallback ${fallbackProvider}`);
+    try {
+      const resolved = await resolveApiKey(fallbackProvider, organizationId);
+      const client = getClient(fallbackProvider, resolved.key);
+      if (client) {
+        recordAIAttempt(fallbackProvider, null, true);
+        const responseText = await executeProviderChat({
+          provider: fallbackProvider,
+          client,
+          model: null,
+          messages: messagesToSend,
+          systemPrompt: safeSystemPrompt,
+          maxTokens,
+          temperature: resolvedTemperature,
+          jsonMode
+        });
+        const { text: safeOutput } = aiSecurity.sanitizeOutput(responseText);
+        return safeOutput;
+      }
+    } catch (fallbackErr) {
+      console.error(`[LLM] Fallback provider ${fallbackProvider} also failed: ${fallbackErr.message}`);
+    }
   }
-  // Reconstruct a normalized URL — drops any path/query/fragment from the
-  // configured base so callers can append `/api/chat` deterministically.
-  return `${parsed.protocol}//${parsed.host}`;
+
+  if (lastError) throw lastError;
+  if (noKeyError) throw noKeyError;
+  throw new Error('Unsupported provider');
 }
 
-async function callOllama(baseUrl, model, systemPrompt, messages, opts = {}) {
-  if (!axios) throw new Error('axios not installed');
-  const url = _sanitizeOllamaBaseUrl(baseUrl);
-  const allMessages = [];
-  if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
-  allMessages.push(...messages);
-  const body = {
-    model: model || PROVIDER_MODELS.ollama[0],
-    messages: allMessages,
-    stream: false,
-  };
-  if (typeof opts.temperature === 'number') body.options = { temperature: opts.temperature };
-  if (opts.jsonMode) body.format = 'json';
-  const resp = await axios.post(`${url}/api/chat`, body, { timeout: PROVIDER_TIMEOUT_MS.ollama });
-  return resp.data.message ? resp.data.message.content : (resp.data.response || '');
-}
-
-// ---------------------------------------------------------------------------
-// Unified call dispatcher
-// ---------------------------------------------------------------------------
-
-function callProvider(provider, apiKey, model, systemPrompt, messages, opts = {}) {
-  const p = (provider || '').toLowerCase();
-  switch (p) {
-    case 'anthropic':
-    case 'claude':
-      return callAnthropic(apiKey, model, systemPrompt, messages, opts);
-    case 'openai': return callOpenAI(apiKey, model, systemPrompt, messages, opts);
-    case 'gemini': return callGemini(apiKey, model, systemPrompt, messages, opts);
-    case 'groq': return callGroq(apiKey, model, systemPrompt, messages, opts);
-    case 'grok':
-    case 'xai':
-      return callGrok(apiKey, model, systemPrompt, messages, opts);
-    case 'ollama': return callOllama(apiKey, model, systemPrompt, messages, opts);
-    default: throw new Error(`Unsupported provider: ${provider}`);
+// ---------- Streaming chat via async generator (for SSE endpoints) ----------
+async function* chatStream({ provider = 'claude', model, messages, systemPrompt, organizationId, maxTokens = 2048, feature = null, temperature: callerTemperature }) {
+  // Apply task-profile model tiering for streaming endpoints.
+  // Temperature is always resolved from the task profile (see chat() above).
+  let resolvedTemperature = typeof callerTemperature === 'number' ? callerTemperature : undefined;
+  if (feature) {
+    const orgModel = await getOrgDefaultModel(organizationId).catch(() => null);
+    const resolved = resolveTaskModel(provider, feature, model || null, orgModel);
+    if (!model && resolved.model) {
+      model = resolved.model;
+    }
+    if (resolvedTemperature === undefined && typeof resolved.temperature === 'number') {
+      resolvedTemperature = resolved.temperature;
+    }
   }
-}
+  // ── AIDEFEND: Adversarial Input Defense (matching chat() pipeline) ──────
+  if (!Array.isArray(messages)) {
+    const err = new Error('messages must be an array');
+    err.statusCode = 400;
+    throw err;
+  }
 
-async function callLLM(params, systemPrompt, userPrompt) {
-  const provider = (params.provider || DEFAULT_PROVIDER).toLowerCase();
-  const model = params.model || (PROVIDER_MODELS[provider] ? PROVIDER_MODELS[provider][0] : null);
-  const orgId = params.organizationId;
+  const sanitizedMessages = sanitizeUserMessages(messages, organizationId);
 
-  const { key } = await resolveApiKey(provider, orgId);
-  if (!key) throw new Error(`No API key configured for provider: ${provider}`);
+  const injectionScan = aiSecurity.scanMessages(sanitizedMessages);
+  if (injectionScan.detected) {
+    const labels = [...new Set(injectionScan.threats.map(t => t.label))].join(', ');
+    console.warn(`[aiSecurity] Prompt injection detected in stream (org=${organizationId}, types=${labels})`);
+  }
 
-  _lastCallMeta = { usedProvider: provider, usedModel: model };
+  // ── AIDEFEND: Privacy Controls — PII/PHI Detection & Redaction (stream) ──
+  const { messages: messagesToStream, systemPrompt: safeStreamSystemPrompt } =
+    applyPrivacyControls(sanitizedMessages, systemPrompt, organizationId);
+  // ─────────────────────────────────────────────────────────────────────────
 
-  const messages = params.messages || [{ role: 'user', content: userPrompt }];
-  const opts = {};
-  if (typeof params.temperature === 'number') opts.temperature = params.temperature;
-  if (params.jsonMode) opts.jsonMode = true;
-  return callProvider(provider, key, model, systemPrompt, messages, opts);
-}
+  const resolved = await resolveApiKey(provider, organizationId);
+  const client = getClient(provider, resolved.key);
 
-// ---------------------------------------------------------------------------
-// Chat & streaming
-// ---------------------------------------------------------------------------
+  if (!client || (provider === 'gemini' && !client.apiKey)) {
+    throw new Error(`No API key configured for ${provider}. Add one in Settings > LLM Configuration.`);
+  }
 
-async function chat({ provider, model, organizationId, messages, systemPrompt, temperature, jsonMode }) {
-  const p = (provider || DEFAULT_PROVIDER).toLowerCase();
-  const m = model || (PROVIDER_MODELS[p] ? PROVIDER_MODELS[p][0] : null);
-  const { key } = await resolveApiKey(p, organizationId);
-  if (!key) throw new Error(`No API key configured for provider: ${p}`);
+  if (provider === 'claude') {
+    const stream = client.messages.stream({
+      model: model || getDefaultModelForProvider('claude'),
+      max_tokens: maxTokens,
+      ...(typeof resolvedTemperature === 'number' ? { temperature: resolvedTemperature } : {}),
+      system: safeStreamSystemPrompt || 'You are an expert GRC (Governance, Risk, and Compliance) analyst.',
+      messages: messagesToStream
+    });
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        yield event.delta.text;
+      }
+    }
+    return;
+  }
 
-  _lastCallMeta = { usedProvider: p, usedModel: m };
-  const opts = {};
-  if (typeof temperature === 'number') opts.temperature = temperature;
-  if (jsonMode) opts.jsonMode = true;
-  return callProvider(p, key, m, systemPrompt, messages, opts);
-}
-
-async function* chatStream({ provider, model, organizationId, messages, systemPrompt, temperature, jsonMode }) {
-  const p = (provider || DEFAULT_PROVIDER).toLowerCase();
-  const m = model || (PROVIDER_MODELS[p] ? PROVIDER_MODELS[p][0] : null);
-  const { key } = await resolveApiKey(p, organizationId);
-  if (!key) throw new Error(`No API key configured for provider: ${p}`);
-
-  _lastCallMeta = { usedProvider: p, usedModel: m };
-
-  // Streaming for OpenAI-compatible providers
-  if (p === 'openai' && OpenAI) {
-    const client = new OpenAI({ apiKey: key });
-    const allMessages = [];
-    if (systemPrompt) allMessages.push({ role: 'system', content: systemPrompt });
-    allMessages.push(...messages);
-    const req = {
-      model: m,
-      messages: allMessages,
-      stream: true,
-    };
-    if (typeof temperature === 'number') req.temperature = temperature;
-    if (jsonMode) req.response_format = { type: 'json_object' };
-    const stream = await client.chat.completions.create(req);
+  if (['openai', 'grok', 'groq', 'ollama'].includes(provider)) {
+    const msgs = [];
+    if (safeStreamSystemPrompt) msgs.push({ role: 'system', content: safeStreamSystemPrompt });
+    msgs.push(...messagesToStream);
+    const stream = await client.chat.completions.create({
+      model: model || getDefaultModelForProvider(provider),
+      max_tokens: maxTokens,
+      ...(typeof resolvedTemperature === 'number' ? { temperature: resolvedTemperature } : {}),
+      messages: msgs,
+      stream: true
+    });
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) yield delta;
@@ -610,485 +905,2025 @@ async function* chatStream({ provider, model, organizationId, messages, systemPr
     return;
   }
 
-  if (p === 'anthropic' && Anthropic) {
-    const client = new Anthropic({ apiKey: key });
-    const mappedMessages = messages.map(msg => ({
-      role: msg.role === 'system' ? 'user' : msg.role,
-      content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+  if (provider === 'gemini') {
+    const chosenModel = model || getDefaultModelForProvider('gemini');
+    const contents = messagesToStream.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.content || '') }]
     }));
-    const req = {
-      model: m,
-      max_tokens: 4096,
-      system: systemPrompt || undefined,
-      messages: mappedMessages,
+    const payload = {
+      contents,
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        ...(typeof resolvedTemperature === 'number' ? { temperature: resolvedTemperature } : {})
+      }
     };
-    if (typeof temperature === 'number') req.temperature = temperature;
-    const stream = await client.messages.stream(req);
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta && event.delta.text) {
-        yield event.delta.text;
+    if (safeStreamSystemPrompt) payload.systemInstruction = { parts: [{ text: safeStreamSystemPrompt }] };
+
+    const response = await fetch(
+      `${GEMINI_API_BASE}/models/${encodeURIComponent(chosenModel)}:streamGenerateContent?key=${client.apiKey}&alt=sse`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+    );
+    if (!response.ok) {
+      throw new Error(`Gemini streaming failed with status ${response.status}`);
+    }
+
+    // Incremental SSE streaming via ReadableStream (avoid buffering entire response)
+    const reader = response.body && typeof response.body.getReader === 'function' ? response.body.getReader() : null;
+    if (!reader) {
+      // Fallback: no readable stream available, buffer entire response
+      const responseText = await response.text();
+      for (const line of responseText.split('\n')) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            const chunk = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+            if (chunk) yield chunk;
+          } catch {
+            // Skip malformed SSE lines
+          }
+        }
+      }
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            const chunk = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+            if (chunk) yield chunk;
+          } catch {
+            // Skip malformed SSE lines
+          }
+        }
+      }
+    }
+
+    if (buffer && buffer.startsWith('data: ')) {
+      try {
+        const data = JSON.parse(buffer.slice(6));
+        const chunk = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+        if (chunk) yield chunk;
+      } catch {
+        // Skip malformed SSE lines
       }
     }
     return;
   }
 
-  // Fallback: non-streaming call, yield entire result
-  const opts = {};
-  if (typeof temperature === 'number') opts.temperature = temperature;
-  if (jsonMode) opts.jsonMode = true;
-  const result = await callProvider(p, key, m, systemPrompt, messages, opts);
-  yield result;
+  throw new Error('Unsupported provider for streaming');
 }
 
-// ---------------------------------------------------------------------------
-// Org configuration helpers
-// ---------------------------------------------------------------------------
+// ---------- GRC System Prompt ----------
+// =====================================================================
+// MODULAR SYSTEM PROMPT — Token-Optimized
+// =====================================================================
+// The full GRC_SYSTEM was ~2,000 tokens and included in every call.
+// Most features only need 1-2 reference sections, not all of them.
+// This modular approach sends only the sections each feature requires,
+// cutting system-prompt tokens by 50-80% on most calls.
+// =====================================================================
 
-async function getOrgDefaultProvider(orgId) {
-  const row = await _queryOne(
-    'SELECT default_provider FROM llm_configurations WHERE organization_id = $1',
-    [orgId]
-  );
-  return row ? row.default_provider || DEFAULT_PROVIDER : DEFAULT_PROVIDER;
+// Core identity + behavioral rules — always included (~400 tokens)
+
+// ---------- GRC system prompt templates (extracted to ./ai/prompts) ----------
+const {
+  GRC_CORE,
+  GRC_MODULES,
+  PROMPT_PROFILES,
+  buildGrcSystem,
+  GRC_SYSTEM,
+} = require('./ai/prompts');
+
+// ---------- Helper: Compact JSON formatting for token optimization ----------
+// Replaces compactJSON(data) with JSON.stringify(data) to remove
+// indentation whitespace, reducing token count by 20-40% for large data structures.
+function compactJSON(data) {
+  return JSON.stringify(data);
 }
 
-async function getOrgDefaultModel(orgId) {
-  const row = await _queryOne(
-    'SELECT default_model FROM llm_configurations WHERE organization_id = $1',
-    [orgId]
-  );
-  return row ? row.default_model || null : null;
+// ---------- Org-personalized system prompt ----------
+// promptProfile: a PROMPT_PROFILES key (e.g. 'controls', 'vulnerability', 'lean')
+//   or an array of module keys. Defaults to 'full' for backward compatibility.
+async function buildPersonalizedSystem(organizationId, extra, contextLevel = 'compact', ragQuery, promptProfile) {
+  // ragQuery: optional text to use for RAG retrieval (user question, analysis topic, etc.)
+  const ragQueryText = ragQuery || '';
+  const [orgContext, frameworkGuardrails, ragContext] = await Promise.all([
+    organizationId ? buildOrgContext(organizationId, contextLevel) : Promise.resolve(''),
+    organizationId ? buildFrameworkGuardrails(organizationId) : Promise.resolve(''),
+    organizationId && ragQueryText ? buildRagContext({ organizationId, queryText: ragQueryText }) : Promise.resolve('')
+  ]);
+  const grcBase = promptProfile ? buildGrcSystem(promptProfile) : GRC_SYSTEM;
+  const base = extra ? `${grcBase}\n${extra}` : grcBase;
+  const withGuardrails = frameworkGuardrails ? `${base}${frameworkGuardrails}` : base;
+  const withOrg = orgContext ? `${withGuardrails}\n\n${orgContext}` : withGuardrails;
+  return ragContext ? `${withOrg}${ragContext}` : withOrg;
 }
 
-async function getOrgApiKey(orgId, provider) {
-  const p = (provider || DEFAULT_PROVIDER).toLowerCase();
-  // Ollama uses base_url, not an encrypted key column
-  if (p === 'ollama') {
-    const row = await _queryOne(
-      'SELECT ollama_base_url FROM llm_configurations WHERE organization_id = $1',
-      [orgId]
-    );
-    return (row && row.ollama_base_url) ? row.ollama_base_url : null;
+// =====================================================================
+// RESULT CACHING AND REQUEST DEDUPLICATION
+// =====================================================================
+// In-memory cache for AI analysis results with configurable TTL
+// Prevents redundant AI calls when multiple users or components request the same analysis
+const aiResultCache = new Map();
+const aiInFlightRequests = new Map();
+const AI_CACHE_TTL_MS = Math.max(1000, parseInt(process.env.AI_CACHE_TTL_MS || '300000', 10)); // Default 5 minutes, min 1 second
+const AI_ERROR_CACHE_TTL_MS = 30 * 1000; // Cache errors for 30 seconds to prevent rapid retries
+
+// Periodic cleanup of expired cache entries to prevent memory leaks
+const cleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of aiResultCache.entries()) {
+    const ttl = entry.error ? AI_ERROR_CACHE_TTL_MS : AI_CACHE_TTL_MS;
+    if (now - entry.timestamp >= ttl) {
+      aiResultCache.delete(key);
+    }
   }
-  const col = PROVIDER_KEY_COLUMNS[p];
-  if (!col) return null;
-  const row = await _queryOne(
-    `SELECT ${col} AS enc_key FROM llm_configurations WHERE organization_id = $1`,
-    [orgId]
-  );
-  if (!row || !row.enc_key) return null;
-  return decryptKey(row.enc_key);
-}
+}, AI_CACHE_TTL_MS); // Run cleanup at same interval as TTL
 
-async function getPlatformApiKey(provider) {
-  const p = (provider || DEFAULT_PROVIDER).toLowerCase();
-  // Check platform_settings
-  const row = await _queryOne(
-    "SELECT setting_value FROM platform_settings WHERE setting_key = 'llm_defaults'",
-    []
-  );
-  if (row && row.setting_value) {
-    let sv;
+// Allow graceful cleanup on shutdown
+cleanupInterval.unref(); // Don't prevent process exit
+
+/**
+ * Wraps an AI function with caching and request deduplication
+ * - Caches results for AI_CACHE_TTL_MS to prevent redundant AI API calls
+ * - Caches errors for 30 seconds to prevent rapid retries during outages
+ * - Deduplicates in-flight requests to prevent concurrent identical calls
+ * 
+ * @param {string} cacheKey - Unique key for this request (e.g., 'gap-analysis:orgId')
+ * @param {Function} fn - Async function that returns the AI result
+ * @returns {Promise<any>} The cached or freshly computed result
+ */
+async function withCacheAndDedup(cacheKey, fn) {
+  // Check cache first
+  const cached = aiResultCache.get(cacheKey);
+  if (cached) {
+    const ttl = cached.error ? AI_ERROR_CACHE_TTL_MS : AI_CACHE_TTL_MS;
+    if (Date.now() - cached.timestamp < ttl) {
+      if (cached.error) {
+        throw new Error(cached.data);
+      }
+      return cached.data;
+    }
+  }
+
+  // Check if request is already in flight
+  const inFlight = aiInFlightRequests.get(cacheKey);
+  if (inFlight) {
+    return inFlight; // Return the existing promise
+  }
+
+  // Execute the function and cache the promise
+  const promise = (async () => {
     try {
-      sv = typeof row.setting_value === 'string' ? JSON.parse(row.setting_value) : row.setting_value;
-    } catch (_jsonErr) {
-      log('error', 'Failed to parse platform LLM defaults in getPlatformApiKey', { error: _jsonErr.message });
-      sv = {};
+      const result = await fn();
+      // Cache the successful result
+      aiResultCache.set(cacheKey, { data: result, timestamp: Date.now(), error: false });
+      return result;
+    } catch (err) {
+      // Cache the error for a short period to prevent rapid retries
+      aiResultCache.set(cacheKey, { data: err.message, timestamp: Date.now(), error: true });
+      throw err;
+    } finally {
+      // Remove from in-flight requests
+      aiInFlightRequests.delete(cacheKey);
     }
-    const k = sv[`${p}_api_key`];
-    if (k) return k;
-  }
-  // Fallback to env
-  const envVar = PROVIDER_ENV_VARS[p];
-  return envVar ? process.env[envVar] || null : null;
+  })();
+
+  aiInFlightRequests.set(cacheKey, promise);
+  return promise;
 }
 
-// ---------------------------------------------------------------------------
-// Logging
-// ---------------------------------------------------------------------------
-
-async function logAIUsage(orgId, userId, feature, provider, model, meta = {}) {
-  await _exec(
-    `INSERT INTO ai_usage_log
-       (organization_id, user_id, feature, provider, model, success, tokens_input, tokens_output, duration_ms, error_message, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-    [
-      orgId, userId, feature,
-      provider || null,
-      model || null,
-      meta.success !== undefined ? meta.success : true,
-      meta.tokens_input || meta.tokensInput || 0,
-      meta.tokens_output || meta.tokensOutput || 0,
-      meta.duration_ms || meta.durationMs || 0,
-      meta.error_message || meta.errorMessage || null,
-    ]
-  );
-}
-
-async function logAIDecision(orgId, feature, inputContext, outputText, meta = {}) {
-  const inputStr = typeof inputContext === 'string' ? inputContext : JSON.stringify(inputContext);
-  const outputStr = typeof outputText === 'string' ? outputText : JSON.stringify(outputText);
-  const inputHash = crypto.createHash('sha256').update(inputStr).digest('hex');
-  const outputHash = crypto.createHash('sha256').update(outputStr).digest('hex');
-  const normalizeId = (v) => (v == null ? null : String(v));
-  const correlationId = normalizeId(meta.correlation_id ?? meta.correlationId);
-  const sessionId = normalizeId(meta.session_id ?? meta.sessionId);
-  // v3.0.0: when the feature has a registered schema, persist the validated
-  // JSON payload alongside the hashed text so downstream consumers can render
-  // structured cards/tables/checklists without re-parsing the model output.
-  const structuredPayload = meta.structured ?? meta.structured_payload ?? null;
-  const structuredJson = structuredPayload != null
-    ? (typeof structuredPayload === 'string' ? structuredPayload : JSON.stringify(structuredPayload))
-    : null;
-  await _exec(
-    `INSERT INTO ai_decision_log
-       (organization_id, feature, input_hash, output_hash, model_version,
-        correlation_id, session_id,
-        data_lineage, risk_level, human_reviewed, bias_flags, bias_reviewed,
-        structured)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-    [
-      orgId, feature, inputHash, outputHash,
-      meta.model_version || meta.modelVersion || null,
-      correlationId,
-      sessionId,
-      meta.data_lineage || meta.dataLineage || null,
-      meta.risk_level || meta.riskLevel || null,
-      meta.human_reviewed || meta.humanReviewed || false,
-      meta.bias_flags ? JSON.stringify(meta.bias_flags || meta.biasFlags) : null,
-      meta.bias_reviewed || meta.biasReviewed || false,
-      structuredJson,
-    ]
-  );
-}
-
-// ---------------------------------------------------------------------------
-// System prompt builder
-// ---------------------------------------------------------------------------
-
-async function buildPersonalizedSystem(orgId, frameworkCode, mode, ragQuery, role) {
-  const parts = [
-    'You are ControlWeave AI, an expert Governance, Risk, and Compliance (GRC) assistant.',
-    'You provide accurate, actionable, and well-structured guidance for compliance professionals.',
-  ];
-
-  if (frameworkCode) {
-    parts.push(`The current compliance framework in scope is: ${frameworkCode}.`);
-  }
-  if (role) {
-    parts.push(`The user's role is: ${role}. Tailor your responses to their level of expertise and responsibilities.`);
-  }
-  if (mode) {
-    parts.push(`Operating mode: ${mode}.`);
-  }
-
-  // Fetch org context if available
-  if (orgId) {
-    const org = await _queryOne(
-      'SELECT name, industry FROM organizations WHERE id = $1',
-      [orgId]
-    );
-    if (org) {
-      if (org.name) parts.push(`Organization: ${org.name}.`);
-      if (org.industry) parts.push(`Industry: ${org.industry}.`);
+/**
+ * Invalidates the cache for a specific organization's AI results
+ * Call this when org data changes significantly (e.g., control implementation updated)
+ * 
+ * @param {string} organizationId
+ * @param {string} feature - Optional feature name to invalidate (e.g., 'gap-analysis')
+ */
+function invalidateAICache(organizationId, feature = null) {
+  if (feature) {
+    // Invalidate specific feature for this org — keys may include :provider:model suffixes
+    const prefix = `${feature}:${organizationId}`;
+    for (const key of aiResultCache.keys()) {
+      if (key === prefix || key.startsWith(`${prefix}:`)) {
+        aiResultCache.delete(key);
+      }
+    }
+  } else {
+    // Invalidate all features for this org — match orgId anywhere in the key
+    for (const key of aiResultCache.keys()) {
+      if (key.includes(`:${organizationId}:`) || key.endsWith(`:${organizationId}`)) {
+        aiResultCache.delete(key);
+      }
     }
   }
+}
 
-  if (ragQuery) {
-    parts.push(`Relevant context for this query: ${ragQuery}`);
-  }
+/**
+ * Cleanup function to stop background tasks
+ * Call before process shutdown for graceful cleanup
+ */
+function cleanupAICache() {
+  clearInterval(cleanupInterval);
+  aiResultCache.clear();
+  aiInFlightRequests.clear();
+}
 
-  parts.push(
-    'Always cite relevant control IDs, framework sections, or regulatory references when applicable.',
-    'If uncertain, clearly state your confidence level and suggest further review.'
+// =====================================================================
+// 1. AUTOMATED GAP ANALYSIS
+// =====================================================================
+async function generateGapAnalysis({ organizationId, provider, model, schemaRetryHint = null }) {
+  // Use cache and deduplication to prevent redundant AI calls
+  // Skip cache on retry to get a fresh structured response
+  const cacheProvider = provider || 'default';
+  const cacheModel = model || 'default';
+  const cacheKey = schemaRetryHint
+    ? `gap-analysis-retry:${organizationId}:${cacheProvider}:${cacheModel}`
+    : `gap-analysis:${organizationId}:${cacheProvider}:${cacheModel}`;
+  return withCacheAndDedup(cacheKey, async () => {
+    const [frameworks, controls, evidenceStats, assessmentStats, assetStats, vulnStats, ownershipStats] = await Promise.all([
+      pool.query(`
+        SELECT f.code, f.name, COUNT(fc.id) as total,
+          COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') as implemented,
+          COUNT(ci.id) FILTER (WHERE ci.status = 'in_progress') as in_progress,
+          COUNT(ci.id) FILTER (WHERE ci.status IS NULL OR ci.status = 'not_started') as not_started
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+        WHERE of2.organization_id = $1
+        GROUP BY f.id, f.code, f.name
+      `, [organizationId]),
+      pool.query(`
+        SELECT fc.control_id, fc.title, fc.priority, f.code as framework,
+          COALESCE(ci.status, 'not_started') as status
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+        WHERE of2.organization_id = $1 AND (ci.status IS NULL OR ci.status != 'implemented')
+        ORDER BY fc.priority ASC, f.code
+        LIMIT 100
+      `, [organizationId]),
+      // Evidence coverage: how many controls have linked evidence (org-scoped)
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT fc.id) as total_controls,
+          COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN ecl.control_id END) as controls_with_evidence,
+          COUNT(DISTINCT e.id) as total_evidence_items
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN evidence_control_links ecl ON ecl.control_id = fc.id
+        LEFT JOIN evidence e ON e.id = ecl.evidence_id AND e.organization_id = $1
+        WHERE of2.organization_id = $1
+      `, [organizationId]),
+      // Assessment completion rates
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT ap2.assessment_procedure_id) as total_procedures_in_plans,
+          COUNT(DISTINCT ar.assessment_procedure_id) as procedures_assessed,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'satisfied') as satisfied,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'other_than_satisfied') as other_than_satisfied,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'not_applicable') as not_applicable,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'not_assessed' OR ar.status IS NULL) as not_assessed
+        FROM assessment_plans ap
+        LEFT JOIN assessment_plan_procedures ap2 ON ap2.assessment_plan_id = ap.id
+        LEFT JOIN assessment_results ar ON ar.assessment_procedure_id = ap2.assessment_procedure_id AND ar.organization_id = $1
+        WHERE ap.organization_id = $1
+      `, [organizationId]),
+      // Asset and environment stats
+      pool.query(`
+        SELECT
+          COUNT(*) as total_assets,
+          COUNT(*) FILTER (WHERE criticality = 'critical') as critical_assets,
+          COUNT(*) FILTER (WHERE criticality = 'high') as high_assets,
+          COUNT(*) FILTER (WHERE status = 'active') as active_assets
+        FROM assets WHERE organization_id = $1
+      `, [organizationId]),
+      // Vulnerability stats
+      pool.query(`
+        SELECT
+          COUNT(*) as total_vulns,
+          COUNT(*) FILTER (WHERE status = 'open') as open_vulns,
+          COUNT(*) FILTER (WHERE severity = 'critical') as critical_vulns,
+          COUNT(*) FILTER (WHERE severity = 'high') as high_vulns,
+          COUNT(*) FILTER (WHERE kev_listed = true) as kev_listed
+        FROM vulnerability_findings WHERE organization_id = $1
+      `, [organizationId]),
+      // Control ownership / assignment stats
+      pool.query(`
+        SELECT
+          COUNT(fc.id) as total_controls,
+          COUNT(ci.assigned_to) as assigned_controls
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+        WHERE of2.organization_id = $1
+      `, [organizationId])
+    ]);
+
+    const ev = evidenceStats.rows[0] || {};
+    const assess = assessmentStats.rows[0] || {};
+    const assets = assetStats.rows[0] || {};
+    const vulns = vulnStats.rows[0] || {};
+    const ownership = ownershipStats.rows[0] || {};
+
+    const kpiBlock = [
+      `- Evidence Coverage: ${ev.controls_with_evidence || 0} of ${ev.total_controls || 0} controls have linked evidence (${ev.total_evidence_items || 0} total evidence items)`,
+      `- Assessment Completion: ${assess.procedures_assessed || 0} of ${assess.total_procedures_in_plans || 0} procedures assessed (${assess.satisfied || 0} satisfied, ${assess.other_than_satisfied || 0} other-than-satisfied, ${assess.not_applicable || 0} not applicable, ${assess.not_assessed || 0} not assessed)`,
+      `- Control Ownership: ${ownership.assigned_controls || 0} of ${ownership.total_controls || 0} controls assigned to owners`,
+      `- Asset Inventory: ${assets.total_assets || 0} assets (${assets.critical_assets || 0} critical, ${assets.high_assets || 0} high criticality)`,
+      `- Vulnerability Exposure: ${vulns.total_vulns || 0} total findings (${vulns.open_vulns || 0} open, ${vulns.critical_vulns || 0} critical, ${vulns.high_vulns || 0} high, ${vulns.kev_listed || 0} KEV-listed)`
+    ].join('\n');
+
+    return chat({
+      provider, model, organizationId,
+      systemPrompt: await buildPersonalizedSystem(organizationId, null, 'full', 'compliance gap analysis controls implementation evidence audit readiness', 'controls'),
+      messages: [{ role: 'user', content: `Generate a comprehensive gap analysis report that tells a compelling compliance story from two expert perspectives: a **CISO** (strategic risk, business impact, board communication) and a **Lead Auditor** (evidence sufficiency, control effectiveness, audit readiness).${buildFewShotBlock('gap_analysis')}
+
+Framework Status:
+${compactJSON(frameworks.rows)}
+
+Top Unimplemented Controls:
+${compactJSON(controls.rows)}
+
+Key Performance Indicators (KPIs):
+${kpiBlock}
+
+Structure the report as follows:
+
+## 1. Executive KPI Dashboard
+Present a concise KPI scorecard with these metrics and RAG (Red/Amber/Green) status:
+- **Implementation Rate**: % of controls implemented across all frameworks
+- **Evidence Coverage Rate**: % of controls backed by evidence
+- **Assessment Completion Rate**: % of assessment procedures completed
+- **Control Ownership Rate**: % of controls assigned to responsible owners
+- **Vulnerability Exposure Index**: open critical/high vulnerabilities relative to asset count
+- **Audit Readiness Score**: composite score (0-100) based on above metrics
+
+## 2. CISO Strategic Risk Narrative
+Write from the perspective of a CISO presenting to the board:
+- Translate compliance gaps into **business risk** (revenue impact, regulatory penalties, reputational exposure, operational disruption)
+- Identify the **top 3 strategic risks** that demand immediate executive attention
+- Provide **Mean Time to Compliance (MTTC)** estimates per framework
+- Quantify potential **financial exposure** from regulatory non-compliance
+- Recommend **budget and resource allocation** priorities
+
+## 3. Lead Auditor Assessment
+Write from the perspective of a lead auditor conducting a readiness review:
+- Assess **evidence sufficiency** — are controls supported by adequate documentation?
+- Evaluate **control effectiveness** — are implemented controls operating as intended?
+- Identify **material weaknesses** vs. **significant deficiencies** vs. **observations**
+- Assess **audit readiness** per framework with realistic timeline to attestation/certification
+- Flag controls where the gap between implementation and evidence creates **audit risk**
+
+## 4. Bridging the Gap: Unified Remediation Roadmap
+Synthesize both perspectives into an actionable plan:
+- **Immediate (0-30 days)**: Critical quick wins that address both strategic risk and audit findings
+- **Short-term (30-90 days)**: Core control implementation with evidence collection
+- **Medium-term (90-180 days)**: Advanced controls, continuous monitoring, audit preparation
+- Identify **crosswalk leverage points** where one implementation satisfies multiple frameworks
+- Prioritize controls by combined risk-and-audit-impact score
+
+## 5. Quick Wins & Momentum Builders
+Highlight 5-10 specific controls that can be implemented quickly to build compliance momentum, with estimated effort and cross-framework impact.${schemaRetryHint ? `\n\n[CORRECTION REQUIRED]\n${schemaRetryHint}` : ''}` }],
+      feature: 'gap_analysis'
+    });
+  });
+}
+
+// =====================================================================
+// 2. CROSSWALK OPTIMIZER
+// =====================================================================
+async function optimizeCrosswalk({ organizationId, provider, model }) {
+  // Use cache and deduplication to prevent redundant AI calls
+  const cacheProvider = provider || 'default';
+  const cacheModel = model || 'default';
+  return withCacheAndDedup(`crosswalk-optimizer:${organizationId}:${cacheProvider}:${cacheModel}`, async () => {
+    const mappings = await pool.query(`
+      SELECT fc1.control_id as source_id, fc1.title as source_title, f1.code as source_fw,
+        fc2.control_id as target_id, fc2.title as target_title, f2.code as target_fw,
+        cm.similarity_score, cm.mapping_type,
+        COALESCE(ci1.status, 'not_started') as source_status,
+        COALESCE(ci2.status, 'not_started') as target_status
+      FROM control_mappings cm
+      JOIN framework_controls fc1 ON fc1.id = cm.source_control_id
+      JOIN framework_controls fc2 ON fc2.id = cm.target_control_id
+      JOIN frameworks f1 ON f1.id = fc1.framework_id
+      JOIN frameworks f2 ON f2.id = fc2.framework_id
+      JOIN organization_frameworks of1 ON of1.framework_id = f1.id AND of1.organization_id = $1
+      LEFT JOIN control_implementations ci1 ON ci1.control_id = fc1.id AND ci1.organization_id = $1
+      LEFT JOIN control_implementations ci2 ON ci2.control_id = fc2.id AND ci2.organization_id = $1
+      WHERE cm.similarity_score >= 80
+      ORDER BY cm.similarity_score DESC
+      LIMIT 200
+    `, [organizationId]);
+
+    return chat({
+      provider, model, organizationId,
+      systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', 'crosswalk framework control mapping implementation', 'controls'),
+      messages: [{ role: 'user', content: `Analyze crosswalk mappings and recommend optimal implementation order.
+
+Crosswalk Mappings (score >= 80%):
+${compactJSON(mappings.rows)}
+
+Provide:
+1. Top 10 "implement first" controls that satisfy the most cross-framework requirements
+2. For each recommendation, list all frameworks satisfied and the similarity scores
+3. Estimated effort reduction percentage from leveraging crosswalks
+4. Controls that are already implemented and their crosswalk impact
+5. Recommended implementation sequence for maximum coverage with minimum effort` }],
+      feature: 'crosswalk_optimizer',
+      maxTokens: 3072
+    });
+  });
+}
+
+// =====================================================================
+// 3. COMPLIANCE FORECASTING
+// =====================================================================
+async function forecastCompliance({ organizationId, provider, model }) {
+  // Use cache and deduplication to prevent redundant AI calls
+  const cacheProvider = provider || 'default';
+  const cacheModel = model || 'default';
+  return withCacheAndDedup(`compliance-forecast:${organizationId}:${cacheProvider}:${cacheModel}`, async () => {
+    const [history, totals, frameworkBreakdown, evidenceTrend, assessmentProgress, controlMaturity] = await Promise.all([
+      pool.query(`
+        SELECT DATE_TRUNC('week', ci.created_at) as week,
+          COUNT(*) as controls_completed
+        FROM control_implementations ci
+        WHERE ci.organization_id = $1 AND ci.status = 'implemented'
+        GROUP BY DATE_TRUNC('week', ci.created_at)
+        ORDER BY week DESC
+        LIMIT 12
+      `, [organizationId]),
+      pool.query(`
+        SELECT COUNT(fc.id) as total,
+          COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') as done,
+          COUNT(ci.id) FILTER (WHERE ci.status = 'in_progress') as in_progress
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+        WHERE of2.organization_id = $1
+      `, [organizationId]),
+      // Per-framework progress for targeted forecasting
+      pool.query(`
+        SELECT f.code, f.name,
+          COUNT(fc.id) as total,
+          COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') as implemented,
+          COUNT(ci.id) FILTER (WHERE ci.status = 'in_progress') as in_progress
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+        WHERE of2.organization_id = $1
+        GROUP BY f.id, f.code, f.name
+      `, [organizationId]),
+      // Evidence collection trend
+      pool.query(`
+        SELECT DATE_TRUNC('week', e.created_at) as week,
+          COUNT(*) as evidence_uploaded
+        FROM evidence e
+        WHERE e.organization_id = $1
+        GROUP BY DATE_TRUNC('week', e.created_at)
+        ORDER BY week DESC
+        LIMIT 12
+      `, [organizationId]),
+      // Assessment completion rates
+      pool.query(`
+        SELECT
+          COUNT(ar.id) as total_results,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'satisfied') as satisfied,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'other_than_satisfied') as other_than_satisfied,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'not_applicable') as not_applicable,
+          COUNT(ar.id) FILTER (WHERE ar.status = 'not_assessed' OR ar.status IS NULL) as not_assessed
+        FROM assessment_results ar
+        WHERE ar.organization_id = $1
+      `, [organizationId]),
+      // Control maturity: earliest/latest implementation dates per framework
+      pool.query(`
+        SELECT f.code, f.name,
+          MIN(ci.created_at) as earliest_implementation,
+          MAX(ci.created_at) as latest_implementation,
+          COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') as implemented
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1 AND ci.status = 'implemented'
+        WHERE of2.organization_id = $1
+        GROUP BY f.id, f.code, f.name
+      `, [organizationId])
+    ]);
+
+    const assess = assessmentProgress.rows[0] || {};
+    const maturity = controlMaturity.rows || [];
+
+    return chat({
+      provider, model, organizationId,
+      systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', 'compliance forecast trajectory implementation velocity evidence collection', 'controls'),
+      messages: [{ role: 'user', content: `Forecast compliance trajectory with dual-perspective analysis from a **CISO** and **Lead Auditor** viewpoint.
+
+Implementation Velocity (weekly):
+${compactJSON(history.rows)}
+
+Current Totals: ${JSON.stringify(totals.rows[0] || {})}
+
+Per-Framework Progress:
+${compactJSON(frameworkBreakdown.rows)}
+
+Evidence Collection Velocity (weekly):
+${compactJSON(evidenceTrend.rows)}
+
+Assessment Status: ${JSON.stringify(assess)}
+
+Control Maturity (implementation history per framework):
+${compactJSON(maturity)}
+
+Structure the forecast as follows:
+
+## 1. Compliance KPI Dashboard
+Present current KPIs with trend indicators (▲ improving, ▼ declining, ► stable):
+- **Overall Implementation Rate**: % complete with week-over-week change
+- **Implementation Velocity**: controls/week (current, average, peak)
+- **Evidence Collection Rate**: evidence items/week trend
+- **Assessment Completion Rate**: % of procedures assessed
+- **Per-Framework Compliance %**: individual framework progress
+- **In-Progress Pipeline**: controls currently being worked on
+
+## 2. CISO Strategic Forecast
+From a CISO's perspective communicating to the board:
+- **Projected Milestone Dates**: estimated dates to reach 50%, 80%, 90%, and 100% compliance (per framework and overall)
+- **Business Risk Timeline**: when key regulatory deadlines intersect with projected compliance dates
+- **Resource Burn Rate**: are current resources sufficient to meet targets?
+- **Risk Exposure Window**: period during which the organization remains exposed before reaching acceptable compliance levels
+- **Budget Impact**: estimated cost implications of current pace vs. accelerated timelines
+
+## 3. Lead Auditor Readiness Assessment
+From a lead auditor's perspective evaluating audit preparedness:
+- **Evidence Sufficiency Forecast**: at current evidence collection rate, when will evidence coverage be adequate for audit?
+- **Assessment Readiness**: based on assessment completion rates, when can a formal assessment/audit be scheduled?
+- **Control Maturity Projection**: using the earliest/latest implementation dates provided, forecast when controls will have sufficient operational history for SOC 2 Type II (typically 3-6 months of operational evidence) or equivalent
+- **Documentation Gap Forecast**: areas where evidence collection lags behind control implementation
+- **Audit Engagement Timeline**: recommended dates for readiness assessment, internal audit, and external audit
+
+## 4. Velocity Analysis & Bottleneck Identification
+- Is the team accelerating or decelerating? Analyze the trend.
+- Identify specific bottlenecks (resource constraints, complexity spikes, framework-specific slowdowns)
+- Compare implementation velocity against evidence collection velocity — highlight mismatches
+- Identify frameworks that are falling behind their peers
+
+## 5. Acceleration Recommendations
+Provide prioritized recommendations from both perspectives:
+- **CISO Priority**: actions that reduce the most business risk the fastest
+- **Auditor Priority**: actions that close the most evidence and assessment gaps
+- **Combined Quick Wins**: actions that satisfy both strategic and audit objectives
+- Resource reallocation suggestions based on framework-specific velocity data
+
+## 6. Risk Assessment: Current Pace Scenario
+- If current velocity continues unchanged, what are the consequences?
+- Quantify compliance debt accumulation
+- Identify regulatory deadlines at risk of being missed
+- Provide a "wake-up call" metric that makes the urgency tangible` }],
+      feature: 'compliance_forecast',
+      maxTokens: 4096
+    });
+  });
+}
+
+// =====================================================================
+// 4. REGULATORY CHANGE MONITOR
+// =====================================================================
+async function monitorRegulatoryChanges({ organizationId, frameworks: fwList, provider, model }) {
+  // Query ALL adopted frameworks with compliance status for focused analysis
+  const adopted = await pool.query(`
+    SELECT f.code, f.name, f.version, f.category, f.tier_required,
+           COUNT(fc.id) AS total_controls,
+           COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') AS implemented_controls,
+           ROUND(
+             COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::numeric
+             / NULLIF(COUNT(fc.id), 0) * 100, 1
+           ) AS compliance_pct
+    FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id
+    JOIN framework_controls fc ON fc.framework_id = f.id
+    LEFT JOIN control_implementations ci
+      ON ci.control_id = fc.id AND ci.organization_id = $1
+    WHERE of2.organization_id = $1
+    GROUP BY f.code, f.name, f.version, f.category, f.tier_required
+    ORDER BY f.name
+  `, [organizationId]);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId,
+      'You have knowledge of regulatory changes and updates through your training data. ' +
+      'Use the full organization context provided to tailor findings to their specific industry, ' +
+      'deployment model, data sensitivity types, and compliance posture.',
+      'full', null, 'policy'),
+    messages: [{ role: 'user', content: `Analyze regulatory changes for EACH framework this organization has adopted.
+Focus your analysis on every single framework listed below — do not skip any.
+
+Adopted Frameworks (with current compliance status):
+${compactJSON(adopted.rows)}
+
+For EACH adopted framework, provide:
+1. Recent and upcoming regulatory changes specific to that framework
+2. Impact assessment for each change (High/Medium/Low)
+3. New controls or requirements that may need to be added
+4. Deprecated or modified controls
+5. Timeline for compliance with new requirements
+6. Recommended actions to stay ahead of changes
+
+Also provide a cross-framework summary:
+- Regulatory changes that affect multiple adopted frameworks simultaneously
+- Priority actions across the entire compliance portfolio
+- Gaps between current compliance posture and upcoming requirements` }]
+  });
+}
+
+// =====================================================================
+// 5. REMEDIATION PLAYBOOKS
+// =====================================================================
+async function generateRemediationPlaybook({ controlId, organizationId, provider, model, schemaRetryHint = null }) {
+  const control = await pool.query(`
+    SELECT fc.*, f.code as framework_code, f.name as framework_name,
+      COALESCE(ci.status, 'not_started') as impl_status, ci.notes as impl_notes
+    FROM framework_controls fc
+    JOIN frameworks f ON f.id = fc.framework_id
+    LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+    WHERE fc.id = $2
+  `, [organizationId, controlId]);
+
+  if (control.rows.length === 0) throw new Error('Control not found');
+
+  const assets = await pool.query(`
+    SELECT a.name, a.hostname, ac.code as category, a.criticality
+    FROM assets a JOIN asset_categories ac ON ac.id = a.category_id
+    WHERE a.organization_id = $1 ORDER BY a.criticality LIMIT 20
+  `, [organizationId]);
+
+  const controlTitle = control.rows[0]?.title || control.rows[0]?.control_id || 'control';
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', `remediation implementation playbook ${controlTitle}`, 'controls'),
+    messages: [{ role: 'user', content: `Generate a detailed remediation playbook for this control.${buildFewShotBlock('remediation_playbook')}
+
+Control:
+${compactJSON(control.rows[0])}
+
+Organization Assets:
+${compactJSON(assets.rows)}
+
+Provide:
+1. Step-by-step implementation guide (numbered steps)
+2. Required tools and technologies
+3. Estimated effort (hours) and required skill level
+4. Configuration examples / code snippets where applicable
+5. Verification steps to confirm implementation
+6. Common pitfalls and how to avoid them
+7. Evidence artifacts to collect during implementation
+8. Related controls that benefit from this implementation${schemaRetryHint ? `\n\n[CORRECTION REQUIRED]\n${schemaRetryHint}` : ''}` }],
+    feature: 'remediation_playbook',
+    maxTokens: 3072
+  });
+}
+
+// =====================================================================
+// VULNERABILITY REMEDIATION PLAN
+// =====================================================================
+async function generateVulnerabilityRemediation({
+  vulnerabilityId,
+  organizationId,
+  provider,
+  model
+}) {
+  const findingResult = await pool.query(
+    `SELECT
+       vf.id,
+       vf.finding_key,
+       vf.vulnerability_id,
+       vf.source,
+       vf.standard,
+       vf.title,
+       vf.description,
+       vf.severity,
+       vf.cvss_score,
+       vf.status,
+       vf.due_date,
+       vf.package_name,
+       vf.component_name,
+       vf.version_detected,
+       vf.cwe_id,
+       vf.owasp_top10_2025_category,
+       vf.kev_listed,
+       vf.exploit_available,
+       a.id AS asset_id,
+       a.name AS asset_name,
+       a.hostname AS asset_hostname,
+       a.ip_address AS asset_ip,
+       e.name AS environment_name
+     FROM vulnerability_findings vf
+     LEFT JOIN assets a ON a.id = vf.asset_id
+     LEFT JOIN environments e ON e.id = a.environment_id
+     WHERE vf.organization_id = $1
+       AND vf.id = $2
+     LIMIT 1`,
+    [organizationId, vulnerabilityId]
   );
 
-  return parts.join('\n');
+  if (findingResult.rows.length === 0) {
+    throw new Error('Vulnerability finding not found');
+  }
+
+  const finding = findingResult.rows[0];
+
+  const workflowResult = await pool.query(
+    `SELECT
+       vw.action_type,
+       vw.action_status,
+       vw.control_effect,
+       vw.response_summary,
+       vw.due_date,
+       fc.control_id AS control_code,
+       fc.title AS control_title,
+       f.code AS framework_code,
+       f.name AS framework_name,
+       COALESCE(ci.status, 'not_started') AS implementation_status
+     FROM vulnerability_control_work_items vw
+     JOIN framework_controls fc ON fc.id = vw.framework_control_id
+     JOIN frameworks f ON f.id = fc.framework_id
+     LEFT JOIN control_implementations ci ON ci.id = vw.implementation_id
+     WHERE vw.organization_id = $1
+       AND vw.vulnerability_id = $2
+     ORDER BY f.code, fc.control_id`,
+    [organizationId, vulnerabilityId]
+  );
+
+  const poamResult = await pool.query(
+    `SELECT
+       id,
+       title,
+       status,
+       priority,
+       due_date,
+       owner_id,
+       remediation_plan
+     FROM poam_items
+     WHERE organization_id = $1
+       AND vulnerability_id = $2
+     ORDER BY created_at DESC
+     LIMIT 5`,
+    [organizationId, vulnerabilityId]
+  );
+
+  return chat({
+    provider,
+    model,
+    organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, 'Focus on practical remediation and control-closure actions for vulnerability findings.', 'compact', null, 'vulnerability'),
+    messages: [{
+      role: 'user',
+      content: `Generate a vulnerability remediation and closure plan.
+
+Vulnerability Finding:
+${compactJSON(finding)}
+${finding.owasp_top10_2025_category ? `\nOWASP Top 10:2025 Category: ${finding.owasp_top10_2025_category}` : ''}
+${finding.cwe_id ? `CWE: ${finding.cwe_id}` : ''}
+
+Related Control Workflow Items:
+${compactJSON(workflowResult.rows)}
+
+Related POA&M Items:
+${compactJSON(poamResult.rows)}
+
+Return:
+1. Executive summary (risk + business impact)
+2. Immediate containment actions (0-24h)
+3. Remediation actions (patch/config/code/process) with owner roles and due dates
+4. Control-closure impact: which controls can move to compliant, which remain partial
+5. Required evidence artifacts for closure and audit defensibility
+6. Residual risk statement and conditions for risk acceptance (if needed)
+7. OWASP Top 10:2025 context: explain which OWASP category applies, why, and category-specific hardening best practices
+8. A JSON block:
+{
+  "finding_id": "${finding.id}",
+  "priority": "low|medium|high|critical",
+  "recommended_actions": [
+    {
+      "title": "...",
+      "owner_role": "...",
+      "target_days": 7,
+      "evidence_required": ["..."],
+      "mapped_controls": ["..."]
+    }
+  ],
+  "closure_criteria": ["..."],
+  "poam_update_suggestion": "..."
+}`
+    }]
+  });
 }
 
-// ---------------------------------------------------------------------------
-// Cache & service factory
-// ---------------------------------------------------------------------------
+// =====================================================================
+// IAVM ASSET ALERT
+// =====================================================================
+// Matches an IAVM (Information Assurance Vulnerability Management) notice
+// against the org's assets and generates an AI-powered risk alert with
+// recommended remediation actions.
+async function generateIAVMAssetAlert({ organizationId, iavmId, title, description, affectedProducts, severity, provider, model }) {
+  const maxAssets = Math.max(50, parseInt(process.env.AI_IAVM_MAX_ASSETS || '500', 10));
+  const assets = await pool.query(`
+    SELECT a.id, a.name, a.hostname, a.fqdn, a.ip_address, a.operating_system,
+           a.software_inventory, a.criticality, a.security_classification,
+           ac.code AS category, e.name AS environment
+    FROM assets a
+    JOIN asset_categories ac ON ac.id = a.category_id
+    LEFT JOIN environments e ON e.id = a.environment_id
+    WHERE a.organization_id = $1
+    ORDER BY a.criticality NULLS LAST
+    LIMIT $2
+  `, [organizationId, maxAssets]);
 
-function invalidateAICache() {
-  _cache = {};
-  log('info', 'AI cache invalidated');
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId,
+      'You are an expert in DoD vulnerability management (IAVM program). ' +
+      'You map IAVM notices to affected assets and generate actionable remediation guidance ' +
+      'aligned with DISA STIGs, NIST 800-53 SI-2/RA-5, and CISA KEV timelines.',
+      'compact', null, 'vulnerability'),
+    messages: [{
+      role: 'user',
+      content: `Analyze this IAVM notice and determine which of the organization's assets are likely affected.
+
+IAVM Notice:
+- ID: ${iavmId || 'Unknown'}
+- Title: ${title || 'Unknown'}
+- Severity: ${severity || 'Unknown'}
+- Affected Products / Platforms:
+${affectedProducts ? compactJSON(affectedProducts) : 'Not specified'}
+- Description:
+${description || 'No description provided'}
+
+Organization Assets (${assets.rows.length} total):
+${compactJSON(assets.rows)}
+
+Provide:
+1. **Affected Assets** – List each asset likely affected by this IAVM, with a brief reason (hostname/OS/software match)
+2. **Risk Assessment** – Overall risk to the organization (Critical/High/Medium/Low) with justification
+3. **Remediation Steps** – Step-by-step remediation plan referencing DISA STIG or patch guidance where applicable
+4. **Compliance Impact** – Which NIST 800-53 controls (e.g. SI-2, RA-5) or other framework controls are triggered
+5. **Timeline** – Recommended remediation timeline based on IAVM severity category (CAT I = 21 days, CAT II = 30 days, CAT III = 180 days)
+6. **Evidence Required** – What scan or patch evidence to collect for audit closure
+
+If no assets appear to be affected, explicitly state that and explain why.`
+    }]
+  });
 }
 
-async function getLLMService(orgId) {
-  const provider = await getOrgDefaultProvider(orgId);
-  const { key } = await resolveApiKey(provider, orgId);
-  if (!key) return null;
+// =====================================================================
+// 6. INCIDENT RESPONSE PLANS
+// =====================================================================
+async function generateIncidentResponsePlan({ organizationId, incidentType, provider, model }) {
+  const assets = await pool.query(`
+    SELECT a.name, a.hostname, a.ip_address, ac.code as category,
+      a.criticality, a.security_classification, e.name as environment
+    FROM assets a
+    JOIN asset_categories ac ON ac.id = a.category_id
+    LEFT JOIN environments e ON e.id = a.environment_id
+    WHERE a.organization_id = $1 ORDER BY a.criticality LIMIT 50
+  `, [organizationId]);
 
-  const p = provider.toLowerCase();
-  const defaultModel = await getOrgDefaultModel(orgId);
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'controls'),
+    messages: [{ role: 'user', content: `Generate an incident response plan for: ${incidentType || 'General cybersecurity incident'}
 
+Organization Asset Inventory:
+${compactJSON(assets.rows)}
+
+Generate a complete IR plan with:
+1. Incident Classification & Severity Matrix
+2. Detection & Identification procedures
+3. Containment Strategy (short-term and long-term)
+4. Eradication Steps
+5. Recovery Procedures with asset-specific actions
+6. Post-Incident Review checklist
+7. Communication plan (internal stakeholders, regulators, affected parties)
+8. Evidence preservation requirements
+9. Regulatory notification requirements (GDPR 72hr, HIPAA, etc.)
+10. Roles and responsibilities matrix` }]
+  });
+}
+
+// =====================================================================
+// 7. BOARD/EXECUTIVE REPORTS
+// =====================================================================
+async function generateExecutiveReport({ organizationId, provider, model }) {
+  const stats = await pool.query(`
+    SELECT f.code, f.name,
+      COUNT(fc.id) as total,
+      COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') as implemented,
+      COUNT(ci.id) FILTER (WHERE ci.status = 'in_progress') as in_progress,
+      ROUND(COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::numeric / NULLIF(COUNT(fc.id),0) * 100, 1) as pct
+    FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id
+    JOIN framework_controls fc ON fc.framework_id = f.id
+    LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+    WHERE of2.organization_id = $1
+    GROUP BY f.id, f.code, f.name ORDER BY f.name
+  `, [organizationId]);
+
+  const assetStats = await pool.query(`
+    SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE criticality = 'critical') as critical,
+      COUNT(*) FILTER (WHERE criticality = 'high') as high
+    FROM assets WHERE organization_id = $1
+  `, [organizationId]);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', 'executive compliance report board risk business impact', 'risk'),
+    messages: [{ role: 'user', content: `Generate a board-ready executive compliance report.
+
+Compliance Status by Framework:
+${compactJSON(stats.rows)}
+
+Asset Summary: ${JSON.stringify(assetStats.rows[0])}
+
+Generate a professional executive report including:
+1. Executive Summary (2-3 paragraphs, non-technical)
+2. Overall Compliance Score with trend indicator
+3. Framework-by-framework breakdown with RAG status (Red/Amber/Green)
+4. Top 5 risks requiring board attention
+5. Key achievements since last report
+6. Resource requirements and budget considerations
+7. Recommended board actions / decisions needed
+8. 90-day outlook and next milestones` }],
+    feature: 'executive_report',
+    maxTokens: 3072
+  });
+}
+
+// =====================================================================
+// 8. RISK HEATMAP
+// =====================================================================
+async function generateRiskHeatmap({ organizationId, provider, model }) {
+  // Use cache and deduplication to prevent redundant AI calls
+  const cacheProvider = provider || 'default';
+  const cacheModel = model || 'default';
+  return withCacheAndDedup(`risk-heatmap:${organizationId}:${cacheProvider}:${cacheModel}`, async () => {
+    const [assets, controlGaps] = await Promise.all([
+      pool.query(`
+        SELECT a.name, ac.code as category, a.criticality, a.security_classification,
+          a.status, e.name as environment
+        FROM assets a
+        JOIN asset_categories ac ON ac.id = a.category_id
+        LEFT JOIN environments e ON e.id = a.environment_id
+        WHERE a.organization_id = $1
+      `, [organizationId]),
+      pool.query(`
+        SELECT f.code as framework, fc.control_id, fc.title, fc.priority
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+        WHERE of2.organization_id = $1 AND (ci.status IS NULL OR ci.status = 'not_started')
+        AND fc.priority::int <= 2
+        ORDER BY fc.priority LIMIT 50
+      `, [organizationId])
+    ]);
+
+    return chat({
+      provider, model, organizationId,
+      systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'risk'),
+      messages: [{ role: 'user', content: `Generate a risk heatmap analysis.
+
+Assets:
+${compactJSON(assets.rows)}
+
+Priority 1-2 Control Gaps:
+${compactJSON(controlGaps.rows)}
+
+Provide:
+1. Risk matrix (Likelihood x Impact) with specific items placed in each cell
+2. Top 10 highest risk items with scores and justification
+3. Risk by category (assets, controls, processes)
+4. Risk by environment (production vs staging vs dev)
+5. Trend analysis and emerging risks
+6. Risk acceptance recommendations vs mitigation priorities
+7. Return data in a structured JSON section for heatmap visualization:
+   { "heatmapData": [{ "item": "name", "likelihood": 1-5, "impact": 1-5, "category": "..." }] }` }]
+    });
+  });
+}
+
+// =====================================================================
+// 9. VENDOR RISK ASSESSMENT
+// =====================================================================
+async function assessVendorRisk({ organizationId, vendorInfo, provider, model }) {
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'risk'),
+    messages: [{ role: 'user', content: `Perform a third-party vendor risk assessment.
+
+Vendor Information:
+${compactJSON(vendorInfo)}
+
+Provide:
+1. Overall vendor risk score (1-100) with justification
+2. Risk breakdown by category:
+   - Data security & privacy
+   - Business continuity
+   - Regulatory compliance
+   - Financial stability
+   - Operational resilience
+3. Key risk factors identified
+4. Required contractual controls
+5. Recommended monitoring frequency
+6. Questionnaire items to send to the vendor
+7. Due diligence checklist
+8. Compliance framework alignment (which controls does this vendor impact)` }]
+  });
+}
+
+// =====================================================================
+// 10. AUDIT READINESS SCORE
+// =====================================================================
+async function assessAuditReadiness({ organizationId, framework, provider, model }) {
+  // Use cache and deduplication to prevent redundant AI calls
+  const cacheProvider = provider || 'default';
+  const cacheModel = model || 'default';
+  const cacheFramework = framework || 'all';
+  return withCacheAndDedup(`audit-readiness:${organizationId}:${cacheFramework}:${cacheProvider}:${cacheModel}`, async () => {
+    let fwFilter = '';
+    const params = [organizationId];
+    if (framework) {
+      fwFilter = ' AND f.code = $2';
+      params.push(framework);
+    }
+
+    const [data, evidence] = await Promise.all([
+      pool.query(`
+        SELECT f.code, f.name, fc.control_id, fc.title, fc.priority,
+          COALESCE(ci.status, 'not_started') as status,
+          ci.notes, ci.created_at as last_update
+        FROM organization_frameworks of2
+        JOIN frameworks f ON f.id = of2.framework_id
+        JOIN framework_controls fc ON fc.framework_id = f.id
+        LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+        WHERE of2.organization_id = $1${fwFilter}
+        ORDER BY fc.priority, f.code
+      `, params),
+      pool.query(`
+        SELECT COUNT(*) as total_evidence,
+          COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '90 days') as recent_evidence
+        FROM evidence WHERE organization_id = $1
+      `, [organizationId])
+    ]);
+
+    return chat({
+      provider, model, organizationId,
+      systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', `audit readiness assessment ${framework || ''} evidence controls documentation`, 'audit'),
+      messages: [{ role: 'user', content: `Assess audit readiness${framework ? ' for ' + framework : ''}.
+
+Control Status:
+${JSON.stringify(data.rows.slice(0, 100), null, 2)}
+
+Evidence Stats: ${JSON.stringify(evidence.rows[0])}
+
+Provide:
+1. Overall Audit Readiness Score (0-100) with letter grade
+2. Category-by-category readiness breakdown
+3. Items an auditor would flag as findings
+4. Missing evidence gaps
+5. Controls with stale documentation (>90 days since update)
+6. Recommended pre-audit actions (prioritized checklist)
+7. Estimated time to become audit-ready
+8. Sample auditor questions and suggested responses` }],
+      feature: 'audit_readiness',
+      maxTokens: 3072
+    });
+  });
+}
+
+// =====================================================================
+// 11. ASSET-TO-CONTROL MAPPING
+// =====================================================================
+async function mapAssetsToControls({ organizationId, provider, model }) {
+  const assets = await pool.query(`
+    SELECT a.id, a.name, ac.code as category, a.criticality,
+      a.security_classification, a.hostname, a.cloud_provider,
+      a.ai_model_type, a.ai_risk_level
+    FROM assets a JOIN asset_categories ac ON ac.id = a.category_id
+    WHERE a.organization_id = $1 ORDER BY a.criticality LIMIT 30
+  `, [organizationId]);
+
+  const frameworks = await pool.query(`
+    SELECT f.code, f.name FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id WHERE of2.organization_id = $1
+  `, [organizationId]);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'controls'),
+    messages: [{ role: 'user', content: `Map assets to applicable compliance controls.
+
+Assets:
+${compactJSON(assets.rows)}
+
+Adopted Frameworks: ${JSON.stringify(frameworks.rows)}
+
+For each asset, identify:
+1. Which framework controls directly apply to this asset type
+2. Priority of each control-asset pairing (Critical/High/Medium/Low)
+3. Any gaps where assets lack required controls
+4. Recommended control implementations per asset category
+5. Return structured mapping data:
+   { "mappings": [{ "asset": "name", "controls": [{ "id": "XX-1", "framework": "code", "priority": "high", "reason": "..." }] }] }` }]
+  });
+}
+
+// =====================================================================
+// 12. SHADOW IT DETECTION
+// =====================================================================
+async function detectShadowIT({ organizationId, provider, model }) {
+  const assets = await pool.query(`
+    SELECT a.name, ac.code as category, a.hostname, a.ip_address, a.cloud_provider,
+      a.status, a.security_classification, e.name as environment
+    FROM assets a JOIN asset_categories ac ON ac.id = a.category_id
+    LEFT JOIN environments e ON e.id = a.environment_id
+    WHERE a.organization_id = $1
+  `, [organizationId]);
+
+  const controls = await pool.query(`
+    SELECT f.code, fc.control_id, fc.title FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id
+    JOIN framework_controls fc ON fc.framework_id = f.id
+    WHERE of2.organization_id = $1
+    AND (fc.title ILIKE '%inventory%' OR fc.title ILIKE '%asset%' OR fc.title ILIKE '%configuration%')
+  `, [organizationId]);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'lean'),
+    messages: [{ role: 'user', content: `Analyze asset inventory for potential Shadow IT gaps.
+
+Registered Assets:
+${compactJSON(assets.rows)}
+
+Asset-related Controls:
+${compactJSON(controls.rows)}
+
+Analyze and provide:
+1. Categories of assets that are typically present but missing from inventory
+2. Common Shadow IT patterns based on the current asset profile
+3. Specific asset types that should be investigated
+4. Questions to ask department heads about undocumented systems
+5. Automated discovery recommendations (tools and techniques)
+6. Risk exposure from potential unregistered assets
+7. Compliance impact of Shadow IT on adopted frameworks` }]
+  });
+}
+
+// =====================================================================
+// 13. AI/ML MODEL GOVERNANCE CHECKS
+// =====================================================================
+async function checkAIGovernance({ organizationId, provider, model }) {
+  const aiAssets = await pool.query(`
+    SELECT a.name, a.ai_model_type, a.ai_risk_level, a.ai_training_data_source,
+      a.ai_bias_testing_completed, a.ai_bias_testing_date, a.ai_human_oversight_required,
+      a.status, a.version
+    FROM assets a JOIN asset_categories ac ON ac.id = a.category_id
+    WHERE a.organization_id = $1 AND ac.code = 'ai_agent'
+  `, [organizationId]);
+
+  const aiControls = await pool.query(`
+    SELECT f.code, f.name, fc.control_id, fc.title, COALESCE(ci.status, 'not_started') as status
+    FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id
+    JOIN framework_controls fc ON fc.framework_id = f.id
+    LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+    WHERE of2.organization_id = $1
+    AND f.code IN ('eu_ai_act', 'nist_ai_rmf', 'iso_42001', 'iso_42005', 'aiuc_1')
+  `, [organizationId]);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'ai_governance'),
+    messages: [{ role: 'user', content: `Perform AI/ML model governance assessment.
+
+AI Assets:
+${compactJSON(aiAssets.rows)}
+
+AI Governance Controls:
+${compactJSON(aiControls.rows)}
+
+Assess:
+1. EU AI Act compliance status per AI asset (risk classification, conformity assessment)
+2. NIST AI RMF alignment check
+3. ISO/IEC 42001 AI management system alignment (governance and operational controls)
+4. ISO/IEC 42005 AI system impact assessment coverage
+5. Bias testing gaps and recommendations
+6. Data governance status for training data
+7. Human oversight requirements vs current implementation
+8. Model documentation completeness
+9. Transparency and explainability gaps
+10. AIUC-1 agentic AI certification readiness (Data & Privacy, Security, Safety, Reliability, Accountability, Societal Impact)
+11. Recommended governance actions prioritized by risk level` }]
+  });
+}
+
+// =====================================================================
+// 14. NATURAL LANGUAGE COMPLIANCE QUERY
+// =====================================================================
+async function queryCompliance({ organizationId, question, provider, model }) {
+  const stats = await pool.query(`
+    SELECT f.code, f.name,
+      COUNT(fc.id) as total, COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') as implemented,
+      ROUND(COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::numeric / NULLIF(COUNT(fc.id),0) * 100, 1) as pct
+    FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id
+    JOIN framework_controls fc ON fc.framework_id = f.id
+    LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+    WHERE of2.organization_id = $1 GROUP BY f.id, f.code, f.name
+  `, [organizationId]);
+
+  const assetCount = await pool.query('SELECT COUNT(*) as count FROM assets WHERE organization_id = $1', [organizationId]);
+  const evidenceCount = await pool.query('SELECT COUNT(*) as count FROM evidence WHERE organization_id = $1', [organizationId]);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, "Answer the user's compliance question based on their actual data. Be specific and cite numbers.", 'compact', null, 'copilot'),
+    messages: [{ role: 'user', content: `Question: ${question}
+
+Organization Data:
+- Framework Compliance: ${JSON.stringify(stats.rows)}
+- Total Assets: ${assetCount.rows[0].count}
+- Total Evidence: ${evidenceCount.rows[0].count}
+
+Answer the question thoroughly based on this data.` }]
+  });
+}
+
+// =====================================================================
+// 15. TRAINING RECOMMENDATIONS
+// =====================================================================
+async function recommendTraining({ organizationId, provider, model }) {
+  const gaps = await pool.query(`
+    SELECT f.code, fc.control_id, fc.title, fc.priority
+    FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id
+    JOIN framework_controls fc ON fc.framework_id = f.id
+    LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+    WHERE of2.organization_id = $1 AND (ci.status IS NULL OR ci.status = 'not_started')
+    ORDER BY fc.priority LIMIT 50
+  `, [organizationId]);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'lean'),
+    messages: [{ role: 'user', content: `Recommend security awareness training based on compliance gaps.
+
+Unimplemented Controls:
+${compactJSON(gaps.rows)}
+
+Provide:
+1. Priority training topics based on gaps (ranked)
+2. Target audience for each topic (IT, management, all staff, developers)
+3. Recommended training format (online, hands-on, workshop)
+4. Suggested training providers/resources
+5. Training schedule recommendation
+6. How each training topic maps to specific control gaps
+7. KPIs to measure training effectiveness` }]
+  });
+}
+
+// =====================================================================
+// 16. EVIDENCE COLLECTION ASSISTANT
+// =====================================================================
+async function suggestEvidence({ controlId, organizationId, provider, model, schemaRetryHint = null }) {
+  const control = await pool.query(`
+    SELECT fc.*, f.code as framework_code, f.name as framework_name
+    FROM framework_controls fc JOIN frameworks f ON f.id = fc.framework_id WHERE fc.id = $1
+  `, [controlId]);
+
+  if (control.rows.length === 0) throw new Error('Control not found');
+
+  const retryBlock = schemaRetryHint ? `\n\n[CORRECTION REQUIRED]\n${schemaRetryHint}` : '';
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'evidence'),
+    messages: [{ role: 'user', content: `Suggest evidence artifacts for this control.${buildFewShotBlock('evidence_suggestion')}
+
+Control: ${compactJSON(control.rows[0])}
+
+Return a JSON object with:
+- control_id, control_title, framework
+- evidence_items: array of { title, description, collection_method, format, freshness_days, automation_possible, automation_hint, example_filename, sufficiency_criteria }
+- collection_notes: string
+- estimated_collection_hours: number${retryBlock}` }],
+    feature: 'evidence_suggestion'
+  });
+}
+
+// =====================================================================
+// BONUS: CONTROL ANALYSIS (existing feature)
+// =====================================================================
+async function analyzeControl({ controlId, organizationId, provider, model }) {
+  const control = await pool.query(`
+    SELECT fc.*, f.code as framework_code, f.name as framework_name,
+      COALESCE(ci.status, 'not_started') as impl_status
+    FROM framework_controls fc
+    JOIN frameworks f ON f.id = fc.framework_id
+    LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
+    WHERE fc.id = $2
+  `, [organizationId, controlId]);
+
+  if (control.rows.length === 0) throw new Error('Control not found');
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'controls'),
+    messages: [{ role: 'user', content: `Analyze this control and provide implementation guidance.
+
+Control: ${compactJSON(control.rows[0])}
+
+Provide:
+1. Plain-English explanation of what this control requires
+2. Implementation approach for a mid-size organization
+3. Technical vs procedural requirements
+4. Estimated implementation effort
+5. Key evidence artifacts needed
+6. Related controls and dependencies` }]
+  });
+}
+
+// =====================================================================
+// BONUS: GENERATE TEST PROCEDURES
+// =====================================================================
+async function generateTestProcedures({ controlId, organizationId, provider, model, schemaRetryHint = null }) {
+  const control = await pool.query(`
+    SELECT fc.*, f.code as framework_code FROM framework_controls fc
+    JOIN frameworks f ON f.id = fc.framework_id WHERE fc.id = $1
+  `, [controlId]);
+
+  if (control.rows.length === 0) throw new Error('Control not found');
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'controls'),
+    messages: [{ role: 'user', content: `Generate test procedures for this control.${buildFewShotBlock('test_procedures')}
+
+Control: ${compactJSON(control.rows[0])}
+
+Provide:
+1. Test objective
+2. Test steps (numbered, detailed)
+3. Expected results for pass/fail
+4. Sample sizes and frequency
+5. Automation scripts where applicable
+6. Evidence to collect during testing${schemaRetryHint ? `\n\n[CORRECTION REQUIRED]\n${schemaRetryHint}` : ''}` }],
+    feature: 'test_procedures'
+  });
+}
+
+// =====================================================================
+// BONUS: ASSET RISK ANALYSIS
+// =====================================================================
+async function analyzeAssetRisk({ assetId, organizationId, provider, model }) {
+  const asset = await pool.query(`
+    SELECT a.*, ac.name as category_name, ac.code as category_code, e.name as environment_name
+    FROM assets a JOIN asset_categories ac ON ac.id = a.category_id
+    LEFT JOIN environments e ON e.id = a.environment_id
+    WHERE a.id = $1 AND a.organization_id = $2
+  `, [assetId, organizationId]);
+
+  if (asset.rows.length === 0) throw new Error('Asset not found');
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'risk'),
+    messages: [{ role: 'user', content: `Perform a risk analysis on this asset.
+
+Asset: ${compactJSON(asset.rows[0])}
+
+Provide:
+1. Risk score (1-100) with justification
+2. Threat vectors specific to this asset type
+3. Vulnerability assessment areas
+4. Compliance requirements (which frameworks apply)
+5. Recommended security controls
+6. Monitoring recommendations` }]
+  });
+}
+
+// =====================================================================
+// BONUS: POLICY GENERATOR
+// =====================================================================
+async function generatePolicy({ policyType, organizationId, provider, model }) {
+  const frameworks = await pool.query(`
+    SELECT f.code, f.name FROM organization_frameworks of2
+    JOIN frameworks f ON f.id = of2.framework_id WHERE of2.organization_id = $1
+  `, [organizationId]);
+
+  return chat({
+    provider, model, organizationId, maxTokens: 8192,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'policy'),
+    messages: [{ role: 'user', content: `Generate a comprehensive ${policyType} policy document.
+
+Adopted Frameworks: ${JSON.stringify(frameworks.rows)}
+
+Generate a complete, professional policy including:
+1. Policy title, version, effective date placeholders
+2. Purpose and scope
+3. Policy statements (specific, actionable)
+4. Roles and responsibilities
+5. Procedures and standards
+6. Compliance and enforcement
+7. Related policies and references
+8. Revision history template
+Map requirements to the organization's adopted frameworks where applicable.` }]
+  });
+}
+
+// =====================================================================
+// AUDITOR AI: PBC REQUEST DRAFTING
+// =====================================================================
+async function generateAuditPbcDraft({
+  organizationId,
+  provider,
+  model,
+  requestContext,
+  controlId,
+  frameworkCode,
+  dueDate,
+  priority,
+  templateStandard
+}) {
+  if (!requestContext || !String(requestContext).trim()) {
+    throw new Error('requestContext is required');
+  }
+
+  let control = null;
+  if (controlId) {
+    const controlResult = await pool.query(`
+      SELECT fc.control_id, fc.title, fc.description, f.code as framework_code, f.name as framework_name
+      FROM framework_controls fc
+      JOIN frameworks f ON f.id = fc.framework_id
+      WHERE fc.id = $1
+      LIMIT 1
+    `, [controlId]);
+    control = controlResult.rows[0] || null;
+  }
+
+  const recentResults = await pool.query(`
+    SELECT ar.status, ar.risk_level, ar.finding, ar.evidence_collected,
+      ap.procedure_id, ap.title AS procedure_title, fc.control_id, f.code AS framework_code
+    FROM assessment_results ar
+    JOIN assessment_procedures ap ON ap.id = ar.assessment_procedure_id
+    JOIN framework_controls fc ON fc.id = ap.framework_control_id
+    JOIN frameworks f ON f.id = fc.framework_id
+    WHERE ar.organization_id = $1
+    ORDER BY COALESCE(ar.assessed_at, ar.updated_at, ar.created_at) DESC
+    LIMIT 20
+  `, [organizationId]);
+
+  return chat({
+    provider,
+    model,
+    organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, 'You are helping an auditor draft request-for-evidence (PBC) items.', 'compact', null, 'audit'),
+    messages: [{
+      role: 'user',
+      content: `Draft a high-quality PBC (Provided By Client) request that is auditor-ready.
+
+Audit Request Context:
+${requestContext}
+
+Optional Metadata:
+- frameworkCode: ${frameworkCode || 'not provided'}
+- controlId: ${controlId || 'not provided'}
+- dueDate: ${dueDate || 'not provided'}
+- priority: ${priority || 'not provided'}
+
+Template Standard (follow this structure and tone when provided):
+${templateStandard || 'No custom template provided.'}
+
+Control Context (if available):
+${compactJSON(control)}
+
+Recent Assessment Context:
+${compactJSON(recentResults.rows)}
+
+Return:
+1. PBC request title
+2. Exact artifacts requested (bulleted list)
+3. Period covered and sampling expectations
+4. Acceptance criteria (what makes evidence sufficient)
+5. Follow-up questions if evidence is incomplete
+6. A JSON block:
+{
+  "title": "...",
+  "request_details": "...",
+  "requested_artifacts": ["..."],
+  "acceptance_criteria": ["..."],
+  "suggested_due_date": "${dueDate || ''}",
+  "priority": "${priority || 'medium'}"
+}`
+    }]
+  });
+}
+
+// =====================================================================
+// AUDITOR AI: WORKPAPER DRAFTING
+// =====================================================================
+async function generateAuditWorkpaperDraft({
+  organizationId,
+  provider,
+  model,
+  controlId,
+  objective,
+  procedurePerformed,
+  evidenceSummary,
+  testOutcome,
+  templateStandard
+}) {
+  if (!objective || !String(objective).trim()) {
+    throw new Error('objective is required');
+  }
+
+  let control = null;
+  if (controlId) {
+    const controlResult = await pool.query(`
+      SELECT fc.control_id, fc.title, fc.description, f.code as framework_code, f.name as framework_name
+      FROM framework_controls fc
+      JOIN frameworks f ON f.id = fc.framework_id
+      WHERE fc.id = $1
+      LIMIT 1
+    `, [controlId]);
+    control = controlResult.rows[0] || null;
+  }
+
+  return chat({
+    provider,
+    model,
+    organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, 'You are helping an auditor draft formal workpaper narratives.', 'compact', null, 'audit'),
+    messages: [{
+      role: 'user',
+      content: `Draft an auditor workpaper narrative.
+
+Control Context:
+${compactJSON(control)}
+
+Inputs:
+- Objective: ${objective}
+- Procedure Performed: ${procedurePerformed || 'not provided'}
+- Evidence Summary: ${evidenceSummary || 'not provided'}
+- Test Outcome: ${testOutcome || 'not provided'}
+
+Template Standard (follow this structure and tone when provided):
+${templateStandard || 'No custom template provided.'}
+
+Return:
+1. Workpaper title
+2. Objective section
+3. Scope and sampling section
+4. Procedure performed (auditor-style narrative)
+5. Results and exceptions
+6. Conclusion with alignment to control intent
+7. Reviewer checklist
+8. A JSON block:
+{
+  "title": "...",
+  "objective": "...",
+  "procedure_performed": "...",
+  "conclusion": "...",
+  "status_recommendation": "draft|in_review|finalized"
+}`
+    }]
+  });
+}
+
+// =====================================================================
+// AUDITOR AI: FINDING DRAFTING
+// =====================================================================
+async function generateAuditFindingDraft({
+  organizationId,
+  provider,
+  model,
+  controlId,
+  issueSummary,
+  evidenceSummary,
+  severityHint,
+  recommendationScope,
+  templateStandard,
+  schemaRetryHint = null
+}) {
+  if (!issueSummary || !String(issueSummary).trim()) {
+    throw new Error('issueSummary is required');
+  }
+
+  let control = null;
+  if (controlId) {
+    const controlResult = await pool.query(`
+      SELECT fc.control_id, fc.title, fc.description, f.code as framework_code, f.name as framework_name
+      FROM framework_controls fc
+      JOIN frameworks f ON f.id = fc.framework_id
+      WHERE fc.id = $1
+      LIMIT 1
+    `, [controlId]);
+    control = controlResult.rows[0] || null;
+  }
+
+  const peerFindings = await pool.query(`
+    SELECT status, risk_level, finding
+    FROM assessment_results
+    WHERE organization_id = $1
+      AND status = 'other_than_satisfied'
+      AND finding IS NOT NULL
+    ORDER BY COALESCE(assessed_at, updated_at, created_at) DESC
+    LIMIT 10
+  `, [organizationId]);
+
+  const retryBlock = schemaRetryHint ? `\n\n[CORRECTION REQUIRED]\n${schemaRetryHint}` : '';
+
+  return chat({
+    provider,
+    model,
+    organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, 'You are helping an auditor draft findings using observation/criteria/cause/effect format.', 'compact', null, 'audit'),
+    messages: [{
+      role: 'user',
+      content: `Draft a formal audit finding.${buildFewShotBlock('finding')}
+
+Control Context:
+${compactJSON(control)}
+
+Inputs:
+- Issue Summary: ${issueSummary}
+- Evidence Summary: ${evidenceSummary || 'not provided'}
+- Severity Hint: ${severityHint || 'not provided'}
+- Recommendation Scope: ${recommendationScope || 'not provided'}
+
+Template Standard (follow this structure and tone when provided):
+${templateStandard || 'No custom template provided.'}
+
+Recent Comparable Findings:
+${compactJSON(peerFindings.rows)}
+
+Return a JSON object with:
+{
+  "title": "...",
+  "severity": "low|medium|high|critical",
+  "criteria": "...",
+  "condition": "...",
+  "cause": "...",
+  "effect": "...",
+  "recommendation": "...",
+  "management_response_placeholder": "...",
+  "related_controls": ["..."],
+  "repeat_finding": false
+}${retryBlock}`
+    }]
+  });
+}
+
+// ---------- Usage tracking ----------
+/**
+ * Log an AI call to ai_usage_log.
+ * @param {string} organizationId
+ * @param {string} userId
+ * @param {string} feature
+ * @param {string} provider
+ * @param {string|null} model
+ * @param {object} [opts] - Extended fields: success, errorMessage, tokensInput, tokensOutput,
+ *                          resourceType, resourceId, ipAddress, durationMs, byokUsed
+ */
+async function logAIUsage(organizationId, userId, feature, provider, model, opts = {}) {
+  const {
+    success = true,
+    errorMessage = null,
+    tokensInput = null,
+    tokensOutput = null,
+    resourceType = null,
+    resourceId = null,
+    ipAddress = null,
+    durationMs = null,
+    byokUsed = false,
+  } = opts;
+
+  await pool.query(`
+    INSERT INTO ai_usage_log
+      (organization_id, user_id, feature, provider, model,
+       success, error_message, tokens_input, tokens_output,
+       resource_type, resource_id, ip_address, duration_ms, byok_used, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+  `, [organizationId, userId, feature, provider, model,
+      success, errorMessage, tokensInput, tokensOutput,
+      resourceType, resourceId, ipAddress, durationMs, byokUsed]);
+}
+
+// High-stakes features that warrant a full ai_decision_log entry
+const HIGH_STAKES_FEATURES = new Set([
+  'gap_analysis', 'compliance_forecast', 'remediation_playbook',
+  'incident_response', 'executive_report', 'risk_heatmap', 'vendor_risk'
+]);
+
+// Map feature → primary regulatory framework for traceability
+function inferRegulatoryFramework(feature) {
+  switch (feature) {
+    case 'gap_analysis':
+    case 'compliance_forecast':
+      return 'Multi-framework';
+    case 'remediation_playbook':
+    case 'incident_response':
+      return 'NIST 800-53';
+    case 'executive_report':
+      return 'SOC 2';
+    case 'risk_heatmap':
+    case 'vendor_risk':
+      return 'ISO 27001';
+    default:
+      return 'Multi-framework';
+  }
+}
+
+/**
+ * Lightweight heuristic bias detection on AI outputs.
+ * Returns an array of flag objects: [{ type, severity, detail }]
+ * Never throws — bias detection errors are swallowed.
+ */
+function detectBiasFlags(feature, outputText) {
+  if (!outputText || typeof outputText !== 'string') return [];
+  const flags = [];
+  const text = outputText.toLowerCase();
+
+  // Subjectivity signals in executive reports
+  if (feature === 'executive_report') {
+    const subjectiveTerms = ['significantly', 'extremely', 'very high', 'very low', 'clearly indicates'];
+    for (const term of subjectiveTerms) {
+      if (text.includes(term)) {
+        flags.push({ type: 'subjectivity', severity: 'low', detail: `Output uses subjective qualifier "${term}" without quantitative basis.` });
+        break;
+      }
+    }
+  }
+
+  // Vendor-specific naming without evidence in vendor risk
+  if (feature === 'vendor_risk') {
+    const vendorPattern = /\b(company|vendor|supplier|provider)\s+[A-Z][a-z]+\b/;
+    if (vendorPattern.test(outputText)) {
+      flags.push({ type: 'vendor_naming', severity: 'medium', detail: 'Output references specific named entities — verify findings are evidence-based, not assumption-based.' });
+    }
+  }
+
+  // Recommendation inconsistency in remediation
+  if (feature === 'remediation_playbook') {
+    const frameworkCount = (text.match(/nist|iso|soc\s*2|hipaa|gdpr|pci/g) || []).length;
+    if (frameworkCount > 4) {
+      flags.push({ type: 'framework_inconsistency', severity: 'low', detail: `Output references ${frameworkCount} frameworks — verify recommendations are consistent across all.` });
+    }
+  }
+
+  return flags;
+}
+
+/**
+ * Write to ai_decision_log for high-stakes AI outputs.
+ * Captures SHA-256 hashes of input and output for integrity verification.
+ * @param {object} opts - { organizationId, feature, inputText, outputText, modelVersion, correlationId, sessionId, resourceType, resourceId }
+ */
+async function logAIDecision(organizationId, feature, inputText, outputText, opts = {}) {
+  if (!HIGH_STAKES_FEATURES.has(feature)) return;
+  try {
+    const inputHash  = crypto.createHash('sha256').update(inputText  || '').digest('hex');
+    const outputHash = crypto.createHash('sha256').update(outputText || '').digest('hex');
+    const riskLevel  = ['incident_response', 'remediation_playbook'].includes(feature) ? 'high' : 'limited';
+    const regulatoryFramework = inferRegulatoryFramework(feature);
+    const biasFlags = detectBiasFlags(feature, outputText);
+
+    // Ensure input/output are valid JSON before inserting into jsonb columns
+    const safeInput  = (() => { try { JSON.parse(inputText  || '""'); return inputText  || '""'; } catch { return JSON.stringify({ text: inputText  || '' }); } })();
+    const safeOutput = (() => { try { JSON.parse(outputText || '""'); return outputText || '""'; } catch { return JSON.stringify({ text: outputText || '' }); } })();
+
+    await pool.query(`
+      INSERT INTO ai_decision_log
+        (organization_id, input_data, input_hash, output_data, output_hash,
+         human_reviewed, risk_level, regulatory_framework, model_version,
+         correlation_id, session_id, processing_timestamp, bias_flags, bias_reviewed,
+         data_lineage)
+      VALUES ($1, $2::jsonb, $3, $4::jsonb, $5, false, $6, $7, $8, $9, $10, NOW(), $11::jsonb, false, $12)
+    `, [
+      organizationId,
+      safeInput,
+      inputHash,
+      safeOutput,
+      outputHash,
+      riskLevel,
+      regulatoryFramework,
+      opts.modelVersion || null,
+      opts.correlationId || null,
+      opts.sessionId || null,
+      JSON.stringify(biasFlags),
+      opts.dataLineage || null
+    ]);
+  } catch (err) {
+    // Non-critical — never block the response due to logging failure
+    console.error('logAIDecision error:', err.message);
+  }
+}
+
+async function getUsageCount(organizationId) {
+  // Only count successful calls — failed attempts should not burn the monthly quota
+  const result = await pool.query(`
+    SELECT COUNT(*) as count FROM ai_usage_log
+    WHERE organization_id = $1
+      AND created_at >= DATE_TRUNC('month', NOW())
+      AND (success IS NULL OR success = true)
+  `, [organizationId]);
+  return parseInt(result.rows[0].count);
+}
+
+function getUsageLimit(tier) {
+  return getAiUsageLimit(tier);
+}
+
+// ---------- Provider status ----------
+function getProviderStatus(orgKeys = {}) {
   return {
-    provider: p,
-    key,
-    call: (model, systemPrompt, messages) => callProvider(p, key, model, systemPrompt, messages),
-    /**
-     * Convenience helper for legacy single-prompt callers.
-     * @param {string} prompt
-     * @param {{ model?: string | null, systemPrompt?: string | null }} [options]
-     * @returns {Promise<string>}
-     */
-    generateText: (prompt, options = {}) => callProvider(
-      p,
-      key,
-      options.model || defaultModel || null,
-      options.systemPrompt || null,
-      [{ role: 'user', content: String(prompt || '') }]
-    ),
+    claude:  { available: !!orgKeys.claude, models: PROVIDERS.claude.models },
+    openai:  { available: !!orgKeys.openai, models: PROVIDERS.openai.models },
+    gemini:  { available: !!orgKeys.gemini, models: PROVIDERS.gemini.models },
+    grok:    { available: !!orgKeys.grok, models: PROVIDERS.grok.models },
+    groq:    { available: !!orgKeys.groq, models: PROVIDERS.groq.models },
+    ollama:  { available: !!orgKeys.ollama, models: PROVIDERS.ollama.models }
   };
 }
 
-// ---------------------------------------------------------------------------
-// Feature system prompts
-// ---------------------------------------------------------------------------
+// =====================================================================
+// TPRM: GENERATE VENDOR QUESTIONNAIRE
+// =====================================================================
+async function generateVendorQuestionnaire({ organizationId, vendorInfo, provider, model }) {
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'risk'),
+    messages: [{
+      role: 'user',
+      content: `Generate a security questionnaire for a third-party vendor to assess their security posture and compliance.
 
-const FEATURE_PROMPTS = {
-  gapAnalysis: `You are a GRC gap analysis expert. Analyze the organization's current compliance posture against the target framework. Identify gaps, prioritize them by risk, and suggest remediation steps. Return your analysis as structured JSON with keys: "gaps" (array of { controlId, gapDescription, severity, recommendation }), "overallScore" (0-100), and "summary".`,
+Vendor Information:
+${compactJSON(vendorInfo)}
 
-  crosswalk: `You are a compliance framework crosswalk specialist. Map controls between frameworks, identifying overlaps and unique requirements. Optimize the crosswalk to reduce redundant effort. Return JSON with keys: "mappings" (array of { sourceControl, targetControl, overlapPercentage, notes }), "efficiencyGain", and "recommendations".`,
+Create a comprehensive questionnaire with 15-20 questions covering:
+1. Information Security Program (policies, ISMS, certifications)
+2. Data Protection & Privacy (data handling, encryption, retention, GDPR/CCPA)
+3. Access Control & Identity Management (MFA, PAM, least privilege)
+4. Incident Response & Business Continuity (IR plan, RTO/RPO, BCP testing)
+5. Vulnerability Management (patching, pen testing, vulnerability scanning)
+6. Supply Chain & Subprocessors (fourth-party risk, subprocessor list)
+7. Physical Security (data center controls, media disposal)
 
-  complianceForecast: `You are a predictive compliance analyst. Forecast the organization's compliance trajectory based on current trends, resource allocation, and regulatory changes. Return JSON with keys: "forecast" (array of { timeframe, complianceScore, risks, opportunities }), "keyDrivers", and "recommendations".`,
+Return a JSON array of question objects. Each object must have:
+- id: sequential string (e.g., "Q1", "Q2")
+- category: one of the categories above
+- question: the question text
+- type: "yes_no", "text", "multiple_choice", or "rating_1_5"
+- options: array of strings (only for multiple_choice type, otherwise omit)
+- required: boolean
+- guidance: brief guidance note for the vendor answering the question
 
-  regulatoryMonitor: `You are a regulatory intelligence analyst. Monitor and analyze regulatory changes that may affect the organization's compliance posture. Return JSON with keys: "changes" (array of { regulation, changeType, effectiveDate, impact, requiredActions }), "urgentItems", and "summary".`,
-
-  remediationPlaybook: `You are a compliance remediation specialist. Generate a detailed, step-by-step remediation playbook for the specified control deficiency. Return JSON with keys: "steps" (array of { order, action, owner, timeline, resources, evidence }), "estimatedEffort", "riskReduction", and "dependencies".`,
-
-  vulnerabilityRemediation: `You are a cybersecurity vulnerability remediation expert. Analyze the vulnerability and provide detailed remediation guidance. Return JSON with keys: "vulnerability" (summary), "severity", "remediationSteps" (array), "workarounds", "verificationSteps", and "references".`,
-
-  iavmAssetAlert: `You are an IAVM (Information Assurance Vulnerability Management) specialist. Generate an asset alert for the given IAVM notice. Return JSON with keys: "alertSummary", "affectedAssets", "requiredActions" (array with timelines), "mitigations", and "complianceImpact".`,
-
-  incidentResponse: `You are a cybersecurity incident response expert. Generate a comprehensive incident response plan for the specified incident type. Return JSON with keys: "phases" (array of { name, actions, roles, timeline }), "communicationPlan", "containmentStrategy", "recoverySteps", and "lessonsLearnedTemplate".`,
-
-  executiveReport: `You are a GRC executive reporting specialist. Generate a concise, executive-level compliance report suitable for board presentation. Use markdown formatting with clear headers, bullet points, and key metrics. Include an executive summary, risk highlights, compliance scorecard, and strategic recommendations.`,
-
-  riskHeatmap: `You are a risk visualization expert. Analyze the organization's risk landscape and generate data for a risk heatmap. Return JSON with keys: "risks" (array of { category, likelihood, impact, score, controls, trend }), "hotspots", "recommendations", and "overallRiskLevel".`,
-
-  vendorRisk: `You are a third-party risk management expert. Assess the vendor's risk profile based on the provided information. Return JSON with keys: "riskScore" (0-100), "riskFactors" (array of { category, level, finding, recommendation }), "overallAssessment", "monitoringRecommendations", and "contractualSuggestions".`,
-
-  vendorQuestionnaire: `You are a vendor assessment specialist. Generate a comprehensive vendor risk assessment questionnaire. Return JSON with keys: "sections" (array of { title, questions: [{ id, text, type, required, riskWeight }] }), "scoringMethodology", and "evaluationCriteria".`,
-
-  questionnaireAnalysis: `You are a vendor questionnaire analysis expert. Analyze the vendor's responses to the risk assessment questionnaire. Return JSON with keys: "overallScore", "sectionScores" (array), "redFlags" (array), "strengths" (array), "gaps" (array), "recommendations", and "riskRating".`,
-
-  vendorEvidence: `You are a vendor evidence review specialist. Analyze the submitted evidence against questionnaire responses for consistency and completeness. Return JSON with keys: "evidenceAssessment" (array of { question, evidenceProvided, adequacy, gaps }), "overallAdequacy", "missingEvidence", and "recommendations".`,
-
-  auditReadiness: `You are an audit readiness assessment expert. Evaluate the organization's preparedness for an audit against the specified framework. Return JSON with keys: "readinessScore" (0-100), "areas" (array of { name, status, gaps, actions }), "timeline", "criticalFindings", and "recommendations".`,
-
-  auditPbc: `You are an audit PBC (Prepared by Client) list specialist. Draft a PBC request document for the specified control. Use markdown formatting with clear sections: Request Description, Required Evidence, Due Date, Priority, Responsible Party, and Submission Instructions.`,
-
-  auditWorkpaper: `You are an audit workpaper specialist. Draft a professional audit workpaper document. Use markdown formatting with sections: Objective, Procedure Performed, Evidence Reviewed, Test Results, Findings, and Conclusion.`,
-
-  auditFinding: `You are an audit findings specialist. Draft a formal audit finding document. Use markdown formatting with sections: Finding Title, Control Reference, Condition, Criteria, Cause, Effect, Risk Rating, Recommendation, and Management Response Template.`,
-
-  assetControlMapping: `You are an IT asset and control mapping specialist. Map organizational assets to relevant compliance controls. Return JSON with keys: "mappings" (array of { assetType, controls, coverageGaps }), "unmappedAssets", "recommendations", and "priorityActions".`,
-
-  shadowIT: `You are a shadow IT detection specialist. Analyze the organization's environment for unauthorized or unmanaged IT resources. Return JSON with keys: "findings" (array of { type, description, riskLevel, evidence }), "riskSummary", "recommendations", and "governanceGaps".`,
-
-  aiGovernance: `You are an AI governance and ethics specialist. Evaluate the organization's AI usage against governance frameworks and ethical guidelines. Return JSON with keys: "assessment" (array of { area, status, findings }), "complianceGaps", "ethicalConcerns", "recommendations", and "governanceMaturity".`,
-
-  complianceQuery: `You are a compliance knowledge expert. Answer the compliance question accurately and thoroughly. Cite relevant standards, regulations, and control frameworks. Use markdown formatting for clarity.`,
-
-  trainingRecommendation: `You are a compliance training specialist. Recommend training programs based on the organization's compliance gaps and roles. Return JSON with keys: "recommendations" (array of { title, audience, priority, duration, topics, objectives }), "trainingPlan", and "complianceAlignment".`,
-
-  evidenceSuggestion: `You are a compliance evidence specialist. Suggest appropriate evidence artifacts for the specified control. Return JSON with keys: "suggestions" (array of { type, description, source, frequency, automatable }), "bestPractices", and "commonPitfalls".`,
-
-  controlAnalysis: `You are a compliance control analysis expert. Perform a detailed analysis of the specified control's design effectiveness, implementation status, and operational effectiveness. Return JSON with keys: "controlSummary", "designEffectiveness", "implementationStatus", "operationalEffectiveness", "gaps", "recommendations", and "riskRating".`,
-
-  testProcedures: `You are an audit test procedure specialist. Generate detailed test procedures for the specified control. Return JSON with keys: "procedures" (array of { id, objective, steps, expectedResults, sampleSize, evidenceRequired }), "testingStrategy", and "reportingTemplate".`,
-
-  assetRisk: `You are an IT asset risk analyst. Analyze the risk profile of the specified asset. Return JSON with keys: "assetSummary", "riskFactors" (array of { factor, severity, likelihood, impact }), "vulnerabilities", "controls", "overallRisk", and "recommendations".`,
-
-  policyGeneration: `You are a compliance policy drafting specialist. Generate a comprehensive, professional policy document for the specified policy type. Use markdown formatting with standard policy sections: Purpose, Scope, Policy Statement, Roles and Responsibilities, Procedures, Compliance, Exceptions, and Revision History Template.`,
-};
-
-// ---------------------------------------------------------------------------
-// AI Feature Functions
-// ---------------------------------------------------------------------------
-
-async function generateGapAnalysis(params) {
-  return callLLM(params, FEATURE_PROMPTS.gapAnalysis,
-    `Perform a gap analysis for organization ${params.organizationId}. Framework: ${params.frameworkCode || 'general'}. Analyze current compliance posture and identify gaps.`);
+Return ONLY the JSON array, no other text.`
+    }]
+  });
 }
 
-async function optimizeCrosswalk(params) {
-  return callLLM(params, FEATURE_PROMPTS.crosswalk,
-    `Optimize the compliance framework crosswalk for organization ${params.organizationId}. Identify control mappings and efficiency opportunities.`);
+// =====================================================================
+// TPRM: ANALYZE QUESTIONNAIRE RESPONSES
+// =====================================================================
+async function analyzeQuestionnaireResponses({ organizationId, vendorInfo, questions, responses, provider, model }) {
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'risk'),
+    messages: [{
+      role: 'user',
+      content: `Analyze the completed security questionnaire responses for this third-party vendor.
+
+Vendor Information:
+${compactJSON(vendorInfo)}
+
+Questions and Responses:
+${compactJSON({ questions, responses })}
+
+Provide:
+1. Overall security posture score (0-100) with justification
+2. Risk rating: critical / high / medium / low
+3. Key findings — both positive and negative
+4. Compliance gaps identified
+5. Recommended risk mitigations (specific, actionable)
+6. Documentation or certifications that should be requested
+7. Recommended re-assessment timeline
+8. Whether this vendor should be approved, conditionally approved, or rejected
+
+Format your response as structured analysis with clear sections.`
+    }]
+  });
 }
 
-async function forecastCompliance(params) {
-  return callLLM(params, FEATURE_PROMPTS.complianceForecast,
-    `Forecast compliance trajectory for organization ${params.organizationId}. Analyze current trends and predict future compliance posture.`);
-}
+// =====================================================================
+// TPRM: ANALYZE VENDOR EVIDENCE (SBOM + DOCUMENTS)
+// =====================================================================
+const MAX_CONTENT_PREVIEW_LENGTH = 1500;
 
-async function monitorRegulatoryChanges(params) {
-  const frameworks = params.frameworks ? (Array.isArray(params.frameworks) ? params.frameworks.join(', ') : params.frameworks) : 'all applicable frameworks';
-  return callLLM(params, FEATURE_PROMPTS.regulatoryMonitor,
-    `Monitor regulatory changes affecting these frameworks: ${frameworks}. Identify recent or upcoming changes and their impact.`);
-}
+async function analyzeVendorEvidence({ organizationId, vendorInfo, questionnaireTitle, questions, responses, evidenceList, provider, model }) {
+  // Build a concise summary of each evidence file for the prompt (avoid sending full file content for large files)
+  const evidenceSummary = evidenceList.map((ev, i) => {
+    const parts = [`[Evidence ${i + 1}] "${ev.original_filename}" (${Math.round(ev.file_size_bytes / 1024)} KB)`];
+    if (ev.is_sbom && ev.sbom_summary) {
+      let s = ev.sbom_summary;
+      if (typeof s === 'string') {
+        try { s = JSON.parse(s); } catch { s = {}; }
+      }
+      if (!s || typeof s !== 'object') s = {};
+      parts.push(`  Type: SBOM (${s.format || 'unknown format'})`);
+      parts.push(`  Components: ${s.component_count || 0}`);
+      parts.push(`  Vulnerabilities found: ${s.vulnerability_count || 0}`);
+      if (Array.isArray(s.top_vulnerabilities) && s.top_vulnerabilities.length > 0) {
+        const vulnList = s.top_vulnerabilities.slice(0, 5).map(v => `${v.id} [${v.severity}]`).join(', ');
+        parts.push(`  Top vulnerabilities: ${vulnList}`);
+      }
+      if (Array.isArray(s.components) && s.components.length > 0) {
+        const sampleComponents = s.components.slice(0, 10).map(c => `${c.name}@${c.version || '?'}`).join(', ');
+        parts.push(`  Sample components: ${sampleComponents}`);
+      }
+    } else {
+      parts.push(`  Type: Document (${ev.mime_type || 'unknown'})`);
+      if (ev.file_content && !ev.file_content.startsWith('base64:')) {
+        const preview = ev.file_content.slice(0, MAX_CONTENT_PREVIEW_LENGTH).replace(/\s+/g, ' ').trim();
+        if (preview.length > 50) {
+          parts.push(`  Content preview: ${preview}${ev.file_content.length > MAX_CONTENT_PREVIEW_LENGTH ? '...' : ''}`);
+        }
+      }
+    }
+    return parts.join('\n');
+  }).join('\n\n');
 
-async function generateRemediationPlaybook(params) {
-  return callLLM(params, FEATURE_PROMPTS.remediationPlaybook,
-    `Generate a remediation playbook for control ${params.controlId}. Provide step-by-step guidance to address the deficiency.`);
-}
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'minimal', null, 'evidence'),
+    messages: [{
+      role: 'user',
+      content: `You are a third-party risk analyst. A vendor has submitted their security questionnaire responses AND evidence files for review.
 
-async function generateVulnerabilityRemediation(params) {
-  return callLLM(params, FEATURE_PROMPTS.vulnerabilityRemediation,
-    `Provide remediation guidance for vulnerability ${params.vulnerabilityId}. Include step-by-step fix instructions and verification.`);
-}
+Vendor Information:
+${compactJSON(vendorInfo)}
 
-async function generateIAVMAssetAlert(params) {
-  return callLLM(params, FEATURE_PROMPTS.iavmAssetAlert,
-    `Generate an IAVM asset alert for: ID=${params.iavmId}, Title="${params.title}", Description="${params.description}", Affected Products: ${params.affectedProducts || 'N/A'}, Severity: ${params.severity || 'N/A'}.`);
-}
+Questionnaire: "${questionnaireTitle}"
 
-async function generateIncidentResponsePlan(params) {
-  return callLLM(params, FEATURE_PROMPTS.incidentResponse,
-    `Generate a comprehensive incident response plan for incident type: ${params.incidentType}. Include all phases from detection through recovery.`);
-}
+Questionnaire Responses Summary:
+${compactJSON({ questions: (questions || []).slice(0, 10), responses: responses || {} })}
 
-async function generateExecutiveReport(params) {
-  return callLLM(params, FEATURE_PROMPTS.executiveReport,
-    `Generate an executive-level compliance report for organization ${params.organizationId}. Summarize the current compliance posture, key risks, and strategic recommendations.`);
-}
+Evidence Submitted (${evidenceList.length} file${evidenceList.length !== 1 ? 's' : ''}):
+${evidenceSummary || '(No evidence provided)'}
 
-async function generateRiskHeatmap(params) {
-  return callLLM(params, FEATURE_PROMPTS.riskHeatmap,
-    `Generate risk heatmap data for organization ${params.organizationId}. Analyze risks across all categories and provide severity assessments.`);
-}
+Analyze the evidence in the context of the questionnaire responses. For each evidence file:
+1. Does it corroborate or contradict the vendor's questionnaire answers?
+2. For SBOMs: are there known vulnerabilities? Prohibited or high-risk licenses? Outdated components?
+3. For documents (certs, reports): are they current? Do they satisfy the control areas asked about?
 
-async function assessVendorRisk(params) {
-  const vendorInfo = typeof params.vendorInfo === 'string' ? params.vendorInfo : JSON.stringify(params.vendorInfo);
-  return callLLM(params, FEATURE_PROMPTS.vendorRisk,
-    `Assess the risk profile for this vendor: ${vendorInfo}`);
-}
+Then provide an overall evidence-based verification:
+- Evidence quality score (0-100)
+- Which questionnaire claims are VERIFIED by evidence
+- Which claims are UNVERIFIED or CONTRADICTED
+- Risk flags identified in the evidence (list with severity: critical/high/medium/low)
+- Recommended follow-up requests or remediation actions
+- Overall vendor trust assessment
 
-async function generateVendorQuestionnaire(params) {
-  const vendorInfo = typeof params.vendorInfo === 'string' ? params.vendorInfo : JSON.stringify(params.vendorInfo);
-  return callLLM(params, FEATURE_PROMPTS.vendorQuestionnaire,
-    `Generate a vendor risk assessment questionnaire for: ${vendorInfo}`);
+Format your response with clear sections. Be specific and cite the evidence file names.`
+    }]
+  });
 }
-
-async function analyzeQuestionnaireResponses(params) {
-  const vendorInfo = typeof params.vendorInfo === 'string' ? params.vendorInfo : JSON.stringify(params.vendorInfo);
-  const questions = typeof params.questions === 'string' ? params.questions : JSON.stringify(params.questions);
-  const responses = typeof params.responses === 'string' ? params.responses : JSON.stringify(params.responses);
-  return callLLM(params, FEATURE_PROMPTS.questionnaireAnalysis,
-    `Analyze questionnaire responses for vendor: ${vendorInfo}\n\nQuestions: ${questions}\n\nResponses: ${responses}`);
-}
-
-async function analyzeVendorEvidence(params) {
-  const vendorInfo = typeof params.vendorInfo === 'string' ? params.vendorInfo : JSON.stringify(params.vendorInfo);
-  const questions = typeof params.questions === 'string' ? params.questions : JSON.stringify(params.questions);
-  const responses = typeof params.responses === 'string' ? params.responses : JSON.stringify(params.responses);
-  const evidenceList = typeof params.evidenceList === 'string' ? params.evidenceList : JSON.stringify(params.evidenceList);
-  return callLLM(params, FEATURE_PROMPTS.vendorEvidence,
-    `Review vendor evidence for: ${vendorInfo}\n\nQuestionnaire: ${params.questionnaireTitle || 'N/A'}\nQuestions: ${questions}\nResponses: ${responses}\nEvidence: ${evidenceList}`);
-}
-
-async function assessAuditReadiness(params) {
-  return callLLM(params, FEATURE_PROMPTS.auditReadiness,
-    `Assess audit readiness for framework: ${params.framework}. Evaluate preparedness across all control families.`);
-}
-
-async function generateAuditPbcDraft(params) {
-  return callLLM(params, FEATURE_PROMPTS.auditPbc,
-    `Draft a PBC request for control ${params.controlId}, framework ${params.frameworkCode || 'N/A'}. Context: ${params.requestContext || 'Standard audit request'}. Due date: ${params.dueDate || 'TBD'}. Priority: ${params.priority || 'Medium'}.`);
-}
-
-async function generateAuditWorkpaperDraft(params) {
-  return callLLM(params, FEATURE_PROMPTS.auditWorkpaper,
-    `Draft an audit workpaper for control ${params.controlId}.\nObjective: ${params.objective || 'N/A'}\nProcedure: ${params.procedurePerformed || 'N/A'}\nEvidence Summary: ${params.evidenceSummary || 'N/A'}\nTest Outcome: ${params.testOutcome || 'N/A'}`);
-}
-
-async function generateAuditFindingDraft(params) {
-  return callLLM(params, FEATURE_PROMPTS.auditFinding,
-    `Draft an audit finding for control ${params.controlId}.\nIssue: ${params.issueSummary || 'N/A'}\nEvidence: ${params.evidenceSummary || 'N/A'}\nSeverity Hint: ${params.severityHint || 'Medium'}\nRecommendation Scope: ${params.recommendationScope || 'Standard'}`);
-}
-
-async function mapAssetsToControls(params) {
-  return callLLM(params, FEATURE_PROMPTS.assetControlMapping,
-    `Map IT assets to compliance controls for organization ${params.organizationId}. Identify coverage gaps and prioritize remediation.`);
-}
-
-async function detectShadowIT(params) {
-  return callLLM(params, FEATURE_PROMPTS.shadowIT,
-    `Detect potential shadow IT in organization ${params.organizationId}. Analyze for unauthorized resources and governance gaps.`);
-}
-
-async function checkAIGovernance(params) {
-  return callLLM(params, FEATURE_PROMPTS.aiGovernance,
-    `Evaluate AI governance posture for organization ${params.organizationId}. Assess against ethical guidelines and governance frameworks.`);
-}
-
-async function queryCompliance(params) {
-  return callLLM(params, FEATURE_PROMPTS.complianceQuery,
-    params.question || 'Provide a general compliance overview.');
-}
-
-async function recommendTraining(params) {
-  return callLLM(params, FEATURE_PROMPTS.trainingRecommendation,
-    `Recommend compliance training programs for organization ${params.organizationId}. Consider current gaps and role-based requirements.`);
-}
-
-async function suggestEvidence(params) {
-  return callLLM(params, FEATURE_PROMPTS.evidenceSuggestion,
-    `Suggest appropriate evidence artifacts for control ${params.controlId}. Include artifact types, sources, and collection frequency.`);
-}
-
-async function analyzeControl(params) {
-  return callLLM(params, FEATURE_PROMPTS.controlAnalysis,
-    `Analyze control ${params.controlId} for organization ${params.organizationId}. Evaluate design, implementation, and operational effectiveness.`);
-}
-
-async function generateTestProcedures(params) {
-  return callLLM(params, FEATURE_PROMPTS.testProcedures,
-    `Generate test procedures for control ${params.controlId}. Include objectives, steps, expected results, and evidence requirements.`);
-}
-
-async function analyzeAssetRisk(params) {
-  return callLLM(params, FEATURE_PROMPTS.assetRisk,
-    `Analyze the risk profile for asset ${params.assetId} in organization ${params.organizationId}. Evaluate vulnerabilities, controls, and overall risk.`);
-}
-
-async function generatePolicy(params) {
-  return callLLM(params, FEATURE_PROMPTS.policyGeneration,
-    `Generate a comprehensive ${params.policyType} policy for organization ${params.organizationId}. Follow industry best practices and regulatory requirements.`);
-}
-
-// ---------------------------------------------------------------------------
-// Exports
-// ---------------------------------------------------------------------------
 
 module.exports = {
-  // Core infrastructure
-  getUsageLimit,
-  getUsageCount,
-  resolveApiKey,
-  getProviderStatus,
-  withAITrackingContext,
-  chatStream,
   chat,
-  getOrgDefaultProvider,
-  getOrgDefaultModel,
-  getOrgApiKey,
-  getPlatformApiKey,
-  logAIUsage,
-  logAIDecision,
-  buildPersonalizedSystem,
-  invalidateAICache,
-  getLLMService,
-
-  // v3.0.0 task-profile tiering
-  TASK_PROFILES,
-  FEATURE_TASK_PROFILE,
-  getTaskProfile,
-  resolveModelAndTemperature,
-
-  // AI feature functions
+  chatStream,
   generateGapAnalysis,
   optimizeCrosswalk,
   forecastCompliance,
@@ -1100,13 +2935,10 @@ module.exports = {
   generateExecutiveReport,
   generateRiskHeatmap,
   assessVendorRisk,
+  assessAuditReadiness,
   generateVendorQuestionnaire,
   analyzeQuestionnaireResponses,
   analyzeVendorEvidence,
-  assessAuditReadiness,
-  generateAuditPbcDraft,
-  generateAuditWorkpaperDraft,
-  generateAuditFindingDraft,
   mapAssetsToControls,
   detectShadowIT,
   checkAIGovernance,
@@ -1117,12 +2949,35 @@ module.exports = {
   generateTestProcedures,
   analyzeAssetRisk,
   generatePolicy,
-
-  // Internal utilities exposed for key management
-  encryptKey,
-  decryptKey,
-  callProvider,
-
-  // Provider metadata
-  PROVIDER_MODELS,
+  generateAuditPbcDraft,
+  generateAuditWorkpaperDraft,
+  generateAuditFindingDraft,
+  logAIUsage,
+  logAIDecision,
+  getUsageCount,
+  getUsageLimit,
+  getProviderStatus,
+  getOrgApiKey,
+  getPlatformApiKey,
+  resolveApiKey,
+  getPlatformDefaultProvider,
+  getAllOrgApiKeys,
+  getAllPlatformApiKeys,
+  invalidateApiKeyCache,
+  invalidatePlatformApiKeyCache,
+  invalidateAICache,
+  cleanupAICache,
+  withAITrackingContext,
+  getAITrackingContext,
+  getOrgDefaultProvider,
+  getOrgDefaultModel,
+  buildPersonalizedSystem,
+  buildGrcSystem,
+  PROMPT_PROFILES,
+  PROVIDERS,
+  TASK_PROFILES,
+  FEATURE_TASK_PROFILE,
+  resolveTaskModel,
+  buildFewShotBlock,
+  loadExemplars
 };

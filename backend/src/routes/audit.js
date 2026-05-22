@@ -4,18 +4,9 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { decrypt } = require('../utils/encrypt');
+const splunk = require('../services/splunkService');
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
-
-let splunk = {
-  getOrgSplunkSettings: async () => ({}),
-  runSearch: async () => ({ sid: null, search: null, results: [] })
-};
-try {
-  splunk = require('../services/splunkService');
-} catch (_err) {
-  // Optional in the public/community repo.
-}
 
 const auditWriteLimiter = createRateLimiter({
   label: 'audit-log-write',
@@ -42,6 +33,8 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       limit,
       offset
     } = req.query;
+    const normalizedLimit = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+    const normalizedOffset = Math.max(0, parseInt(offset, 10) || 0);
 
     let query = `
       SELECT al.id, al.event_type, al.resource_type, al.resource_id, al.details,
@@ -104,10 +97,10 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
 
     query += ' ORDER BY al.created_at DESC';
     query += ` LIMIT $${idx}`;
-    params.push(parseInt(limit) || 50);
+    params.push(normalizedLimit);
     idx++;
     query += ` OFFSET $${idx}`;
-    params.push(parseInt(offset) || 0);
+    params.push(normalizedOffset);
 
     const result = await pool.query(query, params);
 
@@ -170,7 +163,7 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       ? await dynamicFieldsService.getCustomFieldValues(auditLogIds)
       : {};
 
-    // Merge custom fields and decrypt stored user emails before returning
+    // Merge custom fields into the audit log entries
     const logsWithCustomFields = result.rows.map(log => ({
       ...log,
       user_email: log.user_email ? decrypt(log.user_email) : null,
@@ -183,8 +176,8 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       logs: logsWithCustomFields,
       pagination: {
         total: parseInt(countResult.rows[0].count),
-        limit: parseInt(limit) || 50,
-        offset: parseInt(offset) || 0
+        limit: normalizedLimit,
+        offset: normalizedOffset
       }
     });
   } catch (error) {

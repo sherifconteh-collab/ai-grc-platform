@@ -6,39 +6,12 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields } = require('../middleware/validate');
+const { notificationNew, notificationRead, notificationReadAll } = require('../services/realtimeEventService');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
-
-function getIpRateLimitKey(req) {
-  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
-  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
-  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
-}
-
-let notificationNew = () => {};
-let notificationRead = () => {};
-let notificationReadAll = () => {};
-try {
-  ({ notificationNew, notificationRead, notificationReadAll } = require('../services/realtimeEventService'));
-} catch (_err) {
-  // Optional in the public/community repo.
-}
 
 router.use(authenticate);
 
 const notificationsRateLimiter = createRateLimiter({ label: 'notifications', windowMs: 60 * 1000, max: 60 });
-router.use(notificationsRateLimiter);
-
-// Explicit express-rate-limit instance for the email-status route so that
-// static-analysis tools (CodeQL) recognise the rate-limiting middleware.
-const emailStatusRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
 
 const NOTIFICATION_TYPES = ['control_due', 'assessment_needed', 'status_change', 'system', 'crosswalk'];
 
@@ -173,9 +146,8 @@ router.get('/preferences', async (req, res) => {
         [req.user.id]
       );
       for (const row of result.rows) stored[row.type] = row;
-    } catch (err) {
+    } catch {
       // Table may not exist if migration not run — return defaults
-      console.warn('notification_preferences query failed (migration may not be applied):', err.message);
     }
 
     const prefs = NOTIFICATION_TYPES.map(type => ({
@@ -217,7 +189,7 @@ router.put('/preferences', validateBody((body) => requireFields(body, ['type']))
 });
 
 // GET /notifications/email-status — whether SMTP is configured (for UI)
-router.get('/email-status', emailStatusRateLimiter, async (req, res) => {
+router.get('/email-status', notificationsRateLimiter, async (req, res) => {
   // Check env vars first (no DB cost)
   if (process.env.SMTP_HOST) {
     return res.json({ success: true, data: { configured: true, source: 'environment' } });
@@ -235,9 +207,7 @@ router.get('/email-status', emailStatusRateLimiter, async (req, res) => {
       if (orgResult.rows.length > 0) {
         return res.json({ success: true, data: { configured: true, source: 'database' } });
       }
-    } catch (err) {
-      console.warn('Org SMTP setting lookup failed:', err.message);
-    }
+    } catch { /* ignore */ }
   }
   // Fall back to platform_settings (backward compat for existing deployments)
   try {
@@ -245,8 +215,7 @@ router.get('/email-status', emailStatusRateLimiter, async (req, res) => {
       `SELECT 1 FROM platform_settings WHERE setting_key = 'smtp_host' AND setting_value IS NOT NULL AND setting_value != '' LIMIT 1`
     );
     return res.json({ success: true, data: { configured: result.rows.length > 0, source: result.rows.length > 0 ? 'database' : 'none' } });
-  } catch (err) {
-    console.warn('platform_settings SMTP lookup failed:', err.message);
+  } catch {
     return res.json({ success: true, data: { configured: false, source: 'none' } });
   }
 });

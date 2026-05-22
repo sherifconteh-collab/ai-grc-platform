@@ -1,257 +1,521 @@
 'use client';
 
-/**
- * StructuredOutput — renders the validated `data.structured` field returned
- * by AI routes that have a registered schema (gap analysis, remediation
- * playbook, evidence suggestion, test procedures, finding).
- *
- * Renders semantic, accessible markup:
- *   - readiness bar (gap analysis)
- *   - severity-chipped gap cards
- *   - numbered playbook step list
- *   - interactive checklist for test procedures
- *   - structured finding (criteria/condition/cause/effect/recommendation)
- *
- * Each list uses `<ul role="list">` with `<li role="listitem">` semantics so
- * screen readers announce row counts correctly.
- */
+import React, { useState } from 'react';
+import { MarkdownContent } from './MarkdownContent';
 
-import React, { useId, useState } from 'react';
+// ---------------------------------------------------------------------------
+// MarkdownBlock — renders AI text output as React nodes (no dangerouslySetInnerHTML).
+// Delegates to the shared MarkdownContent component, which is XSS-safe by
+// construction because all content is emitted as React children.
+// ---------------------------------------------------------------------------
+interface MarkdownBlockProps {
+  content: string;
+  className?: string;
+}
 
-type Severity = 'critical' | 'high' | 'medium' | 'low' | string;
+export function MarkdownBlock({ content, className = '' }: MarkdownBlockProps) {
+  return <MarkdownContent content={content} className={className} />;
+}
 
-const severityClass: Record<string, string> = {
-  critical: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700',
-  high:     'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/40 dark:text-orange-200 dark:border-orange-700',
-  medium:   'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-200 dark:border-yellow-700',
-  low:      'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700',
+// ---------------------------------------------------------------------------
+// Severity chip
+// ---------------------------------------------------------------------------
+type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+
+const SEVERITY_STYLES: Record<Severity, string> = {
+  critical: 'bg-red-100 text-red-800 border border-red-200',
+  high:     'bg-orange-100 text-orange-800 border border-orange-200',
+  medium:   'bg-yellow-100 text-yellow-800 border border-yellow-200',
+  low:      'bg-green-100 text-green-800 border border-green-200',
+  info:     'bg-blue-100 text-blue-700 border border-blue-200',
 };
 
-function SeverityChip({ severity }: { severity: Severity }) {
-  const cls = severityClass[severity?.toLowerCase?.()] || 'bg-zinc-100 text-zinc-800 border-zinc-300';
+export function SeverityChip({ severity }: { severity: string }) {
+  const style = SEVERITY_STYLES[severity as Severity] || SEVERITY_STYLES.info;
   return (
-    <span className={`inline-flex items-center rounded border px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${cls}`}>
-      {severity}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${style}`}>
+      {severity.toUpperCase()}
     </span>
   );
 }
 
-function ReadinessBar({ score }: { score: number }) {
-  const pct = Math.max(0, Math.min(100, Math.round(score)));
-  const tone = pct >= 80 ? 'bg-green-600' : pct >= 60 ? 'bg-yellow-500' : pct >= 40 ? 'bg-orange-500' : 'bg-red-600';
-  return (
-    <div className="my-2">
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="font-medium">Readiness</span>
-        <span className="font-mono">{pct}%</span>
-      </div>
-      <div
-        className="h-3 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
-        role="progressbar"
-        aria-valuenow={pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Readiness ${pct}%`}
-      >
-        <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
+// ---------------------------------------------------------------------------
+// Gap Analysis output card
+// ---------------------------------------------------------------------------
+interface GapItem {
+  control_id: string;
+  framework?: string;
+  title: string;
+  severity: string;
+  description: string;
+  evidence_required?: string[];
+  estimated_effort_days?: number;
 }
 
-function GapAnalysis({ data }: { data: any }) {
-  return (
-    <div>
-      {typeof data.readiness_score === 'number' && <ReadinessBar score={data.readiness_score} />}
-      {data.summary && <p className="my-2 text-sm leading-relaxed">{data.summary}</p>}
-      {Array.isArray(data.gaps) && data.gaps.length > 0 && (
-        <section aria-label="Gaps">
-          <h4 className="mt-3 mb-1 text-sm font-semibold">Gaps</h4>
-          <ul role="list" className="space-y-2">
-            {data.gaps.map((g: any, i: number) => (
-              <li key={i} role="listitem" className="rounded border border-zinc-200 p-3 dark:border-zinc-700">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-mono text-xs">{g.control}</span>
-                  <SeverityChip severity={g.severity} />
-                </div>
-                <p className="mt-1 text-sm">{g.description}</p>
-                {Array.isArray(g.evidence_required) && g.evidence_required.length > 0 && (
-                  <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                    Evidence: {g.evidence_required.join(', ')}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {Array.isArray(data.recommended_roadmap) && data.recommended_roadmap.length > 0 && (
-        <section aria-label="Recommended roadmap" className="mt-3">
-          <h4 className="mb-1 text-sm font-semibold">Recommended Roadmap</h4>
-          <ul role="list" className="list-disc space-y-1 pl-5 text-sm">
-            {data.recommended_roadmap.map((step: string, i: number) => (
-              <li key={i} role="listitem">{step}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
-  );
+interface GapAnalysisData {
+  executive_summary?: string;
+  audit_readiness_score?: number;
+  gaps?: GapItem[];
+  remediation_roadmap?: {
+    immediate?: string[];
+    short_term?: string[];
+    medium_term?: string[];
+  };
 }
 
-function RemediationPlaybook({ data }: { data: any }) {
-  return (
-    <div>
-      {data.objective && <p className="my-2 text-sm font-medium">{data.objective}</p>}
-      {Array.isArray(data.prerequisites) && data.prerequisites.length > 0 && (
-        <section aria-label="Prerequisites">
-          <h4 className="mt-2 mb-1 text-sm font-semibold">Prerequisites</h4>
-          <ul role="list" className="list-disc space-y-1 pl-5 text-sm">
-            {data.prerequisites.map((p: string, i: number) => <li key={i} role="listitem">{p}</li>)}
-          </ul>
-        </section>
-      )}
-      {Array.isArray(data.steps) && data.steps.length > 0 && (
-        <section aria-label="Steps">
-          <h4 className="mt-3 mb-1 text-sm font-semibold">Steps</h4>
-          <ol role="list" className="space-y-2">
-            {data.steps.map((s: any, i: number) => (
-              <li key={i} role="listitem" className="rounded border border-zinc-200 p-3 dark:border-zinc-700">
-                <div className="flex items-baseline gap-2">
-                  <span className="rounded bg-zinc-200 px-2 py-0.5 font-mono text-xs dark:bg-zinc-700">{s.order}</span>
-                  <span className="text-sm">{s.action}</span>
-                </div>
-                {(s.owner || typeof s.estimated_hours === 'number') && (
-                  <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                    {s.owner ? `Owner: ${s.owner}` : ''}
-                    {s.owner && typeof s.estimated_hours === 'number' ? ' · ' : ''}
-                    {typeof s.estimated_hours === 'number' ? `Est. ${s.estimated_hours}h` : ''}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-    </div>
-  );
-}
-
-function TestProcedures({ data }: { data: any }) {
-  const [checked, setChecked] = useState<Record<number, boolean>>({});
-  const toggle = (i: number) => setChecked(c => ({ ...c, [i]: !c[i] }));
-  const idPrefix = useId();
+function GapAnalysisCard({ data }: { data: GapAnalysisData }) {
+  const [expandedGap, setExpandedGap] = useState<string | null>(null);
+  const score = data.audit_readiness_score;
 
   return (
-    <div>
-      {data.objective && <p className="my-2 text-sm font-medium">{data.objective}</p>}
-      {data.scope && <p className="my-1 text-xs text-zinc-600 dark:text-zinc-400">Scope: {data.scope}</p>}
-      {Array.isArray(data.steps) && data.steps.length > 0 && (
-        <section aria-label="Test procedures">
-          <h4 className="mt-3 mb-1 text-sm font-semibold">Procedures</h4>
-          <ul role="list" className="space-y-2">
-            {data.steps.map((s: any, i: number) => {
-              const id = `${idPrefix}-tp-step-${i}`;
-              return (
-                <li key={i} role="listitem" className="flex items-start gap-2 rounded border border-zinc-200 p-3 dark:border-zinc-700">
-                  <input
-                    id={id}
-                    type="checkbox"
-                    checked={!!checked[i]}
-                    onChange={() => toggle(i)}
-                    className="mt-1"
-                    aria-label={`Mark procedure ${s.order} complete`}
+    <div className="space-y-4">
+      {/* Score + summary */}
+      {(score !== undefined || data.executive_summary) && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-center gap-4 mb-3">
+            <h3 className="font-semibold text-gray-900">Gap Analysis Summary</h3>
+            {score !== undefined && (
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${score >= 70 ? 'bg-green-500' : score >= 40 ? 'bg-yellow-400' : 'bg-red-500'}`}
+                    style={{ width: `${score}%` }}
                   />
-                  <label htmlFor={id} className="flex-1 text-sm">
-                    <span className="mr-2 rounded bg-zinc-200 px-2 py-0.5 font-mono text-xs dark:bg-zinc-700">{s.order}</span>
-                    {s.procedure}
-                    {s.method && (
-                      <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 text-xs uppercase tracking-wide text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                        {s.method}
+                </div>
+                <span className="text-sm font-medium text-gray-700">{score}/100 readiness</span>
+              </div>
+            )}
+          </div>
+          {data.executive_summary && (
+            <p className="text-sm text-gray-600 leading-relaxed">{data.executive_summary}</p>
+          )}
+        </div>
+      )}
+
+      {/* Gaps table */}
+      {data.gaps && data.gaps.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900">Identified Gaps ({data.gaps.length})</h4>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {data.gaps.map((gap, i) => (
+              <div key={i} className="px-5 py-3">
+                <button
+                  type="button"
+                  className="w-full flex items-start gap-3 cursor-pointer text-left"
+                  aria-expanded={expandedGap === `${i}`}
+                  onClick={() => setExpandedGap(expandedGap === `${i}` ? null : `${i}`)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                        {gap.control_id}
                       </span>
+                      {gap.framework && (
+                        <span className="text-xs text-gray-500">{gap.framework}</span>
+                      )}
+                      <SeverityChip severity={gap.severity} />
+                    </div>
+                    <p className="text-sm font-medium text-gray-800">{gap.title}</p>
+                  </div>
+                  <span className="text-gray-400 text-xs mt-1" aria-hidden="true">{expandedGap === `${i}` ? '▲' : '▼'}</span>
+                </button>
+                {expandedGap === `${i}` && (
+                  <div className="mt-3 pl-0 space-y-2">
+                    <p className="text-sm text-gray-600">{gap.description}</p>
+                    {gap.evidence_required && gap.evidence_required.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 mb-1">Evidence Required:</p>
+                        <ul className="space-y-1">
+                          {gap.evidence_required.map((ev, j) => (
+                            <li key={j} className="text-xs text-gray-600 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                              {ev}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
-                  </label>
-                </li>
+                    {gap.estimated_effort_days !== undefined && (
+                      <p className="text-xs text-gray-500">
+                        Estimated effort: <span className="font-medium">{gap.estimated_effort_days} days</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Remediation roadmap */}
+      {data.remediation_roadmap && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">Remediation Roadmap</h4>
+          <div className="space-y-3">
+            {(['immediate', 'short_term', 'medium_term'] as const).map(phase => {
+              const items = data.remediation_roadmap![phase];
+              if (!items || items.length === 0) return null;
+              const labels = { immediate: '0–30 days', short_term: '30–90 days', medium_term: '90–180 days' };
+              const colors = { immediate: 'bg-red-50 border-red-200', short_term: 'bg-yellow-50 border-yellow-200', medium_term: 'bg-green-50 border-green-200' };
+              return (
+                <div key={phase} className={`border rounded-lg p-3 ${colors[phase]}`}>
+                  <p className="text-xs font-semibold text-gray-700 mb-2">{labels[phase]}</p>
+                  <ul className="space-y-1">
+                    {items.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               );
             })}
-          </ul>
-        </section>
-      )}
-    </div>
-  );
-}
-
-function EvidenceSuggestion({ data }: { data: any }) {
-  return (
-    <div>
-      {(data.control_title || data.framework) && (
-        <p className="my-1 text-sm font-medium">
-          {data.control_title}{data.framework ? ` · ${data.framework}` : ''}
-        </p>
-      )}
-      {Array.isArray(data.evidence_items) && data.evidence_items.length > 0 && (
-        <ul role="list" className="space-y-2">
-          {data.evidence_items.map((e: any, i: number) => (
-            <li key={i} role="listitem" className="rounded border border-zinc-200 p-3 dark:border-zinc-700">
-              <div className="text-sm font-medium">{e.name}</div>
-              <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                {[e.format, e.cadence, e.source_system].filter(Boolean).join(' · ')}
-              </div>
-              {e.notes && <p className="mt-1 text-xs">{e.notes}</p>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function Finding({ data }: { data: any }) {
-  const fields: [string, string][] = [
-    ['Criteria', data.criteria],
-    ['Condition', data.condition],
-    ['Cause', data.cause],
-    ['Effect', data.effect],
-    ['Recommendation', data.recommendation],
-  ];
-  return (
-    <dl className="space-y-2">
-      {fields.map(([label, value]) =>
-        value ? (
-          <div key={label} className="rounded border border-zinc-200 p-3 dark:border-zinc-700">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">{label}</dt>
-            <dd className="mt-1 text-sm">{value}</dd>
           </div>
-        ) : null
+        </div>
       )}
-    </dl>
+    </div>
   );
 }
 
-export interface StructuredOutputProps {
-  feature: string;
-  data: unknown;
+// ---------------------------------------------------------------------------
+// Playbook steps card
+// ---------------------------------------------------------------------------
+interface PlaybookStep {
+  step: number;
+  action: string;
+  detail?: string;
+  tools?: string[];
+  evidence_artifact?: string;
+}
+
+interface PlaybookData {
+  control_id?: string;
+  title?: string;
+  estimated_effort_hours?: number;
+  required_skills?: string[];
+  steps?: PlaybookStep[];
+  common_pitfalls?: string[];
+  evidence_artifacts?: string[];
+}
+
+function PlaybookCard({ data }: { data: PlaybookData }) {
+  return (
+    <div className="space-y-4">
+      {(data.title || data.estimated_effort_hours !== undefined) && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              {data.title && <h3 className="font-semibold text-gray-900 mb-1">{data.title}</h3>}
+              {data.required_skills && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {data.required_skills.map((s, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-full border border-purple-200">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {data.estimated_effort_hours !== undefined && (
+              <span className="text-sm text-gray-500 whitespace-nowrap">{data.estimated_effort_hours}h est.</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {data.steps && data.steps.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h4 className="text-sm font-semibold text-gray-900">Implementation Steps</h4>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {data.steps.map((step, i) => (
+              <div key={i} className="px-5 py-4 flex gap-4">
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                  {step.step || i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 mb-1">{step.action}</p>
+                  {step.detail && <p className="text-sm text-gray-600 mb-2">{step.detail}</p>}
+                  {step.tools && step.tools.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {step.tools.map((t, j) => (
+                        <span key={j} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded font-mono">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {step.evidence_artifact && (
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <span className="text-green-600">📎</span>
+                      Artifact: {step.evidence_artifact}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.common_pitfalls && data.common_pitfalls.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <h4 className="text-sm font-semibold text-amber-800 mb-2">Common Pitfalls</h4>
+          <ul className="space-y-1">
+            {data.common_pitfalls.map((p, i) => (
+              <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
+                <span className="mt-1 text-amber-500 flex-shrink-0">⚠</span>
+                {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test procedure checklist card
+// ---------------------------------------------------------------------------
+interface TestStep {
+  step: number;
+  test_type?: string;
+  procedure: string;
+  pass_criteria?: string;
+  fail_criteria?: string;
+}
+
+interface TestProcedureData {
+  control_id?: string;
+  objective?: string;
+  test_method?: string;
+  steps?: TestStep[];
+  expected_results?: { pass?: string; fail?: string };
+  sample_size?: string;
+  frequency?: string;
+  evidence_to_collect?: string[];
+}
+
+function TestProcedureCard({ data }: { data: TestProcedureData }) {
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const toggle = (i: number) => setChecked(prev => {
+    const next = new Set(prev);
+    if (next.has(i)) next.delete(i); else next.add(i);
+    return next;
+  });
+
+  return (
+    <div className="space-y-4">
+      {(data.objective || data.test_method) && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          {data.test_method && (
+            <span className="inline-block px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs rounded-full border border-indigo-200 mb-2 capitalize">
+              {data.test_method}
+            </span>
+          )}
+          {data.objective && <p className="text-sm text-gray-700">{data.objective}</p>}
+        </div>
+      )}
+
+      {data.steps && data.steps.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900">Test Checklist</h4>
+            <span className="text-xs text-gray-500">{checked.size}/{data.steps.length} complete</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {data.steps.map((step, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`w-full text-left px-5 py-4 cursor-pointer transition-colors ${checked.has(i) ? 'bg-green-50' : 'hover:bg-gray-50'}`}
+                aria-pressed={checked.has(i)}
+                onClick={() => toggle(i)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors ${checked.has(i) ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`} aria-hidden="true">
+                    {checked.has(i) && <span className="text-xs">✓</span>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {step.test_type && (
+                      <span className="text-xs text-gray-400 uppercase tracking-wide mr-2">{step.test_type}</span>
+                    )}
+                    <p className={`text-sm ${checked.has(i) ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                      {step.procedure}
+                    </p>
+                    {step.pass_criteria && (
+                      <p className="text-xs text-green-600 mt-1">✓ Pass: {step.pass_criteria}</p>
+                    )}
+                    {step.fail_criteria && (
+                      <p className="text-xs text-red-600 mt-0.5">✗ Fail: {step.fail_criteria}</p>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(data.sample_size || data.frequency) && (
+        <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 flex gap-6">
+          {data.sample_size && <span><span className="font-medium">Sample: </span>{data.sample_size}</span>}
+          {data.frequency && <span><span className="font-medium">Frequency: </span>{data.frequency}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Action bar — copy / export / insert actions
+// ---------------------------------------------------------------------------
+interface ActionBarProps {
+  content: string;
+  feature?: string;
+  onInsert?: (content: string) => void;
+  onAttach?: (content: string) => void;
+}
+
+function ActionBar({ content, onInsert, onAttach }: ActionBarProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ai-output.md';
+    document.body.appendChild(a);
+    a.click();
+    // Defer revocation so the browser has time to start the download.
+    // Revoking synchronously after click() can cancel the download in some browsers.
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      a.remove();
+    }, 0);
+  };
+
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-gray-100 mt-2">
+      <button
+        onClick={handleCopy}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+      >
+        {copied ? '✓ Copied' : 'Copy'}
+      </button>
+      <button
+        onClick={handleExport}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+      >
+        Export .md
+      </button>
+      {onInsert && (
+        <button
+          onClick={() => onInsert(content)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+        >
+          Insert into workpaper
+        </button>
+      )}
+      {onAttach && (
+        <button
+          onClick={() => onAttach(content)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded transition-colors"
+        >
+          Attach to finding
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main StructuredOutput component
+// ---------------------------------------------------------------------------
+interface StructuredOutputProps {
+  /** Raw string from AI response (may be plain text or JSON) */
+  content: string;
+  /** Feature key to select card rendering */
+  feature?: string;
+  /** Whether to show copy / export / insert actions */
+  showActions?: boolean;
+  onInsert?: (content: string) => void;
+  onAttach?: (content: string) => void;
   className?: string;
 }
 
-const FEATURE_RENDERERS: Record<string, React.FC<{ data: any }>> = {
-  gap_analysis: GapAnalysis,
-  remediation_playbook: RemediationPlaybook,
-  vulnerability_remediation: RemediationPlaybook,
-  test_procedures: TestProcedures,
-  evidence_suggestion: EvidenceSuggestion,
-  evidence_suggest: EvidenceSuggestion,
-  finding: Finding,
-  audit_finding_draft: Finding,
-};
+export default function StructuredOutput({
+  content,
+  feature,
+  showActions = true,
+  onInsert,
+  onAttach,
+  className = ''
+}: StructuredOutputProps) {
+  // Try to parse as JSON — if it succeeds and we recognize the feature, render a structured card.
+  let parsed: unknown = null;
+  try {
+    // Strip markdown fences if present
+    const stripped = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    if (stripped.startsWith('{') || stripped.startsWith('[')) {
+      parsed = JSON.parse(stripped);
+    }
+  } catch {
+    // Not valid JSON — fall through to markdown rendering
+  }
 
-export default function StructuredOutput({ feature, data, className }: StructuredOutputProps) {
-  if (data == null || typeof data !== 'object') return null;
-  const Renderer = FEATURE_RENDERERS[feature];
-  if (!Renderer) return null;
+  const renderCard = () => {
+    if (parsed && typeof parsed === 'object') {
+      if (feature === 'gap_analysis') {
+        return <GapAnalysisCard data={parsed as GapAnalysisData} />;
+      }
+      if (feature === 'remediation_playbook') {
+        return <PlaybookCard data={parsed as PlaybookData} />;
+      }
+      if (feature === 'test_procedures') {
+        return <TestProcedureCard data={parsed as TestProcedureData} />;
+      }
+      // Unknown structured feature — render as formatted JSON
+      return (
+        <pre className="bg-gray-900 text-green-300 text-xs p-4 rounded-xl overflow-x-auto">
+          {JSON.stringify(parsed, null, 2)}
+        </pre>
+      );
+    }
+    // Plain markdown text
+    return <MarkdownBlock content={content} />;
+  };
+
   return (
-    <div className={className} data-feature={feature} data-testid="structured-output">
-      <Renderer data={data} />
+    <div className={`space-y-2 ${className}`}>
+      {renderCard()}
+      {showActions && (
+        <ActionBar
+          content={content}
+          feature={feature}
+          onInsert={onInsert}
+          onAttach={onAttach}
+        />
+      )}
     </div>
   );
 }
+
+export { GapAnalysisCard, PlaybookCard, TestProcedureCard, ActionBar };

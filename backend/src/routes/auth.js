@@ -8,82 +8,14 @@ const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { validateBody, requireFields, sanitizeInput, isUuid } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
-const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
-
-// ---------------------------------------------------------------------------
-// Security constants — raised in v3.0.0
-// ---------------------------------------------------------------------------
-// bcrypt cost factor for new password hashes. Existing hashes at lower cost
-// continue to verify successfully; on a successful login we re-hash lazily
-// so the user is silently upgraded to the new cost.
-const BCRYPT_COST = 14;
-
-// JWT verification is pinned to HS256 only. Tokens signed with any other
-// algorithm are rejected (defends against algorithm-confusion attacks).
-const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: ['HS256'] });
-
-/**
- * Returns the bcrypt cost embedded in a hash string, or null if it cannot be
- * determined. bcrypt hashes have the form `$2a$<cost>$...`.
- */
-function getBcryptCost(hash) {
-  if (typeof hash !== 'string') return null;
-  const m = /^\$2[abxy]\$(\d{2})\$/.exec(hash);
-  return m ? parseInt(m[1], 10) : null;
-}
-
-/**
- * If the stored hash is below the current BCRYPT_COST, transparently re-hash
- * the password and update the user's row. Errors are swallowed so an upgrade
- * failure can never block a legitimate login.
- */
-async function maybeUpgradePasswordHash(userId, plaintext, currentHash) {
-  try {
-    const cost = getBcryptCost(currentHash);
-    if (cost !== null && cost >= BCRYPT_COST) return;
-    const newHash = await bcrypt.hash(plaintext, BCRYPT_COST);
-    await pool.query(
-      'UPDATE users SET password_hash = $1, password_cost = $2 WHERE id = $3',
-      [newHash, BCRYPT_COST, userId]
-    );
-  } catch (_e) {
-    // intentional no-op: upgrade is best-effort
-  }
-}
-let getTrialSeedData = () => ({
-  tier: 'community',
-  billingStatus: 'community',
-  trialSourceTier: 'community',
-  trialDays: 0,
-  trialStatus: 'none'
-});
-let expireOrganizationTrialIfNeeded = async () => false;
-let ensureOrgFrameworks = async () => {};
-try {
-  ({
-    getTrialSeedData,
-    expireOrganizationTrialIfNeeded,
-    ensureOrgFrameworks
-  } = require('../services/subscriptionService'));
-} catch (_err) {
-  // Optional in the public/community repo.
-}
+const { JWT_SECRET, JWT_ALGORITHM, JWT_VERIFY_OPTIONS, SECURITY_CONFIG } = require('../config/security');
+const {
+  getTrialSeedData,
+  expireOrganizationTrialIfNeeded,
+  ensureOrgFrameworks
+} = require('../services/subscriptionService');
 const { sendPasswordResetEmail } = require('../services/emailService');
-let getGeolocationFromRequest = () => ({});
-let extractIpFromRequest = (req) => {
-  if (!req) return null;
-  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
-  if (typeof xForwardedFor === 'string' && xForwardedFor.length > 0) {
-    return xForwardedFor.split(',')[0].trim();
-  }
-  return req.ip || req.socket?.remoteAddress || null;
-};
-try {
-  ({ getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService'));
-} catch (_err) {
-  // Optional in the public/community repo.
-}
+const { getGeolocationFromRequest, extractIpFromRequest } = require('../services/geolocationService');
 const { createAuditLog } = require('../services/auditService');
 const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
@@ -99,6 +31,7 @@ const {
 const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 const DEMO_SESSION_EXPIRY = process.env.JWT_DEMO_SESSION_EXPIRY || '8h';
+const BCRYPT_ROUNDS = 14;
 const ALLOWED_INITIAL_ROLES = new Set(['admin', 'auditor', 'user']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_REGISTER_FRAMEWORK_CODES = 20;
@@ -108,11 +41,6 @@ const AUTH_TOTP_COLUMNS = ['totp_enabled', 'totp_secret', 'totp_backup_codes'];
 let loggedMissingAuthTotpColumns = false;
 // email_hash column availability — checked once per process lifetime for backward compat
 let authEmailHashColumnAvailable = null;
-
-function getIpRateLimitKey(req) {
-  return ipKeyGenerator(extractIpFromRequest(req) || 'unknown');
-}
-
 const forgotPasswordLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 8,
@@ -135,55 +63,6 @@ const switchOrgLimiter = createRateLimiter({
   label: 'auth-switch-organization',
   keyGenerator: (req) => req.user?.id || req.ip
 });
-
-// Broad rate limiter applied via router.use() so that CodeQL can statically
-// verify that every route in this file is rate-limited.  Per-route limiters
-// below impose stricter limits on sensitive endpoints.
-const authBroadLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
-router.use(authBroadLimiter);
-
-// Explicit express-rate-limit instances for stricter per-endpoint limits on
-// sensitive auth routes.
-const authRegisterLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
-const authLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
-const authRefreshLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
-const authGeneralLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
-
 const VALID_INFORMATION_TYPES = new Set([
   'pii',
   'phi',
@@ -343,7 +222,7 @@ function resolveSessionExpiryTimestamp(isDemoAccount, sessionExpiresAt = null) {
  * @returns {string}
  */
 function buildAccessToken(userId, sessionExpiresAt = null) {
-  const payload = { userId, type: 'access' };
+  const payload = { userId };
   let expiresIn = ACCESS_EXPIRY_SECONDS;
 
   if (sessionExpiresAt) {
@@ -355,7 +234,7 @@ function buildAccessToken(userId, sessionExpiresAt = null) {
     expiresIn = Math.max(1, Math.min(ACCESS_EXPIRY_SECONDS, remainingSeconds));
   }
 
-  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+  return jwt.sign(payload, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn });
 }
 
 /**
@@ -380,7 +259,7 @@ function generateSessionTokens(userId, { isDemoAccount = false, sessionExpiresAt
     refreshPayload.session_expires_at = resolvedSessionExpiresAt;
   }
 
-  const refreshToken = jwt.sign(refreshPayload, JWT_SECRET, { expiresIn: refreshExpiresIn });
+  const refreshToken = jwt.sign(refreshPayload, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: refreshExpiresIn });
   return { accessToken, refreshToken, sessionExpiresAt: resolvedSessionExpiresAt };
 }
 
@@ -430,7 +309,7 @@ async function getUserByEmail(email) {
     authEmailHashColumnAvailable = await hasPublicColumn('users', 'email_hash');
     if (!authEmailHashColumnAvailable) {
       log('warn', 'auth.email_hash_column_missing', {
-        message: 'email_hash column not present — email field-level encryption inactive. Apply migration 101 to enable.'
+        message: 'email_hash column not present — email field-level encryption inactive. Apply migration 098 to enable.'
       });
     }
   }
@@ -488,7 +367,7 @@ async function getUserByEmail(email) {
     } else {
       // Fallback: plain-text email for rows not yet migrated (email_hash IS NULL)
       const plainResult = await pool.query(
-        `SELECT ${selectCols} ${joins} WHERE LOWER(u.email) = $1 AND u.email_hash IS NULL`,
+        `SELECT ${selectCols} ${joins} WHERE u.email = $1 AND u.email_hash IS NULL`,
         [email]
       );
       if (plainResult.rows.length > 0) {
@@ -509,9 +388,9 @@ async function getUserByEmail(email) {
       user.email = decrypt(user.email);
     }
   } else {
-    // Migration 101 not yet applied — plain-text lookup
+    // Migration 098 not yet applied — plain-text lookup
     const result = await pool.query(
-      `SELECT ${selectCols} ${joins} WHERE LOWER(u.email) = $1`,
+      `SELECT ${selectCols} ${joins} WHERE u.email = $1`,
       [email]
     );
     user = result.rows[0] || null;
@@ -541,6 +420,7 @@ async function getUserById(userId) {
   if (user) {
     user.email = decrypt(user.email);
   }
+
   return user;
 }
 
@@ -560,14 +440,14 @@ async function resolveFrameworkIdsByCode(client, frameworkCodes) {
   const foundCodes = new Set(result.rows.map((row) => String(row.code || '').toLowerCase()));
   const missingCodes = frameworkCodes.filter((code) => !foundCodes.has(code));
   if (missingCodes.length > 0) {
-    console.warn(`[auth.register] Ignoring unknown framework codes during signup: ${missingCodes.join(', ')}`);
+    log('warn', 'ignoring_unknown_framework_codes', { missing_codes: missingCodes.join(', ') })
   }
 
   return result.rows.map((row) => row.id);
 }
 
 // POST /auth/register
-router.post('/register', authRegisterLimiter, validateBody((body) => requireFields(body, ['email', 'password', 'full_name'])), async (req, res) => {
+router.post('/register', validateBody((body) => requireFields(body, ['email', 'password', 'full_name'])), async (req, res) => {
   try {
     const {
       email,
@@ -621,32 +501,22 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
       });
     }
 
-    // Check existing user (use email_hash for encrypted-email lookup when available,
-    // with fallback to plain-text email for unmigrated rows)
+    // Check existing user (use email_hash for encrypted-email lookup when available)
     if (authEmailHashColumnAvailable === null) {
       authEmailHashColumnAvailable = await hasPublicColumn('users', 'email_hash');
     }
     const emailHash = authEmailHashColumnAvailable === false
       ? null
       : hashForLookup(normalizedEmail);
-    if (emailHash) {
-      // Check by hash first, then also check for unmigrated plain-text rows
-      const existingByHash = await pool.query('SELECT id FROM users WHERE email_hash = $1', [emailHash]);
-      if (existingByHash.rows.length > 0) {
-        return res.status(409).json({ success: false, error: 'Email already registered' });
-      }
-      const existingByPlain = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL', [normalizedEmail]);
-      if (existingByPlain.rows.length > 0) {
-        return res.status(409).json({ success: false, error: 'Email already registered' });
-      }
-    } else {
-      const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [normalizedEmail]);
-      if (existing.rows.length > 0) {
-        return res.status(409).json({ success: false, error: 'Email already registered' });
-      }
+    const existingQuery = emailHash
+      ? 'SELECT id FROM users WHERE email_hash = $1'
+      : 'SELECT id FROM users WHERE email = $1';
+    const existing = await pool.query(existingQuery, [emailHash ?? normalizedEmail]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ success: false, error: 'Email already registered' });
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const nameParts = normalizedFullName.split(/\s+/);
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -697,11 +567,11 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
 
       const storedEmail = emailHash ? encrypt(normalizedEmail) : normalizedEmail;
       const insertCols = emailHash
-        ? 'organization_id, email, email_hash, password_hash, password_cost, first_name, last_name, role, country_code, region'
-        : 'organization_id, email, password_hash, password_cost, first_name, last_name, role, country_code, region';
+        ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role, country_code, region'
+        : 'organization_id, email, password_hash, first_name, last_name, role, country_code, region';
       const insertVals = emailHash
-        ? [org.id, storedEmail, emailHash, passwordHash, BCRYPT_COST, firstName, lastName, selectedRole, countryCode, region]
-        : [org.id, normalizedEmail, passwordHash, BCRYPT_COST, firstName, lastName, selectedRole, countryCode, region];
+        ? [org.id, storedEmail, emailHash, passwordHash, firstName, lastName, selectedRole, countryCode, region]
+        : [org.id, normalizedEmail, passwordHash, firstName, lastName, selectedRole, countryCode, region];
       const insertPlaceholders = insertVals.map((_, i) => `$${i + 1}`).join(', ');
       const userResult = await client.query(
         `INSERT INTO users (${insertCols})
@@ -806,11 +676,11 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
         userAgent: req.headers['user-agent'],
         success: true,
         authenticationMethod: 'password'
-      }).catch(err => console.error('Audit log error:', err));
+      }).catch(err => log('error', 'audit_log_error', { error: err?.message || String(err) }));
 
       // Ensure all seeded frameworks the org is entitled to are adopted.
       // Fire-and-forget — does not block the registration response.
-      ensureOrgFrameworks(org.id, org.tier).catch(err => console.error('ensureOrgFrameworks error:', err));
+      ensureOrgFrameworks(org.id, org.tier);
 
       res.status(201).json({
         success: true,
@@ -845,7 +715,7 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
       client.release();
     }
   } catch (error) {
-    console.error('Register error:', error);
+    log('error', 'register_error', { error: error?.message || String(error) });
     const statusCode = Number(error.statusCode) || 500;
     const message = statusCode === 500 ? 'Registration failed' : String(error.message || 'Registration failed');
     res.status(statusCode).json({ success: false, error: message });
@@ -853,7 +723,7 @@ router.post('/register', authRegisterLimiter, validateBody((body) => requireFiel
 });
 
 // POST /auth/login
-router.post('/login', authLoginLimiter, validateBody((body) => requireFields(body, ['email', 'password'])), async (req, res) => {
+router.post('/login', validateBody((body) => requireFields(body, ['email', 'password'])), async (req, res) => {
   try {
     const { email, password } = req.body;
     const normalizedEmail = sanitizeInput(String(email || '').trim().toLowerCase());
@@ -903,8 +773,16 @@ router.post('/login', authLoginLimiter, validateBody((body) => requireFields(bod
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
-    // Lazily upgrade legacy password hashes to current BCRYPT_COST. Best-effort.
-    maybeUpgradePasswordHash(user.id, password, user.password_hash);
+    // Lazy rehash: upgrade stored bcrypt cost to BCRYPT_ROUNDS on next successful login
+    // without forcing a password reset. Fire-and-forget — never blocks the login response.
+    if (validPassword && !isDemoAccount) {
+      const storedRounds = bcrypt.getRounds(user.password_hash);
+      if (storedRounds < BCRYPT_ROUNDS) {
+        bcrypt.hash(password, BCRYPT_ROUNDS)
+          .then(newHash => pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]))
+          .catch(err => log('warn', 'auth.rehash.failed', { userId: user.id, error: err.message }));
+      }
+    }
 
     // Reset lockout on successful password check and update region
     const geo = getGeolocationFromRequest(req);
@@ -1029,12 +907,12 @@ router.post('/login', authLoginLimiter, validateBody((body) => requireFields(bod
       userAgent: req.headers['user-agent'],
       success: true,
       authenticationMethod: 'password'
-    }).catch(err => console.error('Audit log error:', err));
+    }).catch(err => log('error', 'audit_log_error', { error: err?.message || String(err) }));
 
     // Ensure all seeded frameworks the org is entitled to are adopted.
     // Fire-and-forget — does not block the login response.
     if (user.organization_id && user.organization_tier) {
-      ensureOrgFrameworks(user.organization_id, user.organization_tier).catch(err => console.error('ensureOrgFrameworks error:', err));
+      ensureOrgFrameworks(user.organization_id, user.organization_tier);
     }
 
     res.json({
@@ -1063,7 +941,7 @@ router.post('/login', authLoginLimiter, validateBody((body) => requireFields(bod
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    log('error', 'login_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Login failed' });
   }
 });
@@ -1089,12 +967,12 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     const fpEmailHash = authEmailHashColumnAvailable !== false ? hashForLookup(email) : null;
     const fpQuery = fpEmailHash
       ? `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE email_hash = $1 LIMIT 1`
-      : `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE LOWER(email) = $1 LIMIT 1`;
+      : `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE email = $1 LIMIT 1`;
     let userResult = await pool.query(fpQuery, [fpEmailHash ?? email]);
     // Fallback for rows not yet migrated (email_hash IS NULL)
     if (userResult.rows.length === 0 && fpEmailHash) {
       userResult = await pool.query(
-        `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL LIMIT 1`,
+        `SELECT id, email, first_name, last_name, is_active, organization_id FROM users WHERE email = $1 AND email_hash IS NULL LIMIT 1`,
         [email]
       );
     }
@@ -1121,12 +999,12 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
       resetLink,
       orgId: user.organization_id || null
     }).catch((error) => {
-      console.warn('Failed to send password reset email:', error.message);
+      log('warn', 'password_reset_email_failed', { error: error?.message || String(error) })
     });
 
     return res.json({ success: true, message: 'If an account exists, a password reset link has been sent.' });
   } catch (error) {
-    console.error('Forgot password error:', error);
+    log('error', 'forgot_password_error', { error: error?.message || String(error) });
     return res.status(500).json({ success: false, error: 'Failed to process forgot password request' });
   }
 });
@@ -1165,18 +1043,17 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
       return res.status(403).json({ success: false, error: 'Password reset is not available for demo accounts' });
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query(
         `UPDATE users
          SET password_hash = $1,
-             password_cost = $2,
              failed_login_attempts = 0,
              locked_until = NULL
-         WHERE id = $3`,
-        [passwordHash, BCRYPT_COST, resetTokenRow.user_id]
+         WHERE id = $2`,
+        [passwordHash, resetTokenRow.user_id]
       );
       await client.query(
         'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1',
@@ -1196,13 +1073,13 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
 
     return res.json({ success: true, message: 'Password has been reset successfully' });
   } catch (error) {
-    console.error('Reset password error:', error);
+    log('error', 'reset_password_error', { error: error?.message || String(error) });
     return res.status(500).json({ success: false, error: 'Failed to reset password' });
   }
 });
 
 // POST /auth/refresh
-router.post('/refresh', authRefreshLimiter, validateBody((body) => requireFields(body, ['refreshToken'])), async (req, res) => {
+router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToken'])), async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
@@ -1245,6 +1122,7 @@ router.post('/refresh', authRefreshLimiter, validateBody((body) => requireFields
     }
 
     // Rotate refresh token: issue new token and invalidate the old one.
+    // The new token's expiry follows the session TTL.
     const isDemoRefresh = Boolean(demoSessionExpiresAt);
     const { accessToken, refreshToken: newRefreshToken, sessionExpiresAt: newExpiresAt } =
       generateSessionTokens(decoded.userId, {
@@ -1259,13 +1137,13 @@ router.post('/refresh', authRefreshLimiter, validateBody((body) => requireFields
 
     res.json({ success: true, data: { accessToken, refreshToken: newRefreshToken } });
   } catch (error) {
-    console.error('Refresh error:', error);
+    log('error', 'refresh_error', { error: error?.message || String(error) });
     res.status(401).json({ success: false, error: 'Token refresh failed' });
   }
 });
 
 // POST /auth/logout
-router.post('/logout', authGeneralLimiter, authenticate, async (req, res) => {
+router.post('/logout', authenticate, async (req, res) => {
   try {
     // Demo accounts are shared — only delete the caller's session, not all sessions
     if (isDemoEmail(req.user.email)) {
@@ -1286,13 +1164,13 @@ router.post('/logout', authGeneralLimiter, authenticate, async (req, res) => {
     }
     res.json({ success: true, message: 'Logged out' });
   } catch (error) {
-    console.error('Logout error:', error);
+    log('error', 'logout_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Logout failed' });
   }
 });
 
 // GET /auth/me
-router.get('/me', authGeneralLimiter, authenticate, async (req, res) => {
+router.get('/me', authenticate, async (req, res) => {
   try {
     await expireOrganizationTrialIfNeeded({
       organizationId: req.user.organization_id,
@@ -1351,7 +1229,7 @@ router.get('/me', authGeneralLimiter, authenticate, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    log('error', 'get_user_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to get user' });
   }
 });
@@ -1362,7 +1240,7 @@ router.get('/me', authGeneralLimiter, authenticate, async (req, res) => {
 
 // ---------- GET /auth/invite/:token ----------
 // Validate invite token and return pre-configured details (no auth required)
-router.get('/invite/:token', authGeneralLimiter, async (req, res) => {
+router.get('/invite/:token', async (req, res) => {
   try {
     const { token } = req.params;
     const result = await pool.query(`
@@ -1411,14 +1289,14 @@ router.get('/invite/:token', authGeneralLimiter, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Validate invite error:', err);
+    log('error', 'validate_invite_error', { error: err?.message || String(err) });
     res.status(500).json({ success: false, error: 'Failed to validate invite' });
   }
 });
 
 // ---------- POST /auth/accept-invite ----------
 // Invited user completes signup with minimal info (name + password)
-router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
+router.post('/accept-invite', validateBody((body) => {
   const errors = [];
   if (!body.token || typeof body.token !== 'string') errors.push('token is required');
   if (!body.full_name || typeof body.full_name !== 'string' || body.full_name.trim().length < 2) {
@@ -1457,30 +1335,21 @@ router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
       return res.status(410).json({ success: false, error: 'This invite has expired' });
     }
 
-    // Check email not already registered (use email_hash for encrypted-email lookup when available,
-    // with fallback to plain-text email for unmigrated rows)
+    // Check email not already registered (use email_hash for encrypted-email lookup when available)
     const inviteEmailNorm = invite.email.toLowerCase();
     if (authEmailHashColumnAvailable === null) {
       authEmailHashColumnAvailable = await hasPublicColumn('users', 'email_hash');
     }
     const inviteEmailHash = authEmailHashColumnAvailable !== false ? hashForLookup(inviteEmailNorm) : null;
-    if (inviteEmailHash) {
-      const existingByHash = await pool.query('SELECT id FROM users WHERE email_hash = $1', [inviteEmailHash]);
-      if (existingByHash.rows.length > 0) {
-        return res.status(409).json({ success: false, error: 'Email already registered' });
-      }
-      const existingByPlain = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL', [inviteEmailNorm]);
-      if (existingByPlain.rows.length > 0) {
-        return res.status(409).json({ success: false, error: 'Email already registered' });
-      }
-    } else {
-      const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [inviteEmailNorm]);
-      if (existing.rows.length > 0) {
-        return res.status(409).json({ success: false, error: 'Email already registered' });
-      }
+    const inviteExistQuery = inviteEmailHash
+      ? 'SELECT id FROM users WHERE email_hash = $1'
+      : 'SELECT id FROM users WHERE LOWER(email) = $1';
+    const existing = await pool.query(inviteExistQuery, [inviteEmailHash ?? inviteEmailNorm]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ success: false, error: 'Email already registered' });
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const nameParts = normalizedFullName.split(/\s+/).filter(Boolean);
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -1492,11 +1361,11 @@ router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
       // Create user in the invite's organization
       const inviteStoredEmail = inviteEmailHash ? encrypt(inviteEmailNorm) : invite.email;
       const inviteInsertCols = inviteEmailHash
-        ? 'organization_id, email, email_hash, password_hash, password_cost, first_name, last_name, role'
-        : 'organization_id, email, password_hash, password_cost, first_name, last_name, role';
+        ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role'
+        : 'organization_id, email, password_hash, first_name, last_name, role';
       const inviteInsertVals = inviteEmailHash
-        ? [invite.organization_id, inviteStoredEmail, inviteEmailHash, passwordHash, BCRYPT_COST, firstName, lastName, invite.primary_role]
-        : [invite.organization_id, invite.email, passwordHash, BCRYPT_COST, firstName, lastName, invite.primary_role];
+        ? [invite.organization_id, inviteStoredEmail, inviteEmailHash, passwordHash, firstName, lastName, invite.primary_role]
+        : [invite.organization_id, invite.email, passwordHash, firstName, lastName, invite.primary_role];
       const inviteInsertPlaceholders = inviteInsertVals.map((_, i) => `$${i + 1}`).join(', ');
       const userResult = await client.query(
         `INSERT INTO users (${inviteInsertCols})
@@ -1581,7 +1450,7 @@ router.post('/accept-invite', authRegisterLimiter, validateBody((body) => {
       client.release();
     }
   } catch (error) {
-    console.error('Accept invite error:', error);
+    log('error', 'accept_invite_error', { error: error?.message || String(error) });
     const statusCode = Number(error.statusCode) || 500;
     const message = statusCode === 500 ? 'Failed to accept invite' : String(error.message || 'Failed to accept invite');
     res.status(statusCode).json({ success: false, error: message });

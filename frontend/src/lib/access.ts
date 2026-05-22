@@ -49,12 +49,8 @@ export function hasAnyPermission(user: AccessUser | null | undefined, permission
   return permissions.some((permission) => hasPermission(user, permission));
 }
 
-export function hasTierAtLeast(user: AccessUser | null | undefined, minTier: OrganizationTier): boolean {
-  if (!user) return false;
-  const tier = user.effectiveTier || user.organizationTier;
-  const userLevel = TIER_LEVELS[normalizeTier(tier)];
-  const requiredLevel = TIER_LEVELS[normalizeTier(minTier)];
-  return userLevel >= requiredLevel;
+export function hasTierAtLeast(_user: AccessUser | null | undefined, _minTier: OrganizationTier): boolean {
+  return true;
 }
 
 /**

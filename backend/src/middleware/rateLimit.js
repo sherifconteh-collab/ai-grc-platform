@@ -139,7 +139,6 @@ function createRateLimiter(options = {}) {
       } catch (err) {
         log('warn', 'ratelimit.redis.request_error', { error: err.message });
         redisAvailable = false;
-        setTimeout(() => { redisAvailable = true; }, 30000).unref();
         ({ count, resetAt, remaining } = checkMemoryLimit(`${label}:${rawKey}`));
       }
     } else {

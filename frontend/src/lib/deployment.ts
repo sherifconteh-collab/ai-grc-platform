@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { getApiBaseUrl } from './apiBase';
 
 export interface DeploymentInfo {
-  edition: 'community' | 'pro' | 'enterprise';
+  edition: 'community' | 'pro' | 'enterprise' | 'open';
   isCommunity: boolean;
   isPro: boolean;
   isSelfHosted: boolean;
@@ -17,9 +17,9 @@ const MARKETING_SITE_ENABLED = ['1', 'true', 'yes', 'on'].includes(
 );
 
 const DEFAULT_DEPLOYMENT_INFO: DeploymentInfo = {
-  edition: MARKETING_SITE_ENABLED ? 'pro' : 'community',
-  isCommunity: !MARKETING_SITE_ENABLED,
-  isPro: MARKETING_SITE_ENABLED,
+  edition: 'open',
+  isCommunity: false,
+  isPro: true,
   isSelfHosted: !MARKETING_SITE_ENABLED,
   marketingSiteEnabled: MARKETING_SITE_ENABLED,
 };
@@ -31,6 +31,7 @@ function normalizeEdition(value: unknown): DeploymentInfo['edition'] {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'enterprise') return 'enterprise';
   if (normalized === 'pro') return 'pro';
+  if (normalized === 'open') return 'open';
   return 'community';
 }
 
@@ -45,7 +46,7 @@ function normalizeDeploymentInfo(payload: unknown): DeploymentInfo {
   return {
     edition,
     isCommunity: Boolean(data.isCommunity ?? (edition === 'community')),
-    isPro: Boolean(data.isPro ?? (edition === 'pro' || edition === 'enterprise')),
+    isPro: Boolean(data.isPro ?? (edition === 'pro' || edition === 'enterprise' || edition === 'open')),
     isSelfHosted: !MARKETING_SITE_ENABLED,
     marketingSiteEnabled: MARKETING_SITE_ENABLED,
   };

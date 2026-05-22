@@ -1,29 +1,38 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
-export function useToast(durationMs = 3000) {
+export type ToastType = 'success' | 'error';
+
+export interface UseToastReturn {
+  toast: string;
+  toastType: ToastType;
+  showToast: (message: string, type?: ToastType) => void;
+}
+
+/**
+ * Shared toast hook with proper timer cleanup.
+ * Clears previous timer on each new toast so rapid calls don't race.
+ * Cleans up on unmount to avoid setting state after component is gone.
+ */
+export function useToast(duration = 3000): UseToastReturn {
   const [toast, setToast] = useState('');
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toastType, setToastType] = useState<ToastType>('success');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((message: string) => {
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setToast(message);
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => {
-      setToast('');
-      timeoutRef.current = null;
-    }, durationMs);
-  }, [durationMs]);
+    setToastType(type);
+    timerRef.current = setTimeout(() => setToast(''), duration);
+  }, [duration]);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
-  return { toast, showToast };
+  return { toast, toastType, showToast };
 }

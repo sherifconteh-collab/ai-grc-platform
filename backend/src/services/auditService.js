@@ -13,8 +13,7 @@
  */
 
 const pool = require('../config/database');
-let siemService;
-try { siemService = require('./siemService'); } catch(e) { siemService = { forwardEvent: async () => [] }; }
+const siemService = require('./siemService');
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
 
 /**
@@ -137,10 +136,9 @@ async function createAuditLog(params) {
 async function forwardToSiem(organizationId, auditLogId, eventType, payload) {
   try {
     const results = await siemService.forwardEvent(organizationId, eventType, payload);
-    const normalizedResults = Array.isArray(results) ? results : [];
     
     // Check if any SIEM forwarding was successful
-    const anySuccess = normalizedResults.some(r => r && r.ok);
+    const anySuccess = results.some(r => r.ok);
     
     if (anySuccess) {
       // Mark as forwarded in audit log
@@ -150,7 +148,7 @@ async function forwardToSiem(organizationId, auditLogId, eventType, payload) {
       );
     }
 
-    return normalizedResults;
+    return results;
   } catch (error) {
     console.error('SIEM forwarding failed:', error);
     return [];

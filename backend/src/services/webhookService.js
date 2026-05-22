@@ -8,6 +8,26 @@ function createSignature(secret, payload) {
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }
 
+// verifyIncomingWebhook validates HMAC signatures on incoming webhook callbacks.
+// Matches the pattern used in openclawWebhook.js (timingSafeEqual, sha256 hex).
+// Returns true if the signature is valid, false otherwise.
+// IMPORTANT: pass the raw request body string (req.rawBody) when available, not the
+// parsed object. JSON.stringify on a parsed object is fragile (key order, whitespace).
+// Usage: if (!verifyIncomingWebhook(secret, req.headers['x-grc-signature'], req.rawBody || JSON.stringify(req.body))) ...
+function verifyIncomingWebhook(secret, signature, body) {
+  if (!secret || !signature) return false;
+  const payload = typeof body === 'string' ? body : JSON.stringify(body);
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(signature.replace(/^sha256=/, '')),
+      Buffer.from(expected)
+    );
+  } catch (_err) {
+    return false;
+  }
+}
+
 function isPrivateIpv4(ip) {
   const octets = ip.split('.').map((value) => Number.parseInt(value, 10));
   if (octets.length !== 4 || octets.some((octet) => !Number.isFinite(octet))) return true;
@@ -227,23 +247,6 @@ async function processPendingWebhookDeliveries({ organizationId = null, limit = 
     failed,
     errors
   };
-}
-
-// verifyIncomingWebhook validates HMAC signatures on incoming webhook callbacks.
-// Pass the raw request body string (req.rawBody) when available, not the parsed
-// object — JSON.stringify on a parsed object is fragile (key order, whitespace).
-function verifyIncomingWebhook(secret, signature, body) {
-  if (!secret || !signature) return false;
-  const payload = typeof body === 'string' ? body : JSON.stringify(body);
-  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(signature.replace(/^sha256=/, '')),
-      Buffer.from(expected)
-    );
-  } catch (_err) {
-    return false;
-  }
 }
 
 module.exports = {

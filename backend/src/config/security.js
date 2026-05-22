@@ -37,6 +37,13 @@ function resolveJwtSecret() {
 
 const JWT_SECRET = resolveJwtSecret();
 
+// Pin the HMAC algorithm on every sign/verify call to prevent algorithm
+// confusion (e.g. an attacker presenting an RS256-signed token the server
+// mistakenly HMAC-verifies against the public key). The shared JWT_SECRET
+// is an HMAC secret, so HS256 is the only valid algorithm.
+const JWT_ALGORITHM = 'HS256';
+const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: [JWT_ALGORITHM] });
+
 const SECURITY_CONFIG = {
   nodeEnv: NODE_ENV,
   isProduction: IS_PRODUCTION,
@@ -88,5 +95,7 @@ const SECURITY_CONFIG = {
 
 module.exports = {
   JWT_SECRET,
+  JWT_ALGORITHM,
+  JWT_VERIFY_OPTIONS,
   SECURITY_CONFIG
 };

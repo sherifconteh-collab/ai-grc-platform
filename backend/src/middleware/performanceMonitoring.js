@@ -86,39 +86,40 @@ function getPerformanceStats() {
   }
 
   // Group by status code
-  const statusCodes = {};
+  const statusCodes = new Map();
   recentRequests.forEach(r => {
     const code = r.statusCode;
-    statusCodes[code] = (statusCodes[code] || 0) + 1;
+    statusCodes.set(code, (statusCodes.get(code) || 0) + 1);
   });
 
   // Group by endpoint
-  const endpointStats = {};
+  const endpointStats = new Map();
   recentRequests.forEach(r => {
     const endpoint = `${r.method} ${r.path}`;
-    if (!endpointStats[endpoint]) {
-      endpointStats[endpoint] = {
+    if (!endpointStats.has(endpoint)) {
+      endpointStats.set(endpoint, {
         count: 0,
         totalDuration: 0,
         avgDuration: 0
-      };
+      });
     }
-    endpointStats[endpoint].count++;
-    endpointStats[endpoint].totalDuration += r.durationMs;
+    const endpointMetric = endpointStats.get(endpoint);
+    endpointMetric.count++;
+    endpointMetric.totalDuration += r.durationMs;
   });
 
   // Calculate averages for endpoints
-  Object.keys(endpointStats).forEach(endpoint => {
-    const stats = endpointStats[endpoint];
-    stats.avgDuration = Number((stats.totalDuration / stats.count).toFixed(2));
-    delete stats.totalDuration;
-  });
+  const normalizedEndpointStats = Array.from(endpointStats.entries(), ([endpoint, stats]) => ({
+    endpoint,
+    count: stats.count,
+    avgDuration: Number((stats.totalDuration / stats.count).toFixed(2))
+  }));
 
   // Get top 10 slowest endpoints
-  const slowestEndpoints = Object.entries(endpointStats)
-    .sort((a, b) => b[1].avgDuration - a[1].avgDuration)
+  const slowestEndpoints = normalizedEndpointStats
+    .sort((a, b) => b.avgDuration - a.avgDuration)
     .slice(0, 10)
-    .map(([endpoint, stats]) => ({ endpoint, ...stats }));
+    .map((stats) => ({ ...stats }));
 
   return {
     uptime: {
@@ -143,7 +144,7 @@ function getPerformanceStats() {
       p95: Number(p95.toFixed(2)),
       p99: Number(p99.toFixed(2))
     },
-    statusCodes,
+    statusCodes: Object.fromEntries(statusCodes),
     slowestEndpoints,
     memory: {
       rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + ' MB',

@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import DashboardLayout from '@/components/DashboardLayout';
-import { dashboardAPI, aiAPI } from '@/lib/api';
+import { dashboardAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
-import { useAutoAIResult } from '@/lib/useAutoAI';
 
 const FRAMEWORK_PROGRESS_COLLAPSED_COUNT = 4;
 const STATUS_FILTER_MAP: Record<string, string> = {
@@ -83,19 +82,67 @@ interface ControlHealthSummary {
   good: number;
   watch: number;
   weak: number;
-  avg_score: number;
+  averageScore: number;
 }
 
 interface ComplianceSummaryFramework {
+  frameworkId: string;
+  frameworkName: string;
+  frameworkCode: string;
+  totalControls: number;
+  implemented: number;
+  inProgress: number;
+  crosswalked: number;
+  notApplicable: number;
+  notStarted: number;
+  compliancePercentage: number;
+  statusDistribution: Record<string, number>;
+}
+
+interface ComplianceSummaryData {
+  overallCompliancePercentage: number;
+  totalFrameworks: number;
+  totalControls: number;
+  totalCompliant: number;
+  frameworks: ComplianceSummaryFramework[];
+}
+
+type ApiError = Error & { response?: { data?: { error?: string } } };
+
+interface TrendDataPoint {
+  date: string;
+  implemented: number;
+  total_changes: number;
+}
+
+interface MaturityDimension {
+  name: string;
+  score: number;
+  weight: number;
+  description: string;
+}
+
+interface MaturityRecommendation {
+  dimension: string;
+  priority: 'critical' | 'medium';
+  message: string;
+}
+
+interface MaturityData {
+  overallScore: number;
+  overallPercentage: number;
+  level: number;
+  label: string;
+  dimensions: MaturityDimension[];
+  recommendations: MaturityRecommendation[];
+}
+
+interface BackendFramework {
   id: string;
   code: string;
   name: string;
   totalControls: number;
   implemented: number;
-  satisfiedViaCrosswalk: number;
-  inProgress: number;
-  notStarted: number;
-  notApplicable: number;
   compliancePercentage: number;
 }
 
@@ -106,43 +153,18 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activity, setActivity] = useState<{ id?: string; changed_by_name: string; control_code: string; control_title: string; old_status: string; new_status: string; changed_at: string; notes?: string }[]>([]);
-  const [trendData, setTrendData] = useState<any[]>([]);
-  const [maturity, setMaturity] = useState<any>(null);
+  const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
+  const [maturity, setMaturity] = useState<MaturityData | null>(null);
   const [showAllFrameworkProgress, setShowAllFrameworkProgress] = useState(false);
   const [showDashboardCustomizer, setShowDashboardCustomizer] = useState(false);
   const [hiddenSections, setHiddenSections] = useState<DashboardSectionKey[]>([]);
   const [dashboardPrefsReady, setDashboardPrefsReady] = useState(false);
-  const [aiInsightsEnabled, setAiInsightsEnabled] = useState(false);
   const [showCrosswalkModal, setShowCrosswalkModal] = useState(false);
   const [crosswalkedControls, setCrosswalkedControls] = useState<CrosswalkedControl[]>([]);
   const [crosswalkLoading, setCrosswalkLoading] = useState(false);
   const [crosswalkError, setCrosswalkError] = useState('');
   const [controlHealthSummary, setControlHealthSummary] = useState<ControlHealthSummary | null>(null);
-  const [complianceSummaryData, setComplianceSummaryData] = useState<{ overall: { totalControls: number; implemented: number; satisfiedViaCrosswalk: number; inProgress: number; notStarted: number; compliancePercentage: number }; frameworks: ComplianceSummaryFramework[] } | null>(null);
-
-  const gapSig = stats ? `${stats.implementedControls}-${stats.totalControls}-${stats.frameworks?.length}` : '';
-  const gapAnalysis = useAutoAIResult({
-    cacheKey: `dashboard-gap-${user?.organizationId}`,
-    signature: gapSig,
-    enabled: aiInsightsEnabled && !!stats && (stats.frameworks?.length ?? 0) > 0,
-    ttlMs: 6 * 60 * 60 * 1000,
-    run: async () => {
-      const res = await aiAPI.gapAnalysis();
-      return res.data?.data?.result;
-    }
-  });
-
-  const forecastSig = stats ? `forecast-${stats.overallCompliance}-${stats.frameworks?.length}` : '';
-  const forecast = useAutoAIResult({
-    cacheKey: `dashboard-forecast-${user?.organizationId}`,
-    signature: forecastSig,
-    enabled: aiInsightsEnabled && !!stats && (stats.frameworks?.length ?? 0) > 0,
-    ttlMs: 6 * 60 * 60 * 1000,
-    run: async () => {
-      const res = await aiAPI.complianceForecast();
-      return res.data?.data?.result;
-    }
-  });
+  const [complianceSummary, setComplianceSummary] = useState<ComplianceSummaryData | null>(null);
 
   useEffect(() => {
     loadOverview();
@@ -177,72 +199,62 @@ export default function DashboardPage() {
     localStorage.setItem(storageKey, JSON.stringify({ hiddenSections }));
   }, [dashboardPrefsReady, user?.id, hiddenSections]);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    const storageKey = `dashboardAiInsights:${user.id}`;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      setAiInsightsEnabled(raw === 'true');
-    } catch (err) {
-      console.error('Failed to load dashboard AI preference:', err);
-      setAiInsightsEnabled(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const storageKey = `dashboardAiInsights:${user.id}`;
-    localStorage.setItem(storageKey, aiInsightsEnabled ? 'true' : 'false');
-  }, [user?.id, aiInsightsEnabled]);
-
   const loadOverview = async () => {
     try {
       setLoading(true);
       setError('');
-      const [overviewRes, healthRes, summaryRes] = await Promise.allSettled([
+
+      // Parallel loading: fetch overview + supplementary data simultaneously
+      const [overviewResult, healthResult, summaryResult] = await Promise.allSettled([
         dashboardAPI.getOverview({ period: '30d' }),
         dashboardAPI.getControlHealthSummary(),
-        dashboardAPI.getComplianceSummary(),
+        dashboardAPI.getComplianceSummary()
       ]);
 
-      if (overviewRes.status === 'rejected') throw overviewRes.reason;
+      // Process main overview data
+      if (overviewResult.status === 'fulfilled') {
+        const payload = overviewResult.value.data?.data || {};
+        const backendData = payload.stats || null;
 
-      const payload = overviewRes.value.data?.data || {};
-      const backendData = payload.stats || null;
+        if (!backendData) {
+          throw new Error('Dashboard overview returned empty stats payload');
+        }
 
-      if (!backendData) {
-        throw new Error('Dashboard overview returned empty stats payload');
+        setStats({
+          overallCompliance: backendData.overall.compliancePercentage,
+          totalControls: backendData.overall.totalControls,
+          implementedControls: backendData.overall.implemented,
+          satisfiedViaAutoCrosswalk: backendData.overall.satisfiedViaCrosswalk,
+          applicableControls: backendData.overall.totalApplicable,
+          frameworks: backendData.frameworks.map((fw: BackendFramework) => ({
+            id: fw.id,
+            code: fw.code,
+            name: fw.name,
+            totalControls: fw.totalControls,
+            implementedControls: fw.implemented,
+            compliancePercentage: fw.compliancePercentage
+          }))
+        });
+
+        setActivity(Array.isArray(payload.activity) ? payload.activity : []);
+        setTrendData(Array.isArray(payload.trend) ? payload.trend : []);
+        setMaturity(payload.maturity || null);
+      } else {
+        throw overviewResult.reason;
       }
 
-      setStats({
-        overallCompliance: backendData.overall.compliancePercentage,
-        totalControls: backendData.overall.totalControls,
-        implementedControls: backendData.overall.implemented,
-        satisfiedViaAutoCrosswalk: backendData.overall.satisfiedViaCrosswalk,
-        applicableControls: backendData.overall.totalApplicable,
-        frameworks: backendData.frameworks.map((fw: any) => ({
-          id: fw.id,
-          code: fw.code,
-          name: fw.name,
-          totalControls: fw.totalControls,
-          implementedControls: fw.implemented,
-          compliancePercentage: fw.compliancePercentage
-        }))
-      });
-
-      setActivity(Array.isArray(payload.activity) ? payload.activity : []);
-      setTrendData(Array.isArray(payload.trend) ? payload.trend : []);
-      setMaturity(payload.maturity || null);
-
-      if (healthRes.status === 'fulfilled') {
-        setControlHealthSummary((healthRes.value.data?.data?.summary as ControlHealthSummary) ?? null);
+      // Process control health summary (non-blocking)
+      if (healthResult.status === 'fulfilled') {
+        setControlHealthSummary(healthResult.value.data?.data || null);
       }
 
-      if (summaryRes.status === 'fulfilled') {
-        setComplianceSummaryData(summaryRes.value.data?.data ?? null);
+      // Process compliance summary (non-blocking)
+      if (summaryResult.status === 'fulfilled') {
+        setComplianceSummary(summaryResult.value.data?.data || null);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load dashboard');
+    } catch (err: unknown) {
+      const axiosErr = err as ApiError;
+      setError(axiosErr.response?.data?.error || 'Failed to load dashboard');
       console.error('Dashboard error:', err);
     } finally {
       setLoading(false);
@@ -295,17 +307,6 @@ export default function DashboardPage() {
             <p className="text-gray-600 mt-2">{APP_POSITIONING_SHORT}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setAiInsightsEnabled((prev) => !prev)}
-              className={`px-4 py-2 border font-medium rounded-lg transition ${
-                aiInsightsEnabled
-                  ? 'border-purple-700 bg-purple-700 text-white hover:bg-purple-800'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {aiInsightsEnabled ? 'AI Insights: On' : 'AI Insights: Off'}
-            </button>
             <button
               type="button"
               onClick={() => setShowDashboardCustomizer((prev) => !prev)}
@@ -396,8 +397,8 @@ export default function DashboardPage() {
                     setCrosswalkLoading(true);
                     setCrosswalkError('');
                     dashboardAPI.getCrosswalkedControls()
-                      .then((res: any) => setCrosswalkedControls(res.data?.data || []))
-                      .catch((err: any) => {
+                      .then((res) => setCrosswalkedControls(res.data?.data || []))
+                      .catch((err: ApiError) => {
                         console.error('Failed to load crosswalked controls:', err);
                         setCrosswalkedControls([]);
                         setCrosswalkError(err?.response?.data?.error || 'Unable to load crosswalked controls. This may happen if no controls have been auto-crosswalked yet.');
@@ -408,9 +409,75 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* AI Gap Analysis Panel */}
-            {aiInsightsEnabled && (stats?.frameworks?.length ?? 0) > 0 && (
-              <AIInsightPanel title="AI Gap Analysis" ai={gapAnalysis} />
+            {/* Control Health Overview */}
+            {isSectionVisible('controlHealth') && controlHealthSummary && controlHealthSummary.total > 0 && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Control Health Overview</h2>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900">{controlHealthSummary.total}</div>
+                    <div className="text-xs text-gray-500">Total Controls</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{controlHealthSummary.strong}</div>
+                    <div className="text-xs text-gray-500">Strong (≥80)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{controlHealthSummary.good}</div>
+                    <div className="text-xs text-gray-500">Good (60–79)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-600">{controlHealthSummary.watch}</div>
+                    <div className="text-xs text-gray-500">Watch (40–59)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{controlHealthSummary.weak}</div>
+                    <div className="text-xs text-gray-500">Weak (&lt;40)</div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="flex h-3 rounded-full overflow-hidden bg-gray-200">
+                    {controlHealthSummary.strong > 0 && (
+                      <div
+                        className="bg-green-500 transition-all duration-500"
+                        style={{ width: `${(controlHealthSummary.strong / controlHealthSummary.total) * 100}%` }}
+                        title={`Strong: ${controlHealthSummary.strong}`}
+                      />
+                    )}
+                    {controlHealthSummary.good > 0 && (
+                      <div
+                        className="bg-blue-500 transition-all duration-500"
+                        style={{ width: `${(controlHealthSummary.good / controlHealthSummary.total) * 100}%` }}
+                        title={`Good: ${controlHealthSummary.good}`}
+                      />
+                    )}
+                    {controlHealthSummary.watch > 0 && (
+                      <div
+                        className="bg-yellow-500 transition-all duration-500"
+                        style={{ width: `${(controlHealthSummary.watch / controlHealthSummary.total) * 100}%` }}
+                        title={`Watch: ${controlHealthSummary.watch}`}
+                      />
+                    )}
+                    {controlHealthSummary.weak > 0 && (
+                      <div
+                        className="bg-red-500 transition-all duration-500"
+                        style={{ width: `${(controlHealthSummary.weak / controlHealthSummary.total) * 100}%` }}
+                        title={`Weak: ${controlHealthSummary.weak}`}
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-500">Average Health Score: <span className="font-semibold text-gray-700">{controlHealthSummary.averageScore}/100</span></span>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/dashboard/security-posture')}
+                      className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                    >
+                      View Details →
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Maturity Score */}
@@ -436,7 +503,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {maturity.dimensions?.map((dim: any) => (
+                  {maturity.dimensions?.map((dim: MaturityDimension) => (
                     <div key={dim.name} className="text-center">
                       <div className="text-xs text-gray-500 mb-1">{dim.name}</div>
                       <div className="relative w-full bg-gray-200 rounded-full h-2 mb-1">
@@ -456,7 +523,7 @@ export default function DashboardPage() {
                 {maturity.recommendations?.length > 0 && (
                   <div className="mt-4 border-t pt-3">
                     <p className="text-xs font-semibold text-gray-500 mb-2">RECOMMENDATIONS</p>
-                    {maturity.recommendations.slice(0, 3).map((rec: any, i: number) => (
+                    {maturity.recommendations.slice(0, 3).map((rec: MaturityRecommendation, i: number) => (
                       <div key={i} className="flex items-start gap-2 mb-1">
                         <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
                           rec.priority === 'critical' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
@@ -468,49 +535,6 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Control Health Overview */}
-            {isSectionVisible('controlHealth') && controlHealthSummary && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-gray-900">Control Health Overview</h2>
-                  <a href="/dashboard/security-posture" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
-                    View Security Posture →
-                  </a>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                  {([
-                    { label: 'Strong', count: controlHealthSummary.strong, color: 'text-green-700 bg-green-50 border-green-200' },
-                    { label: 'Good', count: controlHealthSummary.good, color: 'text-blue-700 bg-blue-50 border-blue-200' },
-                    { label: 'Watch', count: controlHealthSummary.watch, color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
-                    { label: 'Weak', count: controlHealthSummary.weak, color: 'text-red-700 bg-red-50 border-red-200' },
-                    { label: 'Total', count: controlHealthSummary.total, color: 'text-gray-700 bg-gray-50 border-gray-200' },
-                  ] as const).map(({ label, count, color }) => (
-                    <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
-                      <div className="text-2xl font-bold">{count}</div>
-                      <div className="text-xs font-medium mt-0.5">{label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600 flex-shrink-0">Avg Health Score</span>
-                  <div
-                    className="flex-1 bg-gray-200 rounded-full h-2"
-                    aria-label={`Average health score: ${controlHealthSummary.avg_score}`}
-                  >
-                    <div
-                      className={`h-2 rounded-full transition-all duration-500 ${
-                        controlHealthSummary.avg_score >= 80 ? 'bg-green-500' :
-                        controlHealthSummary.avg_score >= 60 ? 'bg-blue-500' :
-                        controlHealthSummary.avg_score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${controlHealthSummary.avg_score}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-bold text-gray-700 flex-shrink-0">{controlHealthSummary.avg_score}/100</span>
-                </div>
               </div>
             )}
 
@@ -559,6 +583,70 @@ export default function DashboardPage() {
                       Example: Implement NIST CSF &quot;GV.OC-01&quot; &rarr; Automatically satisfies ISO 27001 &quot;A.5.1.1&quot; and SOC 2 &quot;CC1.1&quot; (90%+ similarity)
                     </p>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Per-Framework Compliance Summary */}
+            {isSectionVisible('complianceSummary') && complianceSummary && complianceSummary.frameworks.length > 0 && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Per-Framework Compliance Summary</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-500 uppercase border-b">
+                        <th className="pb-2 pr-4">Framework</th>
+                        <th className="pb-2 pr-4 text-right">Total</th>
+                        <th className="pb-2 pr-4 text-right">Implemented</th>
+                        <th className="pb-2 pr-4 text-right">In Progress</th>
+                        <th className="pb-2 pr-4 text-right">Crosswalked</th>
+                        <th className="pb-2 pr-4 text-right">Not Started</th>
+                        <th className="pb-2 text-right">Compliance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {complianceSummary.frameworks.map((fw) => (
+                        <tr key={fw.frameworkId} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-2 pr-4">
+                            <span className="font-medium text-gray-900">{fw.frameworkCode}</span>
+                            <span className="text-xs text-gray-400 ml-1">{fw.frameworkName}</span>
+                          </td>
+                          <td className="py-2 pr-4 text-right text-gray-700">{fw.totalControls}</td>
+                          <td className="py-2 pr-4 text-right text-green-600 font-medium">{fw.implemented}</td>
+                          <td className="py-2 pr-4 text-right text-blue-600">{fw.inProgress}</td>
+                          <td className="py-2 pr-4 text-right text-orange-600">{fw.crosswalked}</td>
+                          <td className="py-2 pr-4 text-right text-gray-400">{fw.notStarted}</td>
+                          <td className="py-2 text-right">
+                            <span className={`font-bold ${
+                              fw.compliancePercentage >= 80 ? 'text-green-600' :
+                              fw.compliancePercentage >= 50 ? 'text-blue-600' :
+                              fw.compliancePercentage >= 25 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {fw.compliancePercentage}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-gray-200 font-semibold">
+                        <td className="pt-2 pr-4 text-gray-900">Overall</td>
+                        <td className="pt-2 pr-4 text-right text-gray-900">{complianceSummary.totalControls}</td>
+                        <td className="pt-2 pr-4 text-right text-green-600">{complianceSummary.totalCompliant}</td>
+                        <td className="pt-2 pr-4 text-right">—</td>
+                        <td className="pt-2 pr-4 text-right">—</td>
+                        <td className="pt-2 pr-4 text-right">—</td>
+                        <td className="pt-2 text-right">
+                          <span className={`font-bold ${
+                            complianceSummary.overallCompliancePercentage >= 80 ? 'text-green-600' :
+                            complianceSummary.overallCompliancePercentage >= 50 ? 'text-blue-600' : 'text-yellow-600'
+                          }`}>
+                            {complianceSummary.overallCompliancePercentage}%
+                          </span>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
             )}
@@ -646,73 +734,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Per-Framework Compliance Summary */}
-            {isSectionVisible('complianceSummary') && (complianceSummaryData?.frameworks?.length ?? 0) > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6 overflow-x-auto">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Per-Framework Compliance Summary</h2>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-gray-500 uppercase border-b">
-                      <th className="pb-2 pr-4">Framework</th>
-                      <th className="pb-2 pr-3 text-right">Total</th>
-                      <th className="pb-2 pr-3 text-right">Implemented</th>
-                      <th className="pb-2 pr-3 text-right">In Progress</th>
-                      <th className="pb-2 pr-3 text-right">Crosswalked</th>
-                      <th className="pb-2 pr-3 text-right">Not Started</th>
-                      <th className="pb-2 text-right">%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {complianceSummaryData!.frameworks.map((fw) => (
-                      <tr key={fw.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-2 pr-4">
-                          <span className="font-medium text-gray-900">{fw.code}</span>
-                          <span className="text-xs text-gray-500 ml-1 hidden sm:inline">· {fw.name}</span>
-                        </td>
-                        <td className="py-2 pr-3 text-right text-gray-600">{fw.totalControls}</td>
-                        <td className="py-2 pr-3 text-right text-gray-600">{fw.implemented}</td>
-                        <td className="py-2 pr-3 text-right text-gray-600">{fw.inProgress}</td>
-                        <td className="py-2 pr-3 text-right text-gray-600">{fw.satisfiedViaCrosswalk}</td>
-                        <td className="py-2 pr-3 text-right text-gray-600">{fw.notStarted}</td>
-                        <td className="py-2 text-right">
-                          <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${
-                            fw.compliancePercentage >= 80 ? 'bg-green-100 text-green-700' :
-                            fw.compliancePercentage >= 50 ? 'bg-blue-100 text-blue-700' :
-                            fw.compliancePercentage >= 25 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {fw.compliancePercentage}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {complianceSummaryData!.overall && (
-                      <tr className="border-t-2 border-gray-200 font-semibold bg-gray-50">
-                        <td className="py-2 pr-4 text-gray-700">Overall</td>
-                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.totalControls}</td>
-                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.implemented}</td>
-                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.inProgress}</td>
-                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.satisfiedViaCrosswalk}</td>
-                        <td className="py-2 pr-3 text-right text-gray-700">{complianceSummaryData!.overall.notStarted}</td>
-                        <td className="py-2 text-right">
-                          <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${
-                            complianceSummaryData!.overall.compliancePercentage >= 80 ? 'bg-green-100 text-green-700' :
-                            complianceSummaryData!.overall.compliancePercentage >= 50 ? 'bg-blue-100 text-blue-700' :
-                            complianceSummaryData!.overall.compliancePercentage >= 25 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {complianceSummaryData!.overall.compliancePercentage}%
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* AI Compliance Forecast Panel */}
-            {aiInsightsEnabled && (stats?.frameworks?.length ?? 0) > 0 && (
-              <AIInsightPanel title="AI Compliance Forecast" ai={forecast} />
-            )}
           </>
         ) : null}
       </div>
@@ -778,61 +799,6 @@ export default function DashboardPage() {
         </div>
       )}
     </DashboardLayout>
-  );
-}
-
-function AIInsightPanel({ title, ai }: { title: string; ai: ReturnType<typeof useAutoAIResult> }) {
-  const [collapsed, setCollapsed] = useState(false);
-  return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div
-        className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-50 to-indigo-50 cursor-pointer"
-        onClick={() => setCollapsed(c => !c)}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-purple-600">✨</span>
-          <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
-          {ai.fromCache && ai.lastUpdatedAt && (
-            <span className="text-xs text-gray-400">
-              · cached {new Date(ai.lastUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-          {ai.status === 'running' && (
-            <span className="text-xs text-purple-500 animate-pulse">· analyzing…</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={e => { e.stopPropagation(); ai.refresh(); }}
-            className="text-xs text-gray-400 hover:text-purple-600 px-2 py-0.5 rounded hover:bg-purple-50"
-          >
-            Refresh
-          </button>
-          <span className="text-gray-400 text-xs">{collapsed ? '▶' : '▼'}</span>
-        </div>
-      </div>
-      {!collapsed && (
-        <div className="p-4">
-          {ai.status === 'running' && !ai.result && (
-            <div className="space-y-2 animate-pulse">
-              <div className="h-3 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-200 rounded w-full" />
-              <div className="h-3 bg-gray-200 rounded w-5/6" />
-              <div className="h-3 bg-gray-200 rounded w-2/3" />
-            </div>
-          )}
-          {ai.status === 'error' && (
-            <p className="text-sm text-red-500">{ai.error}</p>
-          )}
-          {ai.result && (
-            <pre className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed font-sans">{ai.result}</pre>
-          )}
-          {ai.status === 'idle' && !ai.result && (
-            <p className="text-xs text-gray-400">AI analysis will run automatically when data is available.</p>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 

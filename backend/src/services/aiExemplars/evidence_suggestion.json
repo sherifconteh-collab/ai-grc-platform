@@ -1,36 +1,106 @@
 [
   {
-    "input": {
-      "control": "CC6.1 — Logical and physical access controls",
-      "framework": "SOC 2"
-    },
+    "_note": "ip-hygiene:ignore-file — This file contains paraphrased standards language used as few-shot exemplars for AI output. All quoted standards text is paraphrased/summarized; any remaining near-verbatim phrasing is permitted under fair-use for internal model prompting. Entries without an 'output' field are metadata and ignored by the loader."
+  },
+  {
+    "description": "Evidence suggestion for NIST 800-53 AC-2 Account Management in a SaaS organization",
+    "input_summary": "Control AC-2 is implemented but evidence has not been collected. Organization uses Okta for SSO and AWS IAM.",
     "output": {
-      "control_title": "CC6.1 — Logical and physical access controls",
-      "framework": "SOC 2",
+      "control_id": "AC-2",
+      "control_title": "Account Management",
+      "framework": "NIST_800_53",
       "evidence_items": [
-        { "name": "Identity provider user export with role assignments", "format": "CSV", "cadence": "Quarterly", "source_system": "Okta", "notes": "Filter to in-scope production groups." },
-        { "name": "MFA enrollment status report", "format": "PDF", "cadence": "Quarterly", "source_system": "Okta", "notes": "Must include 100% enrollment for privileged users." },
-        { "name": "Server room access badge log", "format": "CSV", "cadence": "Monthly", "source_system": "Brivo", "notes": "If applicable; otherwise mark colo provider SOC 2 report as compensating." }
+        {
+          "title": "Quarterly Access Review Report",
+          "description": "Signed attestation from system owners confirming all user accounts have been reviewed, orphaned accounts removed, and access rights remain appropriate to job function. Must cover all systems that authenticate via Okta SSO.",
+          "collection_method": "Export from Okta Access Certification campaign; supplement with manual review attestation form signed by ISSO.",
+          "format": "PDF report or spreadsheet",
+          "freshness_days": 90,
+          "automation_possible": true,
+          "automation_hint": "Use Okta Lifecycle Management API to export last login dates and role assignments; automate report generation monthly.",
+          "example_filename": "AC-2_access_review_Q1_2025.pdf",
+          "sufficiency_criteria": "Must show: (1) review date, (2) reviewer identity, (3) disposition for each account (retain/modify/remove), (4) completion date ≤90 days prior to audit inquiry."
+        },
+        {
+          "title": "Account Provisioning and Deprovisioning Procedure",
+          "description": "Written procedure defining the account lifecycle including request, approval, provisioning, modification, and termination steps. Must reference HR triggers for onboarding and offboarding.",
+          "collection_method": "Export policy document from knowledge management system (Confluence, SharePoint) with version and approval metadata visible.",
+          "format": "PDF or Word document with version control header",
+          "freshness_days": 365,
+          "automation_possible": false,
+          "example_filename": "AC-2_account_mgmt_procedure_v1.3.pdf",
+          "sufficiency_criteria": "Must include: (1) approval authority, (2) SLA from request to provision (≤1 business day recommended), (3) separation of duties note, (4) emergency access procedure."
+        },
+        {
+          "title": "Terminated User Account Closure Log (6-month sample)",
+          "description": "Log showing accounts disabled within 24 hours of HR offboarding event. Export from Okta or Active Directory showing disabled_at timestamp vs. HR termination date.",
+          "collection_method": "Run Okta System Log query: event_type eq 'user.lifecycle.deactivate'; cross-reference with HRIS termination dates for the sample period.",
+          "format": "CSV or PDF export with timestamps",
+          "freshness_days": 180,
+          "automation_possible": true,
+          "automation_hint": "Script: query Okta /api/v1/logs?filter=eventType eq 'user.lifecycle.deactivate' and join to HRIS API on email; flag rows where delta > 24h.",
+          "example_filename": "AC-2_termination_log_Jan-Jun2025.csv",
+          "sufficiency_criteria": "Must cover ≥6 months; show ≥95% closure within 24 hours of offboarding trigger; include any exceptions with explanation."
+        },
+        {
+          "title": "Privileged Account Inventory",
+          "description": "Complete list of all accounts with privileged access (admin, root, service accounts) including owner, business justification, last review date, and MFA enforcement status.",
+          "collection_method": "Export AWS IAM users/roles with 'AdministratorAccess' or '*' permissions; add Okta admin console export; merge into single spreadsheet.",
+          "format": "Spreadsheet (XLSX or CSV)",
+          "freshness_days": 90,
+          "automation_possible": true,
+          "automation_hint": "AWS CLI: `aws iam get-account-authorization-details --filter User Role` then filter on attached policies containing Action: '*'.",
+          "example_filename": "AC-2_privileged_accounts_inventory_2025-Q2.xlsx",
+          "sufficiency_criteria": "Must include account name, type, owner, date last reviewed, MFA status, and justification for each privileged account."
+        }
       ],
-      "collection_notes": "Capture screenshots of system configuration that drives each export.",
-      "estimated_collection_hours": 6
+      "collection_notes": "Prioritize the Access Review Report and Termination Log first — these are the most commonly requested artifacts in AC-2 audit inquiries. The Privileged Account Inventory is typically a Day 1 PBC item.",
+      "estimated_collection_hours": 4
     }
   },
   {
-    "input": {
-      "control": "AC-2 — Account Management",
-      "framework": "NIST 800-53 Rev. 5"
-    },
+    "description": "Evidence suggestion for SOC 2 CC6.1 Logical Access Controls in a fintech startup",
+    "input_summary": "SOC 2 Type II readiness. CC6.1 covers logical access security over protected information assets. Org uses GitHub, AWS, Datadog, and Stripe.",
     "output": {
-      "control_title": "AC-2 — Account Management",
-      "framework": "NIST 800-53 Rev. 5",
+      "control_id": "CC6.1",
+      "control_title": "Logical and Physical Access Controls",
+      "framework": "SOC2",
       "evidence_items": [
-        { "name": "Joiner/Mover/Leaver workflow documentation", "format": "Confluence page export", "cadence": "Annual", "source_system": "Confluence" },
-        { "name": "Termination tickets sample with disablement timestamps", "format": "Jira export", "cadence": "Quarterly", "source_system": "Jira" },
-        { "name": "Quarterly access review attestations", "format": "PDF with signatures", "cadence": "Quarterly", "source_system": "Drive" }
+        {
+          "title": "Access Control Policy",
+          "description": "Formally approved policy governing user authentication, authorization, least-privilege, and access review cadence. Must reference all in-scope systems.",
+          "collection_method": "Export from policy management tool or Google Drive with approved version visible and CISO/management signature.",
+          "format": "PDF",
+          "freshness_days": 365,
+          "automation_possible": false,
+          "example_filename": "CC6.1_access_control_policy_v2.1.pdf",
+          "sufficiency_criteria": "Must be current (reviewed in last 12 months), signed by appropriate authority, and reference all in-scope systems."
+        },
+        {
+          "title": "GitHub Repository Access Matrix",
+          "description": "Current list of all users with access to production repositories, their role (read/write/admin), and business justification. Shows no unauthorized direct push to main branch.",
+          "collection_method": "GitHub API: GET /orgs/{org}/members then GET /repos/{owner}/{repo}/collaborators for each production repo. Export branch protection rules screenshot.",
+          "format": "CSV + screenshot",
+          "freshness_days": 90,
+          "automation_possible": true,
+          "automation_hint": "Use GitHub API with token: `gh api orgs/ORG/members --paginate --jq '.[].login'` then cross-reference with repo access.",
+          "example_filename": "CC6.1_github_access_matrix_2025-06.csv",
+          "sufficiency_criteria": "Must show: all repo members, roles, branch protection enabled on main, and evidence of PR approval requirement."
+        },
+        {
+          "title": "AWS IAM Access Audit",
+          "description": "IAM credential report showing all active users/roles, last activity, MFA enrollment, and access key age. No stale credentials (>90 days unused) should remain active.",
+          "collection_method": "AWS Console → IAM → Credential Report (generate and download). Supplement with AWS Access Analyzer findings export.",
+          "format": "CSV credential report + PDF Access Analyzer findings",
+          "freshness_days": 90,
+          "automation_possible": true,
+          "automation_hint": "AWS CLI: `aws iam generate-credential-report` then `aws iam get-credential-report --query 'Content' --output text | base64 -d`",
+          "example_filename": "CC6.1_aws_iam_credential_report_2025-06.csv",
+          "sufficiency_criteria": "Must show MFA enabled for console users, no access keys unused >90 days, no root account active access keys."
+        }
       ],
-      "collection_notes": "Cross-reference termination tickets with HR feed to identify any missed disablements.",
-      "estimated_collection_hours": 8
+      "collection_notes": "SOC 2 auditors focus heavily on evidence of monitoring controls, not just policy existence. Include screenshots of automated alerts for failed login attempts and privilege escalation.",
+      "estimated_collection_hours": 3
     }
   }
 ]

@@ -6,16 +6,9 @@ import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { organizationAPI, frameworkAPI, assessmentsAPI } from '@/lib/api';
-import { hasPermission, normalizeTier } from '@/lib/access';
+import { hasPermission } from '@/lib/access';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
 
-function getFrameworkLimit(tier: string): number {
-  switch (tier) {
-    case 'community': return 2;
-    case 'pro': return -1;
-    default: return -1;
-  }
-}
 
 interface Framework {
   id: string;
@@ -67,9 +60,6 @@ export default function FrameworksPage() {
   const { user } = useAuth();
   const canManageFrameworks = hasPermission(user, 'frameworks.manage');
   const canReadAssessments = hasPermission(user, 'assessments.read');
-  const userTier = normalizeTier(user?.effectiveTier || user?.organizationTier);
-  const frameworkLimit = getFrameworkLimit(userTier);
-  const isLimitedTier = frameworkLimit !== -1;
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
   const [procedureCountsByCode, setProcedureCountsByCode] = useState<Record<string, number>>({});
@@ -204,14 +194,6 @@ export default function FrameworksPage() {
       if (prev.includes(frameworkId)) {
         return prev.filter((id) => id !== frameworkId);
       }
-      if (frameworkLimit !== -1 && prev.length >= frameworkLimit) {
-        const tierLabel = userTier.charAt(0).toUpperCase() + userTier.slice(1);
-        setMessage({
-          type: 'error',
-          text: `${tierLabel} plan allows up to ${frameworkLimit} framework${frameworkLimit === 1 ? '' : 's'}. Deselect one first, or upgrade to ControlWeave Pro for more.`
-        });
-        return prev;
-      }
       return [...prev, frameworkId];
     });
   };
@@ -305,11 +287,11 @@ export default function FrameworksPage() {
 
         {/* AI cross-feature linkage */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Link href="/dashboard/ai-analysis"
+          <Link href="/dashboard/ai-insights"
             className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors text-xs">
-            <span>✨</span>
+            <span>📈</span>
             <div>
-              <div className="font-medium text-purple-800">AI Analysis</div>
+              <div className="font-medium text-purple-800">AI Insights</div>
               <div className="text-purple-600">Gap analysis & crosswalk optimizer</div>
             </div>
           </Link>
@@ -352,33 +334,6 @@ export default function FrameworksPage() {
           </div>
         )}
 
-        {/* Tier framework limit banner */}
-        {isLimitedTier && canManageFrameworks && (
-          <div className={`border rounded-lg p-4 flex items-center justify-between gap-4 ${
-            selectedFrameworks.length >= frameworkLimit
-              ? 'bg-amber-50 border-amber-300'
-              : 'bg-blue-50 border-blue-200'
-          }`}>
-            <p className={`text-sm font-medium ${
-              selectedFrameworks.length >= frameworkLimit ? 'text-amber-900' : 'text-blue-900'
-            }`}>
-              <span className="font-semibold">{userTier.charAt(0).toUpperCase() + userTier.slice(1)} plan:</span>{' '}
-              {selectedFrameworks.length} of {frameworkLimit} framework{frameworkLimit === 1 ? '' : 's'} selected
-              {selectedFrameworks.length >= frameworkLimit && ' — limit reached'}
-            </p>
-            {process.env.NEXT_PUBLIC_PRO_URL && (
-              <a
-                href={process.env.NEXT_PUBLIC_PRO_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 text-xs px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-medium"
-              >
-                Get ControlWeave Pro
-              </a>
-            )}
-          </div>
-        )}
-
         {/* Selection Summary */}
         {selectedFrameworks.length > 0 && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
@@ -403,10 +358,10 @@ export default function FrameworksPage() {
                   </p>
                 </div>
                 <Link
-                  href="/dashboard/ai-analysis"
+                  href="/dashboard/ai-insights"
                   className="px-4 py-2 text-sm rounded-md bg-white/10 hover:bg-white/20 border border-white/20"
                 >
-                  Run AI governance checks
+                  Open AI Insights
                 </Link>
               </div>
             </div>
@@ -415,8 +370,7 @@ export default function FrameworksPage() {
                 {featuredSpotlight.map((framework) => {
                   const isSelected = selectedFrameworks.includes(framework.id);
                   const procedureCount = procedureCountsByCode[framework.code] ?? null;
-                  const isAtLimit = frameworkLimit !== -1 && selectedFrameworks.length >= frameworkLimit;
-                  const isLocked = canManageFrameworks && !isSelected && isAtLimit;
+                  const isLocked = false;
                   return (
                     <div
                       key={`spotlight-${framework.id}`}
@@ -679,8 +633,7 @@ export default function FrameworksPage() {
             {orderedFrameworks.map((framework) => {
               const isSelected = selectedFrameworks.includes(framework.id);
               const procedureCount = procedureCountsByCode[framework.code] ?? null;
-              const isAtLimit = frameworkLimit !== -1 && selectedFrameworks.length >= frameworkLimit;
-              const isLocked = canManageFrameworks && !isSelected && isAtLimit;
+              const isLocked = false;
               return (
                 <div
                   key={framework.id}

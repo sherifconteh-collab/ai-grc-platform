@@ -6,6 +6,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
 const { invalidateAICache } = require('../services/llmService');
+const { log } = require('../utils/logger');
 
 router.use(authenticate);
 
@@ -52,7 +53,7 @@ router.post('/by-control/:controlId/ensure', requirePermission('implementations.
       }
     });
   } catch (error) {
-    console.error('Ensure implementation error:', error);
+    log('error', 'ensure_implementation_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to ensure implementation' });
   }
 });
@@ -111,7 +112,7 @@ router.get('/', requirePermission('implementations.read'), async (req, res) => {
     const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Implementations error:', error);
+    log('error', 'implementations_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load implementations' });
   }
 });
@@ -140,7 +141,7 @@ router.get('/activity/feed', requirePermission('implementations.read'), async (r
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Activity feed error:', error);
+    log('error', 'activity_feed_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load activity feed' });
   }
 });
@@ -169,7 +170,7 @@ router.get('/due/upcoming', requirePermission('implementations.read'), async (re
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Due controls error:', error);
+    log('error', 'due_controls_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load due controls' });
   }
 });
@@ -232,7 +233,7 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
 
     res.json({ success: true, data: implementation });
   } catch (error) {
-    console.error('Get implementation error:', error);
+    log('error', 'get_implementation_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load implementation' });
   }
 });
@@ -310,7 +311,7 @@ router.patch('/:id/status', requirePermission('implementations.write'), validate
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Update status error:', error);
+    log('error', 'update_status_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update status' });
   }
 });
@@ -344,7 +345,7 @@ router.patch('/:id/assign', requirePermission('implementations.write'), validate
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Assign error:', error);
+    log('error', 'assign_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to assign control' });
   }
 });
@@ -368,7 +369,7 @@ router.post('/:id/review', requirePermission('implementations.write'), validateB
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Review error:', error);
+    log('error', 'review_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to submit review' });
   }
 });
@@ -399,8 +400,127 @@ router.patch('/:id/test-result', requirePermission('assessments.write'), validat
     }
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Test result update error:', error);
+    log('error', 'test_result_update_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update test result' });
+  }
+});
+
+// ============================================================
+// Phase 5.2 — Implementation Narrative
+// PUT /api/v1/implementations/:id/narrative
+// Save implementation narrative + test method metadata
+// ============================================================
+router.put('/:id/narrative', requirePermission('implementations.write'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const organizationId = req.user.organization_id;
+    const {
+      implementationNarrative,
+      testMethod,
+      testPerformedBy,
+      testPerformedAt
+    } = req.body;
+
+    const VALID_TEST_METHODS = ['examine', 'interview', 'test', 'automated', 'document_review'];
+    if (testMethod && !VALID_TEST_METHODS.includes(testMethod)) {
+      return res.status(400).json({ success: false, error: 'Invalid test method' });
+    }
+
+    // Validate testPerformedBy as a UUID if provided — prevents a non-UUID
+    // value reaching the DB and producing a 500.
+    if (testPerformedBy && !isUuid(testPerformedBy)) {
+      return res.status(400).json({ success: false, error: 'testPerformedBy must be a UUID' });
+    }
+
+    // Validate testPerformedAt as a parseable ISO-8601 timestamp if provided.
+    // Without this, a bad string produces an Invalid Date and fails the UPDATE.
+    let parsedTestPerformedAt = null;
+    if (testPerformedAt) {
+      const ts = new Date(testPerformedAt);
+      if (Number.isNaN(ts.getTime())) {
+        return res.status(400).json({ success: false, error: 'testPerformedAt must be a valid ISO-8601 timestamp' });
+      }
+      parsedTestPerformedAt = ts;
+    }
+
+    const result = await pool.query(
+      `UPDATE control_implementations
+       SET implementation_narrative = COALESCE($1, implementation_narrative),
+           test_method = COALESCE($2, test_method),
+           test_performed_by = COALESCE($3, test_performed_by),
+           test_performed_at = COALESCE($4, test_performed_at),
+           updated_at = NOW()
+       WHERE id = $5 AND organization_id = $6
+       RETURNING id, implementation_narrative, test_method, test_performed_by, test_performed_at, updated_at`,
+      [
+        implementationNarrative || null,
+        testMethod || null,
+        testPerformedBy || null,
+        parsedTestPerformedAt,
+        id,
+        organizationId
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Implementation not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    log('error', 'implementation_narrative_update', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to update implementation narrative' });
+  }
+});
+
+// ============================================================
+// Phase 5.2 — Implementation Review
+// PUT /api/v1/implementations/:id/review-status
+// Record reviewer approval, return, or comments
+// ============================================================
+router.put('/:id/review-status', requirePermission('implementations.write'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const organizationId = req.user.organization_id;
+    const { reviewStatus, reviewComments } = req.body;
+
+    const VALID_STATUSES = ['pending', 'approved', 'returned'];
+    if (!reviewStatus || !VALID_STATUSES.includes(reviewStatus)) {
+      return res.status(400).json({ success: false, error: `review_status must be one of: ${VALID_STATUSES.join(', ')}` });
+    }
+
+    const result = await pool.query(
+      `UPDATE control_implementations
+       SET review_status = $1,
+           -- Distinguish "field omitted" (keep prior value) from "explicitly
+           -- provided" (including empty string → clear). When the caller
+           -- omits the field, $2 is NULL and $3 is FALSE so the CASE keeps
+           -- the prior value; when explicitly provided, $3 is TRUE and $2
+           -- is used verbatim (empty string clears).
+           review_comments = CASE WHEN $3 THEN $2 ELSE review_comments END,
+           reviewed_by = $4,
+           reviewed_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $5 AND organization_id = $6
+       RETURNING id, review_status, review_comments, reviewed_by, reviewed_at`,
+      [
+        reviewStatus,
+        typeof reviewComments === 'string' ? reviewComments : null,
+        Object.prototype.hasOwnProperty.call(req.body || {}, 'reviewComments'),
+        req.user.id,
+        id,
+        organizationId
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Implementation not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    log('error', 'implementation_review_status_update', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to update implementation review status' });
   }
 });
 

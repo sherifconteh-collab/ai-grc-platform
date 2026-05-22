@@ -6,9 +6,9 @@ Skim this file before any non-trivial change. Detailed conventions live under
 
 ## Quick orientation
 
-- **Repo**: ControlWeave (AI-GRC) Community fork.
+- **Repo**: ControlWeave (AI-GRC) — fully open source, all features enabled.
 - **Stack**: Node.js (Express) backend, Next.js (App Router, React 19) frontend, Electron desktop wrapper.
-- **Tier markers**: every server-side source file declares `// @tier: community` or `// @tier: pro`. The Community fork must never depend on `@tier: pro` code paths.
+- **Tier markers**: legacy `// @tier:` comments may still appear in some files but are no longer enforced — all tier gating is removed (`requireTier`/`requireProEdition`/`hasTierAtLeast` are no-ops, edition reports as `open`). Do not add new tier gating.
 - **Releases**: `RELEASE_NOTES.md` is the source of truth for version state. `backend`, `frontend`, and `electron` `package.json` versions stay in lock-step with the latest entry.
 
 ## Validation commands

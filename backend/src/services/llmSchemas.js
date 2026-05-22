@@ -2,268 +2,294 @@
 'use strict';
 
 /**
- * llmSchemas.js — JSON Schemas for structured AI outputs (v3.0.0).
+ * JSON Schemas for structured AI outputs.
  *
- * The validator is a deliberately small recursive walker that supports the
- * subset of JSON Schema draft-07 needed by our prompt contracts:
- *   - type: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean'
- *   - required: string[]
- *   - properties: { [k]: schema }
- *   - items: schema   (for arrays)
- *   - enum: any[]
- *   - minimum / maximum (number)
- *   - minLength (string)
- *   - additionalProperties: boolean (default true)
- *
- * The prior top-level-only validator let malformed gaps[] / steps[] items
- * through silently. This walker descends into nested object properties and
- * array items, accumulating Ajv-style errors with a JSON-pointer-ish path so
- * aiHandler() can inject them back into the user prompt as a correction hint.
+ * Each schema defines the shape of the JSON object an AI feature must return.
+ * Used with Anthropic tool-use and OpenAI response_format: json_schema to force
+ * deterministic structured output. Validated with the validate() helper before
+ * the result is persisted or returned to the client.
  */
 
-const GAP_ANALYSIS_SCHEMA = {
-  type: 'object',
-  required: ['readiness_score', 'summary', 'gaps', 'recommended_roadmap'],
-  properties: {
-    readiness_score: { type: 'number', minimum: 0, maximum: 100 },
-    summary: { type: 'string', minLength: 1 },
-    gaps: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['control', 'severity', 'description'],
-        properties: {
-          control: { type: 'string', minLength: 1 },
-          severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
-          description: { type: 'string', minLength: 1 },
-          evidence_required: { type: 'array', items: { type: 'string' } },
-          estimated_effort_days: { type: 'number', minimum: 0 },
-        },
-      },
-    },
-    recommended_roadmap: { type: 'array', items: { type: 'string' } },
-  },
-};
-
-const REMEDIATION_PLAYBOOK_SCHEMA = {
-  type: 'object',
-  required: ['objective', 'steps'],
-  properties: {
-    objective: { type: 'string', minLength: 1 },
-    prerequisites: { type: 'array', items: { type: 'string' } },
-    steps: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['order', 'action'],
-        properties: {
-          order: { type: 'integer', minimum: 1 },
-          action: { type: 'string', minLength: 1 },
-          owner: { type: 'string' },
-          estimated_hours: { type: 'number', minimum: 0 },
-        },
-      },
-    },
-    tools: { type: 'array', items: { type: 'string' } },
-    artifacts: { type: 'array', items: { type: 'string' } },
-    estimated_total_hours: { type: 'number', minimum: 0 },
-  },
-};
-
-const TEST_PROCEDURES_SCHEMA = {
-  type: 'object',
-  required: ['objective', 'steps'],
-  properties: {
-    objective: { type: 'string', minLength: 1 },
-    scope: { type: 'string' },
-    steps: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['order', 'procedure'],
-        properties: {
-          order: { type: 'integer', minimum: 1 },
-          procedure: { type: 'string', minLength: 1 },
-          method: { type: 'string', enum: ['walkthrough', 'inspection', 'observation', 're-performance', 'inquiry'] },
-          pass_criteria: { type: 'string' },
-          fail_criteria: { type: 'string' },
-        },
-      },
-    },
-    sample_size: { type: 'string' },
-    frequency: { type: 'string' },
-  },
-};
-
-const EVIDENCE_SUGGESTION_SCHEMA = {
-  type: 'object',
-  required: ['control_title', 'framework', 'evidence_items'],
-  properties: {
-    control_title: { type: 'string', minLength: 1 },
-    framework: { type: 'string', minLength: 1 },
-    evidence_items: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['name', 'format'],
-        properties: {
-          name: { type: 'string', minLength: 1 },
-          format: { type: 'string' },
-          cadence: { type: 'string' },
-          source_system: { type: 'string' },
-          notes: { type: 'string' },
-        },
-      },
-    },
-    collection_notes: { type: 'string' },
-    estimated_collection_hours: { type: 'number', minimum: 0 },
-  },
-};
-
-const FINDING_SCHEMA = {
-  type: 'object',
-  required: ['criteria', 'condition', 'cause', 'effect', 'recommendation'],
-  properties: {
-    criteria: { type: 'string', minLength: 1 },
-    condition: { type: 'string', minLength: 1 },
-    cause: { type: 'string', minLength: 1 },
-    effect: { type: 'string', minLength: 1 },
-    recommendation: { type: 'string', minLength: 1 },
-    management_response_placeholder: { type: 'string' },
-    related_controls: { type: 'array', items: { type: 'string' } },
-    repeat_finding: { type: 'boolean' },
-    finding_id_hint: { type: 'string' },
-  },
-};
-
-// Map feature key -> schema. Includes the route-level aliases noted in v3.0.0
-// (evidence_suggest, audit_finding_draft) so those routes also trigger
-// validation + retry instead of slipping through unchecked.
-const FEATURE_SCHEMAS = {
-  gap_analysis: GAP_ANALYSIS_SCHEMA,
-  remediation_playbook: REMEDIATION_PLAYBOOK_SCHEMA,
-  test_procedures: TEST_PROCEDURES_SCHEMA,
-  evidence_suggestion: EVIDENCE_SUGGESTION_SCHEMA,
-  evidence_suggest: EVIDENCE_SUGGESTION_SCHEMA, // alias
-  finding: FINDING_SCHEMA,
-  finding_analysis: FINDING_SCHEMA, // alias
-  audit_finding_draft: FINDING_SCHEMA, // alias
-};
-
-function getSchemaForFeature(featureKey) {
-  if (!featureKey) return null;
-  return FEATURE_SCHEMAS[featureKey] || null;
-}
-
-function _typeOf(v) {
-  if (v === null) return 'null';
-  if (Array.isArray(v)) return 'array';
-  if (Number.isInteger(v)) return 'integer';
-  return typeof v;
-}
-
-function _typeMatches(actual, expected) {
-  if (expected === 'integer') return actual === 'integer';
-  if (expected === 'number') return actual === 'integer' || actual === 'number';
-  return actual === expected;
-}
-
-/**
- * Recursive validator. Returns { valid, errors } where errors is an array of
- * { instancePath, message } in Ajv style.
- */
-function validate(schema, value, path = '') {
+// ---------------------------------------------------------------------------
+// Minimal JSON-Schema-subset validator (no external dependency)
+// Recursively validates presence/types of properties, including nested
+// objects and arrays (via `items` schema).
+// Returns { valid: boolean, errors: string[] }
+// ---------------------------------------------------------------------------
+function validate(schema, data, path = '') {
   const errors = [];
-  if (!schema || typeof schema !== 'object') return { valid: true, errors };
 
-  if (schema.type) {
-    const actual = _typeOf(value);
-    if (!_typeMatches(actual, schema.type)) {
-      errors.push({ instancePath: path || '/', message: `expected type ${schema.type} but got ${actual}` });
+  // Top-level or nested object validation
+  if (schema.type === 'object' || schema.properties || schema.required) {
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      errors.push(`${path || 'root'}: expected object`);
       return { valid: false, errors };
     }
-  }
 
-  if (Array.isArray(schema.enum)) {
-    const ok = schema.enum.some(e => e === value);
-    if (!ok) errors.push({ instancePath: path || '/', message: `must be one of ${JSON.stringify(schema.enum)}` });
-  }
+    const required = schema.required || [];
+    const properties = schema.properties || {};
 
-  if (schema.type === 'string') {
-    if (typeof schema.minLength === 'number' && value.length < schema.minLength) {
-      errors.push({ instancePath: path || '/', message: `must be at least ${schema.minLength} characters` });
-    }
-  }
-
-  if (schema.type === 'number' || schema.type === 'integer') {
-    if (typeof schema.minimum === 'number' && value < schema.minimum) {
-      errors.push({ instancePath: path || '/', message: `must be >= ${schema.minimum}` });
-    }
-    if (typeof schema.maximum === 'number' && value > schema.maximum) {
-      errors.push({ instancePath: path || '/', message: `must be <= ${schema.maximum}` });
-    }
-  }
-
-  if (schema.type === 'object' && value && typeof value === 'object' && !Array.isArray(value)) {
-    if (Array.isArray(schema.required)) {
-      for (const k of schema.required) {
-        if (!(k in value)) {
-          errors.push({ instancePath: path || '/', message: `missing required property "${k}"` });
-        }
+    for (const key of required) {
+      if (!(key in data) || data[key] === null || data[key] === undefined) {
+        errors.push(`${path ? path + '.' : ''}${key}: missing required property`);
       }
     }
-    if (schema.properties) {
-      for (const [k, subSchema] of Object.entries(schema.properties)) {
-        if (k in value) {
-          const sub = validate(subSchema, value[k], `${path}/${k}`);
-          if (!sub.valid) errors.push(...sub.errors);
+
+    for (const [key, propSchema] of Object.entries(properties)) {
+      if (!(key in data)) continue;
+      const val = data[key];
+      const subPath = path ? `${path}.${key}` : key;
+
+      if (propSchema.type === 'array') {
+        if (!Array.isArray(val)) {
+          errors.push(`${subPath}: expected array`);
+          continue;
+        }
+        if (propSchema.items) {
+          val.forEach((item, idx) => {
+            const itemResult = validate(propSchema.items, item, `${subPath}[${idx}]`);
+            errors.push(...itemResult.errors);
+          });
+        }
+      } else if (propSchema.type === 'string' && typeof val !== 'string') {
+        errors.push(`${subPath}: expected string`);
+      } else if (propSchema.type === 'number' && typeof val !== 'number') {
+        errors.push(`${subPath}: expected number`);
+      } else if (propSchema.type === 'boolean' && typeof val !== 'boolean') {
+        errors.push(`${subPath}: expected boolean`);
+      } else if (propSchema.type === 'object' || propSchema.properties || propSchema.required) {
+        if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+          const nested = validate(propSchema, val, subPath);
+          errors.push(...nested.errors);
+        } else {
+          errors.push(`${subPath}: expected object`);
         }
       }
-    }
-    // additionalProperties: false → reject keys not declared in `properties`.
-    // Default (true / omitted) leaves extras alone.
-    if (schema.additionalProperties === false) {
-      const declared = schema.properties ? Object.keys(schema.properties) : [];
-      for (const k of Object.keys(value)) {
-        if (!declared.includes(k)) {
-          errors.push({ instancePath: path || '/', message: `unexpected additional property "${k}"` });
-        }
+
+      if (propSchema.enum && !propSchema.enum.includes(val)) {
+        errors.push(`${subPath}: must be one of [${propSchema.enum.join(', ')}], got "${val}"`);
+      }
+
+      if (propSchema.minLength && typeof val === 'string' && val.length < propSchema.minLength) {
+        errors.push(`${subPath}: must be at least ${propSchema.minLength} characters`);
       }
     }
+
+    return { valid: errors.length === 0, errors };
   }
 
-  if (schema.type === 'array' && Array.isArray(value) && schema.items) {
-    value.forEach((item, idx) => {
-      const sub = validate(schema.items, item, `${path}/${idx}`);
-      if (!sub.valid) errors.push(...sub.errors);
-    });
+  // Primitive/scalar validation (used when recursed as items schema)
+  if (schema.type === 'string' && typeof data !== 'string') {
+    errors.push(`${path || 'value'}: expected string`);
+  } else if (schema.type === 'number' && typeof data !== 'number') {
+    errors.push(`${path || 'value'}: expected number`);
+  } else if (schema.type === 'boolean' && typeof data !== 'boolean') {
+    errors.push(`${path || 'value'}: expected boolean`);
+  }
+  if (schema.enum && !schema.enum.includes(data)) {
+    errors.push(`${path || 'value'}: must be one of [${schema.enum.join(', ')}]`);
   }
 
   return { valid: errors.length === 0, errors };
 }
 
+// ---------------------------------------------------------------------------
+// Schema definitions
+// ---------------------------------------------------------------------------
+
+const GAP_ANALYSIS_SCHEMA = {
+  type: 'object',
+  required: ['executive_summary', 'gaps', 'remediation_roadmap', 'audit_readiness_score'],
+  properties: {
+    executive_summary: { type: 'string', minLength: 100 },
+    audit_readiness_score: { type: 'number' },
+    gaps: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['control_id', 'framework', 'title', 'severity', 'description'],
+        properties: {
+          control_id:  { type: 'string' },
+          framework:   { type: 'string' },
+          title:       { type: 'string' },
+          severity:    { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+          description: { type: 'string' }
+        }
+      }
+    },
+    remediation_roadmap: {
+      type: 'object',
+      properties: {
+        immediate:   { type: 'array' },
+        short_term:  { type: 'array' },
+        medium_term: { type: 'array' }
+      }
+    }
+  }
+};
+
+const REMEDIATION_PLAYBOOK_SCHEMA = {
+  type: 'object',
+  required: ['control_id', 'title', 'steps', 'estimated_effort_hours', 'evidence_artifacts'],
+  properties: {
+    control_id:             { type: 'string' },
+    title:                  { type: 'string' },
+    steps:                  { type: 'array' },
+    estimated_effort_hours: { type: 'number' },
+    required_skills:        { type: 'array' },
+    evidence_artifacts:     { type: 'array' },
+    common_pitfalls:        { type: 'array' }
+  }
+};
+
+const TEST_PROCEDURE_SCHEMA = {
+  type: 'object',
+  required: ['control_id', 'objective', 'steps', 'expected_results'],
+  properties: {
+    control_id:       { type: 'string' },
+    objective:        { type: 'string' },
+    test_method:      { type: 'string', enum: ['examine', 'interview', 'test', 'automated', 'document_review'] },
+    steps:            { type: 'array' },
+    expected_results: { type: 'object' },
+    sample_size:      { type: 'string' },
+    frequency:        { type: 'string' },
+    evidence_to_collect: { type: 'array' }
+  }
+};
+
+const EVIDENCE_SUGGESTION_SCHEMA = {
+  type: 'object',
+  required: ['control_id', 'evidence_items'],
+  properties: {
+    control_id:    { type: 'string' },
+    control_title: { type: 'string' },
+    framework:     { type: 'string' },
+    evidence_items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['title', 'description', 'collection_method'],
+        properties: {
+          title:                { type: 'string' },
+          description:          { type: 'string' },
+          collection_method:    { type: 'string' },
+          format:               { type: 'string' },
+          freshness_days:       { type: 'number' },
+          automation_possible:  { type: 'boolean' },
+          automation_hint:      { type: 'string' },
+          example_filename:     { type: 'string' },
+          sufficiency_criteria: { type: 'string' }
+        }
+      }
+    },
+    collection_notes:          { type: 'string' },
+    estimated_collection_hours: { type: 'number' }
+  }
+};
+
+const FINDING_SCHEMA = {
+  type: 'object',
+  required: ['title', 'severity', 'criteria', 'condition', 'cause', 'effect', 'recommendation'],
+  properties: {
+    title:                          { type: 'string' },
+    severity:                       { type: 'string', enum: ['critical', 'high', 'medium', 'low', 'informational'] },
+    criteria:                       { type: 'string' },
+    condition:                      { type: 'string' },
+    cause:                          { type: 'string' },
+    effect:                         { type: 'string' },
+    recommendation:                 { type: 'string' },
+    management_response_placeholder: { type: 'string' },
+    related_controls:               { type: 'array', items: { type: 'string' } },
+    evidence_of_exception:          { type: 'array', items: { type: 'string' } },
+    repeat_finding:                 { type: 'boolean' },
+    finding_id_hint:                { type: 'string' }
+  }
+};
+
+// Map feature keys to their output schema. Keys match BOTH the route-level
+// feature identifier used for usage logging AND the profile key, so the
+// schema-validation-and-retry flow in aiHandler() correctly resolves a
+// schema regardless of which key the caller passes.
+const FEATURE_SCHEMAS = {
+  gap_analysis:          GAP_ANALYSIS_SCHEMA,
+  remediation_playbook:  REMEDIATION_PLAYBOOK_SCHEMA,
+  test_procedures:       TEST_PROCEDURE_SCHEMA,
+  evidence_suggestion:   EVIDENCE_SUGGESTION_SCHEMA,
+  // Route feature id for the evidence endpoint (see routes/ai.js evidence-suggest)
+  evidence_suggest:      EVIDENCE_SUGGESTION_SCHEMA,
+  finding_analysis:      FINDING_SCHEMA,
+  // Route feature id for the audit finding draft endpoint
+  audit_finding_draft:   FINDING_SCHEMA,
+  finding:               FINDING_SCHEMA
+};
+
 /**
- * Format an error list as a human-readable correction hint suitable for
- * appending to a follow-up prompt during a one-shot retry.
+ * Safely parse a JSON string that may be wrapped in markdown code fences.
+ * Returns the parsed object, or null on failure.
  */
-function formatErrorsForRetry(errors) {
-  if (!errors || !errors.length) return '';
-  const lines = errors.slice(0, 10).map(e => `- ${e.instancePath}: ${e.message}`);
-  return [
-    'Your previous response did not validate against the required schema. Errors:',
-    ...lines,
-    'Please respond again with valid JSON that satisfies the schema. Do not include any prose outside the JSON object.',
-  ].join('\n');
+function parseJsonOutput(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // Strip markdown code fences (```json ... ``` or ``` ... ```)
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    // Attempt to extract the first JSON object from mixed prose+JSON output
+    const match = stripped.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+/**
+ * Validate AI output for a given feature against its schema.
+ * Returns { valid, parsed, errors }.
+ *
+ * @param {string} feature  - Feature key (from FEATURE_TASK_PROFILE)
+ * @param {string|object} output - Raw AI output text or already-parsed object
+ */
+function validateFeatureOutput(feature, output) {
+  const schema = FEATURE_SCHEMAS[feature];
+  if (!schema) {
+    // No schema for this feature — pass through without validation
+    return { valid: true, parsed: typeof output === 'string' ? output : output, errors: [] };
+  }
+
+  const parsed = typeof output === 'object' ? output : parseJsonOutput(output);
+  if (!parsed) {
+    return { valid: false, parsed: null, errors: ['output is not valid JSON'] };
+  }
+
+  const result = validate(schema, parsed);
+  return { ...result, parsed };
+}
+
+/**
+ * Returns true when the given feature has a registered JSON schema.
+ * Callers use this to decide whether to enable provider JSON mode
+ * (OpenAI `response_format: json_object`, Gemini `response_mime_type`).
+ */
+function hasFeatureSchema(feature) {
+  return !!(feature && FEATURE_SCHEMAS[feature]);
 }
 
 module.exports = {
   GAP_ANALYSIS_SCHEMA,
   REMEDIATION_PLAYBOOK_SCHEMA,
-  TEST_PROCEDURES_SCHEMA,
+  TEST_PROCEDURE_SCHEMA,
   EVIDENCE_SUGGESTION_SCHEMA,
   FINDING_SCHEMA,
   FEATURE_SCHEMAS,
-  getSchemaForFeature,
   validate,
-  formatErrorsForRetry,
+  parseJsonOutput,
+  validateFeatureOutput,
+  hasFeatureSchema
 };

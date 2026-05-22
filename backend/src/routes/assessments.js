@@ -19,357 +19,47 @@ const PDFDocument = require('pdfkit');
 const llm = require('../services/llmService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
+const { log } = require('../utils/logger');
 
 // All routes require authentication
 router.use(authenticate);
 
-const VALID_ENGAGEMENT_TYPES = ['internal_audit', 'external_audit', 'readiness', 'assessment'];
-const VALID_ENGAGEMENT_STATUSES = ['planning', 'fieldwork', 'reporting', 'completed', 'archived'];
-const VALID_PBC_PRIORITIES = ['low', 'medium', 'high', 'critical'];
-const VALID_PBC_STATUSES = ['open', 'in_progress', 'submitted', 'accepted', 'rejected', 'closed'];
-const VALID_WORKPAPER_STATUSES = ['draft', 'in_review', 'finalized'];
-const VALID_FINDING_SEVERITIES = ['low', 'medium', 'high', 'critical'];
-const VALID_FINDING_STATUSES = ['open', 'accepted', 'remediating', 'verified', 'closed'];
-const VALID_SIGNOFF_TYPES = [
-  'auditor',
-  'management',
-  'executive',
-  'customer_acknowledgment',
-  'company_leadership',
-  'auditor_firm_recommendation'
-];
-const VALID_SIGNOFF_STATUSES = ['approved', 'rejected'];
-const VALID_AUDIT_TEMPLATE_TYPES = ['pbc', 'workpaper', 'finding', 'signoff', 'engagement_report'];
-const TEMPLATE_MAX_CHARS = 250000;
-const templateUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 8 * 1024 * 1024
-  }
-});
-const SIGNOFF_ROLE_CONFIG = [
-  {
-    key: 'customer_acknowledgment',
-    label: 'Customer Acknowledgment',
-    acceptedTypes: ['customer_acknowledgment', 'management']
-  },
-  {
-    key: 'auditor',
-    label: 'Auditor Sign-off',
-    acceptedTypes: ['auditor']
-  },
-  {
-    key: 'company_leadership',
-    label: 'Company Leadership Sign-off',
-    acceptedTypes: ['company_leadership', 'executive']
-  },
-  {
-    key: 'auditor_firm_recommendation',
-    label: 'Auditor Firm Final Recommendation',
-    acceptedTypes: ['auditor_firm_recommendation']
-  }
-];
-
-function toInt(value, fallback) {
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function parseFrameworkCodes(input) {
-  if (!input) return [];
-  if (Array.isArray(input)) {
-    return Array.from(new Set(input.map((value) => String(value || '').trim()).filter(Boolean)));
-  }
-  if (typeof input === 'string') {
-    return Array.from(new Set(input.split(',').map((value) => value.trim()).filter(Boolean)));
-  }
-  return [];
-}
-
-function truncateText(value, max = TEMPLATE_MAX_CHARS) {
-  const text = String(value || '');
-  if (text.length <= max) {
-    return { value: text, truncated: false };
-  }
-  return { value: text.slice(0, max), truncated: true };
-}
-
-function normalizeNullableText(value) {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  const normalized = String(value).trim();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function parseBooleanFlag(value, fallback = false) {
-  if (value === undefined || value === null) return fallback;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value).trim().toLowerCase();
-  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
-  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
-  return fallback;
-}
-
-function normalizeAiResponseToText(result) {
-  if (result === null || result === undefined) return '';
-  if (typeof result === 'string') return result;
-  if (typeof result === 'object') {
-    if (typeof result.text === 'string') return result.text;
-    if (typeof result.content === 'string') return result.content;
-  }
-  return JSON.stringify(result, null, 2);
-}
-
-function extractJsonObject(rawText) {
-  const text = String(rawText || '');
-  const first = text.indexOf('{');
-  const last = text.lastIndexOf('}');
-  if (first === -1 || last === -1 || last <= first) return null;
-  const candidate = text.slice(first, last + 1);
-  try {
-    return JSON.parse(candidate);
-  } catch (error) {
-    return null;
-  }
-}
-
-function renderTemplate(templateContent, context = {}) {
-  const fallback = String(templateContent || '');
-  if (!fallback.trim()) return '';
-  return fallback.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_, key) => {
-    const value = context[key];
-    if (value === null || value === undefined) return '';
-    return String(value);
-  });
-}
-
-async function extractTemplateText(file) {
-  const ext = path.extname(file?.originalname || '').toLowerCase();
-  let parser = 'plain-text';
-  let text = '';
-  const warnings = [];
-
-  if (['.txt', '.md', '.csv', '.json', '.xml', '.log'].includes(ext)) {
-    text = Buffer.from(file.buffer).toString('utf8');
-  } else if (ext === '.pdf') {
-    parser = 'pdf-parse';
-    try {
-      const pdfParse = require('pdf-parse');
-      const parsed = await pdfParse(file.buffer);
-      text = String(parsed?.text || '');
-    } catch (error) {
-      parser = 'binary-fallback';
-      warnings.push(`PDF parser fallback used: ${error.message}`);
-      text = Buffer.from(file.buffer).toString('utf8');
-    }
-  } else if (ext === '.docx') {
-    parser = 'mammoth';
-    try {
-      const mammoth = require('mammoth');
-      const parsed = await mammoth.extractRawText({ buffer: file.buffer });
-      text = String(parsed?.value || '');
-      if (Array.isArray(parsed?.messages) && parsed.messages.length > 0) {
-        warnings.push(`DOCX parser reported ${parsed.messages.length} warning(s).`);
-      }
-    } catch (error) {
-      parser = 'binary-fallback';
-      warnings.push(`DOCX parser fallback used: ${error.message}`);
-      text = Buffer.from(file.buffer).toString('utf8');
-    }
-  } else {
-    parser = 'binary-fallback';
-    warnings.push(`Limited parsing support for ${ext || 'unknown extension'}; fallback parser used.`);
-    text = Buffer.from(file.buffer).toString('utf8');
-  }
-
-  const clipped = truncateText(text, TEMPLATE_MAX_CHARS);
-  return {
-    parser,
-    text: clipped.value.trim(),
-    warnings,
-    char_count: text.length,
-    truncated: clipped.truncated
-  };
-}
-
-async function getDefaultAuditTemplate(organizationId, userId, artifactType) {
-  if (!VALID_AUDIT_TEMPLATE_TYPES.includes(String(artifactType || '').toLowerCase())) return null;
-  const result = await pool.query(
-    `SELECT *
-     FROM audit_artifact_templates
-     WHERE organization_id = $1
-       AND owner_user_id = $2
-       AND artifact_type = $3
-       AND is_active = true
-     ORDER BY is_default DESC, updated_at DESC, created_at DESC
-     LIMIT 1`,
-    [organizationId, userId, String(artifactType).toLowerCase()]
-  );
-  return result.rows[0] || null;
-}
-
-async function getEngagementById(organizationId, engagementId) {
-  const result = await pool.query(
-    `SELECT id, organization_id, name, status, framework_codes, lead_auditor_id, engagement_owner_id
-     FROM audit_engagements
-     WHERE id = $1 AND organization_id = $2`,
-    [engagementId, organizationId]
-  );
-  return result.rows[0] || null;
-}
-
-async function assertEngagementAccess(req, res) {
-  const { id } = req.params;
-  const engagement = await getEngagementById(req.user.organization_id, id);
-  if (!engagement) {
-    res.status(404).json({ success: false, error: 'Audit engagement not found' });
-    return null;
-  }
-  return engagement;
-}
-
-async function ensureOrgUser(organizationId, userId) {
-  if (!userId) return true;
-  const userResult = await pool.query(
-    'SELECT id FROM users WHERE id = $1 AND organization_id = $2 AND is_active = true',
-    [userId, organizationId]
-  );
-  return userResult.rows.length > 0;
-}
-
-async function ensureOrgAuditorUser(organizationId, userId) {
-  if (!userId) return false;
-  const userResult = await pool.query(
-    `SELECT
-       LOWER(COALESCE(u.role, '')) AS primary_role,
-       EXISTS (
-         SELECT 1
-         FROM user_roles ur
-         JOIN roles r ON r.id = ur.role_id
-         WHERE ur.user_id = u.id
-           AND (
-             LOWER(r.name) = 'auditor'
-             OR LOWER(r.name) LIKE 'auditor\\_%' ESCAPE '\\'
-           )
-       ) AS has_auditor_role
-     FROM users u
-     WHERE u.id = $1
-       AND u.organization_id = $2
-       AND u.is_active = true
-     LIMIT 1`,
-    [userId, organizationId]
-  );
-
-  if (userResult.rows.length === 0) return false;
-  const row = userResult.rows[0];
-  return row.primary_role === 'auditor' || Boolean(row.has_auditor_role);
-}
-
-async function resolveEngagementFrameworkCodes(organizationId, engagement) {
-  const directCodes = parseFrameworkCodes(engagement?.framework_codes || []);
-  if (directCodes.length > 0) return directCodes;
-
-  const orgFrameworks = await pool.query(
-    `SELECT f.code
-     FROM organization_frameworks of2
-     JOIN frameworks f ON f.id = of2.framework_id
-     WHERE of2.organization_id = $1`,
-    [organizationId]
-  );
-  return orgFrameworks.rows.map((row) => String(row.code || '').trim()).filter(Boolean);
-}
-
-async function getAssessmentProcedureById(procedureId) {
-  if (!procedureId) return null;
-  const result = await pool.query(
-    `SELECT
-      ap.id,
-      ap.procedure_id,
-      ap.procedure_type,
-      ap.title,
-      ap.description,
-      ap.expected_evidence,
-      ap.assessor_notes,
-      ap.depth,
-      fc.id AS framework_control_id,
-      fc.control_id,
-      fc.title AS control_title,
-      f.code AS framework_code,
-      f.name AS framework_name
-     FROM assessment_procedures ap
-     JOIN framework_controls fc ON fc.id = ap.framework_control_id
-     JOIN frameworks f ON f.id = fc.framework_id
-     WHERE ap.id = $1
-     LIMIT 1`,
-    [procedureId]
-  );
-  return result.rows[0] || null;
-}
-
-async function assertProcedureAllowedForEngagement(organizationId, engagement, procedureId) {
-  if (!procedureId) return { procedure: null, derivedControlId: null };
-  const procedure = await getAssessmentProcedureById(procedureId);
-  if (!procedure) {
-    return {
-      error: {
-        status: 400,
-        message: 'assessment_procedure_id is invalid'
-      }
-    };
-  }
-  const frameworkCodes = await resolveEngagementFrameworkCodes(organizationId, engagement);
-  if (frameworkCodes.length > 0 && !frameworkCodes.includes(String(procedure.framework_code))) {
-    return {
-      error: {
-        status: 400,
-        message: `assessment_procedure_id (${procedure.procedure_id || procedure.id}) is outside the engagement framework scope`
-      }
-    };
-  }
-  return {
-    procedure,
-    derivedControlId: procedure.framework_control_id
-  };
-}
-
-function buildValidationChecklist(signoffRows = []) {
-  return SIGNOFF_ROLE_CONFIG.map((rule) => {
-    const matching = signoffRows
-      .filter((row) => rule.acceptedTypes.includes(String(row.signoff_type || '').toLowerCase()))
-      .sort((a, b) => new Date(b.signed_at).getTime() - new Date(a.signed_at).getTime());
-    const latest = matching[0] || null;
-    const approved = Boolean(latest && String(latest.status) === 'approved');
-    return {
-      key: rule.key,
-      label: rule.label,
-      required: true,
-      approved,
-      latest: latest
-        ? {
-            id: latest.id,
-            signoff_type: latest.signoff_type,
-            status: latest.status,
-            comments: latest.comments,
-            signed_by: latest.signed_by,
-            signed_by_name: latest.signed_by_name || null,
-            signed_at: latest.signed_at
-          }
-        : null
-    };
-  });
-}
-
-async function logAuditEvent(req, eventType, resourceType, resourceId, details = {}) {
-  try {
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [req.user.organization_id, req.user.id, eventType, resourceType, resourceId || null, details]
-    );
-  } catch (error) {
-    // Audit logging should not block business operations.
-  }
-}
+// ---------- Shared constants and helpers (extracted to ./assessments/_shared) ----------
+const {
+  VALID_ENGAGEMENT_TYPES,
+  VALID_ENGAGEMENT_STATUSES,
+  VALID_PBC_PRIORITIES,
+  VALID_PBC_STATUSES,
+  VALID_WORKPAPER_STATUSES,
+  VALID_FINDING_SEVERITIES,
+  VALID_FINDING_STATUSES,
+  VALID_SIGNOFF_TYPES,
+  VALID_SIGNOFF_STATUSES,
+  VALID_AUDIT_TEMPLATE_TYPES,
+  TEMPLATE_MAX_CHARS,
+  SIGNOFF_ROLE_CONFIG,
+  templateUpload,
+  toInt,
+  parseFrameworkCodes,
+  truncateText,
+  normalizeNullableText,
+  parseBooleanFlag,
+  normalizeAiResponseToText,
+  extractJsonObject,
+  renderTemplate,
+  extractTemplateText,
+  getDefaultAuditTemplate,
+  getEngagementById,
+  assertEngagementAccess,
+  ensureOrgUser,
+  ensureOrgAuditorUser,
+  resolveEngagementFrameworkCodes,
+  getAssessmentProcedureById,
+  assertProcedureAllowedForEngagement,
+  buildValidationChecklist,
+  logAuditEvent,
+  assertEngagementChildAccess,
+} = require('./assessments/_shared');
 
 // ============================================================
 // GET /api/v1/assessments/procedures
@@ -496,7 +186,7 @@ router.get('/procedures', requirePermission('assessments.read'), async (req, res
       }
     });
   } catch (error) {
-    console.error('Get procedures error:', error);
+    log('error', 'get_procedures_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to fetch assessment procedures' });
   }
 });
@@ -560,7 +250,7 @@ router.get('/procedures/by-control/:controlId', requirePermission('assessments.r
       }
     });
   } catch (error) {
-    console.error('Get control procedures error:', error);
+    log('error', 'get_control_procedures_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to fetch procedures for control' });
   }
 });
@@ -615,7 +305,7 @@ router.get('/procedures/:id', requirePermission('assessments.read'), async (req,
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Get procedure error:', error);
+    log('error', 'get_procedure_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to fetch procedure' });
   }
 });
@@ -783,7 +473,7 @@ router.post('/results', requirePermission('assessments.write'), async (req, res)
           ]
         );
       } catch (auditError) {
-        console.error('Assessment result audit log (update) failed:', auditError);
+        log('error', 'assessment_result_audit_log_update_failed', { error: auditError?.message || String(auditError) });
       }
     } else {
       result = await pool.query(`
@@ -834,13 +524,13 @@ router.post('/results', requirePermission('assessments.write'), async (req, res)
           ]
         );
       } catch (auditError) {
-        console.error('Assessment result audit log (insert) failed:', auditError);
+        log('error', 'assessment_result_audit_log_insert_failed', { error: auditError?.message || String(auditError) });
       }
     }
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Record result error:', error);
+    log('error', 'record_result_error', { error: error?.message || String(error) });
     // Sanitize error message to avoid leaking database details
     let errorMessage = 'Failed to record assessment result';
     if (error.message) {
@@ -941,7 +631,7 @@ router.get('/stats', requirePermission('assessments.read'), async (req, res) => 
       }
     });
   } catch (error) {
-    console.error('Get assessment stats error:', error);
+    log('error', 'get_assessment_stats_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to fetch assessment statistics' });
   }
 });
@@ -968,7 +658,7 @@ router.get('/frameworks', requirePermission('assessments.read'), async (req, res
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Get assessment frameworks error:', error);
+    log('error', 'get_assessment_frameworks_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to fetch assessment frameworks' });
   }
 });
@@ -1005,7 +695,7 @@ router.post('/plans', requirePermission('assessments.write'), async (req, res) =
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Create plan error:', error);
+    log('error', 'create_plan_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create assessment plan' });
   }
 });
@@ -1032,7 +722,7 @@ router.get('/plans', requirePermission('assessments.read'), async (req, res) => 
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Get plans error:', error);
+    log('error', 'get_plans_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to fetch assessment plans' });
   }
 });
@@ -1110,7 +800,7 @@ router.get('/templates', requirePermission('assessments.read'), async (req, res)
 
     res.json({ success: true, data });
   } catch (error) {
-    console.error('List audit templates error:', error);
+    log('error', 'list_audit_templates_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to list audit templates' });
   }
 });
@@ -1194,7 +884,7 @@ router.post('/templates', requirePermission('assessments.write'), async (req, re
       client.release();
     }
   } catch (error) {
-    console.error('Create audit template error:', error);
+    log('error', 'create_audit_template_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create audit template' });
   }
 });
@@ -1291,7 +981,7 @@ router.post(
         client.release();
       }
     } catch (error) {
-      console.error('Upload audit template error:', error);
+      log('error', 'upload_audit_template_error', { error: error?.message || String(error) });
       res.status(500).json({ success: false, error: 'Failed to upload audit template' });
     }
   }
@@ -1381,7 +1071,7 @@ router.patch('/templates/:templateId', requirePermission('assessments.write'), a
       client.release();
     }
   } catch (error) {
-    console.error('Update audit template error:', error);
+    log('error', 'update_audit_template_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update audit template' });
   }
 });
@@ -1405,7 +1095,7 @@ router.delete('/templates/:templateId', requirePermission('assessments.write'), 
     }
     res.json({ success: true, data: { id: templateId, is_active: false } });
   } catch (error) {
-    console.error('Delete audit template error:', error);
+    log('error', 'delete_audit_template_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to delete audit template' });
   }
 });
@@ -1489,7 +1179,7 @@ router.get('/engagements', requirePermission('assessments.read'), async (req, re
       }
     });
   } catch (error) {
-    console.error('List audit engagements error:', error);
+    log('error', 'list_audit_engagements_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to list audit engagements' });
   }
 });
@@ -1563,7 +1253,7 @@ router.post('/engagements', requirePermission('assessments.write'), async (req, 
 
     res.status(201).json({ success: true, data: inserted.rows[0] });
   } catch (error) {
-    console.error('Create audit engagement error:', error);
+    log('error', 'create_audit_engagement_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create audit engagement' });
   }
 });
@@ -1638,7 +1328,7 @@ router.post('/engagements/:id/handoff', requirePermission('assessments.write'), 
       }
     });
   } catch (error) {
-    console.error('Handoff engagement error:', error);
+    log('error', 'handoff_engagement_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to hand off engagement' });
   }
 });
@@ -1684,7 +1374,7 @@ router.get('/engagements/:id', requirePermission('assessments.read'), async (req
       }
     });
   } catch (error) {
-    console.error('Get audit engagement error:', error);
+    log('error', 'get_audit_engagement_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to fetch audit engagement' });
   }
 });
@@ -1778,7 +1468,7 @@ router.patch('/engagements/:id', requirePermission('assessments.write'), async (
 
     res.json({ success: true, data: updated.rows[0] });
   } catch (error) {
-    console.error('Update audit engagement error:', error);
+    log('error', 'update_audit_engagement_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update audit engagement' });
   }
 });
@@ -1920,7 +1610,7 @@ router.get('/engagements/:id/procedures', requirePermission('assessments.read'),
       }
     });
   } catch (error) {
-    console.error('List engagement procedures error:', error);
+    log('error', 'list_engagement_procedures_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to list engagement procedures' });
   }
 });
@@ -2088,7 +1778,7 @@ router.post('/engagements/:id/pbc/auto-create', requirePermission('assessments.w
       }
     });
   } catch (error) {
-    console.error('Auto-create engagement PBC error:', error);
+    log('error', 'auto_create_engagement_pbc_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to auto-create PBC requests' });
   }
 });
@@ -2221,7 +1911,7 @@ router.post(
         }
       });
     } catch (error) {
-      console.error('AI workpaper draft error:', error);
+      log('error', 'ai_workpaper_draft_error', { error: error?.message || String(error) });
       res.status(500).json({ success: false, error: 'Failed to generate AI workpaper draft' });
     }
   }
@@ -2356,7 +2046,7 @@ router.post(
         }
       });
     } catch (error) {
-      console.error('AI PBC draft error:', error);
+      log('error', 'ai_pbc_draft_error', { error: error?.message || String(error) });
       res.status(500).json({ success: false, error: 'Failed to generate AI PBC draft' });
     }
   }
@@ -2491,32 +2181,12 @@ router.post(
         }
       });
     } catch (error) {
-      console.error('AI finding draft error:', error);
+      log('error', 'ai_finding_draft_error', { error: error?.message || String(error) });
       res.status(500).json({ success: false, error: 'Failed to generate AI finding draft' });
     }
   }
 );
 
-async function assertEngagementChildAccess(req, res, tableName, childIdParamName, notFoundMessage) {
-  const engagement = await assertEngagementAccess(req, res);
-  if (!engagement) return null;
-
-  const childId = req.params[childIdParamName];
-  const result = await pool.query(
-    `SELECT id
-     FROM ${tableName}
-     WHERE organization_id = $1 AND engagement_id = $2 AND id = $3
-     LIMIT 1`,
-    [req.user.organization_id, engagement.id, childId]
-  );
-
-  if (result.rows.length === 0) {
-    res.status(404).json({ success: false, error: notFoundMessage });
-    return null;
-  }
-
-  return { engagement, childId };
-}
 
 // ============================================================
 // GET /api/v1/assessments/engagements/:id/pbc
@@ -2562,7 +2232,7 @@ router.get('/engagements/:id/pbc', requirePermission('assessments.read'), async 
     const rows = await pool.query(query, params);
     res.json({ success: true, data: rows.rows });
   } catch (error) {
-    console.error('List engagement PBC error:', error);
+    log('error', 'list_engagement_pbc_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to list PBC requests' });
   }
 });
@@ -2637,7 +2307,7 @@ router.post('/engagements/:id/pbc', requirePermission('assessments.write'), asyn
 
     res.status(201).json({ success: true, data: inserted.rows[0] });
   } catch (error) {
-    console.error('Create engagement PBC error:', error);
+    log('error', 'create_engagement_pbc_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create PBC request' });
   }
 });
@@ -2747,7 +2417,7 @@ router.patch('/engagements/:id/pbc/:pbcId', requirePermission('assessments.write
 
     res.json({ success: true, data: updated.rows[0] });
   } catch (error) {
-    console.error('Update engagement PBC error:', error);
+    log('error', 'update_engagement_pbc_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update PBC request' });
   }
 });
@@ -2788,7 +2458,7 @@ router.get('/engagements/:id/workpapers', requirePermission('assessments.read'),
     const rows = await pool.query(query, params);
     res.json({ success: true, data: rows.rows });
   } catch (error) {
-    console.error('List engagement workpapers error:', error);
+    log('error', 'list_engagement_workpapers_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to list workpapers' });
   }
 });
@@ -2878,7 +2548,7 @@ router.post('/engagements/:id/workpapers', requirePermission('assessments.write'
 
     res.status(201).json({ success: true, data: inserted.rows[0] });
   } catch (error) {
-    console.error('Create engagement workpaper error:', error);
+    log('error', 'create_engagement_workpaper_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create workpaper' });
   }
 });
@@ -3021,7 +2691,7 @@ router.patch('/engagements/:id/workpapers/:workpaperId', requirePermission('asse
 
     res.json({ success: true, data: updated.rows[0] });
   } catch (error) {
-    console.error('Update engagement workpaper error:', error);
+    log('error', 'update_engagement_workpaper_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update workpaper' });
   }
 });
@@ -3071,7 +2741,7 @@ router.get('/engagements/:id/findings', requirePermission('assessments.read'), a
     const rows = await pool.query(query, params);
     res.json({ success: true, data: rows.rows });
   } catch (error) {
-    console.error('List engagement findings error:', error);
+    log('error', 'list_engagement_findings_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to list findings' });
   }
 });
@@ -3145,7 +2815,7 @@ router.post('/engagements/:id/findings', requirePermission('assessments.write'),
 
     res.status(201).json({ success: true, data: inserted.rows[0] });
   } catch (error) {
-    console.error('Create engagement finding error:', error);
+    log('error', 'create_engagement_finding_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create finding' });
   }
 });
@@ -3255,7 +2925,7 @@ router.patch('/engagements/:id/findings/:findingId', requirePermission('assessme
 
     res.json({ success: true, data: updated.rows[0] });
   } catch (error) {
-    console.error('Update engagement finding error:', error);
+    log('error', 'update_engagement_finding_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update finding' });
   }
 });
@@ -3281,7 +2951,7 @@ router.get('/engagements/:id/signoffs', requirePermission('assessments.read'), a
 
     res.json({ success: true, data: rows.rows });
   } catch (error) {
-    console.error('List engagement signoffs error:', error);
+    log('error', 'list_engagement_signoffs_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to list sign-offs' });
   }
 });
@@ -3339,7 +3009,7 @@ router.post('/engagements/:id/signoffs', requirePermission('assessments.write'),
 
     res.status(201).json({ success: true, data: inserted.rows[0] });
   } catch (error) {
-    console.error('Create engagement signoff error:', error);
+    log('error', 'create_engagement_signoff_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create sign-off' });
   }
 });
@@ -3411,7 +3081,7 @@ router.get('/engagements/:id/signoff-readiness', requirePermission('assessments.
       }
     });
   } catch (error) {
-    console.error('Signoff readiness error:', error);
+    log('error', 'signoff_readiness_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to compute sign-off readiness' });
   }
 });
@@ -3511,7 +3181,7 @@ router.get('/engagements/:id/validation-package', requirePermission('assessments
 
     res.json({ success: true, data: packageData });
   } catch (error) {
-    console.error('Validation package build error:', error);
+    log('error', 'validation_package_build_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to build validation package' });
   }
 });
@@ -3683,7 +3353,7 @@ router.get('/engagements/:id/validation-package/pdf', requirePermission('assessm
 
     doc.end();
   } catch (error) {
-    console.error('Validation package PDF error:', error);
+    log('error', 'validation_package_pdf_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to generate validation package PDF' });
   }
 });
@@ -3693,6 +3363,200 @@ router.use((err, req, res, next) => {
     return res.status(400).json({ success: false, error: 'Template upload failed' });
   }
   return next(err);
+});
+
+// ============================================================
+// Phase 6.1 — Procedure result evidence linking
+// POST /api/v1/assessments/results/:resultId/evidence
+// Link an evidence item directly to a specific procedure result
+// ============================================================
+router.post('/results/:resultId/evidence', requirePermission('assessments.write'), async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const organizationId = req.user.organization_id;
+    const { evidenceId, linkNotes } = req.body;
+
+    if (!evidenceId) {
+      return res.status(400).json({ success: false, error: 'evidenceId is required' });
+    }
+
+    // Verify the result belongs to this org
+    const resultCheck = await pool.query(
+      'SELECT id FROM assessment_results WHERE id = $1 AND organization_id = $2 LIMIT 1',
+      [resultId, organizationId]
+    );
+    if (resultCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Assessment result not found' });
+    }
+
+    // Verify the evidence belongs to this org
+    const evidenceCheck = await pool.query(
+      'SELECT id FROM evidence WHERE id = $1 AND organization_id = $2 LIMIT 1',
+      [evidenceId, organizationId]
+    );
+    if (evidenceCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence item not found' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO assessment_result_evidence_links
+         (assessment_result_id, evidence_id, organization_id, link_notes, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (assessment_result_id, evidence_id) DO UPDATE
+         SET link_notes = EXCLUDED.link_notes
+       RETURNING *`,
+      [resultId, evidenceId, organizationId, linkNotes || null, req.user.id]
+    );
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    log('error', 'assessment_result_evidence_link', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to link evidence to assessment result' });
+  }
+});
+
+// DELETE /api/v1/assessments/results/:resultId/evidence/:evidenceId
+router.delete('/results/:resultId/evidence/:evidenceId', requirePermission('assessments.write'), async (req, res) => {
+  try {
+    const { resultId, evidenceId } = req.params;
+    const organizationId = req.user.organization_id;
+
+    const result = await pool.query(
+      `DELETE FROM assessment_result_evidence_links
+       WHERE assessment_result_id = $1 AND evidence_id = $2 AND organization_id = $3
+       RETURNING id`,
+      [resultId, evidenceId, organizationId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence link not found' });
+    }
+
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    log('error', 'assessment_result_evidence_unlink', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to remove evidence link' });
+  }
+});
+
+// GET /api/v1/assessments/results/:resultId/evidence
+router.get('/results/:resultId/evidence', requirePermission('assessments.read'), async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const organizationId = req.user.organization_id;
+
+    const result = await pool.query(
+      `SELECT arel.id, arel.link_notes, arel.created_at,
+              e.id as evidence_id, e.title, e.file_name, e.file_type,
+              e.collection_date, e.status,
+              u.first_name || ' ' || u.last_name as linked_by
+       FROM assessment_result_evidence_links arel
+       JOIN evidence e ON e.id = arel.evidence_id
+       LEFT JOIN users u ON u.id = arel.created_by
+       WHERE arel.assessment_result_id = $1
+         AND arel.organization_id = $2
+       ORDER BY arel.created_at`,
+      [resultId, organizationId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'assessment_result_evidence_list', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to list result evidence links' });
+  }
+});
+
+// ============================================================
+// Phase 6.2 — Finding control links
+// POST /api/v1/assessments/findings/:findingId/controls
+// Link additional controls (many-to-many) to a finding
+// ============================================================
+router.post('/findings/:findingId/controls', requirePermission('assessments.write'), async (req, res) => {
+  try {
+    const { findingId } = req.params;
+    const organizationId = req.user.organization_id;
+    const { controlId, linkType = 'related' } = req.body;
+
+    if (!controlId) {
+      return res.status(400).json({ success: false, error: 'controlId is required' });
+    }
+
+    const VALID_LINK_TYPES = ['primary', 'related', 'crosswalk'];
+    if (!VALID_LINK_TYPES.includes(linkType)) {
+      return res.status(400).json({ success: false, error: `linkType must be one of: ${VALID_LINK_TYPES.join(', ')}` });
+    }
+
+    // Verify finding belongs to this org
+    const findingCheck = await pool.query(
+      'SELECT id FROM audit_findings WHERE id = $1 AND organization_id = $2 LIMIT 1',
+      [findingId, organizationId]
+    );
+    if (findingCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Finding not found' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO finding_control_links (finding_id, control_id, organization_id, link_type, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (finding_id, control_id) DO UPDATE SET link_type = EXCLUDED.link_type
+       RETURNING *`,
+      [findingId, controlId, organizationId, linkType, req.user.id]
+    );
+
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    log('error', 'finding_control_link', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to link control to finding' });
+  }
+});
+
+// DELETE /api/v1/assessments/findings/:findingId/controls/:controlId
+router.delete('/findings/:findingId/controls/:controlId', requirePermission('assessments.write'), async (req, res) => {
+  try {
+    const { findingId, controlId } = req.params;
+    const organizationId = req.user.organization_id;
+
+    const result = await pool.query(
+      `DELETE FROM finding_control_links
+       WHERE finding_id = $1 AND control_id = $2 AND organization_id = $3
+       RETURNING id`,
+      [findingId, controlId, organizationId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Finding-control link not found' });
+    }
+
+    res.json({ success: true, data: { deleted: true } });
+  } catch (error) {
+    log('error', 'finding_control_unlink', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to remove control link from finding' });
+  }
+});
+
+// GET /api/v1/assessments/findings/:findingId/controls
+router.get('/findings/:findingId/controls', requirePermission('assessments.read'), async (req, res) => {
+  try {
+    const { findingId } = req.params;
+    const organizationId = req.user.organization_id;
+
+    const result = await pool.query(
+      `SELECT fcl.id, fcl.link_type, fcl.created_at,
+              fc.id as control_id, fc.control_id as control_ref, fc.title as control_title,
+              f.code as framework_code, f.name as framework_name
+       FROM finding_control_links fcl
+       JOIN framework_controls fc ON fc.id = fcl.control_id
+       JOIN frameworks f ON f.id = fc.framework_id
+       WHERE fcl.finding_id = $1 AND fcl.organization_id = $2
+       ORDER BY fcl.link_type, fc.control_id`,
+      [findingId, organizationId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'finding_controls_list', { error: error?.message || String(error) });
+    res.status(500).json({ success: false, error: 'Failed to list finding control links' });
+  }
 });
 
 module.exports = router;

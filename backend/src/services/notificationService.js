@@ -26,8 +26,44 @@ async function createNotification(orgId, userId, type, title, message, link = nu
     } catch {
       // Email errors never block the in-app notification
     }
+
+    // Send push notification to mobile devices (non-blocking)
+    maybePush(userId, orgId, title, message, link).catch(() => {});
   } catch (err) {
     console.error('[notificationService] Failed to create notification:', err.message);
+  }
+}
+
+/**
+ * Fire-and-forget push notification via pushService.
+ * For user-targeted notifications, sends to that user's devices.
+ * For broadcast notifications (userId = null), sends to all org admins.
+ */
+async function maybePush(userId, orgId, title, message, link) {
+  let pushService;
+  try {
+    pushService = require('./pushService');
+  } catch {
+    return; // pushService unavailable (optional dependency)
+  }
+
+  const data = link ? { link } : {};
+
+  if (userId) {
+    await pushService.sendPush(userId, title, message, data);
+    return;
+  }
+
+  // Broadcast: push to all admin users in the org
+  try {
+    const result = await pool.query(
+      `SELECT id FROM users WHERE organization_id = $1 AND role = 'admin' AND is_active = true`,
+      [orgId]
+    );
+    const tasks = result.rows.map((u) => pushService.sendPush(u.id, title, message, data));
+    await Promise.allSettled(tasks);
+  } catch {
+    // Non-fatal — broadcast push errors are swallowed
   }
 }
 

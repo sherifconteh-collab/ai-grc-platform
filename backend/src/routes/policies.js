@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
+const { decrypt } = require('../utils/encrypt');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
 const { generatePolicyFromFrameworks } = require('../services/policyService');
@@ -22,6 +23,32 @@ router.use(authenticate);
 const ALLOWED_POLICY_STATUSES = ['draft', 'under_review', 'approved', 'published', 'archived'];
 const ALLOWED_REVIEW_TYPES = ['annual', 'triggered', 'ad_hoc', 'change_driven'];
 const ALLOWED_REVIEW_STATUSES = ['scheduled', 'in_progress', 'completed', 'overdue'];
+const POLICY_EMAIL_FIELDS = Object.freeze([
+  'created_by_email',
+  'approved_by_email',
+  'reviewed_by_email',
+  'resolved_by_email',
+  'uploaded_by_email'
+]);
+
+function decryptPolicyEmailFields(record) {
+  if (!record || typeof record !== 'object') {
+    return record;
+  }
+
+  const normalized = { ...record };
+  for (const field of POLICY_EMAIL_FIELDS) {
+    if (normalized[field]) {
+      normalized[field] = decrypt(normalized[field]);
+    }
+  }
+
+  return normalized;
+}
+
+function decryptPolicyEmailRows(rows) {
+  return Array.isArray(rows) ? rows.map((row) => decryptPolicyEmailFields(row)) : [];
+}
 
 // GET /api/v1/policies
 // List all policies for organization
@@ -75,7 +102,7 @@ router.get('/', requirePermission('controls.read'), async (req, res) => {
     res.json({
       success: true,
       data: {
-        policies: result.rows,
+        policies: decryptPolicyEmailRows(result.rows),
         total: countResult.rows[0]?.total || 0,
         pagination: { limit: qLimit, offset: qOffset }
       }
@@ -135,9 +162,9 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
     res.json({
       success: true,
       data: {
-        policy: policyResult.rows[0],
+        policy: decryptPolicyEmailFields(policyResult.rows[0]),
         sections: sectionsResult.rows,
-        recent_reviews: reviewsResult.rows
+        recent_reviews: decryptPolicyEmailRows(reviewsResult.rows)
       }
     });
   } catch (error) {
@@ -434,6 +461,7 @@ router.patch('/:id', requirePermission('controls.write'), async (req, res) => {
 // POST /api/v1/policies/:id/sections
 // Add or update policy section
 router.post('/:id/sections', requirePermission('controls.write'), async (req, res) => {
+  const client = await pool.connect();
   try {
     const orgId = req.user.organization_id;
     const policyId = req.params.id;
@@ -448,57 +476,115 @@ router.post('/:id/sections', requirePermission('controls.write'), async (req, re
     } = req.body || {};
 
     // Validate policy exists
-    const policyResult = await pool.query(
+    await client.query('BEGIN');
+
+    const policyResult = await client.query(
       `SELECT id FROM organization_policies WHERE organization_id = $1 AND id = $2 LIMIT 1`,
       [orgId, policyId]
     );
 
     if (policyResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, error: 'Policy not found' });
     }
 
     if (!section_number || !section_title || !section_content) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'section_number, section_title, and section_content are required'
       });
     }
 
-    // Insert or update section
-    const sectionResult = await pool.query(
-      `INSERT INTO policy_sections (
-         organization_id, policy_id, section_number, section_title, section_content,
-         framework_family_code, framework_family_name, display_order
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT ON CONSTRAINT policy_sections_pkey
-       DO UPDATE SET
-         section_title = EXCLUDED.section_title,
-         section_content = EXCLUDED.section_content,
-         framework_family_code = EXCLUDED.framework_family_code,
-         framework_family_name = EXCLUDED.framework_family_name,
-         display_order = EXCLUDED.display_order,
-         updated_at = NOW()
-       RETURNING *`,
-      [
-        orgId,
-        policyId,
-        section_number,
-        section_title,
-        section_content,
-        framework_family_code || null,
-        framework_family_name || null,
-        display_order
-      ]
+    const existingSectionsResult = await client.query(
+      `SELECT id
+       FROM policy_sections
+       WHERE organization_id = $1 AND policy_id = $2 AND section_number = $3
+       ORDER BY created_at ASC, id ASC`,
+      [orgId, policyId, section_number]
     );
 
-    const section = sectionResult.rows[0];
+    let section;
+    let created = false;
+    let deduplicatedSections = 0;
+
+    if (existingSectionsResult.rows.length > 0) {
+      const [canonicalSection, ...duplicateSections] = existingSectionsResult.rows;
+
+      if (duplicateSections.length > 0) {
+        const duplicateSectionIds = duplicateSections.map((row) => row.id);
+        deduplicatedSections = duplicateSectionIds.length;
+
+        await client.query(
+          `INSERT INTO policy_control_mappings (
+             organization_id, policy_section_id, control_id, framework_id, mapping_notes
+           )
+           SELECT organization_id, $1, control_id, framework_id, mapping_notes
+           FROM policy_control_mappings
+           WHERE policy_section_id = ANY($2::uuid[])
+           ON CONFLICT (policy_section_id, control_id) DO UPDATE SET
+             mapping_notes = COALESCE(EXCLUDED.mapping_notes, policy_control_mappings.mapping_notes)`,
+          [canonicalSection.id, duplicateSectionIds]
+        );
+
+        await client.query(
+          `DELETE FROM policy_sections WHERE id = ANY($1::uuid[])`,
+          [duplicateSectionIds]
+        );
+      }
+
+      const updatedSectionResult = await client.query(
+        `UPDATE policy_sections
+         SET section_title = $4,
+             section_content = $5,
+             framework_family_code = $6,
+             framework_family_name = $7,
+             display_order = $8,
+             updated_at = NOW()
+         WHERE organization_id = $1 AND policy_id = $2 AND id = $3
+         RETURNING *`,
+        [
+          orgId,
+          policyId,
+          canonicalSection.id,
+          section_title,
+          section_content,
+          framework_family_code || null,
+          framework_family_name || null,
+          display_order
+        ]
+      );
+
+      section = updatedSectionResult.rows[0];
+    } else {
+      const insertedSectionResult = await client.query(
+        `INSERT INTO policy_sections (
+           organization_id, policy_id, section_number, section_title, section_content,
+           framework_family_code, framework_family_name, display_order
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [
+          orgId,
+          policyId,
+          section_number,
+          section_title,
+          section_content,
+          framework_family_code || null,
+          framework_family_name || null,
+          display_order
+        ]
+      );
+
+      section = insertedSectionResult.rows[0];
+      created = true;
+    }
 
     // Add control mappings if provided
     if (Array.isArray(control_mappings) && control_mappings.length > 0) {
       for (const mapping of control_mappings) {
         if (mapping.control_id && mapping.framework_id) {
-          await pool.query(
+          await client.query(
             `INSERT INTO policy_control_mappings (
                organization_id, policy_section_id, control_id, framework_id, mapping_notes
              )
@@ -518,21 +604,26 @@ router.post('/:id/sections', requirePermission('controls.write'), async (req, re
     }
 
     // Audit log
-    await pool.query(
+    await client.query(
       `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_section_created', 'policy', $3, $4::jsonb, true)`,
+       VALUES ($1, $2, $3, 'policy', $4, $5::jsonb, true)`,
       [
         orgId,
         req.user.id,
+        created ? 'policy_section_created' : 'policy_section_updated',
         policyId,
-        JSON.stringify({ section_number, section_title })
+        JSON.stringify({ section_number, section_title, deduplicated_sections: deduplicatedSections })
       ]
     );
 
-    res.status(201).json({ success: true, data: section });
+    await client.query('COMMIT');
+    res.status(created ? 201 : 200).json({ success: true, data: section });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Create policy section error:', error);
     res.status(500).json({ success: false, error: 'Failed to create policy section' });
+  } finally {
+    client.release();
   }
 });
 
@@ -776,7 +867,7 @@ router.get('/:id/monitoring-alerts', requirePermission('controls.read'), async (
       [orgId, policyId, resolved === 'true']
     );
 
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: decryptPolicyEmailRows(result.rows) });
   } catch (error) {
     console.error('Get policy monitoring alerts error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch monitoring alerts' });
@@ -926,7 +1017,7 @@ router.get('/uploads', requirePermission('controls.read'), async (req, res) => {
       [orgId, Number(limit), Number(offset)]
     );
     
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: decryptPolicyEmailRows(result.rows) });
   } catch (error) {
     console.error('List policy uploads error:', error);
     res.status(500).json({ success: false, error: 'Failed to list policy uploads' });
@@ -957,7 +1048,7 @@ router.get('/uploads/:id', requirePermission('controls.read'), async (req, res) 
       return res.status(404).json({ success: false, error: 'Policy upload not found' });
     }
     
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: decryptPolicyEmailFields(result.rows[0]) });
   } catch (error) {
     console.error('Get policy upload error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch policy upload' });
@@ -1062,7 +1153,7 @@ router.get('/uploads/:id/gaps', requirePermission('controls.read'), async (req, 
       
       detailedResults.push({
         ...analysis,
-        gaps: gapsResult.rows
+        gaps: decryptPolicyEmailRows(gapsResult.rows)
       });
     }
     

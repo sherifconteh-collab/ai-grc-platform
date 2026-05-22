@@ -4,11 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { requiresOrganizationOnboarding, hasPermission } from '@/lib/access';
-import { requiresBillingResolution, getStoredPendingBillingPlan } from '@/lib/billing';
+import { getStoredPendingBillingPlan, requiresBillingResolution } from '@/lib/billing';
 import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import { WebSocketStatusIndicator } from './WebSocketStatusIndicator';
 import Sidebar from './Sidebar';
-import AICopilot from './AICopilot';
 import { getAccessToken } from '@/lib/tokenStore';
 import { licenseAPI } from '@/lib/api';
 import AiQuotaModal from './AiQuotaModal';
@@ -50,7 +49,7 @@ export default function DashboardLayout({
   const [setupModalOpen, setSetupModalOpen] = useState(false);
 
   const canManageSettings = hasPermission(user, 'settings.manage');
-
+  
   const mustCompleteOnboarding = Boolean(
     user && requiresOrganizationOnboarding(user) && !user.onboardingCompleted
   );
@@ -211,7 +210,6 @@ export default function DashboardLayout({
           )}
           <div className="container mx-auto px-6 py-8">{children}</div>
         </main>
-        <AICopilot />
         <WebSocketStatusIndicator />
       </div>
       <AiQuotaModal

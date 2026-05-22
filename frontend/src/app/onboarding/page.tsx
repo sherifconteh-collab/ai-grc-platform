@@ -1,16 +1,17 @@
-// @tier: community
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { frameworkAPI, organizationAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { organizationAPI, frameworkAPI } from '@/lib/api';
-import { APP_NAME } from '@/lib/branding';
-
-/* ── Types ─────────────────────────────────────────────────────────── */
+import { hasPermission, requiresOrganizationOnboarding } from '@/lib/access';
+import { getStoredPendingBillingPlan, VALID_BILLING_PLANS } from '@/lib/billing';
 
 type CiaLevel = 'low' | 'moderate' | 'high';
-
+type RmfStage = 'prepare' | 'categorize' | 'select' | 'implement' | 'assess' | 'authorize' | 'monitor';
+type DeploymentModel = 'on_prem' | 'single_cloud' | 'multi_cloud' | 'hybrid' | 'saas_only';
+type ComplianceProfile = 'private' | 'federal' | 'hybrid';
+type NistAdoptionMode = 'best_practice' | 'mandatory';
 interface FrameworkOption {
   id: string;
   code: string;
@@ -21,6 +22,7 @@ interface FrameworkOption {
   group?: string | null;
 }
 
+// Framework groups: all standards in a group count as 1 toward the tier limit
 const FRAMEWORK_GROUP_METADATA: Record<string, { label: string; description: string }> = { // ip-hygiene:ignore
   iso_27000: { label: 'ISO 27000 Series', description: 'Information security management standards — 27001, 27002, 27005, 27017, 27018, 27701, and 31000. Counts as 1 framework.' }, // ip-hygiene:ignore
   iso_ai: { label: 'ISO AI Suite', description: 'AI governance standards — 42001, 42005, 23894, 38507, 22989, 23053, 5259, and TRs on bias, trust, and ethics. Counts as 1 framework.' }, // ip-hygiene:ignore
@@ -54,31 +56,50 @@ const DATA_SENSITIVITY_OPTIONS = [
   { value: 'confidential', label: 'Confidential' },
   { value: 'restricted', label: 'Restricted' },
 ];
+const RMF_FRAMEWORK_CODES = ['nist_800_53', 'nist_800_171'];
+const GOVCLOUD_FRAMEWORK_CODES = ['nist_privacy', 'gdpr', 'hipaa', 'eu_ai_act', 'ccpa_cpra', 'state_ai_governance', 'international_ai_governance'];
 
-const CIA_OPTIONS: { value: CiaLevel; label: string; description: string }[] = [
-  { value: 'low', label: 'Low', description: 'Limited adverse effect' },
-  { value: 'moderate', label: 'Moderate', description: 'Serious adverse effect' },
-  { value: 'high', label: 'High', description: 'Severe or catastrophic effect' },
-];
-
-function toggleArrayValue(current: string[], value: string): string[] {
-  return current.includes(value)
-    ? current.filter((v) => v !== value)
-    : [...current, value];
+function formatBillingPlan(plan: string): string {
+  const [tier = '', cadence = ''] = String(plan || '').split('_');
+  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : 'Selected';
+  const cadenceLabel = cadence === 'annual'
+    ? 'Annual'
+    : cadence === 'monthly'
+      ? 'Monthly'
+      : '';
+  return cadenceLabel ? `${tierLabel} (${cadenceLabel})` : tierLabel;
 }
 
-/* ── Component ────────────────────────────────────────────────────── */
+function formatTierLabel(tier: string | null | undefined): string {
+  switch (String(tier || '').toLowerCase()) {
+    case 'community': return 'Community';
+    case 'pro': return 'Pro';
+    case 'enterprise': return 'Enterprise';
+    case 'govcloud': return 'Gov Cloud & Advisory';
+    default: return String(tier || 'community');
+  }
+}
 
-const TOTAL_STEPS = 4;
+function toggleArrayValue(current: string[], value: string) {
+  if (current.includes(value)) {
+    return current.filter((item) => item !== value);
+  }
+  return [...current, value];
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
+  const { user, loading, isAuthenticated, refreshUser } = useAuth();
+  const canManageFrameworks = hasPermission(user, 'frameworks.manage');
 
-  /* Step tracking */
-  const [step, setStep] = useState(1);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [availableFrameworks, setAvailableFrameworks] = useState<FrameworkOption[]>([]);
+  const [selectedFrameworkIds, setSelectedFrameworkIds] = useState<string[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  /* Step 1 — Organization basics */
   const [companyLegalName, setCompanyLegalName] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
   const [industry, setIndustry] = useState('');
@@ -86,509 +107,357 @@ export default function OnboardingPage() {
   const [headquartersLocation, setHeadquartersLocation] = useState('');
   const [employeeCountRange, setEmployeeCountRange] = useState('');
 
-  /* Step 2 — System info */
   const [systemName, setSystemName] = useState('');
   const [systemDescription, setSystemDescription] = useState('');
   const [authorizationBoundary, setAuthorizationBoundary] = useState('');
-  const [environmentTypes, setEnvironmentTypes] = useState<string[]>([]);
+  const [operatingEnvironmentSummary, setOperatingEnvironmentSummary] = useState('');
 
-  /* Step 3 — Impact classification */
   const [confidentialityImpact, setConfidentialityImpact] = useState<CiaLevel | ''>('');
   const [integrityImpact, setIntegrityImpact] = useState<CiaLevel | ''>('');
   const [availabilityImpact, setAvailabilityImpact] = useState<CiaLevel | ''>('');
+  const [impactRationale, setImpactRationale] = useState('');
+
+  const [environmentTypes, setEnvironmentTypes] = useState<string[]>([]);
+  const [deploymentModel, setDeploymentModel] = useState<DeploymentModel | ''>('');
+  const [cloudProvidersInput, setCloudProvidersInput] = useState('');
   const [dataSensitivityTypes, setDataSensitivityTypes] = useState<string[]>([]);
 
-  /* Step 4 — Framework selection */
-  const [availableFrameworks, setAvailableFrameworks] = useState<FrameworkOption[]>([]);
-  const [selectedFrameworkIds, setSelectedFrameworkIds] = useState<string[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [rmfStage, setRmfStage] = useState<RmfStage | ''>('');
+  const [rmfNotes, setRmfNotes] = useState('');
+  const [complianceProfile, setComplianceProfile] = useState<ComplianceProfile | ''>('private');
+  const [nistAdoptionMode, setNistAdoptionMode] = useState<NistAdoptionMode | ''>('best_practice');
+  const [nistNotes, setNistNotes] = useState('');
+  const [selectedFrameworkCodes, setSelectedFrameworkCodes] = useState<string[]>([]);
+  const [pendingBillingPlan, setPendingBillingPlan] = useState('');
+  const hasRmfRelevantFramework = selectedFrameworkCodes.some((code) => RMF_FRAMEWORK_CODES.includes(String(code || '').toLowerCase()));
+  const requiresNist80053InformationTypes = selectedFrameworkCodes.includes('nist_800_53');
+  const hasGovcloudFrameworks = selectedFrameworkCodes.some((code) => GOVCLOUD_FRAMEWORK_CODES.includes(code));
 
-  /* General state */
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [loadingFrameworks, setLoadingFrameworks] = useState(true);
+  const updateSelectedFrameworkCodes = (frameworkIds: string[], frameworksList: FrameworkOption[] = availableFrameworks) => {
+    const codeById = new Map(
+      frameworksList.map((framework) => [framework.id, String(framework.code || '').toLowerCase()])
+    );
+    const codes = frameworkIds
+      .map((id) => codeById.get(id))
+      .filter((code): code is string => Boolean(code));
+    setSelectedFrameworkCodes(Array.from(new Set(codes)));
+  };
 
-  /* ── Redirect if onboarding already complete ────────────────────── */
-  useEffect(() => {
-    if (user?.onboardingCompleted) {
-      router.replace('/dashboard');
+  // Count effective frameworks: each framework_group counts as 1, ungrouped count individually
+  const frameworkById = new Map(availableFrameworks.map((f) => [f.id, f]));
+
+  const getEffectiveCount = (ids: string[]) => {
+    const seen = new Set<string>();
+    for (const id of ids) {
+      const fw = frameworkById.get(id);
+      seen.add(fw?.group || id);
     }
-  }, [user, router]);
+    return seen.size;
+  };
 
-  /* ── Load available frameworks ──────────────────────────────────── */
+  const effectiveCount = getEffectiveCount(selectedFrameworkIds);
+
+  // Pre-compute set of selected groups for render-time checks
+  const selectedGroups = new Set<string>();
+  for (const id of selectedFrameworkIds) {
+    const fw = frameworkById.get(id);
+    if (fw?.group) selectedGroups.add(fw.group);
+  }
+
+  const toggleFrameworkSelection = (frameworkId: string) => {
+    if (!canManageFrameworks) return;
+
+    const isSelected = selectedFrameworkIds.includes(frameworkId);
+    if (isSelected) {
+      const nextIds = selectedFrameworkIds.filter((id) => id !== frameworkId);
+      setSelectedFrameworkIds(nextIds);
+      updateSelectedFrameworkCodes(nextIds);
+      return;
+    }
+
+    const nextIds = [...selectedFrameworkIds, frameworkId];
+
+    setSelectedFrameworkIds(nextIds);
+    updateSelectedFrameworkCodes(nextIds);
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    const pendingPlan = getStoredPendingBillingPlan();
+    if (pendingPlan && VALID_BILLING_PLANS.has(pendingPlan)) {
+      setPendingBillingPlan(pendingPlan);
+    } else {
+      setPendingBillingPlan('');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    if (!requiresOrganizationOnboarding(user)) {
+      if (String(user?.role || '').toLowerCase() === 'auditor') {
+        router.push('/dashboard/auditor-workspace');
+      } else {
+        router.push('/dashboard');
+      }
+      return;
+    }
+
+    if (user?.onboardingCompleted) {
+      router.push('/dashboard');
+      return;
+    }
+
+    const loadProfile = async () => {
       try {
-        const res = await frameworkAPI.getAll();
-        if (!cancelled) {
-          const fws = (res.data?.data || res.data || []).map((fw: Record<string, unknown>) => ({
-            id: String(fw.id || ''),
-            code: String(fw.code || ''),
-            name: String(fw.name || ''),
-            description: String(fw.description || ''),
-            controlCount: Number(fw.control_count || fw.controlCount || 0),
-            tierRequired: fw.tier_required ?? fw.tierRequired ?? null,
-            group: fw.group ?? null,
-          }));
-          setAvailableFrameworks(fws);
-        }
-      } catch {
-        // Non-fatal — user can still complete onboarding without selecting frameworks
+        setPageLoading(true);
+        const [profileResponse, frameworksResponse, selectedFrameworksResponse] = await Promise.all([
+          organizationAPI.getMyProfile(),
+          frameworkAPI.getAll(),
+          user?.organizationId
+            ? organizationAPI.getFrameworks(user.organizationId)
+            : Promise.resolve({ data: { data: [] } })
+        ]);
+        const profile = profileResponse.data?.data?.profile || {};
+        const available = Array.isArray(frameworksResponse.data?.data)
+          ? frameworksResponse.data.data.map((framework: any) => ({
+              id: framework.id,
+              code: String(framework.code || ''),
+              name: String(framework.name || ''),
+              description: String(framework.description || ''),
+              controlCount: Number.parseInt(String(framework.control_count || '0'), 10) || 0,
+              tierRequired: framework.tier_required || null,
+              group: framework.framework_group || null
+            }))
+          : [];
+        setAvailableFrameworks(available);
+
+        const selectedFrameworkRows = Array.isArray(selectedFrameworksResponse.data?.data)
+          ? selectedFrameworksResponse.data.data
+          : [];
+        const selectedIds = selectedFrameworkRows
+          .map((entry: any) => String(entry.id || ''))
+          .filter((entry: string) => entry.length > 0);
+        setSelectedFrameworkIds(selectedIds);
+
+        const selectedCodesFromOrg = selectedFrameworkRows
+          .map((entry: any) => String(entry.code || '').toLowerCase())
+          .filter((entry: string) => entry.length > 0);
+        const selectedCodesFromProfile = Array.isArray(profileResponse.data?.data?.selected_framework_codes)
+          ? profileResponse.data.data.selected_framework_codes
+              .map((entry: any) => String(entry || '').toLowerCase())
+              .filter((entry: string) => entry.length > 0)
+          : [];
+        setSelectedFrameworkCodes(
+          selectedCodesFromOrg.length > 0 ? selectedCodesFromOrg : selectedCodesFromProfile
+        );
+
+        setCompanyLegalName(profile.company_legal_name || user?.organizationName || '');
+        setCompanyDescription(profile.company_description || '');
+        setIndustry(profile.industry || '');
+        setWebsite(profile.website || '');
+        setHeadquartersLocation(profile.headquarters_location || '');
+        setEmployeeCountRange(profile.employee_count_range || '');
+
+        setSystemName(profile.system_name || '');
+        setSystemDescription(profile.system_description || '');
+        setAuthorizationBoundary(profile.authorization_boundary || '');
+        setOperatingEnvironmentSummary(profile.operating_environment_summary || '');
+
+        setConfidentialityImpact(profile.confidentiality_impact || '');
+        setIntegrityImpact(profile.integrity_impact || '');
+        setAvailabilityImpact(profile.availability_impact || '');
+        setImpactRationale(profile.impact_rationale || '');
+
+        setEnvironmentTypes(Array.isArray(profile.environment_types) ? profile.environment_types : []);
+        setDeploymentModel(profile.deployment_model || '');
+        setCloudProvidersInput(Array.isArray(profile.cloud_providers) ? profile.cloud_providers.join(', ') : '');
+        setDataSensitivityTypes(Array.isArray(profile.data_sensitivity_types) ? profile.data_sensitivity_types : []);
+
+        setRmfStage(profile.rmf_stage || '');
+        setRmfNotes(profile.rmf_notes || '');
+        setComplianceProfile(profile.compliance_profile || 'private');
+        setNistAdoptionMode(profile.nist_adoption_mode || 'best_practice');
+        setNistNotes(profile.nist_notes || '');
+      } catch (loadError: any) {
+        setError(loadError.response?.data?.error || 'Failed to load onboarding profile');
       } finally {
-        if (!cancelled) setLoadingFrameworks(false);
+        setPageLoading(false);
       }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    };
 
-  /* ── Load existing profile (resume interrupted onboarding) ──────── */
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await organizationAPI.getMyProfile();
-        const profile = res.data?.data?.profile;
-        if (!cancelled && profile) {
-          setCompanyLegalName(profile.company_legal_name || '');
-          setCompanyDescription(profile.company_description || '');
-          setIndustry(profile.industry || '');
-          setWebsite(profile.website || '');
-          setHeadquartersLocation(profile.headquarters_location || '');
-          setEmployeeCountRange(profile.employee_count_range || '');
-          setSystemName(profile.system_name || '');
-          setSystemDescription(profile.system_description || '');
-          setAuthorizationBoundary(profile.authorization_boundary || '');
-          setEnvironmentTypes(profile.environment_types || []);
-          setConfidentialityImpact(profile.confidentiality_impact || '');
-          setIntegrityImpact(profile.integrity_impact || '');
-          setAvailabilityImpact(profile.availability_impact || '');
-          setDataSensitivityTypes(profile.data_sensitivity_types || []);
-        }
-      } catch {
-        // non-fatal
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    loadProfile();
+  }, [user, loading, isAuthenticated, router]);
 
-  /* ── Load selected org frameworks ──────────────────────────────── */
-  useEffect(() => {
-    let cancelled = false;
-    if (!user?.organizationId) return;
-    (async () => {
-      try {
-        const res = await organizationAPI.getFrameworks(user.organizationId);
-        const ids = (res.data?.data || res.data || []).map((f: Record<string, unknown>) => String(f.framework_id || f.id || ''));
-        if (!cancelled) setSelectedFrameworkIds(ids.filter(Boolean));
-      } catch {
-        // non-fatal
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [user?.organizationId]);
+  const buildPayload = (markCompleted: boolean) => ({
+    company_legal_name: companyLegalName,
+    company_description: companyDescription,
+    industry: industry || null,
+    website: website || null,
+    headquarters_location: headquartersLocation || null,
+    employee_count_range: employeeCountRange || null,
+    system_name: systemName,
+    system_description: systemDescription,
+    authorization_boundary: authorizationBoundary || null,
+    operating_environment_summary: operatingEnvironmentSummary || null,
+    confidentiality_impact: confidentialityImpact || null,
+    integrity_impact: integrityImpact || null,
+    availability_impact: availabilityImpact || null,
+    impact_rationale: impactRationale || null,
+    environment_types: environmentTypes,
+    deployment_model: deploymentModel || null,
+    cloud_providers: cloudProvidersInput
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter((item) => item.length > 0),
+    data_sensitivity_types: dataSensitivityTypes,
+    rmf_stage: hasRmfRelevantFramework ? (rmfStage || null) : null,
+    rmf_notes: hasRmfRelevantFramework ? (rmfNotes || null) : null,
+    compliance_profile: hasRmfRelevantFramework ? (complianceProfile || 'private') : 'private',
+    nist_adoption_mode: hasRmfRelevantFramework ? (nistAdoptionMode || 'best_practice') : 'best_practice',
+    nist_notes: hasRmfRelevantFramework ? (nistNotes || null) : null,
+    onboarding_completed: markCompleted,
+  });
 
-  /* ── Validation per step ────────────────────────────────────────── */
-  function stepOneValid() {
-    return companyLegalName.trim().length > 0 && companyDescription.trim().length > 0;
-  }
-
-  function stepTwoValid() {
-    return systemName.trim().length > 0 && systemDescription.trim().length > 0 && environmentTypes.length > 0;
-  }
-
-  function stepThreeValid() {
-    return confidentialityImpact !== '' && integrityImpact !== '' && availabilityImpact !== '';
-  }
-
-  /* ── Save & complete ────────────────────────────────────────────── */
-  async function handleComplete() {
-    setSaving(true);
-    setError('');
+  const handleSave = async (markCompleted: boolean) => {
     try {
-      // Save frameworks
-      if (selectedFrameworkIds.length > 0 && user?.organizationId) {
-        try {
-          await organizationAPI.addFrameworks(user.organizationId, { frameworkIds: selectedFrameworkIds });
-        } catch {
-          // non-fatal — frameworks may already be set
-        }
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      if (canManageFrameworks && user?.organizationId) {
+        await organizationAPI.addFrameworks(user.organizationId, {
+          frameworkIds: selectedFrameworkIds,
+        });
       }
 
-      // Save profile + mark onboarding complete
-      await organizationAPI.updateMyProfile({
-        company_legal_name: companyLegalName.trim(),
-        company_description: companyDescription.trim(),
-        industry: industry.trim() || null,
-        website: website.trim() || null,
-        headquarters_location: headquartersLocation.trim() || null,
-        employee_count_range: employeeCountRange.trim() || null,
-        system_name: systemName.trim(),
-        system_description: systemDescription.trim(),
-        authorization_boundary: authorizationBoundary.trim() || null,
-        environment_types: environmentTypes,
-        confidentiality_impact: confidentialityImpact as CiaLevel,
-        integrity_impact: integrityImpact as CiaLevel,
-        availability_impact: availabilityImpact as CiaLevel,
-        data_sensitivity_types: dataSensitivityTypes,
-        onboarding_completed: true,
-      });
+      await organizationAPI.updateMyProfile(buildPayload(markCompleted));
 
-      // Refresh user so DashboardLayout no longer redirects back here
-      if (refreshUser) await refreshUser();
+      if (markCompleted) {
+        await refreshUser();
+        const pendingPlan = getStoredPendingBillingPlan();
+        if (pendingPlan.length > 0 && VALID_BILLING_PLANS.has(pendingPlan)) {
+          // Don't remove pendingPlan here — it must survive until Stripe checkout
+          // actually succeeds (cleared on the billing/success page).
+          router.push(`/billing/checkout?plan=${encodeURIComponent(pendingPlan)}`);
+          return;
+        }
+        router.push('/dashboard');
+        return;
+      }
 
-      router.replace('/dashboard');
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg || 'Failed to save. Please check required fields and try again.');
+      setSuccess('Progress saved. Complete setup when ready.');
+    } catch (saveError: any) {
+      const details = saveError.response?.data;
+      if (Array.isArray(details?.missing_fields)) {
+        setError(`Complete required fields: ${details.missing_fields.join(', ')}`);
+      } else {
+        setError(details?.error || 'Failed to save onboarding profile');
+      }
     } finally {
       setSaving(false);
     }
-  }
+  };
 
-  /* ── Framework toggling ─────────────────────────────────────────── */
-  function toggleFramework(id: string) {
-    setSelectedFrameworkIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  if (loading || pageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
     );
   }
 
-  /* ── Render ─────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 flex flex-col">
-      {/* Header */}
-      <header className="px-6 py-4 flex items-center gap-3 border-b border-gray-200 bg-white/80 backdrop-blur">
-        <span className="text-xl font-bold text-purple-700">{APP_NAME}</span>
-        <h1 className="text-lg font-semibold text-gray-900">Organization Setup</h1>
-        <span className="ml-auto text-sm text-gray-500">Step {step} of {TOTAL_STEPS}</span>
-      </header>
+    <div className="min-h-screen bg-linear-to-br from-indigo-900 via-slate-900 to-slate-800 py-10 px-4">
+      <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-slate-900 text-white px-8 py-6">
+          <h1 className="text-2xl font-bold">Organization Onboarding</h1>
+          <p className="text-slate-200 mt-2 text-sm">
+            Private-sector baseline intake for company context, system scope, CIA baseline, and operating environment.
+            Additional NIST/RMF fields are enabled only when your selected frameworks require them.
+          </p>
+          <p className="text-slate-300 mt-2 text-xs">
+            Active frameworks: {selectedFrameworkCodes.length > 0 ? selectedFrameworkCodes.join(', ') : 'None selected yet'}
+          </p>
+        </div>
 
-      {/* Progress bar */}
-      <div className="h-1 bg-gray-200">
-        <div
-          className="h-full bg-purple-600 transition-all duration-300"
-          style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
-        />
-      </div>
-
-      {/* Main content */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-6 py-10">
-        {error && (
-          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* ─── Step 1: Organization Basics ────────────────────────── */}
-        {step === 1 && (
-          <section className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Tell us about your organization</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                This information populates your compliance documentation and SSP packages.
+        <div className="px-8 py-8 space-y-8">
+          {pendingBillingPlan && (
+            <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-4 py-3 rounded-lg">
+              <p className="text-sm font-medium">You’ll continue to Stripe after setup.</p>
+              <p className="text-xs mt-1">
+                Pending checkout plan: {formatBillingPlan(pendingBillingPlan)}
               </p>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="md:col-span-2">
-                <label htmlFor="companyLegalName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Company Legal Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="companyLegalName"
-                  type="text"
-                  value={companyLegalName}
-                  onChange={(e) => setCompanyLegalName(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Acme Corp, Inc."
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label htmlFor="companyDescription" className="block text-sm font-medium text-gray-700 mb-1">
-                  Company Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  id="companyDescription"
-                  value={companyDescription}
-                  onChange={(e) => setCompanyDescription(e.target.value)}
-                  required
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Brief description of what your organization does..."
-                />
-              </div>
-
-              <div>
-                <label htmlFor="industry" className="block text-sm font-medium text-gray-700 mb-1">
-                  Industry
-                </label>
-                <input
-                  id="industry"
-                  type="text"
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="e.g. Financial Services"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-1">
-                  Website
-                </label>
-                <input
-                  id="website"
-                  type="url"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="https://example.com"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="headquartersLocation" className="block text-sm font-medium text-gray-700 mb-1">
-                  Headquarters Location
-                </label>
-                <input
-                  id="headquartersLocation"
-                  type="text"
-                  value={headquartersLocation}
-                  onChange={(e) => setHeadquartersLocation(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="e.g. New York, NY"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="employeeCountRange" className="block text-sm font-medium text-gray-700 mb-1">
-                  Number of Employees
-                </label>
-                <select
-                  id="employeeCountRange"
-                  value={employeeCountRange}
-                  onChange={(e) => setEmployeeCountRange(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="">Select range</option>
-                  <option value="1-10">1-10</option>
-                  <option value="11-50">11-50</option>
-                  <option value="51-200">51-200</option>
-                  <option value="201-500">201-500</option>
-                  <option value="501-1000">501-1000</option>
-                  <option value="1001-5000">1001-5000</option>
-                  <option value="5000+">5000+</option>
-                </select>
-              </div>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
             </div>
-          </section>
-        )}
+          )}
 
-        {/* ─── Step 2: System Information ─────────────────────────── */}
-        {step === 2 && (
-          <section className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Define your system</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Describe the primary information system under compliance scope.
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+              {success}
+            </div>
+          )}
+
+          <section className="space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <h2 className="text-lg font-semibold text-slate-900">Framework Selection</h2>
+              <p className="text-xs text-slate-500">
+                {selectedFrameworkIds.length} selected
               </p>
             </div>
+            <p className="text-sm text-slate-600">
+              Select from our framework catalog of standards and regulations. Bundled groups (ISO series, OWASP, CSF Profiles) count as 1 toward your limit.
+            </p>
 
-            <div className="space-y-5">
-              <div>
-                <label htmlFor="systemName" className="block text-sm font-medium text-gray-700 mb-1">
-                  System Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="systemName"
-                  type="text"
-                  value={systemName}
-                  onChange={(e) => setSystemName(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="e.g. Acme Cloud Platform"
-                />
+            {!canManageFrameworks && (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                You can view framework selections, but only users with <code>frameworks.manage</code> can change them.
               </div>
+            )}
 
-              <div>
-                <label htmlFor="systemDescription" className="block text-sm font-medium text-gray-700 mb-1">
-                  System Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  id="systemDescription"
-                  value={systemDescription}
-                  onChange={(e) => setSystemDescription(e.target.value)}
-                  required
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="What does this system do? What data does it process?"
-                />
+            {availableFrameworks.length === 0 ? (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
+                No active frameworks available.
               </div>
-
-              <div>
-                <label htmlFor="authorizationBoundary" className="block text-sm font-medium text-gray-700 mb-1">
-                  Authorization Boundary
-                </label>
-                <textarea
-                  id="authorizationBoundary"
-                  value={authorizationBoundary}
-                  onChange={(e) => setAuthorizationBoundary(e.target.value)}
-                  rows={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Describe the logical and physical boundary of the system..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Environment Types <span className="text-red-500">*</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {ENVIRONMENT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setEnvironmentTypes(toggleArrayValue(environmentTypes, opt.value))}
-                      className={`px-3 py-1.5 rounded-full text-sm transition ${
-                        environmentTypes.includes(opt.value)
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ─── Step 3: Impact Classification ─────────────────────── */}
-        {step === 3 && (
-          <section className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Impact classification</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Set the FIPS 199 security categorization for your system. This drives control baseline selection.
-              </p>
-            </div>
-
-            {/* CIA selectors */}
-            {([
-              { label: 'Confidentiality', value: confidentialityImpact, setter: setConfidentialityImpact },
-              { label: 'Integrity', value: integrityImpact, setter: setIntegrityImpact },
-              { label: 'Availability', value: availabilityImpact, setter: setAvailabilityImpact },
-            ] as const).map(({ label, value, setter }) => (
-              <div key={label}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {label} Impact <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {CIA_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setter(opt.value)}
-                      className={`text-left rounded-lg border p-3 transition ${
-                        value === opt.value
-                          ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                          : 'border-gray-200 bg-white hover:border-purple-400'
-                      }`}
-                    >
-                      <p className="text-sm font-semibold text-gray-900">{opt.label}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {/* Data sensitivity */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Sensitivity Types
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {DATA_SENSITIVITY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setDataSensitivityTypes(toggleArrayValue(dataSensitivityTypes, opt.value))}
-                    className={`px-3 py-1.5 rounded-full text-sm transition ${
-                      dataSensitivityTypes.includes(opt.value)
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Select all data classification types processed by the system.
-              </p>
-            </div>
-          </section>
-        )}
-
-        {/* ─── Step 4: Framework Selection ────────────────────────── */}
-        {step === 4 && (
-          <section className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Select compliance frameworks</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Choose the frameworks your organization needs to comply with. You can change these later in Settings.
-              </p>
-            </div>
-
-            {loadingFrameworks ? (
-              <p className="text-sm text-gray-500">Loading frameworks...</p>
-            ) : availableFrameworks.length === 0 ? (
-              <p className="text-sm text-gray-500">No frameworks available. You can add them later from the dashboard.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[32rem] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {(() => {
                   const renderedGroups = new Set<string>();
-                  return availableFrameworks.map((fw) => {
-                    if (fw.group) {
-                      const groupKey = fw.group;
-                      if (renderedGroups.has(groupKey)) return null;
-                      renderedGroups.add(groupKey);
-                      const groupMeta = FRAMEWORK_GROUP_METADATA[groupKey];
-                      const groupMembers = availableFrameworks.filter((f) => f.group === groupKey);
+                  return availableFrameworks.map((framework) => {
+                    // Grouped framework — render once as a collapsible card
+                    if (framework.group) {
+                      if (renderedGroups.has(framework.group)) return null;
+                      renderedGroups.add(framework.group);
+                      const groupMeta = FRAMEWORK_GROUP_METADATA[framework.group];
+                      const groupMembers = availableFrameworks.filter((f) => f.group === framework.group);
                       const selectedCount = groupMembers.filter((f) => selectedFrameworkIds.includes(f.id)).length;
                       const totalControls = groupMembers.reduce((sum, f) => sum + f.controlCount, 0);
-                      const isExpanded = expandedGroups.has(groupKey);
+                      const isExpanded = expandedGroups.has(framework.group);
+                      const groupAlreadySelected = selectedGroups.has(framework.group);
                       return (
-                        <div
-                          key={`group-${groupKey}`}
-                          className={`rounded-lg border p-3 transition ${
-                            selectedCount > 0 ? 'border-purple-600 bg-purple-50' : 'border-gray-200 bg-white'
-                          }`}
-                        >
+                        <div key={`group-${framework.group}`} className={`rounded-lg border p-3 transition ${selectedCount > 0 ? 'border-purple-600 bg-purple-50' : 'border-slate-200 bg-white'}`}>
                           <button
                             type="button"
-                            onClick={() =>
-                              setExpandedGroups((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(groupKey)) next.delete(groupKey);
-                                else next.add(groupKey);
-                                return next;
-                              })
-                            }
+                            onClick={() => setExpandedGroups((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(framework.group!)) next.delete(framework.group!); else next.add(framework.group!);
+                              return next;
+                            })}
                             className="w-full text-left"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold text-gray-900">
-                                  {groupMeta?.label ?? groupKey}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  {groupMembers.length} standards &middot; {totalControls} controls
-                                </p>
+                                <p className="text-sm font-semibold text-slate-900">{groupMeta?.label ?? framework.group}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">{groupMembers.length} standards · {totalControls} controls</p>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
                                 {selectedCount > 0 && (
@@ -596,28 +465,42 @@ export default function OnboardingPage() {
                                     {selectedCount} selected
                                   </span>
                                 )}
-                                <span className="text-xs text-gray-400">{isExpanded ? '\u25BC' : '\u25B6'}</span>
+                                <span className="text-xs text-slate-400">{isExpanded ? '▼' : '▶'}</span>
                               </div>
                             </div>
-                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{groupMeta?.description}</p>
+                            <p className="text-xs text-slate-600 mt-1 line-clamp-2">{groupMeta?.description}</p>
                           </button>
                           {isExpanded && (
-                            <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+                            <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
                               {groupMembers.map((child) => {
-                                const isSelected = selectedFrameworkIds.includes(child.id);
+                                const isChildSelected = selectedFrameworkIds.includes(child.id);
+                                const isChildLocked = false;
                                 return (
                                   <button
                                     key={child.id}
                                     type="button"
-                                    onClick={() => toggleFramework(child.id)}
-                                    className={`w-full text-left rounded-md border p-2 text-xs transition ${
-                                      isSelected
-                                        ? 'border-purple-500 bg-purple-50'
-                                        : 'border-gray-200 bg-white hover:border-purple-300'
+                                    onClick={() => toggleFrameworkSelection(child.id)}
+                                    disabled={!canManageFrameworks || isChildLocked}
+                                    className={`w-full text-left rounded-md border p-2 transition text-xs ${
+                                      isChildSelected
+                                        ? 'border-purple-500 bg-purple-100'
+                                        : isChildLocked
+                                          ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                                          : canManageFrameworks
+                                            ? 'border-slate-200 bg-white hover:border-purple-300'
+                                            : 'border-slate-200 bg-slate-50'
                                     }`}
                                   >
-                                    <span className="font-medium text-gray-900">{child.name}</span>
-                                    <span className="text-gray-500 ml-1">({child.controlCount} controls)</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-slate-900">{child.name}</p>
+                                      </div>
+                                      <span className={`shrink-0 px-2 py-0.5 rounded-full ${isChildSelected ? 'bg-purple-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                        {isChildSelected ? '✓' : 'Select'}
+                                      </span>
+                                    </div>
+                                    <p className="text-slate-500 mt-1 line-clamp-1">{child.description}</p>
+                                    <p className="text-slate-400 mt-0.5">{child.controlCount} controls · Tier: {formatTierLabel(child.tierRequired)}</p>
                                   </button>
                                 );
                               })}
@@ -627,21 +510,45 @@ export default function OnboardingPage() {
                       );
                     }
 
-                    const isSelected = selectedFrameworkIds.includes(fw.id);
+                    // Ungrouped framework — render as individual card
+                    const isSelected = selectedFrameworkIds.includes(framework.id);
+                    const isLocked = false;
                     return (
                       <button
-                        key={fw.id}
+                        key={framework.id}
                         type="button"
-                        onClick={() => toggleFramework(fw.id)}
-                        className={`text-left rounded-lg border p-3 transition ${
+                        onClick={() => toggleFrameworkSelection(framework.id)}
+                        disabled={!canManageFrameworks || isLocked}
+                        className={`text-left rounded-lg border p-4 transition ${
                           isSelected
-                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                            : 'border-gray-200 bg-white hover:border-purple-400'
+                            ? 'border-purple-600 bg-purple-50'
+                            : isLocked
+                              ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
+                              : canManageFrameworks
+                                ? 'border-slate-200 bg-white hover:border-purple-400'
+                                : 'border-slate-200 bg-slate-50'
                         }`}
                       >
-                        <p className="text-sm font-semibold text-gray-900">{fw.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{fw.controlCount} controls</p>
-                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">{fw.description}</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{framework.name}</p>
+                            <p className="text-xs text-slate-500 mt-1">{framework.code}</p>
+                          </div>
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full ${
+                              isSelected
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {isSelected ? 'Selected' : 'Not selected'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-2 line-clamp-2">{framework.description}</p>
+                        <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                          <span>{framework.controlCount} controls</span>
+                          <span>Tier: {formatTierLabel(framework.tierRequired)}</span>
+                        </div>
                       </button>
                     );
                   });
@@ -649,47 +556,391 @@ export default function OnboardingPage() {
               </div>
             )}
           </section>
-        )}
 
-        {/* ─── Navigation buttons ─────────────────────────────────── */}
-        <div className="mt-10 flex items-center justify-between">
-          {step > 1 ? (
-            <button
-              type="button"
-              onClick={() => { setStep(step - 1); setError(''); }}
-              className="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
-            >
-              Back
-            </button>
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900">Company Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input label="Legal Company Name *" value={companyLegalName} onChange={setCompanyLegalName} />
+              <Input label="Industry" value={industry} onChange={setIndustry} />
+              <Input label="Website" value={website} onChange={setWebsite} placeholder="https://example.com" />
+              <Input label="Headquarters Location" value={headquartersLocation} onChange={setHeadquartersLocation} />
+              <Select
+                label="Employee Count Range"
+                value={employeeCountRange}
+                onChange={setEmployeeCountRange}
+                options={[
+                  { value: '', label: 'Select range' },
+                  { value: '1-10', label: '1-10' },
+                  { value: '11-50', label: '11-50' },
+                  { value: '51-200', label: '51-200' },
+                  { value: '201-500', label: '201-500' },
+                  { value: '501-1000', label: '501-1000' },
+                  { value: '1000+', label: '1000+' },
+                ]}
+              />
+            </div>
+            <TextArea
+              label="Company Description *"
+              value={companyDescription}
+              onChange={setCompanyDescription}
+              rows={3}
+              placeholder="Describe mission, business operations, and regulatory footprint."
+            />
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900">System Context</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input label="System Name *" value={systemName} onChange={setSystemName} />
+            </div>
+            <TextArea
+              label="System Description *"
+              value={systemDescription}
+              onChange={setSystemDescription}
+              rows={3}
+              placeholder="Describe purpose, major capabilities, and information processed."
+            />
+            <TextArea
+              label="Authorization Boundary"
+              value={authorizationBoundary}
+              onChange={setAuthorizationBoundary}
+              rows={3}
+              placeholder="Define logical/physical boundaries, interfaces, and external dependencies."
+            />
+            <TextArea
+              label="Operating Environment Summary"
+              value={operatingEnvironmentSummary}
+              onChange={setOperatingEnvironmentSummary}
+              rows={3}
+              placeholder="Summarize production/development/test and hosting context."
+            />
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900">CIA Impact Baseline</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Select
+                label="Confidentiality *"
+                value={confidentialityImpact}
+                onChange={(value) => setConfidentialityImpact(value as CiaLevel | '')}
+                options={[
+                  { value: '', label: 'Select' },
+                  { value: 'low', label: 'Low' },
+                  { value: 'moderate', label: 'Moderate' },
+                  { value: 'high', label: 'High' },
+                ]}
+              />
+              <Select
+                label="Integrity *"
+                value={integrityImpact}
+                onChange={(value) => setIntegrityImpact(value as CiaLevel | '')}
+                options={[
+                  { value: '', label: 'Select' },
+                  { value: 'low', label: 'Low' },
+                  { value: 'moderate', label: 'Moderate' },
+                  { value: 'high', label: 'High' },
+                ]}
+              />
+              <Select
+                label="Availability *"
+                value={availabilityImpact}
+                onChange={(value) => setAvailabilityImpact(value as CiaLevel | '')}
+                options={[
+                  { value: '', label: 'Select' },
+                  { value: 'low', label: 'Low' },
+                  { value: 'moderate', label: 'Moderate' },
+                  { value: 'high', label: 'High' },
+                ]}
+              />
+            </div>
+            <TextArea
+              label="Impact Rationale"
+              value={impactRationale}
+              onChange={setImpactRationale}
+              rows={3}
+              placeholder="Why these impact levels were selected."
+            />
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900">Environment and Data Exposure</h2>
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-2">Environment Types *</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {ENVIRONMENT_OPTIONS.map((option) => (
+                  <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={environmentTypes.includes(option.value)}
+                      onChange={() => setEnvironmentTypes((current) => toggleArrayValue(current, option.value))}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Deployment Model"
+                value={deploymentModel}
+                onChange={(value) => setDeploymentModel(value as DeploymentModel | '')}
+                options={[
+                  { value: '', label: 'Select model' },
+                  { value: 'on_prem', label: 'On-Prem' },
+                  { value: 'single_cloud', label: 'Single Cloud' },
+                  { value: 'multi_cloud', label: 'Multi-Cloud' },
+                  { value: 'hybrid', label: 'Hybrid' },
+                  { value: 'saas_only', label: 'SaaS Only' },
+                ]}
+              />
+              <Input
+                label="Cloud Providers"
+                value={cloudProvidersInput}
+                onChange={setCloudProvidersInput}
+                placeholder="aws, azure, gcp"
+              />
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-2">
+                {requiresNist80053InformationTypes
+                  ? 'Information Types (NIST SP 800-60) *'
+                  : 'Data Sensitivity Types'}
+              </p>
+              {requiresNist80053InformationTypes && (
+                <p className="text-xs text-slate-600 mb-2">
+                  Required when NIST 800-53 is selected. Choose the data/information types your system processes.
+                </p>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {DATA_SENSITIVITY_OPTIONS.map((option) => (
+                  <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={dataSensitivityTypes.includes(option.value)}
+                      onChange={() => setDataSensitivityTypes((current) => toggleArrayValue(current, option.value))}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {hasRmfRelevantFramework ? (
+            <>
+              <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-slate-900">NIST/RMF Operating Mode</h2>
+                <p className="text-sm text-slate-600">
+                  Because NIST 800-53 or 800-171 is selected, you can track RMF posture here.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Select
+                    label="Organization Compliance Profile"
+                    value={complianceProfile}
+                    onChange={(value) => setComplianceProfile(value as ComplianceProfile | '')}
+                    options={[
+                      { value: 'private', label: 'Private Sector' },
+                      { value: 'federal', label: 'Federal / Government' },
+                      { value: 'hybrid', label: 'Hybrid (Commercial + Federal)' },
+                    ]}
+                  />
+                  <Select
+                    label="NIST Adoption Mode"
+                    value={nistAdoptionMode}
+                    onChange={(value) => setNistAdoptionMode(value as NistAdoptionMode | '')}
+                    options={[
+                      { value: 'best_practice', label: 'Best-Practice (Optional)' },
+                      { value: 'mandatory', label: 'Mandatory Baseline' },
+                    ]}
+                  />
+                </div>
+                <TextArea
+                  label="NIST Adoption Notes"
+                  value={nistNotes}
+                  onChange={setNistNotes}
+                  rows={2}
+                  placeholder="Capture why NIST is optional or mandatory for your business context."
+                />
+              </section>
+
+              <section className="space-y-4">
+                <h2 className="text-lg font-semibold text-slate-900">RMF Posture</h2>
+                <p className="text-sm text-slate-600">
+                  RMF stage is optional and used for posture tracking only. Per NIST SP 800-37,
+                  organizations progress through Prepare → Categorize → Select → Implement → Assess → Authorize → Monitor as work is completed.
+                </p>
+                <Select
+                  label="Current RMF Stage"
+                  value={rmfStage}
+                  onChange={(value) => setRmfStage(value as RmfStage | '')}
+                  options={[
+                    { value: '', label: 'Select RMF stage' },
+                    { value: 'prepare', label: 'Prepare' },
+                    { value: 'categorize', label: 'Categorize' },
+                    { value: 'select', label: 'Select' },
+                    { value: 'implement', label: 'Implement' },
+                    { value: 'assess', label: 'Assess' },
+                    { value: 'authorize', label: 'Authorize' },
+                    { value: 'monitor', label: 'Monitor' },
+                  ]}
+                />
+                <TextArea
+                  label="RMF Notes"
+                  value={rmfNotes}
+                  onChange={setRmfNotes}
+                  rows={3}
+                  placeholder="Capture current execution posture, approvals, and immediate priorities."
+                />
+              </section>
+            </>
           ) : (
-            <div />
+            <section className="space-y-3">
+              <h2 className="text-lg font-semibold text-slate-900">Framework Guidance</h2>
+              <p className="text-sm text-slate-600">
+                RMF fields are hidden because your selected frameworks do not require NIST RMF tracking.
+                If you add NIST 800-53 or 800-171 later, this section will appear automatically.
+              </p>
+            </section>
           )}
 
-          {step < TOTAL_STEPS ? (
+          {/* AI Regulatory Monitoring — informational note when Gov Cloud-tier frameworks selected */}
+          {hasGovcloudFrameworks && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-900">AI Regulatory Monitoring</h2>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 font-medium">
+                  Gov Cloud &amp; Advisory
+                </span>
+              </div>
+              <div className="border border-teal-200 bg-teal-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">🤖</span>
+                  <p className="text-sm font-semibold text-teal-900">Regulatory Landscape Monitoring Available</p>
+                </div>
+                <p className="text-xs text-teal-800 mt-1">
+                  Your selected privacy and regional frameworks include AI-powered regulatory monitoring.
+                  After onboarding, configure your LLM provider in Settings → LLM Configuration to enable automatic scanning for:
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-teal-800 list-disc list-inside">
+                  <li>Upcoming state privacy laws and enforcement deadlines</li>
+                  <li>New AI governance requirements at state, federal, and international levels</li>
+                  <li>Amendments to existing regulations (CCPA/CPRA, GDPR, HIPAA, EU AI Act)</li>
+                  <li>Emerging controls and compliance obligations before they take effect</li>
+                </ul>
+                <p className="text-xs text-teal-700 mt-3 font-medium">
+                  🔄 Provider-agnostic context
+                </p>
+                <p className="text-xs text-teal-700 mt-0.5">
+                  The onboarding data you provide here builds a master context prompt that is injected into every AI call.
+                  If you switch LLM providers later, the new provider receives your full environment context immediately — no reconfiguration needed.
+                </p>
+              </div>
+            </section>
+          )}
+
+          <div className="pt-4 border-t flex flex-col sm:flex-row gap-3 justify-end">
             <button
               type="button"
-              disabled={
-                (step === 1 && !stepOneValid()) ||
-                (step === 2 && !stepTwoValid()) ||
-                (step === 3 && !stepThreeValid())
-              }
-              onClick={() => { setStep(step + 1); setError(''); }}
-              className="px-6 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Continue
-            </button>
-          ) : (
-            <button
-              type="button"
+              onClick={() => handleSave(false)}
               disabled={saving}
-              onClick={handleComplete}
-              className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              Save Progress
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={saving}
+              className="px-5 py-2.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60"
             >
               {saving ? 'Saving...' : 'Complete Setup'}
             </button>
-          )}
+          </div>
         </div>
-      </main>
+      </div>
     </div>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      />
+    </label>
+  );
+}
+
+function Select({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TextArea({
+  label,
+  value,
+  onChange,
+  rows,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  rows: number;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={rows}
+        placeholder={placeholder}
+        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      />
+    </label>
   );
 }

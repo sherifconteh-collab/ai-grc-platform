@@ -55,7 +55,7 @@ function getHmacKey() {
     return _cachedHmacKey;
   }
   const buf = Buffer.from(raw, 'hex');
-  if (buf.length !== 48) {
+  if (buf.length < 48) {
     throw new Error('HMAC_KEY must be a 96-character hex string (48 bytes) for CNSA Suite 1.0 compliance');
   }
   _cachedHmacKey = buf;
@@ -176,12 +176,11 @@ function auditEncryptionStrength() {
   );
 
   // 2. Key length — CNSA Suite 1.0 requires ≥256-bit keys
-  const keyBits = getKey().length * 8;
   addCheck(
     'CNSA-1.0-KEYLEN',
     'Encryption key length (CNSA 1.0: ≥256 bits)',
-    keyBits >= 256 ? 'pass' : 'fail',
-    `Key length: ${keyBits} bits (required ≥256 bits for CNSA Suite 1.0)`
+    KEY_BITS >= 256 ? 'pass' : 'fail',
+    `Key length: ${KEY_BITS} bits (required ≥256 bits for CNSA Suite 1.0)`
   );
 
   // 3. HMAC algorithm — CNSA Suite 1.0 mandates SHA-384+

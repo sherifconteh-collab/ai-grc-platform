@@ -1,53 +1,144 @@
-/**
- * Tier Policy — Community Edition
- *
- * In the community (self-hosted) edition every organization is treated as
- * having unlimited access.  The hosted ControlWeave product enforces
- * tier-based limits; this module provides sensible open defaults so the
- * rest of the codebase can call the same helpers without branching.
- *
- * Tier names (post migration 094):
- *   community  — free self-hosted (index 0)
- *   pro        — paid tier 1       (index 1)
- *   enterprise — paid tier 2       (index 2)
- *   govcloud   — gov cloud tier    (index 3)
- */
+const TIER_LEVELS = Object.freeze({
+  community: 0,
+  pro: 1,
+  enterprise: 2,
+  govcloud: 3
+});
 
-const TIER_ORDER = ['community', 'pro', 'enterprise', 'govcloud'];
+const TIER_LIMITS = Object.freeze({
+  community: {
+    frameworks: -1,
+    aiRequestsPerMonth: -1,
+    cmdbEnabled: true,
+    cmdbAssetLimit: -1,
+    cmdbEnvironmentLimit: -1
+  },
+  pro: {
+    frameworks: -1,
+    aiRequestsPerMonth: -1,
+    cmdbEnabled: true,
+    cmdbAssetLimit: -1,
+    cmdbEnvironmentLimit: -1
+  },
+  enterprise: {
+    frameworks: -1,
+    aiRequestsPerMonth: -1,
+    cmdbEnabled: true,
+    cmdbAssetLimit: -1,
+    cmdbEnvironmentLimit: -1
+  },
+  govcloud: {
+    frameworks: -1,
+    aiRequestsPerMonth: -1,
+    cmdbEnabled: true,
+    cmdbAssetLimit: -1,
+    cmdbEnvironmentLimit: -1
+  }
+});
 
-function normalizeTier(raw) {
-  const t = String(raw || 'community').trim().toLowerCase();
-  return TIER_ORDER.includes(t) ? t : 'community';
+const DEFAULT_TIER = 'community';
+const PAID_TIERS = Object.freeze(['pro', 'enterprise', 'govcloud']);
+
+function normalizeTier(tier) {
+  const value = String(tier || '').toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(TIER_LEVELS, value)) {
+    return DEFAULT_TIER;
+  }
+  return value;
 }
 
 function tierLevel(tier) {
-  const idx = TIER_ORDER.indexOf(normalizeTier(tier));
-  return idx === -1 ? TIER_ORDER.length - 1 : idx;
+  return TIER_LEVELS[normalizeTier(tier)];
+}
+
+function getTierLimits(tier) {
+  return TIER_LIMITS[normalizeTier(tier)] || TIER_LIMITS[DEFAULT_TIER];
 }
 
 function getFrameworkLimit(tier) {
-  // Community edition: unlimited frameworks
-  return 9999;
+  return getTierLimits(tier).frameworks;
 }
 
-function shouldEnforceAiLimitForByok(/* tier */) {
-  // Community edition: no BYOK rate limits when self-hosted
-  return false;
+function getAiUsageLimit(tier) {
+  return getTierLimits(tier).aiRequestsPerMonth;
 }
 
-function getByokPolicy(/* tier */) {
+function canUseCmdb(tier) {
+  return getTierLimits(tier).cmdbEnabled;
+}
+
+function getCmdbAssetLimit(tier) {
+  return getTierLimits(tier).cmdbAssetLimit;
+}
+
+function getCmdbEnvironmentLimit(tier) {
+  return getTierLimits(tier).cmdbEnvironmentLimit;
+}
+
+function getContactLimit(tier) {
+  const limit = getTierLimits(tier).contactLimit;
+  return Number.isFinite(limit) ? limit : -1;
+}
+
+function isTierAtLeast(currentTier, minTier) {
+  return tierLevel(currentTier) >= tierLevel(minTier);
+}
+
+function isPaidTier(tier) {
+  return PAID_TIERS.includes(normalizeTier(tier));
+}
+
+function parseTierList(raw, fallbackCsv) {
+  const source = String(raw || fallbackCsv || '')
+    .split(',')
+    .map((tier) => normalizeTier(tier))
+    .filter(Boolean);
+  return new Set(source.length ? source : [normalizeTier(DEFAULT_TIER)]);
+}
+
+function getByokPolicy() {
+  const legacyFlag = process.env.AI_LIMIT_APPLIES_TO_BYOK;
+  if (typeof legacyFlag === 'string' && legacyFlag.trim().length > 0) {
+    const enforce = legacyFlag.toLowerCase() === 'true';
+    return {
+      mode: enforce ? 'enforce_all' : 'bypass_all',
+      enforceByokForTier: () => enforce
+    };
+  }
+
+  const bypassTiers = parseTierList(
+    process.env.AI_BYOK_BYPASS_TIERS,
+    'community,pro,enterprise,govcloud'
+  );
+
   return {
-    allowed: true,
-    monthlyLimit: null, // unlimited
-    providers: ['anthropic', 'openai', 'gemini', 'grok', 'groq', 'ollama'],
+    mode: 'tiered',
+    bypassTiers: Array.from(bypassTiers),
+    enforceByokForTier: (tier) => !bypassTiers.has(normalizeTier(tier))
   };
 }
 
+function shouldEnforceAiLimitForByok(tier) {
+  const policy = getByokPolicy();
+  return policy.enforceByokForTier(tier);
+}
+
 module.exports = {
-  TIER_ORDER,
+  DEFAULT_TIER,
+  TIER_LEVELS,
+  TIER_LIMITS,
   normalizeTier,
   tierLevel,
+  getTierLimits,
   getFrameworkLimit,
-  shouldEnforceAiLimitForByok,
+  getAiUsageLimit,
+  canUseCmdb,
+  getCmdbAssetLimit,
+  getCmdbEnvironmentLimit,
+  getContactLimit,
+  isTierAtLeast,
+  isPaidTier,
+  PAID_TIERS,
   getByokPolicy,
+  shouldEnforceAiLimitForByok
 };
