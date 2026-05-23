@@ -44,6 +44,33 @@
 - **Breaking (webhooks):** outbound webhook signatures now use the `sha384=`
   prefix (HMAC-SHA-384). Receivers that validate signatures must update; inbound
   verification still accepts legacy SHA-256 during transition.
+- **JWT algorithm-confusion hardening.** `middleware/auth.js` now passes the
+  explicit `JWT_VERIFY_OPTIONS` (`algorithms: ['HS384','HS256']`) to every
+  `jwt.verify` call, closing the implicit-algorithm path. Additional routes
+  (`autoEvidenceCollection.js`, `dataGovernance.js`, `externalAi.js`,
+  `externalAiKeys.js`) had their lingering SHA-256 hashes upgraded to SHA-384.
+- **Dependency advisories pinned.** Added overrides to clear the moderate
+  `qs` DoS advisory (GHSA-q8mj-m7cp-5q26 — `qs >=6.15.2`), the low-severity
+  `@tootallnate/once` AbortSignal hang (`>=2.0.1`), and a moderate
+  `brace-expansion` DoS in the Electron tree (`>=5.0.6`). All three
+  `npm audit --audit-level=moderate` gates (backend / frontend / electron)
+  exit clean.
+
+### Fixed
+
+- **README restored.** The parity-port commit had collapsed the project
+  README to a 7-line stub with three broken relative links. The full README is
+  back, re-flowed for 4.0 (no tier markers, dual-license badge, CNSA badge,
+  documented Security section, expanded feature list including the newly
+  unlocked CMDB / Service Accounts / SBOM / Vendor / Splunk / Realtime
+  surfaces).
+
+### Dependencies
+
+- `frontend`: `react` / `react-dom` 19.2.5 → 19.2.6 (absorbs Dependabot PRs
+  #166, #170).
+- `electron`: `ip-address` 10.1.0 → 10.2.0 (absorbs Dependabot PR #162).
+- `backend`: `@tootallnate/once >=2.0.1` override (absorbs Dependabot PR #175).
 
 ### Migrations
 
