@@ -87,6 +87,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- feat: ControlWeave 4.0.0 — full open-source parity (de-tier + all features) ([#174](https://github.com/sherifconteh-collab/ai-grc-platform/pull/174)) — @sherifconteh-collab
 
 - feat: sync ControlWeave v3.4.0 + v3.5.0 functionality ([#173](https://github.com/sherifconteh-collab/ai-grc-platform/pull/173)) — @sherifconteh-collab
 

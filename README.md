@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-06 | PR #160: chore(frontend): sync package-lock.json version to 3.3.0 -->
+<!-- LAST_UPDATED: 2026-05-23 | PR #174: feat: ControlWeave 4.0.0 — full open-source parity (de-tier + all features) -->
 
 ## 🎯 What is This?
 
@@ -685,9 +685,9 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Crosswalks**: 80+ cross-framework mappings
 - **AI Features**: 25+ analysis capabilities (BYOK)
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
-- **Tables**: 140+ database tables
-- **API Routes**: 60+ route modules
-- **Services**: 21 service modules
+- **Tables**: 150+ database tables
+- **API Routes**: 70+ route modules
+- **Services**: 46 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Security**: CNSA Suite 1.0 + 2.0 — HS384 JWTs, SHA-384 hashing, RSA-3072, hybrid ML-DSA-65 PQC license signing, AES-256-GCM PII encryption, HMAC-SHA-384 webhooks, 15-char password policy, bcrypt cost 14
