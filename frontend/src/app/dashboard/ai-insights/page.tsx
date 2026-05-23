@@ -1,10 +1,8 @@
-// @tier: community
 'use client';
 
 import { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import StructuredOutput from '@/components/ai/StructuredOutput';
-import MarkdownContent from '@/components/ai/MarkdownContent';
 import { aiAPI } from '@/lib/api';
 
 type WidgetKey = 'gap' | 'forecast' | 'audit' | 'risk';
@@ -12,18 +10,17 @@ type WidgetKey = 'gap' | 'forecast' | 'audit' | 'risk';
 interface WidgetState {
   loading: boolean;
   result: string | null;
-  structured: unknown | null;
   error: string | null;
 }
 
-const initialState: WidgetState = { loading: false, result: null, structured: null, error: null };
+const initialState: WidgetState = { loading: false, result: null, error: null };
 
 interface WidgetSpec {
   key: WidgetKey;
   title: string;
   description: string;
   feature: string;
-  run: () => Promise<{ data: { data?: { result?: string; structured?: unknown } } }>;
+  run: () => Promise<{ data: { data?: { result?: string } } }>;
 }
 
 const WIDGETS: WidgetSpec[] = [
@@ -66,18 +63,17 @@ export default function AIInsightsPage() {
   });
 
   const runWidget = async (widget: WidgetSpec) => {
-    setStates(prev => ({ ...prev, [widget.key]: { loading: true, result: null, structured: null, error: null } }));
+    setStates(prev => ({ ...prev, [widget.key]: { loading: true, result: null, error: null } }));
     try {
       const res = await widget.run();
       const result = res.data?.data?.result ?? '';
-      const structured = res.data?.data?.structured ?? null;
-      setStates(prev => ({ ...prev, [widget.key]: { loading: false, result, structured, error: null } }));
+      setStates(prev => ({ ...prev, [widget.key]: { loading: false, result, error: null } }));
     } catch (err) {
       const error = err instanceof Error ? err.message : 'Request failed';
       const responseError = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setStates(prev => ({
         ...prev,
-        [widget.key]: { loading: false, result: null, structured: null, error: responseError ?? error },
+        [widget.key]: { loading: false, result: null, error: responseError ?? error },
       }));
     }
   };
@@ -116,26 +112,27 @@ export default function AIInsightsPage() {
                     disabled={state.loading}
                     className="shrink-0 px-3 py-1.5 text-xs font-medium rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {state.loading ? 'Generating…' : state.result || state.structured ? 'Refresh' : 'Generate'}
+                    {state.loading ? 'Generating…' : state.result ? 'Refresh' : 'Generate'}
                   </button>
                 </div>
 
                 <div className="mt-4 flex-1 min-h-[120px]">
                   {state.loading && (
-                    <p className="text-xs text-gray-500">Running analysis…</p>
+                    <div className="text-xs text-gray-500">Running analysis…</div>
                   )}
                   {state.error && (
                     <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                       {state.error}
                     </div>
                   )}
-                  {!state.loading && !state.error && !!state.structured && (
-                    <StructuredOutput feature={widget.feature} data={state.structured} />
+                  {state.result && !state.loading && !state.error && (
+                    <StructuredOutput
+                      content={state.result}
+                      feature={widget.feature}
+                      showActions={false}
+                    />
                   )}
-                  {!state.loading && !state.error && !state.structured && state.result && (
-                    <MarkdownContent>{state.result}</MarkdownContent>
-                  )}
-                  {!state.result && !state.structured && !state.loading && !state.error && (
+                  {!state.result && !state.loading && !state.error && (
                     <p className="text-xs text-gray-400">
                       Click Generate to run this analysis on your current organization data.
                     </p>

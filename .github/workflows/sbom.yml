@@ -101,7 +101,7 @@ jobs:
           # ── Read project version from backend package.json ────────────────
           pkg = json.load(open("backend/package.json"))
           app_version = pkg.get("version", "0.0.0")
-          app_name    = "ControlWeave Community Edition"
+          app_name    = "ControlWeave"
           timestamp   = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
           # ── AI providers supported by the platform ────────────────────────
@@ -365,7 +365,7 @@ jobs:
                       ],
                   },
                   "properties": [
-                      {"name": "ControlWeave:edition",         "value": "community"},
+                      {"name": "ControlWeave:edition",         "value": "open"},
                       {"name": "ControlWeave:ai-integration",  "value": "BYOK (Bring Your Own Key)"},
                       {"name": "ControlWeave:ai-providers",    "value": "anthropic,openai,gemini,grok,groq,ollama"},
                       {"name": "ControlWeave:governance-framework", "value": "NIST AI RMF 1.0, EU AI Act, ISO 42001"},

@@ -37,6 +37,18 @@ function resolveJwtSecret() {
 
 const JWT_SECRET = resolveJwtSecret();
 
+// Pin the HMAC algorithm on every sign/verify call to prevent algorithm
+// confusion (e.g. an attacker presenting an RS256-signed token the server
+// mistakenly HMAC-verifies against the public key). The shared JWT_SECRET is an
+// HMAC secret. CNSA Suite 1.0 mandates SHA-384+, so tokens are signed HS384.
+//
+// Backward-compatible rotation: verification still accepts legacy HS256 tokens
+// so existing sessions are not invalidated. Drop 'HS256' from the allow-list
+// once all pre-cutover tokens have expired (>= max refresh-token TTL).
+const JWT_ALGORITHM = 'HS384';
+const JWT_LEGACY_ALGORITHMS = Object.freeze(['HS256']);
+const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: [JWT_ALGORITHM, ...JWT_LEGACY_ALGORITHMS] });
+
 const SECURITY_CONFIG = {
   nodeEnv: NODE_ENV,
   isProduction: IS_PRODUCTION,
@@ -88,5 +100,7 @@ const SECURITY_CONFIG = {
 
 module.exports = {
   JWT_SECRET,
+  JWT_ALGORITHM,
+  JWT_VERIFY_OPTIONS,
   SECURITY_CONFIG
 };

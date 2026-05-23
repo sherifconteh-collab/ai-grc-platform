@@ -16,9 +16,9 @@
  * - Returning clear error messages about edition limitations
  */
 
-let EDITION = (process.env.EDITION || 'community').toLowerCase();
-let IS_COMMUNITY = EDITION === 'community';
-let IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
+let EDITION = 'open';
+let IS_COMMUNITY = false;
+let IS_PRO = true;
 
 /**
  * Feature tier requirements mapping
@@ -62,34 +62,8 @@ const PRO_FEATURES = Object.freeze({
  * @param {string} feature - Feature name from PRO_FEATURES
  * @returns {Function} Express middleware
  */
-function requireProEdition(feature) {
-  return (req, res, next) => {
-    // Pro edition: allow everything
-    if (IS_PRO) {
-      return next();
-    }
-    
-    // Community edition: block Pro features
-    if (IS_COMMUNITY && PRO_FEATURES[feature]) {
-      const requiredTier = PRO_FEATURES[feature];
-      return res.status(403).json({
-        success: false,
-        error: 'Feature not available in Community Edition',
-        message: `This feature requires ${requiredTier} tier or higher and is not available in the Community Edition.`,
-        feature: feature,
-        edition: 'community',
-        requiredEdition: 'pro',
-        upgradeUrl: 'https://controlweave.com/pricing'
-      });
-    }
-    
-    // Unknown edition or feature: deny by default (fail closed)
-    return res.status(403).json({
-      success: false,
-      error: 'Feature availability check failed',
-      message: 'Unable to determine feature availability for your edition.'
-    });
-  };
+function requireProEdition(_feature) {
+  return (_req, _res, next) => next();
 }
 
 /**
@@ -99,10 +73,8 @@ function requireProEdition(feature) {
  * @param {string} feature - Feature name from PRO_FEATURES
  * @returns {boolean}
  */
-function isFeatureAvailable(feature) {
-  if (IS_PRO) return true;
-  if (IS_COMMUNITY) return !PRO_FEATURES[feature];
-  return false; // Unknown edition: deny by default
+function isFeatureAvailable(_feature) {
+  return true;
 }
 
 /**
@@ -133,17 +105,7 @@ function attachEditionInfo(req, res, next) {
  * Express middleware to block ALL Pro features in community edition
  * Apply this at the router level for entire Pro feature modules
  */
-function blockProFeaturesInCommunity(req, res, next) {
-  if (IS_COMMUNITY) {
-    return res.status(403).json({
-      success: false,
-      error: 'Feature not available in Community Edition',
-      message: 'This feature is not available in the Community Edition. Please upgrade to Pro edition for access to enterprise features.',
-      edition: 'community',
-      requiredEdition: 'pro',
-      upgradeUrl: 'https://controlweave.com/pricing'
-    });
-  }
+function blockProFeaturesInCommunity(_req, _res, next) {
   next();
 }
 
@@ -170,30 +132,7 @@ const LICENSE_TIER_TO_EDITION = Object.freeze({
  * @param {string} newEdition - 'community' | 'pro' | 'enterprise'
  * @returns {boolean} true if the edition actually changed
  */
-function upgradeEdition(newEdition) {
-  const valid = ['community', 'pro', 'enterprise'];
-  if (!newEdition || typeof newEdition !== 'string') return false;
-  const normalized = newEdition.trim().toLowerCase();
-  if (!valid.includes(normalized)) return false;
-
-  const oldEdition = EDITION;
-  EDITION = normalized;
-  IS_COMMUNITY = EDITION === 'community';
-  IS_PRO = EDITION === 'pro' || EDITION === 'enterprise';
-  process.env.EDITION = EDITION;
-
-  // Update module.exports so future require() calls see current values.
-  // Note: callers that already destructured (const { IS_COMMUNITY } = require(...))
-  // will still hold stale references — middleware functions use the module-level
-  // let variables directly, which is the intended runtime path.
-  module.exports.EDITION = EDITION;
-  module.exports.IS_COMMUNITY = IS_COMMUNITY;
-  module.exports.IS_PRO = IS_PRO;
-
-  if (oldEdition !== EDITION) {
-    console.log(`[Edition] Upgraded from ${oldEdition.toUpperCase()} to ${EDITION.toUpperCase()}`);
-    return true;
-  }
+function upgradeEdition(_newEdition) {
   return false;
 }
 
@@ -206,31 +145,7 @@ function upgradeEdition(newEdition) {
  * customers get full access without a subscription.
  */
 function validateEdition() {
-  const valid = ['community', 'pro', 'enterprise'];
-  if (!valid.includes(EDITION)) {
-    console.warn(`[SECURITY WARNING] Invalid EDITION value: "${EDITION}". Must be one of: ${valid.join(', ')}. Defaulting to 'community' for security.`);
-    upgradeEdition('community');
-    return false;
-  }
-
-  // Check for perpetual license key
-  try {
-    const { loadLicenseFromEnv } = require('../services/licenseService');
-    const license = loadLicenseFromEnv();
-    if (license && license.valid) {
-      console.log(`[Edition] Perpetual license detected — licensee: ${license.licensee}, tier: ${license.tier}, seats: ${license.seats === -1 ? 'unlimited' : license.seats}`);
-      // Upgrade edition to match license tier
-      const effectiveEdition = LICENSE_TIER_TO_EDITION[license.tier] || 'community';
-      if (valid.indexOf(effectiveEdition) > valid.indexOf(EDITION)) {
-        upgradeEdition(effectiveEdition);
-      }
-    }
-  } catch (err) {
-    // licenseService not critical — log and continue
-    console.warn(`[Edition] License check skipped: ${err.message}`);
-  }
-
-  console.log(`[Edition] Running in ${EDITION.toUpperCase()} edition`);
+  console.log('[Edition] Running in OPEN SOURCE mode — all features enabled');
   return true;
 }
 

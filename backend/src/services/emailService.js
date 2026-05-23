@@ -81,9 +81,8 @@ async function _getTransporterForOrg(orgId) {
       });
       foundOrgConfig = true;
     }
-  } catch (err) {
+  } catch {
     // DB not available — fall through to global config
-    console.warn('Org SMTP config lookup failed:', err.message);
   }
 
   if (!foundOrgConfig) {
@@ -91,13 +90,8 @@ async function _getTransporterForOrg(orgId) {
     transporter = await _getGlobalTransporter();
   }
 
-  // Only cache when the org has its own SMTP config. When falling back to
-  // the global transporter we intentionally skip caching so that a later
-  // global SMTP configuration change is picked up without requiring an
-  // explicit per-org cache invalidation.
-  if (foundOrgConfig) {
-    _orgTransporterCache.set(orgId, { transporter, valid: true });
-  }
+  // Cache the resolved transporter (org-specific or global fallback) to avoid repeated DB lookups.
+  _orgTransporterCache.set(orgId, { transporter, valid: true });
   return transporter;
 }
 
@@ -131,9 +125,8 @@ async function _getGlobalTransporter() {
       port = dbSettings.smtp_port;
       user = dbSettings.smtp_user;
       pass = dbSettings.smtp_pass;
-    } catch (err) {
+    } catch {
       // DB not available — stay null
-      console.warn('Global SMTP config lookup failed:', err.message);
     }
   }
 
@@ -174,9 +167,7 @@ async function _getFromEmailForOrg(orgId) {
     if (result.rows.length > 0 && result.rows[0].setting_value) {
       fromEmail = result.rows[0].setting_value;
     }
-  } catch (err) {
-    console.warn('Org from-email lookup failed:', err.message);
-  }
+  } catch { /* ignore */ }
 
   if (!fromEmail) {
     fromEmail = await _getFromEmail();
@@ -196,10 +187,8 @@ async function _getFromEmail() {
     if (result.rows.length > 0 && result.rows[0].setting_value) {
       return result.rows[0].setting_value;
     }
-  } catch (err) {
-    console.warn('Platform from-email lookup failed:', err.message);
-  }
-  return process.env.DEFAULT_FROM_EMAIL || 'ControlWeave <noreply@example.com>';
+  } catch { /* ignore */ }
+  return 'ControlWeave <contehconsulting@gmail.com>';
 }
 
 // Keep old name as alias for callers that don't have an org context

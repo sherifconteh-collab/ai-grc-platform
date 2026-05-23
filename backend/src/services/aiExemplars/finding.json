@@ -1,38 +1,41 @@
 [
   {
-    "input": {
-      "framework": "SOC 2",
-      "control": "CC6.1",
-      "observation": "3 of 25 sampled terminations had user accounts active 4+ days after termination."
-    },
+    "_note": "ip-hygiene:ignore-file — This file contains paraphrased standards language (HIPAA, SOC 2 Trust Services Criteria) used as few-shot exemplars for AI output. All quoted standards text is paraphrased/summarized; any remaining near-verbatim phrasing is permitted under fair-use for internal model prompting. Entries without an 'output' field are metadata and ignored by the loader."
+  },
+  {
+    "description": "Audit finding draft for a SOC 2 Type II engagement — missing vulnerability management process",
+    "input_summary": "Auditor found no formal vulnerability scanning program. Target environment: cloud SaaS, AWS-hosted. Prior-year finding does not exist.",
     "output": {
-      "criteria": "SOC 2 CC6.1 requires the entity to implement logical access security software, infrastructure, and architectures over protected information assets to protect them from security events.",
-      "condition": "During testing of the joiner/mover/leaver process, 3 of 25 sampled terminations (12%) had user accounts that remained active for 4 or more days after the documented termination date.",
-      "cause": "The HR-to-IAM termination notification depends on a manual ticket. Two of the three exceptions traced back to the requesting manager forgetting to file the ticket; the third was filed but not actioned for 6 days due to lack of an SLA.",
-      "effect": "Active accounts of terminated personnel could be used to access customer data, undermining CC6.1 and increasing the risk of unauthorized access incidents and audit findings.",
-      "recommendation": "Implement an automated HRIS-to-IAM disablement integration with a 24-hour SLA, monitored by a daily exception report routed to the SecOps team.",
-      "management_response_placeholder": "[Awaiting management response]",
-      "related_controls": ["AC-2(3)", "AC-2(13)"],
-      "repeat_finding": false,
-      "finding_id_hint": "F-2026-CC6.1-01"
+      "finding_id_hint": "FINDING-VM-001",
+      "title": "Absence of Formal Vulnerability Management Program",
+      "severity": "high",
+      "criteria": "SOC 2 Trust Services Criteria CC7.1 requires that the entity use detection and monitoring procedures to identify changes to configurations that introduce new vulnerabilities. CC7.2 requires management of vulnerabilities and application security threats on an ongoing basis. An implemented vulnerability management program with periodic scanning, remediation SLAs, and evidence of remediation is required.",
+      "condition": "During the audit period (January 1 – December 31, 2024), ControlWeave observed no evidence of a documented vulnerability management policy, vulnerability scanning configuration, or remediation tracking register. Inquiry with the DevOps team confirmed ad-hoc patching triggered only by public advisories rather than a systematic scanning cadence.",
+      "cause": "No formal ownership of the vulnerability management function has been assigned. Security tooling (e.g., Amazon Inspector, Trivy, Snyk) is available but not configured to scan production workloads on a recurring schedule.",
+      "effect": "Without systematic vulnerability identification and tracking, critical vulnerabilities may remain undetected and unmitigated for extended periods, increasing the risk of unauthorized access, data breach, and material disruption to services. Exploitable vulnerabilities identified in penetration testing may not be remediated within acceptable timeframes.",
+      "recommendation": "1. Appoint a vulnerability management owner (ISSM or equivalent).\n2. Deploy automated scanning of all production infrastructure on at least a weekly cadence using a tool such as Amazon Inspector, Tenable, or Qualys.\n3. Define and document remediation SLAs: Critical ≤15 days, High ≤30 days, Medium ≤90 days.\n4. Establish a vulnerability tracking register reviewed monthly by the security team.\n5. Produce a written Vulnerability Management Policy approved by senior management.",
+      "management_response_placeholder": "Management agrees with the finding. Target remediation: [DATE]. Owner: [NAME/ROLE].",
+      "related_controls": ["CC7.1", "CC7.2", "CC4.1"],
+      "evidence_of_exception": [],
+      "repeat_finding": false
     }
   },
   {
-    "input": {
-      "framework": "ISO/IEC 27001:2022",
-      "control": "A.8.16",
-      "observation": "Audit logs from the customer database are not reviewed."
-    },
+    "description": "Audit finding for a NIST 800-53 engagement — access review not performed within required cadence",
+    "input_summary": "Agency environment. AC-2(2) requires automated account removal for temporary/emergency accounts. Auditor found 34 accounts not reviewed in 18 months.",
     "output": {
-      "criteria": "ISO/IEC 27001:2022 Annex A.8.16 requires monitoring of networks, systems, and applications for anomalous behavior with appropriate actions taken to evaluate potential information security incidents.",
-      "condition": "Database audit logs are forwarded to the SIEM but no review cadence, alerting rule, or evidence of review exists for the customer-data database cluster.",
-      "cause": "The detection engineering backlog deprioritized this work after a re-org; no owner was reassigned.",
-      "effect": "Anomalous queries against customer data could go undetected, prolonging incident dwell time and increasing breach impact.",
-      "recommendation": "Assign an owner, build alerting rules for high-volume export and admin-credential queries, and document a weekly review cadence with sign-off.",
-      "management_response_placeholder": "[Awaiting management response]",
-      "related_controls": ["A.8.15", "A.5.25"],
-      "repeat_finding": true,
-      "finding_id_hint": "F-2026-A8.16-02"
+      "finding_id_hint": "FINDING-AC-002",
+      "title": "User Access Reviews Not Conducted Within Required Frequency — 34 Stale Accounts Identified",
+      "severity": "medium",
+      "criteria": "NIST SP 800-53 Rev 5 AC-2(2) requires the organization to automatically remove temporary and emergency accounts after an organization-defined time period. AC-2(3) requires automatic disabling of inactive accounts after [90 days]. The current System Security Plan specifies quarterly access reviews.",
+      "condition": "Of the 412 active accounts in the system, 34 accounts (8.3%) have had no access review activity in the past 18 months. Additionally, 6 temporary contractor accounts created for a Q1 2023 project were not disabled upon project completion and remain active as of the audit inquiry date (November 2024).",
+      "cause": "The quarterly access review process is manual and depends on system owner availability. During periods of high operational tempo (Q3 2023, Q2 2024), reviews were deprioritized. No automated workflow or reminder system exists to enforce the cadence.",
+      "effect": "Stale accounts represent a potential attack surface for credential theft and misuse. The 6 active contractor accounts have elevated read access to controlled unclassified information (CUI) without a current business justification, which may violate FIPS 199 confidentiality requirements and applicable data sharing agreements.",
+      "recommendation": "1. Immediately disable the 6 identified contractor accounts pending business justification review.\n2. Implement automated access review workflows using the organization's existing ITSM tooling to trigger quarterly access certification campaigns.\n3. Configure the IAM platform to automatically flag accounts with zero activity for 90 days for administrator review and disable after 120 days.\n4. Update the SSP to reflect the automated controls and document exceptions.\n5. Conduct a one-time sweep of all remaining 34 stale accounts within 30 days.",
+      "management_response_placeholder": "Management concurs. POA&M entry created. Target: [DATE]. Owner: [NAME/ROLE].",
+      "related_controls": ["AC-2", "AC-2(2)", "AC-2(3)", "AU-9"],
+      "evidence_of_exception": ["6 contractor accounts active without current SOW"],
+      "repeat_finding": false
     }
   }
 ]

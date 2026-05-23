@@ -6,9 +6,13 @@ const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const llm = require('../services/llmService');
 const auditService = require('../services/auditService');
 const pool = require('../config/database');
+const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
 const { log } = require('../utils/logger');
-const llmSchemas = require('../services/llmSchemas');
-const { runQualityGate } = require('../services/aiQualityGate');
+const { validateFeatureOutput, hasFeatureSchema } = require('../services/llmSchemas');
+
+// (orgRagService is currently consumed by llm.buildPersonalizedSystem(ragQuery, ...)
+// inside each feature handler; no handler-level auto-wire is needed.)
+
 
 const aiOrgRateLimiter = createOrgRateLimiter({
   windowMs: 60 * 1000,
@@ -95,30 +99,6 @@ function extractAgentMetadata(req) {
   };
 }
 
-// Helper: try to extract a JSON object/array from a possibly-mixed text response.
-// Models sometimes wrap JSON in ```json fences or surrounding prose. We strip
-// the most common wrappers; if no parseable JSON is found we return null.
-function _tryParseJson(text) {
-  if (text == null) return null;
-  if (typeof text === 'object') return text;
-  if (typeof text !== 'string') return null;
-  let s = text.trim();
-  // Strip code fences
-  const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(s);
-  if (fence) s = fence[1].trim();
-  // Try direct parse first
-  try { return JSON.parse(s); } catch (_e) { /* fall through */ }
-  // Find first { or [ ... last } or ]
-  const firstObj = s.indexOf('{');
-  const firstArr = s.indexOf('[');
-  let start = firstObj;
-  if (firstArr !== -1 && (firstObj === -1 || firstArr < firstObj)) start = firstArr;
-  if (start === -1) return null;
-  const last = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
-  if (last <= start) return null;
-  try { return JSON.parse(s.substring(start, last + 1)); } catch (_e) { return null; }
-}
-
 // Helper: wrap AI handler with logging
 function aiHandler(feature, fn, opts = {}) {
   return async (req, res) => {
@@ -135,82 +115,56 @@ function aiHandler(feature, fn, opts = {}) {
     try {
       params = await getAIParams(req);
 
-      // v3.0.0: resolve task profile + temperature; pass through params so
-      // feature functions that build their own LLM calls can honor it.
-      const profileResolution = llm.resolveModelAndTemperature({
-        featureKey: feature,
-        provider: params.provider,
-        callerOverrides: {
-          model: req.body?.model || req.query?.model,
-          temperature: typeof req.body?.temperature === 'number' ? req.body.temperature : undefined,
-        },
-        orgDefaults: { model: params.model },
-      });
-      params.temperature = profileResolution.temperature;
-      // Force JSON mode for features with a registered structured schema.
-      const schema = llmSchemas.getSchemaForFeature(feature);
-      if (schema) params.jsonMode = true;
-      params.taskProfile = profileResolution.profile;
+      // Phase 1.4: RAG is handled downstream by llm.buildPersonalizedSystem(ragQuery, ...)
+      // inside each feature handler. We previously auto-fetched a RAG block here and set
+      // req.ragContext, but no caller consumed it — so the extra vector/embedding call was
+      // pure overhead. Removed; individual handlers pass a feature-appropriate ragQuery to
+      // buildPersonalizedSystem which performs and inlines the retrieval.
 
       const tracked = await llm.withAITrackingContext(() => fn(req, params));
       let result = tracked?.result;
       const durationMs = Date.now() - startMs;
-      let tracking = tracked?.tracking || null;
-      let resolvedProvider = tracking?.usedProvider || params.provider;
-      let resolvedModel = tracking?.usedModel || params.model;
-      let fallbackUsed = !!tracking?.fallbackUsed;
+      const tracking = tracked?.tracking || null;
+      const resolvedProvider = tracking?.usedProvider || params.provider;
+      const resolvedModel = tracking?.usedModel || params.model;
+      const fallbackUsed = !!tracking?.fallbackUsed;
 
-      // v3.0.0: structured-output validation + one-shot retry.
-      // If the feature has a registered schema, parse + validate the result.
-      // On failure, set req._aiCorrectionHint and retry once. If retry also
-      // fails, return the original (best-effort) result with structured=null.
+      // Phase 1.2: Schema validation + single retry with error context.
+      // If the result is a string for a feature that has a JSON schema, attempt to
+      // validate it. If validation fails, inject a retry hint into req and call fn
+      // once more so the prompt builder can append the correction instruction.
+      // The parsed structured object is also persisted/returned alongside the raw
+      // narrative so the frontend can render cards/tables/checklists from it.
       let structured = null;
-      let qualityErrors = null;
-      if (schema) {
-        const parsed = _tryParseJson(result);
-        const validation = parsed ? llmSchemas.validate(schema, parsed) : { valid: false, errors: [{ instancePath: '/', message: 'response was not valid JSON' }] };
-        if (validation.valid) {
-          structured = parsed;
-        } else {
-          // One-shot retry with error context
-          req._aiCorrectionHint = llmSchemas.formatErrorsForRetry(validation.errors);
+      if (typeof result === 'string' && hasFeatureSchema(feature)) {
+        const validation = validateFeatureOutput(feature, result);
+        if (!validation.valid) {
+          log('warn', `ai.${feature}.schema_retry`, { feature, errors: validation.errors.slice(0, 3) });
+          req.schemaRetryHint = `Your previous response did not pass JSON schema validation. Errors: ${validation.errors.slice(0, 3).join('; ')}. Return ONLY a valid JSON object matching the required schema — no prose, no markdown fences.`;
           try {
             const retried = await llm.withAITrackingContext(() => fn(req, params));
-            const retryResult = retried?.result;
-            const retryParsed = _tryParseJson(retryResult);
-            const retryValidation = retryParsed ? llmSchemas.validate(schema, retryParsed) : { valid: false, errors: validation.errors };
-            if (retryValidation.valid) {
-              structured = retryParsed;
-              result = retryResult;
-              // Update tracking metadata to reflect the retry attempt that
-              // actually produced the response we're returning.
-              tracking = retried?.tracking || tracking;
-              if (tracking) {
-                resolvedProvider = tracking.usedProvider || resolvedProvider;
-                resolvedModel = tracking.usedModel || resolvedModel;
-                fallbackUsed = !!tracking.fallbackUsed;
+            if (retried?.result) {
+              result = retried.result;
+              log('info', `ai.${feature}.schema_retry.success`, { feature });
+              const revalidation = validateFeatureOutput(feature, result);
+              if (revalidation.valid && revalidation.parsed && typeof revalidation.parsed === 'object') {
+                structured = revalidation.parsed;
               }
-            } else {
-              qualityErrors = retryValidation.errors;
             }
-          } catch (_retryErr) {
-            qualityErrors = validation.errors;
+          } catch (retryErr) {
+            // Retry failed — return original result and log
+            log('warn', `ai.${feature}.schema_retry.failed`, { feature, error: retryErr.message });
           } finally {
-            delete req._aiCorrectionHint;
+            delete req.schemaRetryHint;
           }
+        } else if (validation.parsed && typeof validation.parsed === 'object') {
+          structured = validation.parsed;
         }
       }
 
       // Capture text output for high-stakes decision logging
       if (typeof result === 'string') resultText = result;
       else if (result && typeof result === 'object') resultText = JSON.stringify(result);
-
-      // Run quality gate on the final output (sync, non-blocking on failure).
-      let qualityScore = null;
-      try {
-        const qgResult = runQualityGate({ output: structured ?? result });
-        qualityScore = qgResult.score;
-      } catch (_qgErr) { /* non-fatal */ }
 
       // Log usage with extended context
       await llm.logAIUsage(params.organizationId, req.user.id, feature, resolvedProvider, resolvedModel, {
@@ -231,7 +185,6 @@ function aiHandler(feature, fn, opts = {}) {
         resourceType: opts.resourceType ? (typeof opts.resourceType === 'function' ? opts.resourceType(req) : opts.resourceType) : null,
         resourceId: opts.resourceId ? (typeof opts.resourceId === 'function' ? opts.resourceId(req) : opts.resourceId) : null,
         dataLineage: agentMetadata.dataLineage,
-        structured,
       }).catch(() => {});
 
       if (fallbackUsed) {
@@ -253,23 +206,10 @@ function aiHandler(feature, fn, opts = {}) {
         }).catch(() => {});
       }
 
-      res.json({
-        success: true,
-        data: {
-          result,
-          structured,           // v3.0.0: validated JSON object (or null when invalid / no schema)
-          feature,
-          provider: resolvedProvider,
-          model: resolvedModel,
-          taskProfile: params.taskProfile,
-          fallbackUsed,
-          qualityErrors,        // null when valid; array of {instancePath, message} otherwise
-          qualityScore,         // 0-100 score from aiQualityGate (null when gate didn't run)
-        }
-      });
+      res.json({ success: true, data: { result, structured, feature, provider: resolvedProvider, model: resolvedModel, fallbackUsed } });
     } catch (err) {
       const durationMs = Date.now() - startMs;
-      console.error(`AI ${feature} error:`, err);
+      log('error', `ai.${feature}.error`, { error: err.message, feature });
       const statusCode = err.statusCode || 500;
       const knownMessage = typeof err.message === 'string' ? err.message : '';
       const hasMissingKeyError = /no api key configured/i.test(knownMessage);
@@ -398,20 +338,19 @@ router.get('/status', async (req, res) => {
           testProcedures: true,
           assetRisk: true,
           policyGenerator: true,
-          iavmAssetAlert: true,
-          chat: true
+          iavmAssetAlert: true
         }
       }
     });
   } catch (err) {
-    console.error('AI status error:', err);
+    log('error', 'ai.status', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to get AI status' });
   }
 });
 
 // ======================== 1. GAP ANALYSIS ========================
 router.post('/gap-analysis', checkAIUsage, aiHandler('gap_analysis', (req, params) =>
-  llm.generateGapAnalysis(params)
+  llm.generateGapAnalysis({ ...params, schemaRetryHint: req.schemaRetryHint || null })
 ));
 
 // ======================== 2. CROSSWALK OPTIMIZER ========================
@@ -431,7 +370,7 @@ router.post('/regulatory-monitor', checkAIUsage, aiHandler('regulatory_monitor',
 
 // ======================== 5. REMEDIATION PLAYBOOKS ========================
 router.post('/remediation/:controlId', checkAIUsage, aiHandler('remediation_playbook', (req, params) =>
-  llm.generateRemediationPlaybook({ ...params, controlId: req.params.controlId })
+  llm.generateRemediationPlaybook({ ...params, controlId: req.params.controlId, schemaRetryHint: req.schemaRetryHint || null })
 ));
 
 // ======================== VULNERABILITY REMEDIATION ========================
@@ -561,7 +500,7 @@ router.post('/tprm/analyze-evidence', checkAIUsage, async (req, res) => {
 
     res.json({ success: true, data: { result, feature: 'tprm_evidence_analyze', provider: params.provider, evidence_count: evidenceResult.rows.length } });
   } catch (err) {
-    console.error('TPRM analyze-evidence AI error:', err);
+    log('error', 'ai.tprm_analyze_evidence', { error: err.message });
     res.status(500).json({ success: false, error: 'AI evidence analysis failed' });
   }
 });
@@ -603,7 +542,8 @@ router.post('/audit/finding-draft', checkAIUsage, aiHandler('audit_finding_draft
     issueSummary: req.body.issueSummary,
     evidenceSummary: req.body.evidenceSummary,
     severityHint: req.body.severityHint,
-    recommendationScope: req.body.recommendationScope
+    recommendationScope: req.body.recommendationScope,
+    schemaRetryHint: req.schemaRetryHint || null
   })
 ));
 
@@ -634,7 +574,7 @@ router.post('/training-recommendations', checkAIUsage, aiHandler('training_recom
 
 // ======================== 16. EVIDENCE ASSISTANT ========================
 router.post('/evidence-suggest/:controlId', checkAIUsage, aiHandler('evidence_suggest', (req, params) =>
-  llm.suggestEvidence({ ...params, controlId: req.params.controlId })
+  llm.suggestEvidence({ ...params, controlId: req.params.controlId, schemaRetryHint: req.schemaRetryHint || null })
 ));
 
 // ======================== CONTROL ANALYSIS ========================
@@ -644,7 +584,7 @@ router.post('/analyze/control/:id', checkAIUsage, aiHandler('control_analysis', 
 
 // ======================== TEST PROCEDURES ========================
 router.post('/test-procedures/:controlId', checkAIUsage, aiHandler('test_procedures', (req, params) =>
-  llm.generateTestProcedures({ ...params, controlId: req.params.controlId })
+  llm.generateTestProcedures({ ...params, controlId: req.params.controlId, schemaRetryHint: req.schemaRetryHint || null })
 ));
 
 // ======================== ASSET RISK ========================
@@ -657,76 +597,6 @@ router.post('/generate-policy', checkAIUsage, aiHandler('policy_generator', (req
   llm.generatePolicy({ ...params, policyType: req.body.policyType })
 ));
 
-// ======================== CHAT ========================
-router.post('/chat', checkAIUsage, aiHandler('chat', async (req, params) => {
-  const messages = req.body.messages || [];
-  // Extract last user message for RAG context retrieval
-  let ragQuery = '';
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') { ragQuery = messages[i].content || ''; break; }
-  }
-  // Build personalized system prompt with org context + RAG when no explicit systemPrompt
-  const systemPrompt = req.body.systemPrompt ||
-    await llm.buildPersonalizedSystem(params.organizationId, null, 'compact', ragQuery, 'copilot');
-  return llm.chat({ ...params, messages, systemPrompt });
-}));
-
-// ======================== STREAMING CHAT ========================
-// SSE endpoint: streams AI response chunks in real-time as Server-Sent Events.
-// Client receives: data: {"chunk":"...", "done":false}\n\n  ...  data: {"chunk":"","done":true}\n\n
-router.post('/stream', checkAIUsage, async (req, res) => {
-  const params = await getAIParams(req);
-  const { messages, systemPrompt, feature = 'chat' } = req.body;
-
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ success: false, error: 'messages array is required' });
-  }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
-  const startMs = Date.now();
-
-  try {
-    const stream = llm.chatStream({
-      ...params,
-      messages,
-      systemPrompt: systemPrompt || null
-    });
-
-    for await (const chunk of stream) {
-      res.write(`data: ${JSON.stringify({ chunk, done: false })}\n\n`);
-    }
-
-    res.write(`data: ${JSON.stringify({ chunk: '', done: true })}\n\n`);
-    res.end();
-
-    const durationMs = Date.now() - startMs;
-    await llm.logAIUsage(params.organizationId, req.user.id, feature, params.provider, params.model, {
-      success: true, byokUsed: !!req.aiUsageByok, ipAddress: req.ip || null, durationMs
-    }).catch(() => {});
-  } catch (err) {
-    const durationMs = Date.now() - startMs;
-    console.error('AI stream error:', err);
-    const isMissingKey = err.message?.includes('No API key');
-    const safeClientMessage = isMissingKey
-      ? 'No API key configured. Add one in Settings > LLM Configuration.'
-      : 'Streaming request failed. Please try again.';
-    if (!res.headersSent) {
-      res.status(isMissingKey ? 400 : 500).json({ success: false, error: safeClientMessage });
-    } else {
-      res.write(`data: ${JSON.stringify({ error: safeClientMessage, done: true })}\n\n`);
-      res.end();
-    }
-    await llm.logAIUsage(params.organizationId, req.user.id, feature, params.provider, params.model, {
-      success: false, errorMessage: err.message?.slice(0, MAX_ERROR_MESSAGE_LENGTH), byokUsed: !!req.aiUsageByok, ipAddress: req.ip || null, durationMs
-    }).catch(() => {});
-  }
-});
-
 // ======================== ADMIN: AI USAGE REPORT ========================
 // Returns paginated AI usage log for the org — admin only
 router.get('/usage-report', requirePermission('settings.manage'), async (req, res) => {
@@ -736,6 +606,24 @@ router.get('/usage-report', requirePermission('settings.manage'), async (req, re
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const pageLimit = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
     const offset = (pageNum - 1) * pageLimit;
+
+    // Validate query parameters to prevent injection via filter values
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (userId && !UUID_RE.test(String(userId))) {
+      return res.status(400).json({ success: false, error: 'Invalid userId format' });
+    }
+    // feature is passed as a parameterized value; additionally constrain length
+    if (feature && (typeof feature !== 'string' || feature.length > 100)) {
+      return res.status(400).json({ success: false, error: 'Invalid feature filter' });
+    }
+    // Validate date strings to ISO 8601 / YYYY-MM-DD format
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]+)?$/;
+    if (startDate && !DATE_RE.test(String(startDate))) {
+      return res.status(400).json({ success: false, error: 'Invalid startDate format' });
+    }
+    if (endDate && !DATE_RE.test(String(endDate))) {
+      return res.status(400).json({ success: false, error: 'Invalid endDate format' });
+    }
 
     const conditions = ['l.organization_id = $1'];
     const values = [orgId];
@@ -747,6 +635,8 @@ router.get('/usage-report', requirePermission('settings.manage'), async (req, re
     if (feature)   { conditions.push(`l.feature = $${idx++}`);     values.push(feature); }
 
     const where = conditions.join(' AND ');
+    const limitPlaceholder = `$${idx++}`;
+    const offsetPlaceholder = `$${idx++}`;
 
     const [rows, countRow] = await Promise.all([
       pool.query(`
@@ -763,7 +653,7 @@ router.get('/usage-report', requirePermission('settings.manage'), async (req, re
         LEFT JOIN users u ON u.id = l.user_id
         WHERE ${where}
         ORDER BY l.created_at DESC
-        LIMIT $${idx++} OFFSET $${idx++}
+        LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}
       `, [...values, pageLimit, offset]),
       pool.query(`SELECT COUNT(*) AS total FROM ai_usage_log l WHERE ${where}`, values),
     ]);
@@ -778,7 +668,7 @@ router.get('/usage-report', requirePermission('settings.manage'), async (req, re
       },
     });
   } catch (err) {
-    console.error('AI usage report error:', err);
+    log('error', 'ai.usage_report', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to fetch AI usage report' });
   }
 });
@@ -830,8 +720,8 @@ router.post('/decisions', aiDecisionWriteLimiter, requirePermission('assessments
         riskLevel,
         body.regulatory_framework || null,
         body.model_version || null,
-        body.correlation_id != null ? String(body.correlation_id) : null,
-        body.session_id != null ? String(body.session_id) : null,
+        body.correlation_id || null,
+        body.session_id || null,
         JSON.stringify(body.bias_flags || []),
         body.reasoning || null,
         body.confidence_score != null ? body.confidence_score : null,
@@ -841,7 +731,7 @@ router.post('/decisions', aiDecisionWriteLimiter, requirePermission('assessments
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
-    console.error('AI decision create error:', err);
+    log('error', 'ai.decision_create', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to log AI decision' });
   }
 });
@@ -915,7 +805,7 @@ router.get('/decisions', requirePermission('settings.manage'), async (req, res) 
       pagination: { page, limit, total: totalCount }
     });
   } catch (err) {
-    console.error('AI decisions error:', err);
+    log('error', 'ai.decisions', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to retrieve AI decisions' });
   }
 });
@@ -951,7 +841,7 @@ router.patch('/decisions/:id/review', requirePermission('assessments.write'), as
     }
     res.json({ success: true });
   } catch (err) {
-    console.error('AI decision review error:', err);
+    log('error', 'ai.decision_review', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to update decision review' });
   }
 });
@@ -975,7 +865,7 @@ router.patch('/decisions/:id/bias-review', requirePermission('assessments.write'
     }
     res.json({ success: true });
   } catch (err) {
-    console.error('Bias review error:', err);
+    log('error', 'ai.bias_review', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to update bias review' });
   }
 });
@@ -1114,29 +1004,8 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
 
 // ======================== MULTI-AGENT SWARM ========================
 
-let orchestrator = {
-  SWARM_CONFIGS: {},
-  getSwarmConfigs: () => [],
-  getSwarmConfig: () => null,
-  executeSwarm: async () => {
-    const err = new Error(UNAVAILABLE_SWARM_ERROR);
-    err.statusCode = 503;
-    throw err;
-  }
-};
-let reasoningMemory = {
-  invalidateCache: () => {}
-};
-try {
-  orchestrator = require('../services/multiAgentOrchestrator');
-} catch (_err) {
-  // Optional in the public/community repo.
-}
-try {
-  reasoningMemory = require('../services/reasoningMemory');
-} catch (_err) {
-  // Optional in the public/community repo.
-}
+const orchestrator = require('../services/multiAgentOrchestrator');
+const reasoningMemory = require('../services/reasoningMemory');
 
 // GET /ai/swarm/configs — list available swarm configurations
 router.get('/swarm/configs', async (req, res) => {
@@ -1144,7 +1013,7 @@ router.get('/swarm/configs', async (req, res) => {
     const configs = orchestrator.getSwarmConfigs();
     res.json({ success: true, data: configs });
   } catch (err) {
-    console.error('Swarm configs error:', err);
+    log('error', 'ai.swarm_configs', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to get swarm configurations' });
   }
 });
@@ -1196,7 +1065,7 @@ router.post('/swarm/execute', checkAIUsage, async (req, res) => {
 
     res.json({ success: true, data: result });
   } catch (err) {
-    console.error('Swarm execution error:', err);
+    log('error', 'ai.swarm_execution', { error: err.message });
     const errorString = String((err && (err.message || err)) || 'Unknown error');
     const normalized = errorString.toLowerCase();
     const isQuotaOrRateLimitError = /quota|rate limit|429/i.test(normalized);
@@ -1239,7 +1108,7 @@ router.get('/reasoning-memory/stats', requireTier('enterprise'), async (req, res
       }
     });
   } catch (err) {
-    console.error('Reasoning memory stats error:', err);
+    log('error', 'ai.reasoning_memory_stats', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to get reasoning memory stats' });
   }
 });
@@ -1269,7 +1138,7 @@ router.get('/reasoning-memory/entries', requireTier('enterprise'), async (req, r
     const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
   } catch (err) {
-    console.error('Reasoning memory entries error:', err);
+    log('error', 'ai.reasoning_memory_entries', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to get reasoning memory entries' });
   }
 });
@@ -1285,7 +1154,7 @@ router.delete('/reasoning-memory', requireTier('enterprise'), async (req, res) =
     reasoningMemory.invalidateCache(orgId);
     res.json({ success: true, data: { deletedCount: result.rowCount } });
   } catch (err) {
-    console.error('Reasoning memory clear error:', err);
+    log('error', 'ai.reasoning_memory_clear', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to clear reasoning memory' });
   }
 });
@@ -1300,7 +1169,7 @@ router.get('/agent-booster/status', async (req, res) => {
     const settingsResult = await pool.query(
       `SELECT settings FROM organizations WHERE id = $1`,
       [orgId]
-    ).catch(err => { console.error('Agent booster settings query error:', err.message); return { rows: [] }; });
+    ).catch(err => { log('error', 'ai.agent_booster_settings', { error: err.message }); return { rows: [] }; });
 
     const orgSettings = settingsResult.rows[0]?.settings || {};
     const boosterConfig = orgSettings.agentBooster || {};
@@ -1316,7 +1185,7 @@ router.get('/agent-booster/status', async (req, res) => {
       WHERE organization_id = $1
         AND feature LIKE 'swarm_%'
         AND created_at > NOW() - INTERVAL '7 days'
-    `, [orgId]).catch(err => { console.error('Agent booster metrics query error:', err.message); return { rows: [{}] }; });
+    `, [orgId]).catch(err => { log('error', 'ai.agent_booster_metrics', { error: err.message }); return { rows: [{}] }; });
 
     const metrics = metricsResult.rows[0] || {};
 
@@ -1343,7 +1212,7 @@ router.get('/agent-booster/status', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Agent booster status error:', err);
+    log('error', 'ai.agent_booster_status', { error: err.message });
     res.status(500).json({ success: false, error: 'Failed to get agent booster status' });
   }
 });

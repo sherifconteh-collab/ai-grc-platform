@@ -55,7 +55,7 @@ function getHmacKey() {
     return _cachedHmacKey;
   }
   const buf = Buffer.from(raw, 'hex');
-  if (buf.length !== 48) {
+  if (buf.length < 48) {
     throw new Error('HMAC_KEY must be a 96-character hex string (48 bytes) for CNSA Suite 1.0 compliance');
   }
   _cachedHmacKey = buf;
@@ -176,12 +176,11 @@ function auditEncryptionStrength() {
   );
 
   // 2. Key length — CNSA Suite 1.0 requires ≥256-bit keys
-  const keyBits = getKey().length * 8;
   addCheck(
     'CNSA-1.0-KEYLEN',
     'Encryption key length (CNSA 1.0: ≥256 bits)',
-    keyBits >= 256 ? 'pass' : 'fail',
-    `Key length: ${keyBits} bits (required ≥256 bits for CNSA Suite 1.0)`
+    KEY_BITS >= 256 ? 'pass' : 'fail',
+    `Key length: ${KEY_BITS} bits (required ≥256 bits for CNSA Suite 1.0)`
   );
 
   // 3. HMAC algorithm — CNSA Suite 1.0 mandates SHA-384+
@@ -237,16 +236,107 @@ function auditEncryptionStrength() {
     `HMAC_KEY: ${hasHmacKey ? 'set' : (isProduction ? 'MISSING (required in production)' : 'using dev fallback')}`
   );
 
+  // 7. JWT signing algorithm — CNSA Suite 1.0 mandates HMAC-SHA-384+ (HS384/HS512)
+  try {
+    const { JWT_ALGORITHM } = require('../config/security');
+    const jwtBits = { HS256: 256, HS384: 384, HS512: 512 }[JWT_ALGORITHM] || 0;
+    addCheck(
+      'CNSA-1.0-JWT',
+      'JWT signing algorithm (CNSA 1.0: HS384+)',
+      jwtBits >= 384 ? 'pass' : 'fail',
+      `JWT algorithm: ${JWT_ALGORITHM} (${jwtBits} bits). CNSA Suite 1.0 mandates HS384 or stronger.`
+    );
+  } catch (err) {
+    addCheck('CNSA-1.0-JWT', 'JWT signing algorithm (CNSA 1.0: HS384+)', 'warn', `Could not resolve JWT algorithm: ${err.message}`);
+  }
+
+  // 8. CNSA 2.0 PQC — ML-DSA-65 availability + sign/verify round-trip
+  let pqcOk = false;
+  let pqcDetail = '';
+  try {
+    const { ml_dsa65 } = require('@noble/post-quantum/ml-dsa.js');
+    const { secretKey, publicKey } = ml_dsa65.keygen();
+    const msg = Buffer.from('cnsa-2.0-pqc-audit', 'utf8');
+    const sig = ml_dsa65.sign(msg, secretKey);
+    pqcOk = ml_dsa65.verify(sig, msg, publicKey);
+    pqcDetail = pqcOk
+      ? 'ML-DSA-65 (CNSA 2.0) sign/verify round-trip succeeded — PQC license signing available.'
+      : 'ML-DSA-65 round-trip failed — verification returned false.';
+  } catch (err) {
+    pqcDetail = `@noble/post-quantum ML-DSA-65 unavailable: ${err.message}`;
+  }
+  addCheck('CNSA-2.0-PQC', 'Post-quantum signatures (CNSA 2.0: ML-DSA-65)', pqcOk ? 'pass' : 'warn', pqcDetail);
+
   const passed = checks.filter((c) => c.status === 'pass').length;
   const failed = checks.filter((c) => c.status === 'fail').length;
   const warnings = checks.filter((c) => c.status === 'warn').length;
   return {
     timestamp: new Date().toISOString(),
-    cnsa_suite: '1.0',
+    cnsa_suite: '1.0+2.0',
     compliant: failed === 0,
     summary: `${passed} passed, ${failed} failed, ${warnings} warnings`,
     checks
   };
 }
 
-module.exports = { encrypt, decrypt, isEncrypted, hashForLookup, auditEncryptionStrength, clearKeyCache };
+/**
+ * SHA-384 hex digest of arbitrary content (Buffer or string).
+ * CNSA Suite 1.0 mandates SHA-384 or higher for hashing.
+ */
+function sha384(input) {
+  return crypto.createHash('sha384').update(input).digest('hex');
+}
+
+/**
+ * SHA-384 digest of a bearer token for non-reversible, DB-stored lookups
+ * (refresh tokens, password-reset tokens, etc.). CNSA Suite 1.0 compliant.
+ */
+function hashToken(token) {
+  return sha384(String(token));
+}
+
+function _safeEqualHex(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verify a token against a stored hash. Matches the SHA-384 (CNSA 1.0) digest
+ * and, during the migration window, the legacy SHA-256 digest so tokens issued
+ * before the cutover keep resolving until they expire.
+ * TODO(cnsa-cleanup): drop the SHA-256 fallback once all pre-migration tokens
+ * have expired (>= max refresh-token TTL).
+ */
+function verifyTokenHash(token, storedHash) {
+  if (!storedHash) return false;
+  if (_safeEqualHex(hashToken(token), storedHash)) return true;
+  const legacy = crypto.createHash('sha256').update(String(token)).digest('hex');
+  return _safeEqualHex(legacy, storedHash);
+}
+
+/**
+ * Candidate hashes for a DB-stored token lookup: the SHA-384 (CNSA 1.0) digest
+ * first, then the legacy SHA-256 digest. Use with `column = ANY($n)` so tokens
+ * issued before the cutover still resolve until they expire.
+ * TODO(cnsa-cleanup): drop the SHA-256 candidate once legacy tokens have expired.
+ */
+function tokenHashCandidates(token) {
+  return [hashToken(token), crypto.createHash('sha256').update(String(token)).digest('hex')];
+}
+
+module.exports = {
+  encrypt,
+  decrypt,
+  isEncrypted,
+  hashForLookup,
+  sha384,
+  hashToken,
+  verifyTokenHash,
+  tokenHashCandidates,
+  auditEncryptionStrength,
+  clearKeyCache,
+};

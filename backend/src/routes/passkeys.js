@@ -1,118 +1,165 @@
-// @tier: community
+// @tier: enterprise
+'use strict';
+
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
+const { authenticate, requireTier } = require('../middleware/auth');
+const PASSKEY_TIER = 'enterprise'; // Passkeys available on Enterprise+
+const passkey = require('../services/passkeyService');
 const pool = require('../config/database');
-const { authenticate } = require('../middleware/auth');
-const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const { log } = require('../utils/logger');
+const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
+const { validateBody, requireFields } = require('../middleware/validate');
+const { decrypt, hashToken } = require('../utils/encrypt');
+const { resolveExpiryTimestampFromNow } = require('../utils/sessionExpiry');
 
-// Public endpoints (no auth required)
+const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
+const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
+
+function issueTokens(userId) {
+  const accessToken = jwt.sign({ userId }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: ACCESS_EXPIRY });
+  const refreshToken = jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: REFRESH_EXPIRY });
+  return { accessToken, refreshToken };
+}
+
+// SHA-384 (CNSA Suite 1.0). The shared /auth/refresh lookup accepts the legacy
+// SHA-256 digest so pre-cutover sessions keep working until they expire.
+function hashRefreshToken(token) {
+  return hashToken(token);
+}
+
+// ─── Registration (requires existing login) ──────────────────────────────────
+
+// GET /auth/passkey/register/options
+router.get('/register/options', authenticate, requireTier(PASSKEY_TIER), async (req, res) => {
+  try {
+    const options = await passkey.getRegistrationOptions(req.user);
+    return res.json({ data: options });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: 'Failed to generate passkey registration options' });
+  }
+});
+
+// POST /auth/passkey/register/verify
+router.post(
+  '/register/verify',
+  authenticate,
+  requireTier(PASSKEY_TIER),
+  validateBody((body) => requireFields(body, ['response'])),
+  async (req, res) => {
+    try {
+      const { response, name } = req.body;
+      const result = await passkey.verifyRegistration(req.user, response, name);
+      return res.json({ data: result });
+    } catch (err) {
+      return res.status(err.statusCode || 500).json({ error: 'Passkey registration verification failed' });
+    }
+  }
+);
+
+// ─── Authentication (public) ──────────────────────────────────────────────────
+
+// POST /auth/passkey/auth/options
 router.post('/auth/options', async (req, res) => {
   try {
-    res.json({
-      success: true,
-      data: { challenge: 'stub', message: 'WebAuthn authentication not yet configured' }
-    });
-  } catch (error) {
-    log('error', 'passkey.auth_options', { error: error.message });
-    res.status(500).json({ success: false, error: 'Failed to generate authentication options' });
+    const { email } = req.body || {};
+    const { options, challengeId } = await passkey.getAuthenticationOptions(email);
+    return res.json({ data: { options, challengeId } });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: 'Failed to generate passkey authentication options' });
   }
 });
 
-router.post('/auth/verify', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: { authenticated: false, message: 'WebAuthn authentication not yet configured' }
-    });
-  } catch (error) {
-    log('error', 'passkey.auth_verify', { error: error.message });
-    res.status(500).json({ success: false, error: 'Failed to verify authentication' });
-  }
-});
+// POST /auth/passkey/auth/verify
+router.post(
+  '/auth/verify',
+  validateBody((body) => requireFields(body, ['response', 'challengeId'])),
+  async (req, res) => {
+    try {
+      const { response, challengeId } = req.body;
+      const { user } = await passkey.verifyAuthentication(response, challengeId);
 
-// Authenticated endpoints
-router.use(authenticate);
-router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 60, label: 'passkey-route' }));
-
-router.get('/register/options', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: {
-        challenge: 'stub',
-        rp: { name: 'ControlWeave' },
-        user: { id: req.user.id, name: req.user.email }
+      // Fetch full user details for token
+      const userRow = await pool.query(
+        `SELECT u.*,
+                TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS full_name,
+                o.name AS org_name
+         FROM users u
+         LEFT JOIN organizations o ON o.id = u.organization_id
+         WHERE u.id = $1`,
+        [user.id]
+      );
+      if (userRow.rows.length === 0) {
+        return res.status(401).json({ error: 'User not found.' });
       }
-    });
-  } catch (error) {
-    log('error', 'passkey.register_options', { error: error.message });
-    res.status(500).json({ success: false, error: 'Failed to generate registration options' });
-  }
-});
 
-router.post('/register/verify', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: { registered: false, message: 'WebAuthn registration not yet configured' }
-    });
-  } catch (error) {
-    log('error', 'passkey.register_verify', { error: error.message });
-    res.status(500).json({ success: false, error: 'Failed to verify registration' });
-  }
-});
+      const fullUser = userRow.rows[0];
+      const plainEmail = decrypt(fullUser.email);
+      const { accessToken, refreshToken } = issueTokens(fullUser.id);
+      const sessionExpiresAt = resolveExpiryTimestampFromNow(REFRESH_EXPIRY, 'JWT_REFRESH_EXPIRY');
+      await pool.query(
+        'INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',
+        [fullUser.id, hashRefreshToken(refreshToken), sessionExpiresAt]
+      );
 
-router.get('/list', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT id, credential_id, name, counter, created_at, last_used_at
-       FROM user_passkeys
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [req.user.id]
-    );
-    res.json({ success: true, data: result.rows });
-  } catch (error) {
-    log('error', 'passkey.list', { error: error.message });
-    res.status(500).json({ success: false, error: 'Failed to list passkeys' });
-  }
-});
-
-router.delete('/:id', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'DELETE FROM user_passkeys WHERE id = $1 AND user_id = $2 RETURNING id',
-      [req.params.id, req.user.id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Passkey not found' });
+      return res.json({
+        data: {
+          accessToken,
+          refreshToken,
+          user: {
+            id: fullUser.id,
+            email: plainEmail,
+            full_name: fullUser.full_name,
+            role: fullUser.role,
+            organization_id: fullUser.organization_id,
+            org_name: fullUser.org_name,
+          },
+        },
+      });
+    } catch (err) {
+      return res.status(err.statusCode || 500).json({ error: 'Passkey authentication verification failed' });
     }
-    res.json({ success: true, data: { deleted: true } });
-  } catch (error) {
-    log('error', 'passkey.delete', { error: error.message });
-    res.status(500).json({ success: false, error: 'Failed to delete passkey' });
+  }
+);
+
+// ─── Passkey Management (requires login) ─────────────────────────────────────
+
+// GET /auth/passkey/list
+router.get('/list', authenticate, requireTier(PASSKEY_TIER), async (req, res) => {
+  try {
+    const passkeys = await passkey.listPasskeys(req.user.id);
+    return res.json({ data: passkeys });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to list passkeys' });
   }
 });
 
-router.patch('/:id/rename', async (req, res) => {
+// DELETE /auth/passkey/:id
+router.delete('/:id', authenticate, requireTier(PASSKEY_TIER), async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ success: false, error: 'Name is required' });
-    }
-    const result = await pool.query(
-      'UPDATE user_passkeys SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING id, name',
-      [name, req.params.id, req.user.id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Passkey not found' });
-    }
-    res.json({ success: true, data: result.rows[0] });
-  } catch (error) {
-    log('error', 'passkey.rename', { error: error.message });
-    res.status(500).json({ success: false, error: 'Failed to rename passkey' });
+    const deleted = await passkey.deletePasskey(req.user.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Passkey not found.' });
+    return res.json({ data: { deleted: true } });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to delete passkey' });
   }
 });
+
+// PATCH /auth/passkey/:id/rename
+router.patch(
+  '/:id/rename',
+  authenticate,
+  requireTier(PASSKEY_TIER),
+  validateBody((body) => requireFields(body, ['name'])),
+  async (req, res) => {
+    try {
+      const renamed = await passkey.renamePasskey(req.user.id, req.params.id, req.body.name);
+      if (!renamed) return res.status(404).json({ error: 'Passkey not found.' });
+      return res.json({ data: { renamed: true } });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to rename passkey' });
+    }
+  }
+);
 
 module.exports = router;

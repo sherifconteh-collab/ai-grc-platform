@@ -14,31 +14,8 @@ const {
 } = require('../utils/passwordPolicy');
 const { encrypt, decrypt, hashForLookup } = require('../utils/encrypt');
 const { hasPublicColumn } = require('../utils/schema');
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
-
-function getUsersRateLimitKey(req) {
-  if (req.user?.id) {
-    return `user:${req.user.id}`;
-  }
-
-  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
-  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
-  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
-}
 
 router.use(authenticate);
-
-// Explicit express-rate-limit instance so that static-analysis tools (CodeQL)
-// recognise the rate-limiting middleware.
-const usersRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getUsersRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
-router.use(usersRateLimiter);
 const ALLOWED_PRIMARY_ROLES = new Set(['admin', 'auditor', 'user']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -167,17 +144,17 @@ router.post('/', requirePermission('users.manage'), validateBody((body) => {
       existing = await pool.query('SELECT id FROM users WHERE email_hash = $1', [emailHash]);
       if (existing.rows.length === 0) {
         // Fallback: plain-text match for rows not yet migrated
-        existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 AND email_hash IS NULL', [email]);
+        existing = await pool.query('SELECT id FROM users WHERE email = $1 AND email_hash IS NULL', [email]);
       }
     } else {
-      existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
+      existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     }
     if (existing.rows.length > 0) {
       return res.status(409).json({ success: false, error: 'Email already registered' });
     }
 
     const { firstName, lastName } = splitFullName(fullName);
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 14);
 
     const client = await pool.connect();
     try {

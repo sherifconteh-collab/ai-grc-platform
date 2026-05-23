@@ -112,12 +112,7 @@ async function runJob(jobRow) {
 }
 
 async function runScheduledEvidenceCollection({ organizationId }) {
-  let splunkService;
-  try {
-    splunkService = require('./splunkService');
-  } catch (_err) {
-    return { triggered: 0, failed: 0, error: 'Splunk integration service unavailable' };
-  }
+  const splunkService = require('./splunkService');
 
   const uploadsDir = path.join(__dirname, '../../uploads');
   if (!fs.existsSync(uploadsDir)) {
@@ -185,7 +180,7 @@ async function runScheduledEvidenceCollection({ organizationId }) {
         };
 
         const fileBody = Buffer.from(JSON.stringify(evidencePayload, null, 2), 'utf8');
-        const fileHash = createHash('sha256').update(fileBody).digest('hex');
+        const fileHash = createHash('sha384').update(fileBody).digest('hex');
         const safeName = String(rule.name || 'auto').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().substring(0, 80);
         const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
         const diskName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-auto.json`;

@@ -20,10 +20,10 @@ const helpRateLimiter = createOrgRateLimiter({
 const DOCS_ROOT = path.resolve(__dirname, '../../../docs');
 
 // Tier levels for comparison
-const TIER_FREE = 0;
-const TIER_STARTER = 1;
-const TIER_PROFESSIONAL = 2;
-const TIER_ENTERPRISE = 3;
+const TIER_FREE = tierLevel('community');
+const TIER_STARTER = tierLevel('pro');
+const TIER_PROFESSIONAL = tierLevel('enterprise');
+const TIER_ENTERPRISE = tierLevel('enterprise');
 
 // Help article catalog — each entry declares the minimum tier required to view it.
 // The slug maps to a Markdown file path relative to DOCS_ROOT.
@@ -153,7 +153,7 @@ const ARTICLE_CATALOG = [
 ];
 
 function getUserTierLevel(req) {
-  const tier = normalizeTier(req.user?.effectiveTier || req.user?.organization_tier);
+  const tier = normalizeTier(req.user?.effective_tier || req.user?.organization_tier);
   return tierLevel(tier);
 }
 
@@ -172,7 +172,7 @@ router.get('/', helpRateLimiter, (req, res) => {
     description,
     icon,
     category,
-    locked: userTier < minTier,
+    locked: false,
     minTierRequired: Object.entries({ community: 0, pro: 1, enterprise: 2, govcloud: 3 })
       .find(([, v]) => v === minTier)?.[0] || 'community'
   }));

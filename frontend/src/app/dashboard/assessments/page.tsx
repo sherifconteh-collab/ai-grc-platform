@@ -475,10 +475,10 @@ function AssessmentsPageInner() {
             <span className="text-lg">✅</span>
             <div><div className="font-medium text-blue-800">Controls</div><div className="text-blue-600">Implementation status &amp; evidence</div></div>
           </Link>
-          <Link href="/dashboard/ai-analysis"
+          <Link href="/dashboard/ai-insights"
             className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors text-xs">
             <span className="text-lg">✨</span>
-            <div><div className="font-medium text-purple-800">AI Analysis</div><div className="text-purple-600">AI audit-readiness &amp; gap analysis</div></div>
+            <div><div className="font-medium text-purple-800">AI Insights</div><div className="text-purple-600">AI audit-readiness &amp; gap analysis</div></div>
           </Link>
           <Link href="/dashboard/frameworks/mappings"
             className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-xs">

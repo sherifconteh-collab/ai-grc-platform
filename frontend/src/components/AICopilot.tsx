@@ -231,7 +231,7 @@ export default function AICopilot() {
                 }`}
               >
                 {msg.role === 'assistant'
-                  ? <MarkdownContent className="leading-relaxed">{msg.content}</MarkdownContent>
+                  ? <MarkdownContent className="leading-relaxed" content={msg.content} />
                   : <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>}
                 {msg.role === 'assistant' && (
                   <button

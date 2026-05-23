@@ -6,9 +6,9 @@ Skim this file before any non-trivial change. Detailed conventions live under
 
 ## Quick orientation
 
-- **Repo**: ControlWeave (AI-GRC) Community fork.
+- **Repo**: ControlWeave (AI-GRC) — fully open source, all features enabled.
 - **Stack**: Node.js (Express) backend, Next.js (App Router, React 19) frontend, Electron desktop wrapper.
-- **Tier markers**: every server-side source file declares `// @tier: community` or `// @tier: pro`. The Community fork must never depend on `@tier: pro` code paths.
+- **Tier markers**: legacy `// @tier:` comments may still appear in some files but are no longer enforced — all tier gating is removed (`requireTier`/`requireProEdition`/`hasTierAtLeast` are no-ops, edition reports as `open`). Do not add new tier gating.
 - **Releases**: `RELEASE_NOTES.md` is the source of truth for version state. `backend`, `frontend`, and `electron` `package.json` versions stay in lock-step with the latest entry.
 
 ## Validation commands
@@ -25,7 +25,7 @@ Skim this file before any non-trivial change. Detailed conventions live under
 
 ## Non-negotiables
 
-1. **Never** weaken security defaults: `bcrypt` cost stays ≥ 14, `jwt.verify` always passes `algorithms: ['HS256']`.
+1. **Never** weaken security defaults: `bcrypt` cost stays ≥ 14, and `jwt.verify` always passes an explicit `algorithms` allow-list. Per CNSA Suite 1.0, tokens are signed **HS384**; the verify allow-list is `['HS384','HS256']` only during the rotation window (legacy HS256 acceptance is dropped once pre-cutover tokens expire).
 2. **Never** introduce `dangerouslySetInnerHTML` in the frontend; use `MarkdownContent` for AI output rendering.
 3. **Never** add raw SQL string interpolation in routes; use parameterized queries via `pool.query`.
 4. **Never** commit secrets; pull from env or `llm_configurations` (encrypted).

@@ -69,9 +69,9 @@ api.interceptors.response.use(
       }
     }
 
-    // AI quota exceeded — fire a global event so AiQuotaModal can respond
-    if (error.response?.status === 429 && (error.response?.data as { upgradeRequired?: boolean })?.upgradeRequired) {
-      const { used = 0, limit = 0, currentTier = 'community' } = (error.response?.data || {}) as {
+    // AI quota exceeded — fire a global event so the AiQuotaModal can respond
+    if (error.response?.status === 429 && error.response?.data?.upgradeRequired) {
+      const { used = 0, limit = 0, currentTier = 'community' } = (error.response.data || {}) as {
         used?: number;
         limit?: number;
         currentTier?: string;
@@ -84,7 +84,7 @@ api.interceptors.response.use(
     }
 
     // No AI provider configured — prompt the user to add their own API key
-    if (error.response?.status === 422 && (error.response?.data as { code?: string })?.code === 'NO_PROVIDER_CONFIGURED') {
+    if (error.response?.status === 422 && error.response?.data?.code === 'NO_PROVIDER_CONFIGURED') {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ai:no-provider'));
       }
@@ -208,7 +208,7 @@ export const dashboardAPI = {
 
   getPriorityActions: () => api.get('/dashboard/priority-actions'),
 
-  getRecentActivity: (params?: { limit?: number }) =>
+  getRecentActivity: (params?: { limit?: number; offset?: number; event_type?: string }) =>
     api.get('/dashboard/recent-activity', { params }),
 
   getComplianceTrend: (params: { period: string }) =>
@@ -220,9 +220,11 @@ export const dashboardAPI = {
 
   getMaturityScore: () => api.get('/dashboard/maturity-score'),
 
-  getControlHealthSummary: () => api.get('/control-health'),
+  getComplianceSummary: () => api.get('/dashboard/compliance-summary'),
 
-  getComplianceSummary: () => api.get('/dashboard/stats'),
+  getControlHealthSummary: () => api.get('/dashboard/control-health-summary'),
+
+  getCacheMetrics: () => api.get('/dashboard/cache-metrics'),
 };
 
 // Organization APIs
@@ -718,8 +720,6 @@ export const cmdbAPI = {
 // AI Analysis APIs
 export const aiAPI = {
   getStatus: () => api.get('/ai/status'),
-  chat: (data: { messages: { role: string; content: string }[]; systemPrompt?: string; provider?: string; model?: string }) =>
-    api.post('/ai/chat', data, { timeout: AI_REQUEST_TIMEOUT }),
   gapAnalysis: (data?: { provider?: string; model?: string }) =>
     api.post('/ai/gap-analysis', data || {}, { timeout: AI_REQUEST_TIMEOUT }),
   crosswalkOptimizer: (data?: { provider?: string; model?: string }) =>
@@ -1380,6 +1380,34 @@ export const platformAdminAPI = {
   }) => api.put('/platform-admin/smtp', data),
   testSmtp: (to_email: string) => api.post('/platform-admin/smtp/test', { to_email }),
   getLlmStatus: () => api.get('/platform-admin/llm/status'),
+  // Backup administration
+  getBackupConfig: () => api.get('/platform-admin/backups/config'),
+  getBackups: () => api.get('/platform-admin/backups'),
+  runBackup: () => api.post('/platform-admin/backups/run'),
+  // Security administration
+  getSecurityRateLimits: () => api.get('/platform-admin/security/rate-limits'),
+  getSecurityHeaders: () => api.get('/platform-admin/security/headers'),
+  getActiveSessions: (params?: { page?: number; limit?: number }) =>
+    api.get('/platform-admin/security/sessions', { params }),
+  revokeUserSessions: (userId: string) =>
+    api.delete(`/platform-admin/security/sessions/user/${userId}`),
+  revokeSession: (sessionId: string) =>
+    api.delete(`/platform-admin/security/sessions/${sessionId}`),
+  getPlatformAuditLogs: (params?: {
+    userId?: string;
+    orgId?: string;
+    eventType?: string;
+    outcome?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    page?: number;
+  }) => api.get('/platform-admin/security/audit-logs', { params }),
+  // License administration (proxies existing /license endpoints)
+  getLicense: () => api.get('/license'),
+  activateLicense: (licenseKey: string) => api.post('/license/activate', { licenseKey }),
+  generateCommunityLicense: () => api.post('/license/generate-community'),
+  checkLicenseUpdate: () => api.get('/license/update-check'),
 };
 
 // Passkey APIs
@@ -1716,6 +1744,13 @@ export const stateAiLawsAPI = {
     api.get('/state-ai-laws/controls', { params }),
   getControl: (controlId: string) => api.get(`/state-ai-laws/controls/${controlId}`),
   getSummary: () => api.get('/state-ai-laws/summary'),
+};
+
+// Push Tokens API — device push token registration for mobile apps (iOS APNs / Android FCM)
+export const pushTokensAPI = {
+  register: (data: { token: string; platform: 'ios' | 'android' }) =>
+    api.post('/push-tokens', data),
+  unregister: (token: string) => api.delete(`/push-tokens/${encodeURIComponent(token)}`),
 };
 
 export default api;

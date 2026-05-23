@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { requiresOrganizationOnboarding } from '@/lib/access';
-import { requiresBillingResolution, readValidPendingPlan } from '@/lib/billing';
-import { useDeploymentInfo } from '@/lib/deployment';
+import { getStoredPendingBillingPlan, requiresBillingResolution } from '@/lib/billing';
 import MarketingNav from '@/components/MarketingNav';
 
 const frameworks = [
@@ -20,7 +19,7 @@ const features = [
     icon: (
       <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
     ),
-    title: '40 Frameworks & Standards, Zero Overlap',
+    title: 'Frameworks & Standards, Zero Overlap',
     desc: 'NIST 800-53, ISO 27001, SOC 2, HIPAA, GDPR, EU AI Act, ISO 42001, AIUC-1, and more — all managed in one unified control library.', // ip-hygiene:ignore
   },
   {
@@ -34,8 +33,8 @@ const features = [
     icon: (
       <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
     ),
-    title: 'AI That Knows Your Organization',
-    desc: '25+ AI features: gap analysis, remediation playbooks, compliance forecasting, and an org-aware AI copilot.',
+    title: 'AI-Assisted Where It Helps',
+    desc: 'Optional BYOK insights for gap analysis, compliance forecasting, and audit readiness. AI is supplementary — the platform works without it.',
   },
   {
     icon: (
@@ -75,14 +74,6 @@ const features = [
 ];
 
 function LandingPage() {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-
-  const withBilling = (href: string) => {
-    if (!href.startsWith('/register?plan=')) return href;
-    const separator = href.includes('?') ? '&' : '?';
-    return `${href}${separator}billing=${billingCycle}`;
-  };
-
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 antialiased">
       {/* Nav */}
@@ -143,7 +134,7 @@ function LandingPage() {
               <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-xs text-gray-400 font-medium">Framework Coverage</div>
-                  <div className="text-xs text-purple-400">97 crosswalk mappings active</div>
+                  <div className="text-xs text-purple-400">Crosswalk mappings built in</div>
                 </div>
                 <div className="space-y-2">
                   {[['NIST 800-53', 89, 'bg-purple-500'], ['ISO 27001', 94, 'bg-purple-500'], ['SOC 2', 78, 'bg-indigo-500']].map(([name, pct, color]) => (
@@ -219,11 +210,11 @@ function LandingPage() {
       <section className="py-14 px-4 text-white" style={{background: 'linear-gradient(90deg, #7e22ce, #7c3aed, #4338ca)'}}>
         <div className="max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 text-center">
           {[
-            ['40', 'Frameworks & Standards'],
-            ['675+', 'Security Controls'],
-            ['97', 'Crosswalk Mappings'],
+            ['30+', 'Frameworks & Standards'],
+            ['670+', 'Security Controls'],
+            ['Built-in', 'Crosswalk Mappings'],
             ['2,000+', 'Assessment Procedures'],
-            ['25+', 'AI Analysis Features'],
+            ['Multi-tenant', 'Org Isolation'],
             ['51', 'MCP Tools'],
           ].map(([val, label]) => (
             <div key={label}>
@@ -234,284 +225,59 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Open Source Banner */}
       <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-1.5 rounded-full text-sm font-semibold mb-4">Pricing</div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Start free. Scale as your compliance program grows. Annual billing saves 20%.</p>
-            <div className="inline-flex items-center mt-8 bg-gray-100 rounded-full p-1 gap-1">
-              <button
-                type="button"
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                  billingCycle === 'monthly'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle('annual')}
-                className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                  billingCycle === 'annual'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500'
-                }`}
-              >
-                Annual <span className="text-green-600 font-semibold">Save 20%</span>
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-            {[
-              {
-                name: 'Community',
-                monthlyPrice: '$0',
-                annualPrice: '$0',
-                monthlyPeriod: 'forever',
-                annualPeriod: 'forever',
-                annualNote: null,
-                description: 'Self-hosted under AGPL v3. Ideal for evaluation and small teams.',
-                features: [
-                  'Up to 2 frameworks',
-                  'Core security controls',
-                  'AI-assisted assessments (10/mo — unlimited with own API key)',
-                  'Multi-org management & template clone',
-                  'Basic evidence collection',
-                  'Community support',
-                  'Full source code access',
-                ],
-                cta: 'Get Started Free',
-                href: '/register',
-                highlighted: false,
-                badge: null,
-              },
-              {
-                name: 'Pro',
-                monthlyPrice: '$499',
-                annualPrice: '$4,990',
-                monthlyPeriod: '/month',
-                annualPeriod: '/year',
-                annualNote: '$416/mo billed annually',
-                annualCost: 'Equivalent to $416/mo billed annually',
-                description: 'Hosted SaaS for growing teams. Unlimited frameworks, SSO, MCP access.',
-                features: [
-                  'Unlimited frameworks',
-                  'Full AI copilot & analysis',
-                  'CMDB + AI governance',
-                  'Audit-ready exports & reports',
-                  'SSO (SAML / OIDC)',
-                  'MCP server access',
-                  'AI threat library (PLOT4ai)',
-                  'Regulatory news monitoring',
-                  '48-hour support SLA',
-                ],
-                cta: 'Start Free Trial',
-                href: '/register?plan=pro',
-                highlighted: true,
-                badge: 'Most Popular',
-              },
-              {
-                name: 'Enterprise',
-                monthlyPrice: 'Custom',
-                annualPrice: 'Custom',
-                monthlyPeriod: '',
-                annualPeriod: '',
-                annualNote: '$3,500 – $12,000 / month',
-                annualCost: '$3,500 – $12,000 / month based on scope',
-                description: 'White-glove onboarding, dedicated CSM, and advanced AI governance.',
-                features: [
-                  'Everything in Pro',
-                  'AI impact assessment (ISO 42005)',
-                  'AIUC-1 Agentic AI Certification framework',
-                  'Auditor workspace & engagements',
-                  'TPRM & vendor security module',
-                  'SBOM / AIBOM analysis',
-                  'SIEM integration',
-                  'RAG-powered document search',
-                  'Custom SLAs & dedicated CSM',
-                  'Priority support',
-                ],
-                cta: 'Contact Sales',
-                href: '/contact',
-                highlighted: false,
-                badge: null,
-              },
-              {
-                name: 'Gov Cloud & Advisory',
-                monthlyPrice: 'Custom',
-                annualPrice: 'Custom',
-                monthlyPeriod: '',
-                annualPeriod: '',
-                annualNote: 'Custom contract + advisory',
-                annualCost: 'Custom contract — platform + consulting',
-                description: 'Full-service GRC: regulated infrastructure, hands-on consulting, and compliance program delivery.',
-                features: [
-                  'Everything in Enterprise',
-                  'FedRAMP / FISMA / StateRAMP',
-                  'IL4 / IL5 deployment patterns',
-                  'ITAR-aligned hosting options',
-                  'US state + international AI law packs',
-                  'Compliance program design & gap assessment',
-                  'Audit readiness & policy authoring',
-                  'Staff training & dedicated engagement manager',
-                ],
-                cta: 'Request Consultation',
-                href: '/contact',
-                highlighted: false,
-                badge: 'Full Service',
-              },
-            ].map((tier) => (
-              <div
-                key={tier.name}
-                className={`rounded-2xl border p-6 flex flex-col ${tier.highlighted ? 'border-purple-500 bg-purple-50 shadow-xl shadow-purple-100' : 'border-gray-200 bg-white'}`}
-              >
-                {tier.badge && (
-                  <div className={`text-xs font-semibold px-3 py-1 rounded-full self-start mb-4 ${tier.highlighted ? 'text-purple-700 bg-purple-200' : 'text-indigo-700 bg-indigo-100'}`}>{tier.badge}</div>
-                )}
-                <h3 className="text-lg font-bold text-gray-900 mb-1">{tier.name}</h3>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-3xl font-extrabold text-gray-900">
-                    {billingCycle === 'annual' ? tier.annualPrice : tier.monthlyPrice}
-                  </span>
-                  <span className="text-gray-500 text-sm">
-                    {billingCycle === 'annual' ? tier.annualPeriod : tier.monthlyPeriod}
-                  </span>
-                </div>
-                {tier.annualCost && billingCycle === 'annual' && (
-                  <p className="text-xs text-gray-400 mb-1">{tier.annualCost}</p>
-                )}
-                <p className="text-gray-600 text-sm mb-5">{tier.description}</p>
-                <ul className="space-y-2 mb-6 flex-1">
-                  {tier.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
-                      <svg className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href={withBilling(tier.href)}
-                  className={`block text-center py-3 rounded-xl font-semibold text-sm transition-colors ${tier.highlighted ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90' : 'border border-purple-600 text-purple-600 hover:bg-purple-50'}`}
-                >
-                  {tier.cta}
-                </Link>
-              </div>
-            ))}
-          </div>
-          <p className="text-center text-sm text-gray-500 mt-8">All paid plans include a 14-day free trial. No credit card required to start.</p>
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-sm font-semibold mb-4">Free &amp; Open Source</div>
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Free for Everyone. Forever.</h2>
+          <p className="text-lg text-gray-600 mb-8">
+            ControlWeaver is open source under AGPL v3. Every feature — CMDB, TPRM, SBOM, evidence automation, AI governance, SSO, and more — is available to all authenticated users at no cost.
+          </p>
+          <Link
+            href="/register"
+            className="inline-block bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity"
+          >
+            Get Started Free →
+          </Link>
         </div>
       </section>
 
       {/* AI Features Showcase */}
-      <section id="ai-features" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+      <section id="ai-insights" className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-              Powered by AI
+              Optional AI insights
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">25+ AI Features That Transform Compliance</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">From gap analysis to compliance forecasting — AI that actually understands your organization.</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">AI Where It Helps. Not Where It Doesn&apos;t.</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              ControlWeave is a multi-framework GRC platform first. AI is layered on as supplementary
+              analysis — bring your own key, turn it on when it helps, leave it off when it doesn&apos;t.
+            </p>
           </div>
 
-          {/* AI Copilot demo mockup */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center mb-16">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Org-Aware AI Copilot</h3>
-              <p className="text-gray-600 mb-6 leading-relaxed">Ask anything about your compliance posture in plain English. The AI Copilot knows your frameworks, controls, evidence gaps, and risk profile — and gives answers grounded in your actual data, not generic advice.</p>
-              <ul className="space-y-3">
-                {[
-                  'Gap analysis across all active frameworks',
-                  'Remediation playbooks tailored to your stack',
-                  'Compliance forecast & risk scoring',
-                  'Policy and procedure drafting',
-                  'Evidence collection recommendations',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
-                    <svg className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            {/* Copilot chat mock */}
-            <div className="rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-              <div className="bg-gray-100 px-4 py-3 flex items-center gap-2 border-b border-gray-200">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                </div>
-                <span className="text-xs text-gray-500 ml-2 font-medium">ControlWeave AI Copilot</span>
-              </div>
-              <div className="bg-gray-950 p-5 space-y-4 min-h-[260px]">
-                <div className="flex gap-3">
-                  <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs text-gray-300">U</span>
-                  </div>
-                  <div className="bg-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-200 max-w-xs">
-                    What are our biggest compliance gaps before our ISO 27001 audit next month?
-                  </div>
-                </div>
-                <div className="flex gap-3 flex-row-reverse">
-                  <div className="w-7 h-7 rounded-full bg-purple-700 flex items-center justify-center flex-shrink-0">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-                  </div>
-                  <div className="bg-purple-900/60 border border-purple-700/40 rounded-xl px-4 py-2.5 text-sm text-gray-100 max-w-sm">
-                    <p className="font-semibold text-purple-300 mb-1">Found 3 critical gaps:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-gray-300">
-                      <li>A.8.8 — 4 controls lack current evidence <span className="text-red-400">(stale {'>'}90d)</span></li>
-                      <li>A.5.31 — Legal compliance review not documented</li>
-                      <li>A.5.18 — Access review overdue for 12 accounts</li>
-                    </ol>
-                    <p className="mt-2 text-purple-300 text-xs">Generating remediation playbook…</p>
-                  </div>
-                </div>
-                <div className="flex gap-3 flex-row-reverse">
-                  <div className="w-7 h-7 rounded-full bg-purple-700 flex items-center justify-center flex-shrink-0">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-                  </div>
-                  <div className="bg-purple-900/60 border border-purple-700/40 rounded-xl px-4 py-2.5 text-sm text-gray-100 max-w-sm">
-                    <p className="text-purple-300 text-xs font-semibold mb-1">Remediation Plan (Priority Order)</p>
-                    <p className="text-gray-300 text-xs">1. Run access review for 12 flagged accounts this week. 2. Upload updated legal review doc to A.5.31 evidence vault. 3. Refresh 4 stale evidence artifacts in A.8.8. Estimated audit readiness: <span className="text-green-400 font-semibold">94%</span></p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* AI feature cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
               {
                 icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
-                title: 'AI Gap Analysis',
-                desc: 'Instant identification of compliance gaps across all active frameworks with prioritized remediation steps.',
+                title: 'Gap Analysis',
+                desc: 'Surface the most material gaps across your active frameworks and rank them by impact.',
               },
               {
                 icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
-                title: 'Compliance Forecasting',
-                desc: 'Predict your compliance posture 30, 60, and 90 days out based on current evidence trends and control drift.',
-              },
-              {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>,
-                title: 'Policy Drafting',
-                desc: 'Generate NIST-aligned policies and procedures from scratch using your org context as source of truth.',
+                title: 'Compliance Forecast',
+                desc: 'Project implementation trajectory based on the current pace of control completion.',
               },
               {
                 icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-                title: 'Evidence Intelligence',
-                desc: 'AI reviews uploaded evidence for quality, relevance, and freshness — flagging issues before auditors do.',
+                title: 'Audit Readiness',
+                desc: 'Highlight what is ready, what is at risk, and what needs attention before fieldwork.',
               },
               {
-                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>,
-                title: 'Smart Evidence Collection',
-                desc: 'AI scans connected integrations, maps logs to framework controls, and suggests evidence items for your approval — no manual hunting.',
+                icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7e22ce" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>,
+                title: 'In-context Assists',
+                desc: 'Inline suggestions for control test procedures, remediation, and evidence — right where you need them.',
               },
             ].map((f) => (
               <div key={f.title} className="p-6 rounded-2xl border border-gray-100 bg-white hover:border-purple-200 hover:shadow-lg hover:shadow-purple-50/40 transition-all">
@@ -521,6 +287,11 @@ function LandingPage() {
               </div>
             ))}
           </div>
+
+          <p className="text-center text-xs text-gray-500 mt-8 max-w-2xl mx-auto">
+            BYOK: bring your own Anthropic, OpenAI, Gemini, Grok, Groq, or Ollama key. AI outputs are
+            always labeled and require human review before they affect your compliance posture.
+          </p>
         </div>
       </section>
 
@@ -653,7 +424,7 @@ function LandingPage() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Start your compliance program today</h2>
-          <p className="text-gray-600 mb-8">Free tier includes 2 frameworks, core controls, and AI-assisted assessments. No credit card required.</p>
+          <p className="text-gray-600 mb-8">Open source, free for everyone. All features included — no subscription required.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/register" className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:opacity-90 transition-opacity">
               Get Started Free
@@ -688,123 +459,21 @@ function LandingPage() {
   );
 }
 
-function formatEditionLabel(edition: 'community' | 'pro' | 'enterprise') {
-  if (edition === 'enterprise') return 'Enterprise';
-  if (edition === 'pro') return 'Pro';
-  return 'Community';
-}
-
-function SelfHostedHome({ edition }: { edition: 'community' | 'pro' | 'enterprise' }) {
-  const editionLabel = formatEditionLabel(edition);
-  const editionBadgeClassName =
-    edition === 'community'
-      ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
-      : 'border-sky-400/30 bg-sky-400/10 text-sky-100';
-
-  return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_38%),linear-gradient(180deg,#0f172a_0%,#111827_100%)] text-white">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-6 py-16 sm:px-10">
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div>
-            <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold ${editionBadgeClassName}`}>
-              Self-Hosted {editionLabel} Edition
-            </div>
-            <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              ControlWeave opens into the application, not the public storefront.
-            </h1>
-            <p className="mt-4 max-w-2xl text-lg text-slate-300">
-              This installation is configured for internal use. Sign in, create the first admin account,
-              or open an invitation link from your organization administrator.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 text-base font-semibold text-slate-950 transition hover:bg-slate-100"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:border-white/35 hover:bg-white/10"
-              >
-                Create Account
-              </Link>
-            </div>
-
-            <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                <p className="text-sm font-semibold text-white">Community-first</p>
-                <p className="mt-2 text-sm text-slate-300">
-                  New self-hosted installs default to Community Edition and stay there until a valid license is activated.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                <p className="text-sm font-semibold text-white">Invite-based access</p>
-                <p className="mt-2 text-sm text-slate-300">
-                  Organization admins can onboard teammates through invite links, and invited users complete setup from a dedicated acceptance page.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                <p className="text-sm font-semibold text-white">License aware</p>
-                <p className="mt-2 text-sm text-slate-300">
-                  {edition === 'community'
-                    ? 'Activate a license after sign-in to unlock commercial modules on this installation.'
-                    : `This server is already licensed for ${editionLabel} Edition.`}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-white/10 bg-black/20 p-6 shadow-2xl shadow-black/20 backdrop-blur-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Instance Summary</p>
-            <div className="mt-6 space-y-5">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Edition</p>
-                <p className="mt-1 text-2xl font-semibold text-white">{editionLabel}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Entry Flow</p>
-                <p className="mt-1 text-sm text-slate-300">Direct access to sign-in, account creation, and invite acceptance.</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Org Invites</p>
-                <p className="mt-1 text-sm text-slate-300">Invite URLs resolve to the in-product acceptance flow at /invite.</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Next Step</p>
-                <p className="mt-1 text-sm text-slate-300">
-                  {edition === 'community'
-                    ? 'Create the first admin account or sign in as an existing admin to manage licensing.'
-                    : 'Sign in to continue with the licensed feature set for this deployment.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   const router = useRouter();
   const { user, isAuthenticated, loading } = useAuth();
-  const { deploymentInfo, loading: deploymentLoading } = useDeploymentInfo();
 
   useEffect(() => {
-    if (!loading && !deploymentLoading && isAuthenticated) {
+    if (!loading && isAuthenticated) {
       const mustCompleteOnboarding = requiresOrganizationOnboarding(user) && !user?.onboardingCompleted;
       if (mustCompleteOnboarding) {
         router.push('/onboarding');
         return;
       }
 
-      // If there's a pending billing plan, go directly to checkout.
-      // readValidPendingPlan() validates against VALID_BILLING_PLANS and
-      // auto-clears stale/malformed values to prevent redirect loops.
-      const pendingPlan = readValidPendingPlan();
-      if (pendingPlan) {
+      // If there's a pending billing plan, go directly to checkout
+      const pendingPlan = getStoredPendingBillingPlan();
+      if (pendingPlan.length > 0) {
         router.push(`/billing/checkout?plan=${encodeURIComponent(pendingPlan)}`);
         return;
       }
@@ -822,18 +491,14 @@ export default function Home() {
         router.push('/dashboard');
       }
     }
-  }, [user, isAuthenticated, loading, deploymentLoading, router]);
+  }, [user, isAuthenticated, loading, router]);
 
-  if (loading || isAuthenticated || deploymentLoading) {
+  if (loading || isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
-  }
-
-  if (deploymentInfo.isSelfHosted) {
-    return <SelfHostedHome edition={deploymentInfo.edition} />;
   }
 
   return <LandingPage />;

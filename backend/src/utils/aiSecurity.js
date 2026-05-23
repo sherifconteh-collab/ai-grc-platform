@@ -135,6 +135,15 @@ const PHI_PATTERNS = [
 const MAX_INPUT_CHARS = 32000;   // ~8k tokens — reasonable single-message cap
 const MAX_OUTPUT_CHARS = 60000;  // Generous but bounded output
 
+function cloneTrustedPattern(pattern, { ensureGlobal = false } = {}) {
+  const flags = ensureGlobal && !pattern.flags.includes('g')
+    ? `${pattern.flags}g`
+    : pattern.flags;
+
+  // eslint-disable-next-line security/detect-non-literal-regexp -- pattern is a validated RegExp; cloning only normalizes flags and lastIndex state.
+  return new RegExp(pattern.source, flags);
+}
+
 // ---------------------------------------------------------------------------
 // Dynamic pattern management (AIDEFEND: continuous monitoring / threat feed)
 // ---------------------------------------------------------------------------
@@ -165,9 +174,7 @@ function addOutputPattern(label, pattern) {
   if (typeof label !== 'string' || !(pattern instanceof RegExp)) {
     throw new TypeError('addOutputPattern: label must be a string and pattern must be a RegExp');
   }
-  // Enforce global flag so all occurrences are redacted, not just the first
-  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
-  const globalPattern = new RegExp(pattern.source, flags);
+  const globalPattern = cloneTrustedPattern(pattern, { ensureGlobal: true });
   OUTPUT_SENSITIVE_PATTERNS = [...OUTPUT_SENSITIVE_PATTERNS, { label, pattern: globalPattern }];
 }
 
@@ -195,10 +202,7 @@ function updateOutputPatterns(patterns) {
     if (typeof p.label !== 'string' || !(p.pattern instanceof RegExp)) {
       throw new TypeError('Each pattern must have a string label and RegExp pattern');
     }
-    // Enforce global flag so all occurrences are redacted
-    const flags = p.pattern.flags.includes('g') ? p.pattern.flags : p.pattern.flags + 'g';
-    const globalPattern = new RegExp(p.pattern.source, flags);
-    return { label: p.label, pattern: globalPattern };
+    return { label: p.label, pattern: cloneTrustedPattern(p.pattern, { ensureGlobal: true }) };
   });
 }
 
@@ -292,7 +296,7 @@ function sanitizeOutput(text) {
 
   // Redact sensitive patterns
   for (const { pattern } of OUTPUT_SENSITIVE_PATTERNS) {
-    const rx = new RegExp(pattern.source, pattern.flags);
+    const rx = cloneTrustedPattern(pattern);
     const replaced = result.replace(rx, '[REDACTED]');
     if (replaced !== result) {
       result = replaced;
@@ -375,7 +379,7 @@ function detectPiiPhi(text) {
 
   for (const { label, pattern } of PII_PATTERNS) {
     // Use a fresh RegExp each call to reset lastIndex for global patterns
-    const rx = new RegExp(pattern.source, pattern.flags);
+    const rx = cloneTrustedPattern(pattern);
     let match;
     while ((match = rx.exec(text)) !== null) {
       piiTypes.add(label);
@@ -386,7 +390,7 @@ function detectPiiPhi(text) {
   }
 
   for (const { label, pattern } of PHI_PATTERNS) {
-    const rx = new RegExp(pattern.source, pattern.flags);
+    const rx = cloneTrustedPattern(pattern);
     let match;
     while ((match = rx.exec(text)) !== null) {
       phiTypes.add(label);
@@ -426,7 +430,7 @@ function redactPiiPhi(text) {
   const phiTypes = new Set();
 
   for (const { label, pattern } of PII_PATTERNS) {
-    const rx = new RegExp(pattern.source, pattern.flags);
+    const rx = cloneTrustedPattern(pattern);
     const replaced = result.replace(rx, `[${label} REDACTED]`);
     if (replaced !== result) {
       result = replaced;
@@ -436,7 +440,7 @@ function redactPiiPhi(text) {
   }
 
   for (const { label, pattern } of PHI_PATTERNS) {
-    const rx = new RegExp(pattern.source, pattern.flags);
+    const rx = cloneTrustedPattern(pattern);
     const replaced = result.replace(rx, `[${label} REDACTED]`);
     if (replaced !== result) {
       result = replaced;
@@ -600,16 +604,16 @@ function redactMessagesForPiiPhi(messages) {
 
 // Map our detector labels to the allowed pii_types values stored in the DB
 // (matches ALLOWED_PII_TYPES in routes/evidence.js)
-const PII_LABEL_TO_TYPE = {
-  EMAIL:           'email',
-  SSN:             'ssn',
-  PHONE:           'phone',
-  CREDIT_CARD:     'financial',
-  IP_ADDRESS:      'other',
-  DATE_OF_BIRTH:   'dob',
-  PASSPORT:        'other',
-  DRIVERS_LICENSE: 'other',
-};
+const PII_LABEL_TO_TYPE = new Map([
+  ['EMAIL', 'email'],
+  ['SSN', 'ssn'],
+  ['PHONE', 'phone'],
+  ['CREDIT_CARD', 'financial'],
+  ['IP_ADDRESS', 'other'],
+  ['DATE_OF_BIRTH', 'dob'],
+  ['PASSPORT', 'other'],
+  ['DRIVERS_LICENSE', 'other']
+]);
 
 // PHI findings always map to the 'health' pii_type
 const PHI_LABELS = new Set([
@@ -618,7 +622,17 @@ const PHI_LABELS = new Set([
 ]);
 
 // Classification severity ranks (higher = more sensitive)
-const CLASSIFICATION_RANK = { none: 0, low: 1, moderate: 2, high: 3, critical: 4 };
+const CLASSIFICATION_RANK = new Map([
+  ['none', 0],
+  ['low', 1],
+  ['moderate', 2],
+  ['high', 3],
+  ['critical', 4]
+]);
+
+function getClassificationRank(level) {
+  return CLASSIFICATION_RANK.get(level) ?? 0;
+}
 
 // PII labels ranked by sensitivity
 const HIGH_SENSITIVITY_PII = new Set(['SSN', 'CREDIT_CARD']);
@@ -667,7 +681,7 @@ function classifyDataSensitivity(text) {
 
   // Score PII findings
   for (const label of scan.piiTypes) {
-    const mapped = PII_LABEL_TO_TYPE[label];
+    const mapped = PII_LABEL_TO_TYPE.get(label);
     if (mapped) piiTypesSet.add(mapped);
 
     let levelForLabel;
@@ -679,7 +693,7 @@ function classifyDataSensitivity(text) {
       levelForLabel = 'moderate';
     }
 
-    if (CLASSIFICATION_RANK[levelForLabel] > CLASSIFICATION_RANK[classificationLevel]) {
+    if (getClassificationRank(levelForLabel) > getClassificationRank(classificationLevel)) {
       classificationLevel = levelForLabel;
     }
   }

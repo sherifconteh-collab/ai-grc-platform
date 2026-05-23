@@ -1,224 +1,222 @@
-// @tier: community
+// @tier: enterprise
 const express = require('express');
 const router = express.Router();
+const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
+const threatIntelService = require('../services/threatIntelService');
 const pool = require('../config/database');
-const { authenticate } = require('../middleware/auth');
-const { createOrgRateLimiter } = require('../middleware/rateLimit');
+
+// Rate limiter for threat intelligence endpoints
+const threatIntelRateLimiter = createRateLimiter({
+  label: 'threat-intel',
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // 200 requests per 15 minutes per org
+  keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
+});
 
 router.use(authenticate);
-router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'threat-intel-route' }));
+router.use(threatIntelRateLimiter);
 
-// GET /feeds - List feeds for org
-router.get('/feeds', async (req, res) => {
+// GET /api/v1/threat-intel/feeds - List all threat feeds
+router.get('/feeds', requireTier('enterprise'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const result = await pool.query(
-      'SELECT * FROM threat_intel_feeds WHERE organization_id = $1 ORDER BY created_at DESC',
-      [orgId]
+    const feeds = await threatIntelService.getThreatFeeds(orgId);
+    
+    res.json({ success: true, data: feeds });
+  } catch (error) {
+    console.error('List threat feeds error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list threat feeds' });
+  }
+});
+
+// GET /api/v1/threat-intel/feeds/:id - Get specific feed
+router.get('/feeds/:id', requireTier('enterprise'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const feedId = req.params.id;
+    
+    const feed = await threatIntelService.getThreatFeed(orgId, feedId);
+    
+    if (!feed) {
+      return res.status(404).json({ success: false, error: 'Threat feed not found' });
+    }
+    
+    res.json({ success: true, data: feed });
+  } catch (error) {
+    console.error('Get threat feed error:', error);
+    res.status(500).json({ success: false, error: 'Failed to get threat feed' });
+  }
+});
+
+// POST /api/v1/threat-intel/feeds - Create new threat feed
+router.post('/feeds', requireTier('enterprise'), requirePermission('organizations.write'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const feedData = req.body;
+    
+    // Validate required fields
+    if (!feedData.feed_type || !feedData.feed_name) {
+      return res.status(400).json({
+        success: false,
+        error: 'feed_type and feed_name are required'
+      });
+    }
+    
+    // Validate feed_type
+    const validTypes = ['nvd', 'cisa_kev', 'mitre', 'otx'];
+    if (!validTypes.includes(feedData.feed_type)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid feed_type. Must be one of: ${validTypes.join(', ')}`
+      });
+    }
+    
+    const feed = await threatIntelService.createThreatFeed(orgId, feedData);
+    
+    // Log audit event
+    await pool.query(
+      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
+       VALUES ($1, $2, 'threat_feed_created', 'threat_feed', $3, $4::jsonb, true)`,
+      [orgId, req.user.id, feed.id, JSON.stringify({ feed_type: feed.feed_type, feed_name: feed.feed_name })]
     );
-    res.json({ success: true, data: result.rows });
+    
+    res.status(201).json({ success: true, data: feed });
   } catch (error) {
-    console.error('Error listing feeds:', error);
-    res.status(500).json({ success: false, error: 'Failed to list feeds' });
+    console.error('Create threat feed error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create threat feed' });
   }
 });
 
-// GET /feeds/:id - Get single feed
-router.get('/feeds/:id', async (req, res) => {
+// PATCH /api/v1/threat-intel/feeds/:id - Update feed configuration
+router.patch('/feeds/:id', requireTier('enterprise'), requirePermission('organizations.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const result = await pool.query(
-      'SELECT * FROM threat_intel_feeds WHERE id = $1 AND organization_id = $2',
-      [req.params.id, orgId]
+    const feedId = req.params.id;
+    const updates = req.body;
+    
+    const feed = await threatIntelService.updateThreatFeed(orgId, feedId, updates);
+    
+    if (!feed) {
+      return res.status(404).json({ success: false, error: 'Threat feed not found' });
+    }
+    
+    // Log audit event
+    await pool.query(
+      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
+       VALUES ($1, $2, 'threat_feed_updated', 'threat_feed', $3, $4::jsonb, true)`,
+      [orgId, req.user.id, feedId, JSON.stringify(updates)]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Feed not found' });
-    }
-    res.json({ success: true, data: result.rows[0] });
+    
+    res.json({ success: true, data: feed });
   } catch (error) {
-    console.error('Error getting feed:', error);
-    res.status(500).json({ success: false, error: 'Failed to get feed' });
+    console.error('Update threat feed error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update threat feed' });
   }
 });
 
-// POST /feeds - Create feed
-router.post('/feeds', async (req, res) => {
+// DELETE /api/v1/threat-intel/feeds/:id - Delete feed
+router.delete('/feeds/:id', requireTier('enterprise'), requirePermission('organizations.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { name, feed_url, feed_type, enabled } = req.body;
-    const result = await pool.query(
-      `INSERT INTO threat_intel_feeds (organization_id, name, feed_url, feed_type, enabled)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [orgId, name, feed_url, feed_type, enabled]
+    const feedId = req.params.id;
+    
+    const deleted = await threatIntelService.deleteThreatFeed(orgId, feedId);
+    
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Threat feed not found' });
+    }
+    
+    // Log audit event
+    await pool.query(
+      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
+       VALUES ($1, $2, 'threat_feed_deleted', 'threat_feed', $3, '{}'::jsonb, true)`,
+      [orgId, req.user.id, feedId]
     );
-    res.status(201).json({ success: true, data: result.rows[0] });
+    
+    res.json({ success: true, message: 'Threat feed deleted successfully' });
   } catch (error) {
-    console.error('Error creating feed:', error);
-    res.status(500).json({ success: false, error: 'Failed to create feed' });
+    console.error('Delete threat feed error:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete threat feed' });
   }
 });
 
-// PATCH /feeds/:id - Update feed fields
-router.patch('/feeds/:id', async (req, res) => {
+// POST /api/v1/threat-intel/feeds/:id/sync - Trigger manual sync
+router.post('/feeds/:id/sync', requireTier('enterprise'), requirePermission('organizations.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const fields = [];
-    const values = [];
-    let idx = 1;
-
-    for (const [key, value] of Object.entries(req.body)) {
-      if (['name', 'feed_url', 'feed_type', 'enabled'].includes(key)) {
-        fields.push(`${key} = $${idx}`);
-        values.push(value);
-        idx++;
-      }
-    }
-
-    if (fields.length === 0) {
-      return res.status(400).json({ success: false, error: 'No valid fields to update' });
-    }
-
-    fields.push(`updated_at = NOW()`);
-    values.push(req.params.id, orgId);
-
-    const result = await pool.query(
-      `UPDATE threat_intel_feeds SET ${fields.join(', ')} WHERE id = $${idx} AND organization_id = $${idx + 1} RETURNING *`,
-      values
+    const feedId = req.params.id;
+    
+    const result = await threatIntelService.syncFeed(orgId, feedId);
+    
+    // Log audit event
+    await pool.query(
+      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
+       VALUES ($1, $2, 'threat_feed_synced', 'threat_feed', $3, $4::jsonb, true)`,
+      [orgId, req.user.id, feedId, JSON.stringify(result)]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Feed not found' });
-    }
-    res.json({ success: true, data: result.rows[0] });
+    
+    res.json({ success: true, data: result });
   } catch (error) {
-    console.error('Error updating feed:', error);
-    res.status(500).json({ success: false, error: 'Failed to update feed' });
+    console.error('Sync threat feed error:', error);
+    
+    // Log failed audit event
+    await pool.query(
+      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
+       VALUES ($1, $2, 'threat_feed_sync_failed', 'threat_feed', $3, $4::jsonb, false)`,
+      [orgId, req.user.id, req.params.id, JSON.stringify({ error: error.message })]
+    ).catch(() => {});
+    
+    res.status(500).json({ success: false, error: 'Failed to sync threat feed' });
   }
 });
 
-// DELETE /feeds/:id - Delete feed
-router.delete('/feeds/:id', async (req, res) => {
+// GET /api/v1/threat-intel/items - List threat intelligence items
+router.get('/items', requireTier('enterprise'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const result = await pool.query(
-      'DELETE FROM threat_intel_feeds WHERE id = $1 AND organization_id = $2 RETURNING *',
-      [req.params.id, orgId]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Feed not found' });
-    }
-    res.json({ success: true, data: result.rows[0] });
+    const filters = {
+      feed_id: req.query.feed_id,
+      item_type: req.query.item_type,
+      severity: req.query.severity,
+      exploit_available: req.query.exploit_available === 'true' ? true : req.query.exploit_available === 'false' ? false : undefined,
+      limit: parseInt(req.query.limit) || 100,
+      offset: parseInt(req.query.offset) || 0
+    };
+    
+    const items = await threatIntelService.getThreatItems(orgId, filters);
+    
+    res.json({ success: true, data: items, count: items.length });
   } catch (error) {
-    console.error('Error deleting feed:', error);
-    res.status(500).json({ success: false, error: 'Failed to delete feed' });
+    console.error('List threat items error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list threat intelligence items' });
   }
 });
 
-// POST /feeds/:id/sync - Stub sync single feed
-router.post('/feeds/:id/sync', async (req, res) => {
+// GET /api/v1/threat-intel/stats - Get statistics
+router.get('/stats', requireTier('enterprise'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const result = await pool.query(
-      `UPDATE threat_intel_feeds SET last_sync_at = NOW(), sync_status = 'completed', updated_at = NOW()
-       WHERE id = $1 AND organization_id = $2 RETURNING *`,
-      [req.params.id, orgId]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Feed not found' });
-    }
-    res.json({ success: true, data: { synced: true, new_items: 0 } });
+    const stats = await threatIntelService.getThreatStats(orgId);
+    
+    res.json({ success: true, data: stats });
   } catch (error) {
-    console.error('Error syncing feed:', error);
-    res.status(500).json({ success: false, error: 'Failed to sync feed' });
+    console.error('Get threat stats error:', error);
+    res.status(500).json({ success: false, error: 'Failed to get threat intelligence statistics' });
   }
 });
 
-// POST /sync-all - Stub sync all feeds
-router.post('/sync-all', async (req, res) => {
+// POST /api/v1/threat-intel/sync-all - Sync all enabled feeds
+router.post('/sync-all', requireTier('enterprise'), requirePermission('organizations.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const result = await pool.query(
-      `UPDATE threat_intel_feeds SET last_sync_at = NOW(), sync_status = 'completed', updated_at = NOW()
-       WHERE organization_id = $1`,
-      [orgId]
-    );
-    res.json({ success: true, data: { feeds_synced: result.rowCount } });
+    
+    await threatIntelService.scheduleAutoSync(orgId);
+    
+    res.json({ success: true, message: 'Sync jobs scheduled for all enabled feeds' });
   } catch (error) {
-    console.error('Error syncing all feeds:', error);
-    res.status(500).json({ success: false, error: 'Failed to sync all feeds' });
-  }
-});
-
-// GET /items - List threat intel items
-router.get('/items', async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { feed_id, severity, item_type, exploit_available, status, limit } = req.query;
-
-    let query = 'SELECT * FROM threat_intel_items WHERE organization_id = $1';
-    const values = [orgId];
-    let idx = 2;
-
-    if (feed_id) {
-      query += ` AND feed_id = $${idx++}`;
-      values.push(feed_id);
-    }
-    if (severity) {
-      query += ` AND severity = $${idx++}`;
-      values.push(severity);
-    }
-    if (item_type) {
-      query += ` AND item_type = $${idx++}`;
-      values.push(item_type);
-    }
-    if (exploit_available !== undefined) {
-      query += ` AND exploit_available = $${idx++}`;
-      values.push(exploit_available);
-    }
-    if (status) {
-      query += ` AND status = $${idx++}`;
-      values.push(status);
-    }
-
-    query += ' ORDER BY created_at DESC';
-
-    if (limit) {
-      query += ` LIMIT $${idx++}`;
-      values.push(parseInt(limit, 10));
-    }
-
-    const result = await pool.query(query, values);
-    res.json({ success: true, data: result.rows });
-  } catch (error) {
-    console.error('Error listing items:', error);
-    res.status(500).json({ success: false, error: 'Failed to list items' });
-  }
-});
-
-// GET /stats - Threat intel statistics
-router.get('/stats', async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-
-    const [totalResult, severityResult, typeResult, feedsResult] = await Promise.all([
-      pool.query('SELECT COUNT(*) as total FROM threat_intel_items WHERE organization_id = $1', [orgId]),
-      pool.query('SELECT severity, COUNT(*) as count FROM threat_intel_items WHERE organization_id = $1 GROUP BY severity', [orgId]),
-      pool.query('SELECT item_type, COUNT(*) as count FROM threat_intel_items WHERE organization_id = $1 GROUP BY item_type', [orgId]),
-      pool.query('SELECT COUNT(*) as total FROM threat_intel_feeds WHERE organization_id = $1', [orgId]),
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        total_items: parseInt(totalResult.rows[0].total, 10),
-        by_severity: severityResult.rows,
-        by_type: typeResult.rows,
-        feeds_count: parseInt(feedsResult.rows[0].total, 10),
-      },
-    });
-  } catch (error) {
-    console.error('Error getting stats:', error);
-    res.status(500).json({ success: false, error: 'Failed to get stats' });
+    console.error('Schedule sync error:', error);
+    res.status(500).json({ success: false, error: 'Failed to schedule sync jobs' });
   }
 });
 

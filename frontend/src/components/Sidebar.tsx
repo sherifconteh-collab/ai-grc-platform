@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import BrandLogo from './BrandLogo';
-import { AccessUser, canAccessAuditorWorkspace, hasAnyPermission, hasPermission, hasTierAtLeast, hasRmfFramework, isPlatformAdmin, isDemoEmail, OrganizationTier } from '@/lib/access';
+import { AccessUser, canAccessAuditorWorkspace, hasAnyPermission, hasPermission, hasRmfFramework, isPlatformAdmin, isDemoEmail } from '@/lib/access';
 
 interface NavigationItem {
   name: string;
@@ -13,7 +13,6 @@ interface NavigationItem {
   icon: string;
   requiredPermissions?: string[];
   requiredPermissionsAny?: string[];
-  minTier?: OrganizationTier;
   isVisible?: (user: AccessUser | null | undefined) => boolean;
 }
 
@@ -34,33 +33,27 @@ const navigationSections: NavigationSection[] = [
     items: [
       { name: 'Controls', href: '/dashboard/controls', icon: '✅', requiredPermissions: ['organizations.read'] },
       { name: 'Frameworks', href: '/dashboard/frameworks', icon: '📐', requiredPermissions: ['organizations.read'] },
-      { name: 'Evidence', href: '/dashboard/evidence', icon: '📄', requiredPermissions: ['evidence.read'], minTier: 'pro' },
+      { name: 'Evidence', href: '/dashboard/evidence', icon: '📄', requiredPermissions: ['evidence.read'] },
       { name: 'Assessments', href: '/dashboard/assessments', icon: '📋', requiredPermissions: ['assessments.read'] },
-      { name: 'Reports', href: '/dashboard/reports', icon: '📑', requiredPermissions: ['reports.read'], minTier: 'pro' },
+      { name: 'Reports', href: '/dashboard/reports', icon: '📑', requiredPermissions: ['reports.read'] },
       { name: 'RMF Lifecycle', href: '/dashboard/rmf', icon: '🔄', requiredPermissions: ['assessments.read'], isVisible: (u) => hasRmfFramework(u) },
       { name: 'Auditor Workspace', href: '/dashboard/auditor-workspace', icon: '🗂️', requiredPermissions: ['assessments.read'], isVisible: (u) => canAccessAuditorWorkspace(u) },
+      { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },
+      { name: 'AI Insights', href: '/dashboard/ai-insights', icon: '📈', requiredPermissions: ['ai.use'] },
     ],
   },
   {
     label: 'Assets & Risk',
     items: [
-      { name: 'Assets', href: '/dashboard/assets', icon: '🏗️', requiredPermissions: ['assets.read'], minTier: 'pro' },
-      { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: '🛡️', requiredPermissions: ['assets.read'], minTier: 'pro' },
-      { name: 'SBOM', href: '/dashboard/sbom', icon: '📦', requiredPermissions: ['assets.read'], minTier: 'enterprise' },
-      { name: 'Security Posture', href: '/dashboard/security-posture', icon: '🛡️', requiredPermissions: ['ai.use'], minTier: 'pro' },
-      { name: 'Threat Intelligence', href: '/dashboard/threat-intel', icon: '🎯', requiredPermissions: ['assets.read'], minTier: 'enterprise' },
-      { name: 'Vendor Contracts', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'], minTier: 'pro' },
-      { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['organizations.read'], minTier: 'enterprise' },
-      { name: 'Financial Compliance', href: '/dashboard/cmdb/financial-services-workspace', icon: '🏦', requiredPermissions: ['assets.read'], minTier: 'govcloud' },
-    ],
-  },
-  {
-    label: 'AI & Intelligence',
-    items: [
-      { name: 'AI Insights', href: '/dashboard/ai-insights', icon: '✨', requiredPermissions: ['ai.use'] },
+      { name: 'Assets', href: '/dashboard/assets', icon: '🏗️', requiredPermissions: ['assets.read'] },
+      { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: '🛡️', requiredPermissions: ['assets.read'] },
+      { name: 'SBOM', href: '/dashboard/sbom', icon: '📦', requiredPermissions: ['assets.read'] },
+      { name: 'Security Posture', href: '/dashboard/security-posture', icon: '🛡️', requiredPermissions: ['ai.use'] },
+      { name: 'Threat Intelligence', href: '/dashboard/threat-intel', icon: '🎯', requiredPermissions: ['assets.read'] },
       { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'] },
-      { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'], minTier: 'enterprise' },
-      { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },
+      { name: 'Vendor Contracts', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'] },
+      { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['organizations.read'] },
+      { name: 'Financial Compliance', href: '/dashboard/cmdb/financial-services-workspace', icon: '🏦', requiredPermissions: ['assets.read'] },
     ],
   },
   {
@@ -69,7 +62,8 @@ const navigationSections: NavigationSection[] = [
       { name: 'My Organizations', href: '/dashboard/my-organizations', icon: '🔀', requiredPermissions: ['organizations.read'] },
       { name: 'Organization Profile', href: '/dashboard/organization', icon: '🏢', requiredPermissions: ['organizations.read'] },
       { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
-      { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'], minTier: 'enterprise' },
+      { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'] },
+      { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'] },
       { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', requiredPermissionsAny: ['settings.manage', 'roles.manage'] },
       { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔', requiredPermissions: ['dashboard.read'] },
       { name: 'Help Center', href: '/dashboard/help', icon: '❓', requiredPermissions: ['dashboard.read'] },
@@ -89,12 +83,9 @@ export default function Sidebar() {
     const hasAnyRequiredPermission = item.requiredPermissionsAny
       ? hasAnyPermission(user, item.requiredPermissionsAny)
       : true;
-    const hasRequiredTier = item.minTier
-      ? hasTierAtLeast(user, item.minTier)
-      : true;
     const passesVisibilityGate = item.isVisible ? item.isVisible(user) : true;
 
-    return hasRequiredPermission && hasAnyRequiredPermission && hasRequiredTier && passesVisibilityGate;
+    return hasRequiredPermission && hasAnyRequiredPermission && passesVisibilityGate;
   };
 
   const visibleSections = navigationSections
@@ -218,6 +209,39 @@ export default function Sidebar() {
             >
               <span className="mr-3 text-lg">🔌</span>
               LLM Status
+            </Link>
+            <Link
+              href="/dashboard/platform/backups"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                pathname === '/dashboard/platform/backups'
+                  ? 'bg-amber-600 text-white'
+                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
+              }`}
+            >
+              <span className="mr-3 text-lg">💾</span>
+              Backups
+            </Link>
+            <Link
+              href="/dashboard/platform/security"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                pathname === '/dashboard/platform/security'
+                  ? 'bg-amber-600 text-white'
+                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
+              }`}
+            >
+              <span className="mr-3 text-lg">🔒</span>
+              Security
+            </Link>
+            <Link
+              href="/dashboard/platform/license"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                pathname === '/dashboard/platform/license'
+                  ? 'bg-amber-600 text-white'
+                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
+              }`}
+            >
+              <span className="mr-3 text-lg">🪪</span>
+              License
             </Link>
           </>
         )}

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import OrganizationSystemsAndVendors from '@/components/OrganizationSystemsAndVendors';
 import { frameworkAPI, organizationAPI } from '@/lib/api';
-import { hasPermission, normalizeTier } from '@/lib/access';
+import { hasPermission } from '@/lib/access';
 import { useAuth } from '@/contexts/AuthContext';
 
 type CiaLevel = 'low' | 'moderate' | 'high';
@@ -60,14 +60,6 @@ const DATA_SENSITIVITY_OPTIONS = [
 
 const RMF_FRAMEWORK_CODES = ['nist_800_53', 'nist_800_171'];
 
-function getFrameworkLimit(tier: string): number {
-  switch (tier) {
-    case 'community': return 2;
-    case 'pro': return -1;
-    default: return -1;
-  }
-}
-
 function toggleArrayValue(current: string[], value: string) {
   if (current.includes(value)) {
     return current.filter((item) => item !== value);
@@ -79,9 +71,6 @@ export default function OrganizationProfilePage() {
   const { user } = useAuth();
   const canReadOrganization = hasPermission(user, 'organizations.read');
   const canManageFrameworks = hasPermission(user, 'frameworks.manage');
-  const userTier = normalizeTier(user?.organizationTier);
-  const frameworkLimit = getFrameworkLimit(userTier);
-  const isLimitedTier = frameworkLimit !== -1;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -171,14 +160,6 @@ export default function OrganizationProfilePage() {
     }
 
     const nextIds = [...selectedFrameworkIds, frameworkId];
-    const nextEffective = getEffectiveCount(nextIds);
-    if (frameworkLimit !== -1 && nextEffective > frameworkLimit) {
-      const tierLabel = userTier.charAt(0).toUpperCase() + userTier.slice(1);
-      setError(
-        `${tierLabel} plan allows up to ${frameworkLimit} framework${frameworkLimit === 1 ? '' : 's'} (bundled groups count as 1). Deselect one first or upgrade tier.`
-      );
-      return;
-    }
 
     setSelectedFrameworkIds(nextIds);
     updateSelectedFrameworkCodes(nextIds);
@@ -375,19 +356,12 @@ export default function OrganizationProfilePage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
             <h2 className="text-lg font-semibold text-gray-900">Framework Selection</h2>
             <p className="text-xs text-gray-500">
-              {selectedFrameworkIds.length} selected{isLimitedTier ? ` (${effectiveCount} counting toward limit of ${frameworkLimit})` : ''}
+              {selectedFrameworkIds.length} selected
             </p>
           </div>
           <p className="text-sm text-gray-600">
             Manage your organization frameworks here. Bundled groups (ISO series, OWASP, CSF Profiles) count as 1 toward your limit.
           </p>
-
-          {isLimitedTier && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              {userTier.charAt(0).toUpperCase() + userTier.slice(1)} tier supports up to {frameworkLimit}{' '}
-              framework{frameworkLimit === 1 ? '' : 's'}.
-            </div>
-          )}
 
           {!canManageFrameworks && (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
@@ -414,7 +388,6 @@ export default function OrganizationProfilePage() {
                     const totalControls = groupMembers.reduce((sum, f) => sum + f.controlCount, 0);
                     const isExpanded = expandedGroups.has(framework.group);
                     const groupAlreadySelected = selectedGroups.has(framework.group);
-                    const isAtLimit = frameworkLimit !== -1 && effectiveCount >= frameworkLimit && !groupAlreadySelected;
                     return (
                       <div key={`group-${framework.group}`} className={`rounded-lg border p-3 transition ${selectedCount > 0 ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'}`}>
                         <button
@@ -446,7 +419,7 @@ export default function OrganizationProfilePage() {
                           <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
                             {groupMembers.map((child) => {
                               const isChildSelected = selectedFrameworkIds.includes(child.id);
-                              const isChildLocked = canManageFrameworks && !isChildSelected && isAtLimit;
+                              const isChildLocked = false;
                               return (
                                 <button
                                   key={child.id}
@@ -484,8 +457,7 @@ export default function OrganizationProfilePage() {
 
                   // Ungrouped framework — render as individual card
                   const isSelected = selectedFrameworkIds.includes(framework.id);
-                  const isAtLimit = frameworkLimit !== -1 && effectiveCount >= frameworkLimit;
-                  const isLocked = canManageFrameworks && !isSelected && isAtLimit;
+                  const isLocked = false;
                   return (
                     <button
                       key={framework.id}

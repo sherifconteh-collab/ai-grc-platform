@@ -2,12 +2,10 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDeploymentInfo } from '@/lib/deployment';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
 import BrandLogo from '@/components/BrandLogo';
-import { VALID_BILLING_PLANS } from '@/lib/billing';
 
 type TierKey = 'community' | 'pro' | 'enterprise' | 'govcloud';
 type BillingCadence = 'monthly' | 'annual';
@@ -156,14 +154,9 @@ function RegisterPageInner() {
   const [loading, setLoading] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const { register } = useAuth();
-  const { deploymentInfo, loading: deploymentLoading } = useDeploymentInfo();
   const organizationIsRequired = initialRole === 'admin';
-  const isSelfHosted = deploymentInfo.isSelfHosted;
-  const effectiveSelectedTier: TierKey = isSelfHosted
-    ? (deploymentInfo.edition === 'enterprise' ? 'enterprise' : deploymentInfo.edition === 'pro' ? 'pro' : 'community')
-    : selectedTier;
 
-  const selectedTierMeta = TIER_OPTIONS.find((t) => t.key === effectiveSelectedTier) || TIER_OPTIONS[0];
+  const selectedTierMeta = TIER_OPTIONS.find((t) => t.key === selectedTier) || TIER_OPTIONS[0];
   const frameworkLimit = selectedTierMeta.frameworkLimit;
 
   const requiresNist80053Details = frameworkCodes.includes('nist_800_53');
@@ -174,10 +167,10 @@ function RegisterPageInner() {
   );
 
   const availableFrameworks = FRAMEWORK_OPTIONS.filter(
-    (fw) => (TIER_ORDER as Record<string, number>)[fw.tierRequired] <= (TIER_ORDER as Record<string, number>)[effectiveSelectedTier]
+    (fw) => (TIER_ORDER as Record<string, number>)[fw.tierRequired] <= (TIER_ORDER as Record<string, number>)[selectedTier]
   );
   const lockedFrameworks = FRAMEWORK_OPTIONS.filter(
-    (fw) => (TIER_ORDER as Record<string, number>)[fw.tierRequired] > (TIER_ORDER as Record<string, number>)[effectiveSelectedTier]
+    (fw) => (TIER_ORDER as Record<string, number>)[fw.tierRequired] > (TIER_ORDER as Record<string, number>)[selectedTier]
   );
 
   useEffect(() => {
@@ -187,17 +180,6 @@ function RegisterPageInner() {
   }, [requiresNist80053Details, requiresNist800171Details, informationTypes.length]);
 
   useEffect(() => {
-    if (deploymentLoading) {
-      return;
-    }
-
-    if (isSelfHosted) {
-      setSelectedTier('community');
-      setBillingCadence('monthly');
-      localStorage.removeItem('pendingPlan');
-      return;
-    }
-
     const rawPlan = String(searchParams.get('plan') || '').toLowerCase().trim();
     const rawBilling = String(searchParams.get('billing') || '').toLowerCase().trim();
 
@@ -226,15 +208,15 @@ function RegisterPageInner() {
     if (cadenceFromQuery) {
       setBillingCadence(cadenceFromQuery);
     }
-  }, [searchParams, isSelfHosted, deploymentLoading]);
+  }, [searchParams]);
 
   useEffect(() => {
     setFrameworkCodes((current) =>
       current.filter((code) =>
-        FRAMEWORK_OPTIONS.some((fw) => fw.code === code && (TIER_ORDER as Record<string, number>)[fw.tierRequired] <= (TIER_ORDER as Record<string, number>)[effectiveSelectedTier])
+        FRAMEWORK_OPTIONS.some((fw) => fw.code === code && (TIER_ORDER as Record<string, number>)[fw.tierRequired] <= (TIER_ORDER as Record<string, number>)[selectedTier])
       )
     );
-  }, [effectiveSelectedTier]);
+  }, [selectedTier]);
 
   // Count effective frameworks: each framework_group counts as 1, ungrouped count individually
   const getEffectiveCount = (codes: string[]) => {
@@ -256,7 +238,7 @@ function RegisterPageInner() {
       const nextCodes = [...current, code];
       const nextEffective = getEffectiveCount(nextCodes);
       if (frameworkLimit !== -1 && nextEffective > frameworkLimit) {
-        setError(`${tierLabel(effectiveSelectedTier)} tier allows up to ${frameworkLimit} framework selection${frameworkLimit === 1 ? '' : 's'} (bundled ISO standards count as 1). ${isSelfHosted ? 'Deselect one first or activate a license after sign-in.' : 'Deselect one first or choose a higher tier.'}`);
+        setError(`${tierLabel(selectedTier)} tier allows up to ${frameworkLimit} framework selection${frameworkLimit === 1 ? '' : 's'} (bundled ISO standards count as 1). Deselect one first or choose a higher tier.`);
         return current;
       }
       return nextCodes;
@@ -296,20 +278,10 @@ function RegisterPageInner() {
     setLoading(true);
 
     try {
-      const candidatePlan = `${selectedTier}_${billingCadence}`;
-      try {
-        if (!isSelfHosted && organizationIsRequired && effectiveSelectedTier !== 'community' && VALID_BILLING_PLANS.has(candidatePlan)) {
-          localStorage.setItem('pendingPlan', candidatePlan);
-        } else {
-          // Either we don't need a paid plan, or the tier/cadence combo isn't a
-          // Stripe checkout SKU (e.g. `govcloud_*` is sales-led).  Clear any
-          // stale value so downstream redirects don't bounce to a 400.
-          localStorage.removeItem('pendingPlan');
-        }
-      } catch {
-        // localStorage may throw in private mode or when storage is disabled.
-        // Registration must not fail because of a storage exception — the
-        // dashboard pendingPlan helper re-validates on read.
+      if (organizationIsRequired && selectedTier !== 'community') {
+        localStorage.setItem('pendingPlan', `${selectedTier}_${billingCadence}`);
+      } else {
+        localStorage.removeItem('pendingPlan');
       }
 
       await register(
@@ -328,14 +300,6 @@ function RegisterPageInner() {
     }
   };
 
-  if (deploymentLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-indigo-800 py-10 px-4">
       <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-3xl">
@@ -347,17 +311,9 @@ function RegisterPageInner() {
             size={64}
           />
           <h1 className="text-3xl font-bold text-gray-900 mt-4">Create Account</h1>
-          {isSelfHosted ? (
-            <p className="text-xs text-purple-700 mt-2 font-medium">
-              {deploymentInfo.edition === 'community'
-                ? 'This self-hosted installation is running Community Edition. Admins can activate a license after sign-in to unlock additional modules.'
-                : `This self-hosted installation is licensed for ${tierLabel(effectiveSelectedTier)} Edition. Additional modules will be available after sign-in.`}
-            </p>
-          ) : (
-            <p className="text-xs text-purple-700 mt-2 font-medium">
-              Includes a 14-day full-feature trial. After trial end, your org moves to Free tier unless upgraded.
-            </p>
-          )}
+          <p className="text-xs text-purple-700 mt-2 font-medium">
+            Includes a 14-day full-feature trial. After trial end, your org moves to Free tier unless upgraded.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -444,83 +400,65 @@ function RegisterPageInner() {
             <>
               {/* Tier Selection */}
               <div>
-                {isSelfHosted ? (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                    <p className="text-sm font-semibold text-emerald-900">
-                      Self-Hosted {tierLabel(effectiveSelectedTier)} Edition
-                    </p>
-                    <p className="mt-1 text-xs text-emerald-800">
-                      Sign-up uses the edition already active on this server. There is no hosted checkout flow in self-hosted mode.
-                    </p>
-                    {deploymentInfo.edition === 'community' && (
-                      <p className="mt-2 text-xs text-emerald-800">
-                        Activate a license after sign-in if you want to unlock higher-tier modules for this installation.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Your Tier
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+                  {TIER_OPTIONS.map((tier) => (
+                    <button
+                      key={tier.key}
+                      type="button"
+                      onClick={() => setSelectedTier(tier.key)}
+                      className={`text-left rounded-lg border p-3 transition ${
+                        selectedTier === tier.key
+                          ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
+                          : 'border-gray-200 bg-white hover:border-purple-400'
+                      }`}
+                    >
+                      <p className="text-sm font-semibold text-gray-900">{tier.label}</p>
+                      <p className="text-xs text-gray-500 mt-1">{tier.description}</p>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Your trial starts on the selected tier. You can change tiers anytime in Settings.
+                </p>
+
+                {selectedTier !== 'community' && (
+                  <div className="mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Your Tier
+                      Billing Cycle
                     </label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                      {TIER_OPTIONS.map((tier) => (
-                        <button
-                          key={tier.key}
-                          type="button"
-                          onClick={() => setSelectedTier(tier.key)}
-                          className={`text-left rounded-lg border p-3 transition ${
-                            selectedTier === tier.key
-                              ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                              : 'border-gray-200 bg-white hover:border-purple-400'
-                          }`}
-                        >
-                          <p className="text-sm font-semibold text-gray-900">{tier.label}</p>
-                          <p className="text-xs text-gray-500 mt-1">{tier.description}</p>
-                        </button>
-                      ))}
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setBillingCadence('monthly')}
+                        className={`text-left rounded-lg border p-3 transition ${
+                          billingCadence === 'monthly'
+                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
+                            : 'border-gray-200 bg-white hover:border-purple-400'
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-gray-900">Monthly</p>
+                        <p className="text-xs text-gray-500 mt-1">Pay month-to-month</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBillingCadence('annual')}
+                        className={`text-left rounded-lg border p-3 transition ${
+                          billingCadence === 'annual'
+                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
+                            : 'border-gray-200 bg-white hover:border-purple-400'
+                        }`}
+                      >
+                        <p className="text-sm font-semibold text-gray-900">Annual</p>
+                        <p className="text-xs text-gray-500 mt-1">Billed yearly</p>
+                      </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      Your trial starts on the selected tier. You can change tiers anytime in Settings.
+                      After setup, you&apos;ll continue to Stripe with: {`${selectedTier}_${billingCadence}`}
                     </p>
-
-                    {selectedTier !== 'community' && (
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Billing Cycle
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setBillingCadence('monthly')}
-                            className={`text-left rounded-lg border p-3 transition ${
-                              billingCadence === 'monthly'
-                                ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                                : 'border-gray-200 bg-white hover:border-purple-400'
-                            }`}
-                          >
-                            <p className="text-sm font-semibold text-gray-900">Monthly</p>
-                            <p className="text-xs text-gray-500 mt-1">Pay month-to-month</p>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setBillingCadence('annual')}
-                            className={`text-left rounded-lg border p-3 transition ${
-                              billingCadence === 'annual'
-                                ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500'
-                                : 'border-gray-200 bg-white hover:border-purple-400'
-                            }`}
-                          >
-                            <p className="text-sm font-semibold text-gray-900">Annual</p>
-                            <p className="text-xs text-gray-500 mt-1">Billed yearly</p>
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          After setup, you&apos;ll continue to Stripe with: {`${selectedTier}_${billingCadence}`}
-                        </p>
-                      </div>
-                    )}
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -535,7 +473,7 @@ function RegisterPageInner() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mb-3">
-                  Select the frameworks for your organization. {isSelfHosted ? 'Availability follows the edition currently active on this server.' : 'Bundled groups (ISO series, OWASP, CSF Profiles) count as 1 toward your limit.'}
+                  Select the frameworks for your organization. Bundled groups (ISO series, OWASP, CSF Profiles) count as 1 toward your limit.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[28rem] overflow-y-auto pr-1">
@@ -720,7 +658,7 @@ function RegisterPageInner() {
               </div>
 
               {/* AI Regulatory Monitoring — shown when Gov Cloud-tier frameworks selected */}
-              {!isSelfHosted && hasGovcloudFrameworks && (
+              {hasGovcloudFrameworks && (
                 <div className="border border-teal-200 bg-teal-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-base">🤖</span>
@@ -871,4 +809,3 @@ function RegisterPageInner() {
     </div>
   );
 }
-

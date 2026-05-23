@@ -38,45 +38,12 @@ const {
   generateCommunityKey,
   setLocalPublicKey
 } = require('../services/licenseService');
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
-function getIpRateLimitKey(req) {
-  const xForwardedFor = req.headers && req.headers['x-forwarded-for'];
-  const forwardedIp = typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : '';
-  return ipKeyGenerator(req.ip || forwardedIp || req.socket?.remoteAddress || 'unknown');
-}
-
-// Explicit express-rate-limit instance so that static-analysis tools (CodeQL)
-// recognise the rate-limiting middleware applied via router.use().
-const licenseRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
+const licenseRateLimiter = createRateLimiter({ label: 'license', windowMs: 60 * 1000, max: 10 });
 // RSA key generation is CPU-intensive — apply a tighter limiter to the
 // generate-community endpoint: 3 generations per hour per IP.
-const licenseGenerateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
-
-// Explicit express-rate-limit instance for the update-check route so that
-// static-analysis tools (CodeQL) recognise the rate-limiting middleware.
-const updateCheckLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getIpRateLimitKey,
-  message: { success: false, error: 'Too many requests', message: 'Rate limit exceeded. Please try again later.' }
-});
+const licenseGenerateLimiter = createRateLimiter({ label: 'license-generate', windowMs: 60 * 60 * 1000, max: 3 });
 
 // ─── Update-check cache ─────────────────────────────────────────────────────
 // Avoid hammering GitHub's API — cache the result for a configurable interval.
@@ -258,7 +225,7 @@ router.get('/', authenticate, requirePermission('settings.manage'), async (req, 
  *
  * Requires: authenticated user with settings.manage permission.
  */
-router.get('/update-check', updateCheckLimiter, authenticate, requirePermission('settings.manage'), async (req, res) => {
+router.get('/update-check', authenticate, requirePermission('settings.manage'), async (req, res) => {
   try {
     // Read installed version from package.json (relative to this file)
     let currentVersion = '0.0.0';

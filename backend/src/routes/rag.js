@@ -1,123 +1,221 @@
-// @tier: community
+// @tier: enterprise
+/**
+ * RAG (Retrieval-Augmented Generation) Routes
+ * Endpoints for indexing, searching, and managing organization documents
+ * used to enrich AI responses with org-specific context.
+ */
+
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
-const { authenticate } = require('../middleware/auth');
-const { createOrgRateLimiter } = require('../middleware/rateLimit');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
+const { log } = require('../utils/logger');
+const ragService = require('../services/orgRagService');
 
 router.use(authenticate);
-router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'rag-route' }));
+router.use(requireTier('enterprise'));
+router.use(requirePermission('ai.use'));
+router.use(createRateLimiter({ label: 'rag', windowMs: 60 * 1000, max: 30 }));
 
-let multer;
-try {
-  multer = require('multer');
-} catch (e) {
-  // multer not available; file upload will be disabled
+// ---------------------------------------------------------------------------
+// File upload config (reuse uploads dir)
+// ---------------------------------------------------------------------------
+const uploadsDir = path.join(__dirname, '../../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const upload = multer ? multer({ storage: multer.memoryStorage() }) : null;
+const ALLOWED_RAG_TYPES = new Set(['.pdf', '.txt', '.md', '.doc', '.docx', '.csv']);
 
-router.post('/index', upload ? upload.single('file') : (req, res, next) => next(), async (req, res) => {
+const upload = multer({
+  dest: uploadsDir,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_RAG_TYPES.has(ext)) {
+      cb(null, true);
+    } else {
+      const err = new Error(`File type ${ext} not supported for RAG indexing. Allowed: ${[...ALLOWED_RAG_TYPES].join(', ')}`);
+      err.status = 400;
+      cb(err);
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Text extraction helpers
+// ---------------------------------------------------------------------------
+async function extractText(filePath, originalName) {
+  const ext = path.extname(originalName).toLowerCase();
+
+  if (ext === '.txt' || ext === '.md' || ext === '.csv') {
+    return fs.readFileSync(filePath, 'utf8');
+  }
+
+  if (ext === '.pdf') {
+    const pdfParse = require('pdf-parse');
+    const buffer = fs.readFileSync(filePath);
+    const data = await pdfParse(buffer);
+    return data.text;
+  }
+
+  if (ext === '.doc' || ext === '.docx') {
+    const mammoth = require('mammoth');
+    const result = await mammoth.extractRawText({ path: filePath });
+    return result.value;
+  }
+
+  throw new Error(`Unsupported file type: ${ext}`);
+}
+
+// ---------------------------------------------------------------------------
+// POST /rag/index — Index a document (file upload)
+// ---------------------------------------------------------------------------
+router.post('/index', upload.single('file'), async (req, res) => {
+  const organizationId = req.user.organization_id;
+  const tmpPath = req.file?.path;
+
   try {
-    const org = req.user.organization_id;
-    const source_name = req.file ? req.file.originalname : req.body.source_name;
-    const source_type = req.body.source_type || 'file';
-    const source_id = req.body.source_id || null;
-    const content_hash = req.body.content_hash || null;
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided. Upload a document to index.' });
+    }
 
-    const result = await pool.query(
-      `INSERT INTO rag_documents (organization_id, source_name, source_type, source_id, content_hash, chunk_count)
-       VALUES ($1, $2, $3, $4, $5, 0) RETURNING *`,
-      [org, source_name, source_type, source_id, content_hash]
-    );
-    return res.status(201).json({
-      success: true,
-      data: { document_id: result.rows[0].id, chunks: 0, message: 'RAG indexing not yet configured' }
+    const sourceName = req.body.source_name || req.file.originalname;
+    const sourceType = req.body.source_type || 'document';
+
+    // Extract text
+    const text = await extractText(tmpPath, req.file.originalname);
+    if (!text || text.trim().length < 50) {
+      return res.status(400).json({ error: 'Document contains too little text to index (minimum 50 characters).' });
+    }
+
+    // Index
+    const result = await ragService.indexDocument({
+      organizationId,
+      text,
+      sourceType,
+      sourceName,
+      metadata: {
+        originalFilename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        uploadedBy: req.user.id
+      }
     });
-  } catch (error) {
-    console.error('Error indexing document:', error);
-    return res.status(500).json({ success: false, error: 'Failed to index document' });
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    log('error', 'rag.index.failed', { error: err.message, orgId: organizationId });
+    res.status(500).json({ error: 'Failed to index document' });
+  } finally {
+    // Clean up temp file
+    if (tmpPath && fs.existsSync(tmpPath)) {
+      fs.unlinkSync(tmpPath);
+    }
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /rag/index-text — Index raw text (no file upload)
+// ---------------------------------------------------------------------------
 router.post('/index-text', async (req, res) => {
+  const organizationId = req.user.organization_id;
+
   try {
-    const org = req.user.organization_id;
-    const { text, source_name, source_type, source_id } = req.body;
-    const result = await pool.query(
-      `INSERT INTO rag_documents (organization_id, source_name, source_type, source_id, content_hash, chunk_count)
-       VALUES ($1, $2, $3, $4, $5, 0) RETURNING *`,
-      [org, source_name, source_type || 'text', source_id, null]
-    );
-    return res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (error) {
-    console.error('Error indexing text:', error);
-    return res.status(500).json({ success: false, error: 'Failed to index text' });
+    const { text, source_name, source_type, source_id, metadata } = req.body;
+    if (!text || text.trim().length < 50) {
+      return res.status(400).json({ error: 'Text must be at least 50 characters.' });
+    }
+
+    const result = await ragService.indexDocument({
+      organizationId,
+      text,
+      sourceType: source_type || 'document',
+      sourceId: source_id,
+      sourceName: source_name || 'Untitled Document',
+      metadata
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    log('error', 'rag.index_text.failed', { error: err.message, orgId: organizationId });
+    res.status(500).json({ error: 'Failed to index text' });
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /rag/search — Semantic search across indexed documents
+// ---------------------------------------------------------------------------
 router.post('/search', async (req, res) => {
+  const organizationId = req.user.organization_id;
+
   try {
-    return res.json({ success: true, data: { results: [], message: 'RAG search not yet configured' } });
-  } catch (error) {
-    console.error('Error searching:', error);
-    return res.status(500).json({ success: false, error: 'Failed to search' });
+    const { query, top_k, threshold, source_type } = req.body;
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Query text is required.' });
+    }
+
+    const results = await ragService.searchDocuments({
+      organizationId,
+      query: query.trim(),
+      topK: top_k,
+      threshold,
+      sourceType: source_type
+    });
+
+    res.json({ success: true, data: results });
+  } catch (err) {
+    log('error', 'rag.search.failed', { error: err.message, orgId: organizationId });
+    res.status(500).json({ error: 'Failed to search documents' });
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /rag/documents — List indexed documents
+// ---------------------------------------------------------------------------
 router.get('/documents', async (req, res) => {
+  const organizationId = req.user.organization_id;
+
   try {
-    const org = req.user.organization_id;
-    const result = await pool.query(
-      'SELECT * FROM rag_documents WHERE organization_id = $1 ORDER BY created_at DESC',
-      [org]
-    );
-    return res.json({ success: true, data: result.rows });
-  } catch (error) {
-    console.error('Error listing documents:', error);
-    return res.status(500).json({ success: false, error: 'Failed to list documents' });
+    const documents = await ragService.listIndexedDocuments(organizationId);
+    res.json({ success: true, data: documents });
+  } catch (err) {
+    log('error', 'rag.list.failed', { error: err.message, orgId: organizationId });
+    res.status(500).json({ error: 'Failed to list documents' });
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /rag/stats — RAG stats for the organization
+// ---------------------------------------------------------------------------
 router.get('/stats', async (req, res) => {
+  const organizationId = req.user.organization_id;
+
   try {
-    const org = req.user.organization_id;
-    const result = await pool.query(
-      `SELECT COUNT(*)::int AS total_documents, COALESCE(SUM(chunk_count), 0)::int AS total_chunks
-       FROM rag_documents WHERE organization_id = $1`,
-      [org]
-    );
-    return res.json({ success: true, data: result.rows[0] });
-  } catch (error) {
-    console.error('Error fetching stats:', error);
-    return res.status(500).json({ success: false, error: 'Failed to fetch stats' });
+    const stats = await ragService.getOrgRagStats(organizationId);
+    res.json({ success: true, data: stats });
+  } catch (err) {
+    log('error', 'rag.stats.failed', { error: err.message, orgId: organizationId });
+    res.status(500).json({ error: 'Failed to fetch RAG stats' });
   }
 });
 
+// ---------------------------------------------------------------------------
+// DELETE /rag/documents/:sourceId — Remove an indexed document
+// ---------------------------------------------------------------------------
 router.delete('/documents/:sourceId', async (req, res) => {
+  const organizationId = req.user.organization_id;
+  const { sourceId } = req.params;
+  const sourceType = req.query.source_type || 'document';
+
   try {
-    const org = req.user.organization_id;
-    const { sourceId } = req.params;
-    const { source_type } = req.query;
-
-    let query = 'DELETE FROM rag_documents WHERE source_id = $1 AND organization_id = $2';
-    const values = [sourceId, org];
-
-    if (source_type) {
-      query += ' AND source_type = $3';
-      values.push(source_type);
-    }
-
-    query += ' RETURNING id';
-    const result = await pool.query(query, values);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Document not found' });
-    }
-    return res.json({ success: true, data: { deleted: result.rows.length } });
-  } catch (error) {
-    console.error('Error deleting document:', error);
-    return res.status(500).json({ success: false, error: 'Failed to delete document' });
+    await ragService.removeDocument(organizationId, sourceType, sourceId);
+    res.json({ success: true, message: 'Document removed from RAG index.' });
+  } catch (err) {
+    log('error', 'rag.delete.failed', { error: err.message, orgId: organizationId });
+    res.status(500).json({ error: 'Failed to remove document' });
   }
 });
 

@@ -1,8 +1,6 @@
 // @tier: community
-
 // Shared Redis caching helper. Auto-initializes when REDIS_URL or REDIS_HOST is set.
 // All operations fail silently when Redis is unavailable — callers always get a result.
-
 const { log } = require('./logger');
 
 let _redis = null;
@@ -52,6 +50,7 @@ if (process.env.REDIS_URL || process.env.REDIS_HOST) {
   initRedis();
 }
 
+// getCached(key, ttlSeconds, fn) — returns cached value or calls fn() and caches the result.
 async function getCached(key, ttlSeconds, fn) {
   if (_available && _redis) {
     try {

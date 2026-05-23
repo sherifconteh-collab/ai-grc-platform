@@ -1,7 +1,8 @@
 // @tier: community
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { regulatoryNewsAPI } from '@/lib/api';
 
@@ -9,260 +10,279 @@ import { regulatoryNewsAPI } from '@/lib/api';
 
 interface NewsItem {
   id: string;
-  title: string;
   source: string;
-  content: string | null;
-  url: string | null;
-  impact_level: string | null;
-  relevant_frameworks: string[] | null;
-  keywords: string[] | null;
+  title: string;
+  summary?: string;
+  url: string;
+  published_at: string;
+  relevant_frameworks?: string[];
+  impact_level?: string;
+  keywords?: string[];
   is_read: boolean;
   is_archived: boolean;
-  is_bookmarked: boolean;
-  published_at: string;
   created_at: string;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const IMPACT_COLORS: Record<string, string> = {
-  critical: 'bg-red-100 text-red-700',
-  high: 'bg-orange-100 text-orange-700',
-  medium: 'bg-yellow-100 text-yellow-700',
-  low: 'bg-blue-100 text-blue-700',
+  critical: 'bg-red-100 text-red-800 border-red-200',
+  high: 'bg-orange-100 text-orange-800 border-orange-200',
+  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  low: 'bg-blue-100 text-blue-800 border-blue-200',
+  info: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
-function ImpactBadge({ level }: { level: string | null }) {
-  if (!level) return null;
-  const cls = IMPACT_COLORS[level] || 'bg-gray-100 text-gray-700';
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase ${cls}`}>
-      {level}
-    </span>
-  );
+const SOURCE_ICONS: Record<string, string> = {
+  fedramp: '🇺🇸',
+  nist: '📐',
+  cisa: '⚡',
+  gdpr: '🇪🇺',
+  hipaa: '🏥',
+  pci: '💳',
+  iso: '🌐',
+  sec: '📈',
+  finra: '🏦',
+};
+
+function fmtDate(d?: string | null) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+function sourceIcon(source: string) {
+  const key = Object.keys(SOURCE_ICONS).find(k => source?.toLowerCase().includes(k));
+  return key ? SOURCE_ICONS[key] : '📰';
+}
 
 export default function RegulatoryNewsPage() {
   const [items, setItems] = useState<NewsItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread' | 'archived'>('all');
   const [refreshing, setRefreshing] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [markingAll, setMarkingAll] = useState(false);
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  // Filters
+  const [showArchived, setShowArchived] = useState(false);
+  const [impactFilter, setImpactFilter] = useState('');
+  const [unreadOnly, setUnreadOnly] = useState(false);
+
+  const loadData = useCallback(async () => {
     try {
-      const params: Record<string, unknown> = { limit: 100 };
-      if (filter === 'unread') params.is_read = false;
-      if (filter === 'archived') params.is_archived = true;
-      const res = await regulatoryNewsAPI.getItems(params as Parameters<typeof regulatoryNewsAPI.getItems>[0]);
-      setItems(res.data?.data || []);
+      setLoading(true);
+      setError('');
+      const [itemsRes, countRes] = await Promise.all([
+        regulatoryNewsAPI.getItems({ is_archived: showArchived ? undefined : false, limit: 100 }),
+        regulatoryNewsAPI.getUnreadCount(),
+      ]);
+      setItems(itemsRes.data?.data || []);
+      setUnreadCount(countRes.data?.data?.count ?? 0);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load regulatory news');
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e.response?.data?.error || 'Failed to load regulatory news');
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [showArchived]);
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  const handleRefresh = async () => {
+  async function markRead(id: string) {
+    try {
+      await regulatoryNewsAPI.updateItem(id, { is_read: true });
+      setItems(prev => prev.map(i => i.id === id ? { ...i, is_read: true } : i));
+      setUnreadCount(c => Math.max(0, c - 1));
+    } catch {
+      // silent
+    }
+  }
+
+  async function archive(id: string) {
+    try {
+      await regulatoryNewsAPI.updateItem(id, { is_archived: true });
+      setItems(prev => prev.filter(i => i.id !== id));
+    } catch {
+      // silent
+    }
+  }
+
+  async function handleRefresh() {
     setRefreshing(true);
     try {
       await regulatoryNewsAPI.refresh();
-      await fetchItems();
-    } catch (err) {
-      console.error('Failed to refresh news:', err);
-      setError(err instanceof Error ? err.message : 'Failed to refresh news');
+      await loadData();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e.response?.data?.error || 'Failed to refresh news');
     } finally {
       setRefreshing(false);
     }
-  };
+  }
 
-  const handleMarkRead = async (id: string) => {
-    try {
-      await regulatoryNewsAPI.updateItem(id, { is_read: true });
-      setItems(prev => prev.map(item => item.id === id ? { ...item, is_read: true } : item));
-    } catch { /* ignore */ }
-  };
-
-  const handleArchive = async (id: string) => {
-    try {
-      await regulatoryNewsAPI.updateItem(id, { is_archived: true });
-      setItems(prev => prev.map(item => item.id === id ? { ...item, is_archived: true } : item));
-    } catch { /* ignore */ }
-  };
-
-  const handleMarkAllRead = async () => {
+  async function handleMarkAllRead() {
+    setMarkingAll(true);
     try {
       await regulatoryNewsAPI.markAllRead();
-      setItems(prev => prev.map(item => ({ ...item, is_read: true })));
-    } catch { /* ignore */ }
-  };
+      setItems(prev => prev.map(i => ({ ...i, is_read: true })));
+      setUnreadCount(0);
+    } catch {
+      // silent
+    } finally {
+      setMarkingAll(false);
+    }
+  }
 
-  const toggleExpand = (id: string) => {
-    setExpandedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
+  const filtered = items.filter(i => {
+    if (unreadOnly && i.is_read) return false;
+    if (impactFilter && i.impact_level !== impactFilter) return false;
+    return true;
+  });
 
-  const unreadCount = items.filter(i => !i.is_read).length;
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
+            <p className="text-gray-500">Loading regulatory news…</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+
+        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">📰 Regulatory News</h1>
-            <p className="text-gray-600 mt-1">
-              Stay informed on regulatory changes, compliance updates, and AI governance news.
+            <h1 className="text-2xl font-bold text-gray-900">Regulatory News</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Stay current with compliance updates from FedRAMP, NIST, CISA, GDPR, HIPAA, PCI-DSS, and more.
             </p>
           </div>
           <div className="flex gap-2">
             {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllRead}
-                className="px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                Mark all read
+              <button onClick={handleMarkAllRead} disabled={markingAll}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
+                {markingAll ? 'Marking…' : `Mark All Read (${unreadCount})`}
               </button>
             )}
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              {refreshing ? 'Refreshing...' : '↻ Refresh'}
+            <button onClick={handleRefresh} disabled={refreshing}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
+              {refreshing ? '⏳ Refreshing…' : '🔄 Refresh'}
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">{error}</div>
         )}
 
-        {/* Filter Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex gap-4">
-            {([
-              { key: 'all' as const, label: 'All' },
-              { key: 'unread' as const, label: `Unread${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
-              { key: 'archived' as const, label: 'Archived' },
-            ]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFilter(key)}
-                className={`py-2 px-1 border-b-2 text-sm font-medium ${
-                  filter === key
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+        {/* Context link */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3 text-sm">
+          <span className="text-blue-600">🔗</span>
+          <span className="text-blue-800">
+            News items are tagged to frameworks. Navigate to&nbsp;
+            <Link href="/dashboard/frameworks" className="font-medium underline hover:no-underline">Frameworks</Link>
+            &nbsp;or&nbsp;
+            <Link href="/dashboard/controls" className="font-medium underline hover:no-underline">Controls</Link>
+            &nbsp;to see impact on your active compliance programs.
+          </span>
         </div>
 
-        {loading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-            <span className="ml-3 text-gray-600">Loading news...</span>
+        {/* Stats row */}
+        <div className="flex gap-4 flex-wrap text-sm">
+          <div className="bg-white rounded-xl border px-4 py-3 flex items-center gap-2">
+            <span className="text-lg font-bold text-gray-900">{unreadCount}</span>
+            <span className="text-gray-500">Unread</span>
           </div>
-        )}
-
-        {!loading && items.length === 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-            <p className="text-gray-500">No regulatory news items found.</p>
-            <p className="text-gray-400 text-sm mt-1">Click Refresh to fetch the latest updates.</p>
+          <div className="bg-white rounded-xl border px-4 py-3 flex items-center gap-2">
+            <span className="text-lg font-bold text-gray-900">{items.filter(i => i.impact_level === 'critical' || i.impact_level === 'high').length}</span>
+            <span className="text-gray-500">High Impact</span>
           </div>
-        )}
+          <div className="bg-white rounded-xl border px-4 py-3 flex items-center gap-2">
+            <span className="text-lg font-bold text-gray-900">{items.length}</span>
+            <span className="text-gray-500">Total Items</span>
+          </div>
+        </div>
 
-        {!loading && items.length > 0 && (
+        {/* Filters */}
+        <div className="flex gap-3 flex-wrap">
+          <select value={impactFilter} onChange={e => setImpactFilter(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm">
+            <option value="">All Impact Levels</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={unreadOnly} onChange={e => setUnreadOnly(e.target.checked)} className="rounded" />
+            Unread only
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="rounded" />
+            Show archived
+          </label>
+        </div>
+
+        {/* News list */}
+        {filtered.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl border">
+            <div className="text-4xl mb-3">📰</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No news items</h3>
+            <p className="text-sm text-gray-500">Click Refresh to pull the latest regulatory updates.</p>
+          </div>
+        ) : (
           <div className="space-y-3">
-            {items.map((item) => {
-              const isExpanded = expandedItems.has(item.id);
-              return (
-                <div
-                  key={item.id}
-                  className={`bg-white rounded-lg border border-gray-200 overflow-hidden ${!item.is_read ? 'border-l-4 border-l-blue-500' : ''}`}
-                >
-                  <button
-                    onClick={() => {
-                      toggleExpand(item.id);
-                      if (!item.is_read) handleMarkRead(item.id);
-                    }}
-                    className="w-full text-left p-4 hover:bg-gray-50"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <ImpactBadge level={item.impact_level} />
-                          <span className="text-xs text-gray-400">{item.source}</span>
-                          <span className="text-xs text-gray-400">
-                            {new Date(item.published_at || item.created_at).toLocaleDateString()}
-                          </span>
-                          {!item.is_read && (
-                            <span className="inline-flex w-2 h-2 bg-blue-500 rounded-full" />
-                          )}
-                        </div>
-                        <h3 className={`text-sm ${!item.is_read ? 'font-bold' : 'font-medium'} text-gray-900`}>
-                          {item.title}
-                        </h3>
-                        {item.relevant_frameworks && item.relevant_frameworks.length > 0 && (
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            {item.relevant_frameworks.map((fw) => (
-                              <span key={fw} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                                {fw}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-gray-400 ml-2">{isExpanded ? '▲' : '▼'}</span>
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="px-4 pb-4 border-t border-gray-100">
-                      {item.content && (
-                        <p className="text-sm text-gray-700 mt-3 whitespace-pre-wrap leading-relaxed">
-                          {item.content}
-                        </p>
+            {filtered.map(item => (
+              <div key={item.id} className={`bg-white rounded-xl border p-4 transition-colors ${!item.is_read ? 'border-l-4 border-l-blue-500' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-base">{sourceIcon(item.source)}</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase font-medium">{item.source}</span>
+                      {item.impact_level && (
+                        <span className={`text-xs px-2 py-0.5 rounded border font-medium ${IMPACT_COLORS[item.impact_level] || IMPACT_COLORS.info}`}>
+                          {item.impact_level} impact
+                        </span>
                       )}
-                      <div className="flex gap-3 mt-3">
-                        {item.url && (
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            Read original →
-                          </a>
-                        )}
-                        {!item.is_archived && (
-                          <button
-                            onClick={() => handleArchive(item.id)}
-                            className="text-xs text-gray-500 hover:text-gray-700"
-                          >
-                            Archive
-                          </button>
-                        )}
-                      </div>
+                      {!item.is_read && <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">New</span>}
                     </div>
-                  )}
+                    <a href={item.url} target="_blank" rel="noopener noreferrer"
+                      onClick={() => !item.is_read && markRead(item.id)}
+                      className="text-sm font-semibold text-gray-900 hover:text-blue-600 hover:underline line-clamp-2">
+                      {item.title}
+                    </a>
+                    {item.summary && (
+                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">{item.summary}</p>
+                    )}
+                    <div className="flex gap-3 mt-2 text-xs text-gray-400">
+                      <span>{fmtDate(item.published_at)}</span>
+                      {Array.isArray(item.relevant_frameworks) && item.relevant_frameworks.length > 0 && (
+                        <span>Frameworks: {item.relevant_frameworks.join(', ')}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    {!item.is_read && (
+                      <button onClick={() => markRead(item.id)}
+                        className="text-xs px-2 py-1 border rounded hover:bg-green-50 text-green-700 border-green-200">
+                        Mark Read
+                      </button>
+                    )}
+                    <button onClick={() => archive(item.id)}
+                      className="text-xs px-2 py-1 border rounded hover:bg-gray-100 text-gray-500">
+                      Archive
+                    </button>
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>

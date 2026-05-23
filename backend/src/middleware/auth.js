@@ -1,334 +1,377 @@
+// @tier: community
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
+const { JWT_SECRET, JWT_VERIFY_OPTIONS } = require('../config/security');
 const { decrypt } = require('../utils/encrypt');
+const {
+  TIER_LEVELS,
+  normalizeTier,
+  tierLevel,
+  canUseCmdb,
+  getCmdbAssetLimit
+} = require('../config/tierPolicy');
+const { expireOrganizationTrialIfNeeded } = require('../services/subscriptionService');
 
-// JWT verification is pinned to HS256. Tokens signed with any other algorithm
-// are rejected. This prevents algorithm-confusion attacks where an attacker
-// could supply a token signed with `none`, RS256-with-pubkey-as-secret, etc.
-// See: RELEASE_NOTES.md [3.0.0] Security.
-const JWT_VERIFY_OPTIONS = Object.freeze({ algorithms: ['HS256'] });
+// In-memory cache for global feature flags (refreshed every 60s)
+let _featureFlagsCache = { data: null, ts: 0 };
+let _hasOrgFeatureOverridesColumn = null;
 
-// ---------------------------------------------------------------------------
-// Community-edition role → permission mapping (fallback when RBAC tables
-// such as user_roles, roles, role_permissions, permissions do not exist).
-// ---------------------------------------------------------------------------
-const ROLE_PERMISSIONS = {
-  admin: ['*'],
-  isse: [
-    'controls.*', 'assessments.*', 'frameworks.*', 'implementations.*',
-    'ai.*', 'policies.*', 'poam.*', 'audit.read'
-  ],
-  auditor: ['*.read', 'assessments.write'],
-  read_only: ['*.read']
+const PLATFORM_OWNER_EMAILS = new Set(
+  String(process.env.PLATFORM_OWNER_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+const ROLE_FALLBACK_PERMISSIONS = new Map([
+  ['admin', ['*']],
+  ['auditor', [
+    'dashboard.read',
+    'frameworks.read',
+    'organizations.read',
+    'users.read',
+    'controls.read',
+    'implementations.read',
+    'evidence.read',
+    'assets.read',
+    'environments.read',
+    'service_accounts.read',
+    'audit.read',
+    'reports.read',
+    'assessments.read',
+    'assessments.write',
+    'notifications.read',
+    'ai.use'
+  ]],
+  ['user', [
+    'dashboard.read',
+    'frameworks.read',
+    'organizations.read',
+    'controls.read',
+    'controls.write',
+    'implementations.read',
+    'implementations.write',
+    'evidence.read',
+    'evidence.write',
+    'assets.read',
+    'assets.write',
+    'environments.read',
+    'environments.write',
+    'service_accounts.read',
+    'service_accounts.write',
+    'assessments.read',
+    'assessments.write',
+    'notifications.read',
+    'notifications.write',
+    'ai.use',
+    'reports.read'
+  ]]
+]);
+
+function getRoleFallbackPermissions(roleName) {
+  return ROLE_FALLBACK_PERMISSIONS.get(roleName) || ROLE_FALLBACK_PERMISSIONS.get('user');
+}
+
+function resolveEffectiveTier(featureOverrides, organizationTier) {
+  const override = typeof featureOverrides?.tier_override === 'string'
+    ? normalizeTier(featureOverrides.tier_override)
+    : null;
+
+  if (override && Object.prototype.hasOwnProperty.call(TIER_LEVELS, override)) {
+    return override;
+  }
+
+  return normalizeTier(organizationTier || 'community');
+}
+
+function toFeatureFlagMap(flags) {
+  if (!flags || typeof flags !== 'object' || Array.isArray(flags)) {
+    return new Map();
+  }
+
+  return new Map(Object.entries(flags));
+}
+
+async function hasOrgFeatureOverridesColumn() {
+  if (_hasOrgFeatureOverridesColumn !== null) {
+    return _hasOrgFeatureOverridesColumn;
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'organizations'
+         AND column_name = 'feature_overrides'
+       LIMIT 1`
+    );
+    _hasOrgFeatureOverridesColumn = result.rows.length > 0;
+  } catch (_error) {
+    _hasOrgFeatureOverridesColumn = false;
+  }
+
+  return _hasOrgFeatureOverridesColumn;
+}
+
+/**
+ * Authenticate JWT token and attach user/org to request
+ */
+const authenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: 'No token provided' });
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
+
+      const includeFeatureOverrides = await hasOrgFeatureOverridesColumn();
+      const featureOverridesSelect = includeFeatureOverrides
+        ? `COALESCE(o.feature_overrides, '{}'::jsonb) as feature_overrides`
+        : `'{}'::jsonb as feature_overrides`;
+
+      // Fetch user and organization details (including feature_overrides when available)
+      const userResult = await pool.query(`
+        SELECT
+          u.id, u.email, u.first_name, u.last_name, u.role, u.is_active,
+          COALESCE(u.is_platform_admin, false) AS is_platform_admin,
+          u.organization_id,
+          o.name as organization_name, o.tier as organization_tier,
+          o.billing_status as organization_billing_status,
+          o.trial_status as organization_trial_status,
+          o.trial_started_at as organization_trial_started_at,
+          o.trial_ends_at as organization_trial_ends_at,
+          ${featureOverridesSelect}
+        FROM users u
+        LEFT JOIN organizations o ON u.organization_id = o.id
+        WHERE u.id = $1
+      `, [decoded.userId]);
+
+      if (userResult.rows.length === 0) {
+        return res.status(401).json({ success: false, error: 'User not found or inactive' });
+      }
+
+      req.user = userResult.rows[0];
+      req.user.email = decrypt(req.user.email);
+
+      if (!Boolean(req.user.is_platform_admin) && !req.user.is_active) {
+        return res.status(401).json({ success: false, error: 'User not found or inactive' });
+      }
+
+      if (!Boolean(req.user.is_platform_admin) && !req.user.organization_id) {
+        return res.status(401).json({ success: false, error: 'User organization is missing' });
+      }
+
+      // Open source: no trial expiry demotion
+
+      // Load global feature flags from platform_settings (cached 60s)
+      let globalFeatureFlags = {};
+      try {
+        const now = Date.now();
+        if (!_featureFlagsCache.data || (now - _featureFlagsCache.ts) > 60000) {
+          const flagsResult = await pool.query(
+            `SELECT setting_value FROM platform_settings WHERE setting_key = 'feature_flags' LIMIT 1`
+          );
+          let parsed = {};
+          if (flagsResult.rows.length > 0 && flagsResult.rows[0].setting_value) {
+            parsed = typeof flagsResult.rows[0].setting_value === 'string'
+              ? JSON.parse(flagsResult.rows[0].setting_value)
+              : flagsResult.rows[0].setting_value;
+            if (!parsed || typeof parsed !== 'object') parsed = {};
+          }
+          _featureFlagsCache = { data: parsed, ts: now };
+        }
+        globalFeatureFlags = _featureFlagsCache.data;
+      } catch (_flagErr) {
+        // Non-fatal — proceed with empty flags
+      }
+      req.user.global_feature_flags = globalFeatureFlags;
+
+      // Resolve effective tier (tier_override from feature_overrides takes precedence)
+      const featureOverrides = typeof req.user.feature_overrides === 'string'
+        ? JSON.parse(req.user.feature_overrides)
+        : (req.user.feature_overrides || {});
+      req.user.feature_overrides = featureOverrides;
+
+      const effectiveTier = resolveEffectiveTier(featureOverrides, req.user.organization_tier);
+      req.user.effective_tier = effectiveTier;
+      // Also update organization_tier so existing requireTier()/checkTierLimit() helpers
+      // respect the override server-side
+      req.user.organization_tier = effectiveTier;
+
+      try {
+        const roleNamesResult = await pool.query(`
+          SELECT r.name
+          FROM user_roles ur
+          JOIN roles r ON r.id = ur.role_id
+          WHERE ur.user_id = $1
+        `, [req.user.id]);
+
+        const permissionResult = await pool.query(`
+          SELECT DISTINCT p.name
+          FROM user_roles ur
+          JOIN role_permissions rp ON rp.role_id = ur.role_id
+          JOIN permissions p ON p.id = rp.permission_id
+          WHERE ur.user_id = $1
+        `, [req.user.id]);
+
+        const fallbackPermissions = getRoleFallbackPermissions(req.user.role);
+        const resolvedPermissions = new Set([
+          ...permissionResult.rows.map((row) => row.name),
+          ...fallbackPermissions
+        ]);
+
+        if (req.user.role === 'admin') {
+          resolvedPermissions.add('*');
+        }
+
+        const resolvedRoles = new Set([
+          req.user.role,
+          ...roleNamesResult.rows.map((row) => row.name)
+        ]);
+
+        req.user.roles = Array.from(resolvedRoles);
+        req.user.permissions = Array.from(resolvedPermissions);
+      } catch (authzError) {
+        // Roles/permissions may not exist yet in bootstrap states.
+        const fallbackPermissions = getRoleFallbackPermissions(req.user.role);
+        req.user.roles = [req.user.role];
+        req.user.permissions = req.user.role === 'admin'
+          ? ['*']
+          : fallbackPermissions;
+      }
+
+      next();
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ success: false, error: 'Token expired' });
+      }
+      return res.status(401).json({ success: false, error: 'Invalid token' });
+    }
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(500).json({ success: false, error: 'Authentication failed' });
+  }
 };
 
 /**
- * Check whether a single granted pattern covers the requested permission.
- * Supports exact match, wildcard-all ('*'), resource wildcard ('controls.*'),
- * and action wildcard ('*.read').
+ * Require minimum tier level for access
  */
-function permissionMatches(granted, requested) {
-  if (granted === '*') return true;
-  if (granted === requested) return true;
-
-  const [gResource, gAction] = granted.split('.');
-  const [rResource, rAction] = requested.split('.');
-
-  if (gResource === '*' && gAction === rAction) return true;
-  if (gAction === '*' && gResource === rResource) return true;
-
-  return false;
-}
-
-function roleHasPermission(role, permission) {
-  const perms = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS['read_only'] || [];
-  return perms.some(p => permissionMatches(p, permission));
-}
-
-// Cache flag so we only probe the DB once per process lifetime.
-let _rbacTablesExist = null;
-
-async function rbacTablesExist() {
-  if (_rbacTablesExist !== null) return _rbacTablesExist;
-  try {
-    await pool.query(
-      `SELECT 1 FROM user_roles
-       JOIN roles ON roles.id = user_roles.role_id
-       JOIN role_permissions ON role_permissions.role_id = roles.id
-       JOIN permissions ON permissions.id = role_permissions.permission_id
-       LIMIT 0`
-    );
-    _rbacTablesExist = true;
-  } catch (err) {
-    // Only cache "false" when tables definitively do not exist (Postgres 42P01).
-    if (err && err.code === '42P01') {
-      _rbacTablesExist = false;
-      return _rbacTablesExist;
-    }
-    // For other errors (e.g., connectivity, permissions), don't cache so we retry next time.
-    return false;
-  }
-  return _rbacTablesExist;
-}
-
-// ---------------------------------------------------------------------------
-// authenticate – JWT verification, sets req.user
-// ---------------------------------------------------------------------------
-const authenticate = async (req, res, next) => {
-  try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ success: false, error: 'Access token required' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, JWT_VERIFY_OPTIONS);
-
-    if (decoded.type !== 'access') {
-      return res.status(401).json({ success: false, error: 'Invalid token type' });
-    }
-
-    const result = await pool.query(
-      `SELECT u.id, u.email, u.organization_id, u.role, u.is_active,
-              COALESCE(u.is_platform_admin, false) AS is_platform_admin,
-              o.tier AS organization_tier
-       FROM users u
-       LEFT JOIN organizations o ON o.id = u.organization_id
-       WHERE u.id = $1`,
-      [decoded.userId]
-    );
-
-    if (result.rows.length === 0 || !result.rows[0].is_active) {
-      return res.status(401).json({ success: false, error: 'User not found or inactive' });
-    }
-
-    const user = result.rows[0];
-    req.user = {
-      id: user.id,
-      email: decrypt(user.email),
-      organization_id: user.organization_id,
-      role: user.role,
-      organizationId: user.organization_id,
-      is_platform_admin: user.is_platform_admin,
-      organization_tier: user.organization_tier
-    };
-
-    next();
-  } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, error: 'Token expired', code: 'TOKEN_EXPIRED' });
-    }
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ success: false, error: 'Invalid token' });
-    }
-    next(error);
-  }
-};
-
-// Backward-compatible alias
-const authenticateToken = authenticate;
-
-// ---------------------------------------------------------------------------
-// requirePermission – checks a single 'resource.action' permission string
-// ---------------------------------------------------------------------------
-const requirePermission = (requiredPermission) => {
-  return async (req, res, next) => {
-    try {
-      const userId = req.user.id;
-      const organizationId = req.user.organizationId;
-
-      if (await rbacTablesExist()) {
-        const result = await pool.query(`
-          SELECT EXISTS (
-            SELECT 1
-            FROM user_roles ur
-            JOIN roles r ON r.id = ur.role_id
-            JOIN role_permissions rp ON rp.role_id = r.id
-            JOIN permissions p ON p.id = rp.permission_id
-            WHERE ur.user_id = $1
-            AND (r.organization_id = $2 OR r.is_system_role = TRUE)
-            AND p.name = $3
-          ) as has_permission
-        `, [userId, organizationId, requiredPermission]);
-
-        if (result.rows[0].has_permission) return next();
-      }
-
-      // Fallback to role-based mapping
-      if (roleHasPermission(req.user.role, requiredPermission)) return next();
-
-      return res.status(403).json({
-        success: false,
-        error: `Forbidden: You don't have permission to ${requiredPermission}`
-      });
-    } catch (error) {
-      console.error('RBAC check error:', error);
-      res.status(500).json({ success: false, error: 'Permission check failed' });
-    }
-  };
-};
-
-// ---------------------------------------------------------------------------
-// requireAnyPermission – passes if user has ANY of the listed permissions
-// ---------------------------------------------------------------------------
-const requireAnyPermission = (permissions) => {
-  return async (req, res, next) => {
-    try {
-      const userId = req.user.id;
-      const organizationId = req.user.organizationId;
-
-      if (await rbacTablesExist()) {
-        const result = await pool.query(`
-          SELECT EXISTS (
-            SELECT 1
-            FROM user_roles ur
-            JOIN roles r ON r.id = ur.role_id
-            JOIN role_permissions rp ON rp.role_id = r.id
-            JOIN permissions p ON p.id = rp.permission_id
-            WHERE ur.user_id = $1
-            AND (r.organization_id = $2 OR r.is_system_role = TRUE)
-            AND p.name = ANY($3)
-          ) as has_permission
-        `, [userId, organizationId, permissions]);
-
-        if (result.rows[0].has_permission) return next();
-      }
-
-      // Fallback to role-based mapping
-      if (permissions.some(p => roleHasPermission(req.user.role, p))) return next();
-
-      return res.status(403).json({
-        success: false,
-        error: "Forbidden: You don't have any of the required permissions"
-      });
-    } catch (error) {
-      console.error('RBAC check error:', error);
-      res.status(500).json({ success: false, error: 'Permission check failed' });
-    }
-  };
-};
-
-// ---------------------------------------------------------------------------
-// requireAllPermissions – passes only if user has ALL listed permissions
-// ---------------------------------------------------------------------------
-const requireAllPermissions = (permissions) => {
-  return async (req, res, next) => {
-    try {
-      const userId = req.user.id;
-      const organizationId = req.user.organizationId;
-
-      if (await rbacTablesExist()) {
-        const result = await pool.query(`
-          SELECT ARRAY_AGG(DISTINCT p.name) as user_permissions
-          FROM user_roles ur
-          JOIN roles r ON r.id = ur.role_id
-          JOIN role_permissions rp ON rp.role_id = r.id
-          JOIN permissions p ON p.id = rp.permission_id
-          WHERE ur.user_id = $1
-          AND (r.organization_id = $2 OR r.is_system_role = TRUE)
-        `, [userId, organizationId]);
-
-        const userPerms = result.rows[0].user_permissions || [];
-        if (permissions.every(p => userPerms.includes(p))) return next();
-      }
-
-      // Fallback to role-based mapping
-      if (permissions.every(p => roleHasPermission(req.user.role, p))) return next();
-
-      return res.status(403).json({
-        success: false,
-        error: `Forbidden: You need all of these permissions: ${permissions.join(', ')}`
-      });
-    } catch (error) {
-      console.error('RBAC check error:', error);
-      res.status(500).json({ success: false, error: 'Permission check failed' });
-    }
-  };
-};
-
-// ---------------------------------------------------------------------------
-// requireRole – backward-compatible role check
-// ---------------------------------------------------------------------------
-const requireRole = (roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ success: false, error: 'Authentication required' });
-    }
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
-    }
-    next();
-  };
-};
-
-// ---------------------------------------------------------------------------
-// requireTier – community edition stub (always passes)
-// ---------------------------------------------------------------------------
-const requireTier = (_tier) => {
+const requireTier = (_minTier) => {
   return (_req, _res, next) => next();
 };
 
-// ---------------------------------------------------------------------------
-// Utility helpers
-// ---------------------------------------------------------------------------
-const getUserPermissions = async (userId, organizationId) => {
-  if (await rbacTablesExist()) {
-    const result = await pool.query(`
-      SELECT ARRAY_AGG(DISTINCT p.name) as permissions
-      FROM user_roles ur
-      JOIN roles r ON r.id = ur.role_id
-      JOIN role_permissions rp ON rp.role_id = r.id
-      JOIN permissions p ON p.id = rp.permission_id
-      WHERE ur.user_id = $1
-      AND (r.organization_id = $2 OR r.is_system_role = TRUE)
-    `, [userId, organizationId]);
-    return result.rows[0].permissions || [];
-  }
-  return [];
-};
-
-const hasRole = async (userId, roleName, organizationId) => {
-  if (await rbacTablesExist()) {
-    const result = await pool.query(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM user_roles ur
-        JOIN roles r ON r.id = ur.role_id
-        WHERE ur.user_id = $1
-        AND r.name = $2
-        AND (r.organization_id = $3 OR r.is_system_role = TRUE)
-      ) as has_role
-    `, [userId, roleName, organizationId]);
-    return result.rows[0].has_role;
-  }
-  return false;
-};
+/**
+ * Check if feature is available for user's tier
+ */
+const checkTierLimit = (_req, _res, next) => next();
 
 /**
- * requirePlatformOwner – ensures the authenticated user has is_platform_admin flag.
- * Used for server-wide operations like license key generation.
+ * Require admin role
  */
-const requirePlatformOwner = (req, res, next) => {
-  if (!req.user || !req.user.is_platform_admin) {
+const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== 'admin') {
     return res.status(403).json({
       success: false,
-      error: 'Platform admin access required',
-      message: 'This action requires platform administrator privileges.'
+      error: 'Admin access required'
     });
   }
   next();
 };
 
+function isPlatformOwner(req) {
+  if (Boolean(req.user?.is_platform_admin)) return true;
+  if (PLATFORM_OWNER_EMAILS.size === 0) return false;
+  const userEmail = String(req.user?.email || '').trim().toLowerCase();
+  return PLATFORM_OWNER_EMAILS.has(userEmail);
+}
+
+const requirePlatformOwner = (req, res, next) => {
+  if (!isPlatformOwner(req)) {
+    return res.status(403).json({
+      success: false,
+      error: 'Platform owner access required'
+    });
+  }
+  next();
+};
+
+function hasPermission(req, permissionName) {
+  const permissions = req.user?.permissions || [];
+  return permissions.includes('*') || permissions.includes(permissionName);
+}
+
+const requirePermission = (permissionName) => {
+  return (req, res, next) => {
+    if (!hasPermission(req, permissionName)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions',
+        requiredPermission: permissionName
+      });
+    }
+    next();
+  };
+};
+
+const requireAnyPermission = (permissionNames) => {
+  return (req, res, next) => {
+    const allowed = permissionNames.some((permissionName) => hasPermission(req, permissionName));
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions',
+        requiredAnyOf: permissionNames
+      });
+    }
+    next();
+  };
+};
+
+/**
+ * Check if a named feature is enabled for the current request.
+ * Resolution priority (evaluated in this order):
+ *   1. Per-org force ON override → enabled
+ *   2. Global flag OFF → blocked (if no per-org force ON)
+ *   3. Per-org force OFF override → disabled
+ *   4. Default → enabled
+ */
+function isFeatureEnabled(req, featureName) {
+  const globalFlags = toFeatureFlagMap(req.user?.global_feature_flags);
+  const orgFeatures = toFeatureFlagMap(req.user?.feature_overrides?.features);
+
+  // Per-org override beats global (force-on wins even if global is off)
+  if (orgFeatures.get(featureName) === true) return true;
+
+  // Global OFF blocks everyone without an org override
+  if (globalFlags.get(featureName) === false) return false;
+
+  // Per-org force OFF
+  if (orgFeatures.get(featureName) === false) return false;
+
+  return true;
+}
+
+/** Invalidate the in-memory feature flags cache (called when admin updates flags). */
+function invalidateFeatureFlagsCache() {
+  _featureFlagsCache = { data: null, ts: 0 };
+}
+
 module.exports = {
   authenticate,
-  authenticateToken,
+  requireTier,
+  checkTierLimit,
+  requireAdmin,
+  isPlatformOwner,
+  requirePlatformOwner,
   requirePermission,
   requireAnyPermission,
-  requireAllPermissions,
-  requireRole,
-  requireTier,
-  requirePlatformOwner,
-  getUserPermissions,
-  hasRole
+  isFeatureEnabled,
+  invalidateFeatureFlagsCache,
+  TIER_LEVELS
 };

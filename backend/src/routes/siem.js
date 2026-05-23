@@ -1,140 +1,142 @@
-// @tier: community
+// @tier: enterprise
+'use strict';
+
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
-const { authenticate } = require('../middleware/auth');
-const { createOrgRateLimiter } = require('../middleware/rateLimit');
+const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
+const { validateBody, requireFields } = require('../middleware/validate');
+const siem = require('../services/siemService');
+const auditService = require('../services/auditService');
 
+// All SIEM routes require authentication, settings.manage permission, and enterprise tier
 router.use(authenticate);
-router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 120, label: 'siem-route' }));
+router.use(requireTier('enterprise'));
+router.use(requirePermission('settings.manage'));
 
-// GET / - List SIEM configurations for organization
+const VALID_PROVIDERS = new Set(['splunk', 'elastic', 'webhook', 'syslog']);
+
+// GET /siem — list all SIEM configurations
 router.get('/', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const result = await pool.query(
-      'SELECT id, organization_id, name, provider, enabled, endpoint_url, event_filter, created_at, updated_at FROM siem_configurations WHERE organization_id = $1',
-      [orgId]
-    );
-    res.json({ success: true, data: result.rows });
+    const configs = await siem.listSiemConfigs(req.user.organization_id);
+    return res.json({ data: configs });
   } catch (err) {
-    console.error('Error fetching SIEM configurations:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch SIEM configurations' });
+    return res.status(500).json({ error: 'Failed to retrieve SIEM configurations' });
   }
 });
 
-// POST / - Create SIEM configuration
-router.post('/', async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { name, provider, endpoint_url, api_key, enabled, event_filter } = req.body;
-
-    const result = await pool.query(
-      `INSERT INTO siem_configurations (organization_id, name, provider, endpoint_url, api_key, enabled, event_filter, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-       RETURNING id, organization_id, name, provider, enabled, endpoint_url, event_filter, created_at, updated_at`,
-      [orgId, name, provider, endpoint_url, api_key, enabled !== false, event_filter || null]
-    );
-
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('Error creating SIEM configuration:', err);
-    res.status(500).json({ success: false, error: 'Failed to create SIEM configuration' });
-  }
-});
-
-// PUT /:id - Update SIEM configuration
-router.put('/:id', async (req, res) => {
-  try {
-    const orgId = req.user.organization_id;
-    const { id } = req.params;
-    const { name, provider, endpoint_url, api_key, enabled, event_filter } = req.body;
-
-    const existing = await pool.query(
-      'SELECT id FROM siem_configurations WHERE id = $1 AND organization_id = $2',
-      [id, orgId]
-    );
-
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'SIEM configuration not found' });
+// POST /siem — create a new SIEM config
+router.post(
+  '/',
+  validateBody((body) => requireFields(body, ['name', 'provider'])),
+  async (req, res) => {
+    try {
+      if (!VALID_PROVIDERS.has(req.body.provider)) {
+        return res.status(400).json({ error: 'Invalid provider. Must be one of: splunk, elastic, webhook, syslog' });
+      }
+      const id = await siem.saveSiemConfig(req.user.organization_id, req.body);
+      
+      // Log SIEM configuration creation
+      const context = auditService.extractAuditContext(req);
+      await auditService.logSiemConfigChange({
+        organizationId: req.user.organization_id,
+        userId: req.user.id,
+        action: 'created',
+        siemProvider: req.body.provider,
+        configId: id,
+        details: {
+          name: req.body.name,
+          enabled: req.body.enabled !== false
+        },
+        ...context,
+        actorName: auditService.getActorName(req.user)
+      });
+      
+      return res.status(201).json({ data: { id } });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to save SIEM configuration' });
     }
-
-    const fields = [];
-    const values = [];
-    let paramIndex = 1;
-
-    if (name !== undefined) { fields.push(`name = $${paramIndex++}`); values.push(name); }
-    if (provider !== undefined) { fields.push(`provider = $${paramIndex++}`); values.push(provider); }
-    if (endpoint_url !== undefined) { fields.push(`endpoint_url = $${paramIndex++}`); values.push(endpoint_url); }
-    if (api_key !== undefined) { fields.push(`api_key = $${paramIndex++}`); values.push(api_key); }
-    if (enabled !== undefined) { fields.push(`enabled = $${paramIndex++}`); values.push(enabled); }
-    if (event_filter !== undefined) { fields.push(`event_filter = $${paramIndex++}`); values.push(event_filter); }
-
-    if (fields.length === 0) {
-      return res.status(400).json({ success: false, error: 'No fields to update' });
-    }
-
-    fields.push(`updated_at = NOW()`);
-    values.push(id, orgId);
-
-    const result = await pool.query(
-      `UPDATE siem_configurations SET ${fields.join(', ')}
-       WHERE id = $${paramIndex++} AND organization_id = $${paramIndex}
-       RETURNING id, organization_id, name, provider, enabled, endpoint_url, event_filter, created_at, updated_at`,
-      values
-    );
-
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    console.error('Error updating SIEM configuration:', err);
-    res.status(500).json({ success: false, error: 'Failed to update SIEM configuration' });
   }
-});
+);
 
-// DELETE /:id - Delete SIEM configuration
+// PUT /siem/:id — update an existing SIEM config
+router.put(
+  '/:id',
+  validateBody((body) => requireFields(body, ['name', 'provider'])),
+  async (req, res) => {
+    try {
+      if (!VALID_PROVIDERS.has(req.body.provider)) {
+        return res.status(400).json({ error: 'Invalid provider.' });
+      }
+      await siem.saveSiemConfig(req.user.organization_id, { ...req.body, id: req.params.id });
+      
+      // Log SIEM configuration update
+      const context = auditService.extractAuditContext(req);
+      await auditService.logSiemConfigChange({
+        organizationId: req.user.organization_id,
+        userId: req.user.id,
+        action: 'updated',
+        siemProvider: req.body.provider,
+        configId: req.params.id,
+        details: {
+          name: req.body.name,
+          enabled: req.body.enabled !== false
+        },
+        ...context,
+        actorName: auditService.getActorName(req.user)
+      });
+      
+      return res.json({ data: { updated: true } });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to update SIEM configuration' });
+    }
+  }
+);
+
+// DELETE /siem/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const { id } = req.params;
-
-    const result = await pool.query(
-      'DELETE FROM siem_configurations WHERE id = $1 AND organization_id = $2 RETURNING *',
-      [id, orgId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'SIEM configuration not found' });
-    }
-
-    res.json({ success: true, data: result.rows[0] });
+    const deleted = await siem.deleteSiemConfig(req.user.organization_id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'SIEM config not found.' });
+    
+    // Log SIEM configuration deletion
+    const context = auditService.extractAuditContext(req);
+    await auditService.logSiemConfigChange({
+      organizationId: req.user.organization_id,
+      userId: req.user.id,
+      action: 'deleted',
+      siemProvider: 'unknown',
+      configId: req.params.id,
+      details: {},
+      ...context,
+      actorName: auditService.getActorName(req.user)
+    });
+    
+    return res.json({ data: { deleted: true } });
   } catch (err) {
-    console.error('Error deleting SIEM configuration:', err);
-    res.status(500).json({ success: false, error: 'Failed to delete SIEM configuration' });
+    return res.status(500).json({ error: 'Failed to delete SIEM configuration' });
   }
 });
 
-// POST /:id/test - Test SIEM connectivity (stub)
+// POST /siem/:id/test — send a test event
 router.post('/:id/test', async (req, res) => {
   try {
-    const orgId = req.user.organization_id;
-    const { id } = req.params;
-
-    const existing = await pool.query(
-      'SELECT id FROM siem_configurations WHERE id = $1 AND organization_id = $2',
-      [id, orgId]
-    );
-
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'SIEM configuration not found' });
-    }
-
-    res.json({
-      success: true,
-      data: { connected: false, message: 'SIEM connectivity test not yet configured' }
-    });
+    const result = await siem.testSiemConfig(req.user.organization_id, req.params.id);
+    return res.json({ data: { ok: true, detail: result } });
   } catch (err) {
-    console.error('Error testing SIEM connection:', err);
-    res.status(500).json({ success: false, error: 'Failed to test SIEM connection' });
+    return res.status(err.statusCode || 500).json({ error: 'SIEM connection test failed' });
+  }
+});
+
+// POST /siem/forward — manually forward an event (for testing/manual flush)
+router.post('/forward', async (req, res) => {
+  try {
+    const { event_type, payload } = req.body;
+    if (!event_type) return res.status(400).json({ error: 'event_type required.' });
+    const results = await siem.forwardEvent(req.user.organization_id, event_type, payload || {});
+    return res.json({ data: results });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to forward SIEM event' });
   }
 });
 

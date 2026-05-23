@@ -3,7 +3,7 @@
 
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../config/security');
+const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
 const { log } = require('../utils/logger');
 const pool = require('../config/database');
 
@@ -53,7 +53,7 @@ function scheduleFatalExit(reason, error) {
  * @returns {Server} Socket.IO server instance
  */
 function initializeWebSocket(httpServer) {
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'];
+  const corsOrigins = SECURITY_CONFIG.corsOrigins;
   const redisRequired = parseBooleanFlag(process.env.REDIS_REQUIRED, false);
   const redisConfigured = Boolean(process.env.REDIS_URL || process.env.REDIS_HOST);
   const defaultStatus = redisConfigured
@@ -180,7 +180,7 @@ function initializeWebSocket(httpServer) {
       }
 
       // Verify JWT token
-      const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+      const decoded = jwt.verify(token, JWT_SECRET);
 
       // Fetch user from database
       const userResult = await pool.query(

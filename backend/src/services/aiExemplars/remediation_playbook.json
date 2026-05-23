@@ -1,44 +1,90 @@
 [
   {
-    "input": {
-      "control": "IA-2(1) — Multi-factor Authentication for Privileged Accounts",
-      "current_state": "Only password authentication for AWS console; no MFA for break-glass accounts."
-    },
+    "description": "Remediation playbook for AC-2 Account Management",
+    "control_id": "AC-2",
+    "framework": "NIST_800_53",
     "output": {
-      "objective": "Roll out phishing-resistant MFA for all privileged AWS console and IAM Identity Center accounts within 30 days.",
-      "prerequisites": [
-        "Inventory of privileged accounts complete",
-        "FIDO2 security keys procured for break-glass accounts",
-        "Communication plan approved by IT leadership"
-      ],
+      "control_id": "AC-2",
+      "title": "Account Management — Implementation Playbook",
+      "estimated_effort_hours": 40,
+      "required_skills": ["IAM engineer", "HR process owner", "System administrator"],
       "steps": [
-        { "order": 1, "action": "Enable MFA enforcement on the AWS Organizations management account.", "owner": "Cloud Platform Lead", "estimated_hours": 2 },
-        { "order": 2, "action": "Distribute and enroll FIDO2 keys for break-glass accounts; store backup keys in dual-control safe.", "owner": "IT Operations", "estimated_hours": 6 },
-        { "order": 3, "action": "Configure IAM Identity Center to require MFA on every sign-in and on session refresh.", "owner": "IAM Engineer", "estimated_hours": 3 },
-        { "order": 4, "action": "Run a force-reauth event and capture CloudTrail evidence of MFA challenges.", "owner": "IAM Engineer", "estimated_hours": 2 },
-        { "order": 5, "action": "Update runbooks and onboarding checklist to include MFA enrollment.", "owner": "Security PM", "estimated_hours": 4 }
+        {
+          "step": 1,
+          "action": "Inventory all active accounts across all systems",
+          "detail": "Export user lists from Active Directory/SSO, cloud IAM (AWS, Azure), SaaS applications. Document account type (service, user, admin), owner, and last login date.",
+          "tools": ["AWS IAM Credential Report", "Azure AD User Export", "Okta User Report"],
+          "evidence_artifact": "Account inventory spreadsheet with last-login dates"
+        },
+        {
+          "step": 2,
+          "action": "Disable accounts inactive for 90+ days",
+          "detail": "Identify accounts with last_sign_in > 90 days. Create a Change Request, notify account owners 5 business days in advance, then disable (do not delete) to enable recovery if needed.",
+          "tools": ["AWS CLI: aws iam generate-credential-report", "Okta admin console bulk deactivation"],
+          "evidence_artifact": "Change request ticket + screenshot of disabled accounts"
+        },
+        {
+          "step": 3,
+          "action": "Document account provisioning and deprovisioning procedures",
+          "detail": "Write an Account Lifecycle Standard Operating Procedure covering: access request form, manager approval, provisioning steps per system, change-of-role handling, and immediate termination procedure. Reference HR offboarding checklist.",
+          "tools": ["Confluence or internal wiki", "JIRA service desk template"],
+          "evidence_artifact": "Approved Account Lifecycle SOP (PDF + version control record)"
+        },
+        {
+          "step": 4,
+          "action": "Implement quarterly access reviews",
+          "detail": "Schedule recurring calendar reminder for access review. Each review: export current user list, send to system owners for certification, document approvals in a signed spreadsheet or tool like Vanta/Drata. Retain records for 12 months minimum.",
+          "tools": ["Google Sheets + approval workflow", "Vanta / Drata automated access review"],
+          "evidence_artifact": "Signed access review report with date and approver"
+        }
       ],
-      "tools": ["AWS IAM Identity Center", "YubiKey 5C NFC", "CloudTrail"],
-      "artifacts": ["MFA enforcement policy JSON", "Enrollment attestation log", "Break-glass key custody form"],
-      "estimated_total_hours": 17
+      "common_pitfalls": [
+        "Deleting accounts instead of disabling — causes data loss and breaks audit trails",
+        "Skipping service accounts in the review — they are frequently overprivileged and rarely reviewed",
+        "Not linking HR terminations to account deprovisioning — creates orphaned accounts within hours of termination"
+      ],
+      "evidence_artifacts": [
+        "Account inventory report (date-stamped)",
+        "Signed access review records (quarterly)",
+        "Account provisioning request records with approvals",
+        "HR offboarding checklist with account revocation confirmation"
+      ]
     }
   },
   {
-    "input": {
-      "control": "AU-6 — Audit Record Review",
-      "current_state": "Logs are centralized but never reviewed."
-    },
+    "description": "Remediation playbook for SC-8 Transmission Confidentiality and Integrity",
+    "control_id": "SC-8",
+    "framework": "NIST_800_53",
     "output": {
-      "objective": "Establish weekly audit log review covering authentication, privileged action, and data export events.",
-      "prerequisites": ["Centralized SIEM ingest verified", "On-call rotation defined"],
+      "control_id": "SC-8",
+      "title": "Transmission Confidentiality and Integrity — TLS Hardening Playbook",
+      "estimated_effort_hours": 16,
+      "required_skills": ["DevOps / Platform engineer", "Security engineer"],
       "steps": [
-        { "order": 1, "action": "Define event taxonomy and severity matrix.", "owner": "Detection Engineer", "estimated_hours": 4 },
-        { "order": 2, "action": "Build saved searches for the three review domains.", "owner": "Detection Engineer", "estimated_hours": 6 },
-        { "order": 3, "action": "Schedule weekly review meeting and capture sign-off in ticketing.", "owner": "SecOps Manager", "estimated_hours": 2 }
+        {
+          "step": 1,
+          "action": "Enumerate all data transmission paths",
+          "detail": "Document every API endpoint, internal service-to-service call, and external integration. Classify each as public (internet-facing), internal (VPC), or third-party.",
+          "tools": ["Network diagram review", "AWS VPC Flow Logs", "Datadog APM service map"],
+          "evidence_artifact": "Data flow diagram with encryption status per path"
+        },
+        {
+          "step": 2,
+          "action": "Enforce TLS 1.2 minimum on all endpoints",
+          "detail": "Update load balancer and web server TLS policy to reject TLS 1.0 and 1.1. Use Mozilla SSL Configuration Generator (modern profile) as baseline. Test with testssl.sh or ssllabs.com.",
+          "tools": ["AWS ALB Security Policy: ELBSecurityPolicy-TLS13-1-2-2021-06", "NGINX ssl_protocols TLSv1.2 TLSv1.3"],
+          "evidence_artifact": "SSL Labs scan report showing A or A+ rating"
+        }
       ],
-      "tools": ["Splunk", "Jira"],
-      "artifacts": ["Saved-search export", "Weekly review meeting minutes"],
-      "estimated_total_hours": 12
+      "common_pitfalls": [
+        "Forgetting internal service mesh — many orgs enforce TLS externally but leave internal traffic unencrypted",
+        "Certificate expiry not monitored — leads to outages and audit findings simultaneously"
+      ],
+      "evidence_artifacts": [
+        "SSL/TLS configuration screenshot (load balancer policy)",
+        "SSL Labs or testssl.sh scan report",
+        "Certificate expiry monitoring alert configuration"
+      ]
     }
   }
 ]

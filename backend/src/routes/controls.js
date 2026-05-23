@@ -7,6 +7,7 @@ const { decrypt } = require('../utils/encrypt');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { enqueueWebhookEvent } = require('../services/webhookService');
+const { log } = require('../utils/logger');
 
 const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
 
@@ -41,7 +42,7 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
     const row = result.rows[0];
     res.json({ success: true, data: { ...row, assigned_to_email: decrypt(row.assigned_to_email) } });
   } catch (error) {
-    console.error('Get control error:', error);
+    log('error', 'get_control_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load control' });
   }
 });
@@ -337,7 +338,7 @@ router.put('/:id/implementation', requirePermission('controls.write'), validateB
       }
     });
   } catch (error) {
-    console.error('Update implementation error:', error);
+    log('error', 'update_implementation_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update implementation' });
   }
 });
@@ -534,7 +535,7 @@ router.post('/:id/inherit', requirePermission('controls.write'), async (req, res
       }
     });
   } catch (error) {
-    console.error('Control inherit error:', error);
+    log('error', 'control_inherit_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to run control inheritance' });
   }
 });
@@ -565,7 +566,7 @@ router.get('/:id/mappings', requirePermission('controls.read'), async (req, res)
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Get mappings error:', error);
+    log('error', 'get_mappings_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load mappings' });
   }
 });
@@ -587,7 +588,7 @@ router.get('/:id/history', requirePermission('controls.read'), async (req, res) 
 
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('Control history error:', error);
+    log('error', 'control_history_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load control history' });
   }
 });
