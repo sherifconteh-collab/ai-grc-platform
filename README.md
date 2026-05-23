@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-23 | v4.0.0 full README revamp -->
+<!-- LAST_UPDATED: 2026-05-23 | v4.0.1 README revamp + framework tiers fix -->
 
 ## 🎯 What is This?
 
@@ -851,10 +851,10 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
-- **Tables**: 140+ database tables
+- **Tables**: 150+ database tables
 - **Migrations**: 110+ sequential, idempotent migrations
-- **API Routes**: 60+ route modules
-- **Services**: 21+ service modules
+- **API Routes**: 70+ route modules
+- **Services**: 46 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
