@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-23 | v4.0.1 README revamp + framework tiers fix -->
+<!-- LAST_UPDATED: 2026-05-23 | PR #176: fix(ci): split macOS build into native arm64 + x64 jobs; fix framework tiers -->
 
 ## 🎯 What is This?
 
