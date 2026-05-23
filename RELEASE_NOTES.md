@@ -5,6 +5,38 @@
 
 ---
 
+## [4.0.1] — 2026-05-23
+
+### Fixed
+
+- **macOS build restored.** The v4.0.0 CI run produced no `.dmg` because the
+  single `macos-latest` (ARM64) runner attempted to cross-compile both `x64`
+  and `arm64` targets; `embedded-postgres` can only download binaries for the
+  runner's native architecture, so the build failed silently. The `build-macos`
+  job is now split into two native jobs: `build-macos-arm64` (`macos-latest`)
+  and `build-macos-x64` (`macos-13` / Intel). Each builds only its own
+  architecture. Both DMGs are uploaded to the GitHub Release; `latest-mac.yml`
+  is published by the arm64 job.
+- Added `CSC_IDENTITY_AUTO_DISCOVERY: false` to both macOS build steps to
+  suppress unsigned-build warnings when no signing certificate is configured.
+- Added `dist:mac:arm64` and `dist:mac:x64` scripts to `electron/package.json`.
+
+### Changed
+
+- README framework section fully rewritten. GDPR, CCPA/CPRA, FINRA, SEC AI,
+  SR 11-7, NIST Privacy Framework, ISO 27002/27005/27017/27018/27701/31000,
+  and all other seeded frameworks are now listed as shipped. Only PCI DSS 4.0,
+  CIS Controls v8, COBIT 2019, and FedRAMP remain as roadmap items. Framework
+  count updated to 35+.
+- `PROJECT_STATUS.md` rewritten from the stale "15% Complete (Jan 2026)"
+  placeholder to a full v4.0.0 feature inventory.
+- `QUICKSTART.md` rewritten around three paths (desktop app / dev from source /
+  self-hosted) with optional Redis, Sentry, and SSO configuration notes.
+- `PHASE_2_ROADMAP.md` updated: Phase 1 & 2 marked complete, Phase 3 items
+  documented.
+
+---
+
 ## [4.0.0] — 2026-05-22
 
 ### Added
