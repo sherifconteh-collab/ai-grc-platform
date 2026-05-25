@@ -1,7 +1,7 @@
 // @tier: enterprise
 'use strict';
 
-const { Issuer } = require('openid-client');
+const { discovery, buildAuthorizationUrl, authorizationCodeGrant, fetchUserInfo } = require('openid-client');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const pool = require('../config/database');
@@ -41,25 +41,20 @@ const SOCIAL_PROVIDERS = {
   },
 };
 
-// ─── OIDC client cache ────────────────────────────────────────────────────────
+// ─── OIDC config cache (openid-client v6) ────────────────────────────────────
 
-const clientCache = new Map(); // discoveryUrl → {client, ts}
+const configCache = new Map(); // `${discoveryUrl}:${clientId}` → { config, ts }
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
-async function getOidcClient(discoveryUrl, clientId, clientSecret) {
+async function getOidcConfig(discoveryUrl, clientId, clientSecret) {
   const cacheKey = `${discoveryUrl}:${clientId}`;
-  const cached = clientCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.client;
+  const cached = configCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.config;
 
-  const issuer = await Issuer.discover(discoveryUrl);
-  const client = new issuer.Client({
-    client_id: clientId,
-    client_secret: clientSecret,
-    response_types: ['code'],
-  });
+  const config = await discovery(new URL(discoveryUrl), clientId, clientSecret);
 
-  clientCache.set(cacheKey, { client, ts: Date.now() });
-  return client;
+  configCache.set(cacheKey, { config, ts: Date.now() });
+  return config;
 }
 
 // ─── Org SSO config ──────────────────────────────────────────────────────────
@@ -129,21 +124,30 @@ async function saveOrgSsoConfig(organizationId, data) {
 // ─── OIDC flow helpers ────────────────────────────────────────────────────────
 
 async function getOidcAuthUrl(discoveryUrl, clientId, clientSecret, redirectUri, state, nonce, scopes) {
-  const client = await getOidcClient(discoveryUrl, clientId, clientSecret);
-  return client.authorizationUrl({
+  const config = await getOidcConfig(discoveryUrl, clientId, clientSecret);
+  const params = new URLSearchParams({
     scope: scopes || 'openid email profile',
     redirect_uri: redirectUri,
     state,
     nonce,
     response_type: 'code',
   });
+  return buildAuthorizationUrl(config, params).href;
 }
 
 async function exchangeOidcCode(discoveryUrl, clientId, clientSecret, redirectUri, callbackParams, checks) {
-  const client = await getOidcClient(discoveryUrl, clientId, clientSecret);
-  const tokenSet = await client.callback(redirectUri, callbackParams, checks);
-  const userinfo = await client.userinfo(tokenSet.access_token);
-  return { tokenSet, userinfo };
+  const config = await getOidcConfig(discoveryUrl, clientId, clientSecret);
+  // Build the full callback URL by appending query params to the redirect URI base
+  const callbackUrl = new URL(redirectUri);
+  for (const [k, v] of Object.entries(callbackParams || {})) {
+    callbackUrl.searchParams.set(k, String(v));
+  }
+  const tokens = await authorizationCodeGrant(config, callbackUrl, {
+    expectedState: checks.state,
+    expectedNonce: checks.nonce,
+  });
+  const userinfo = await fetchUserInfo(config, tokens.access_token, tokens.claims().sub);
+  return { tokenSet: tokens, userinfo };
 }
 
 // ─── User provisioning ────────────────────────────────────────────────────────
