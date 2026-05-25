@@ -606,8 +606,222 @@ router.get('/types', requirePermission('reports.read'), async (req, res) => {
       { id: 'compliance-excel', name: 'Compliance Report (Excel)', format: 'xlsx', description: 'Spreadsheet with summary, frameworks, and all controls with status' },
       { id: 'ssp-pdf', name: 'System Security Plan (SSP) PDF', format: 'pdf', description: 'Narrative SSP including organization profile, control posture, assets, vulnerabilities, evidence, and POA&M' },
       { id: 'ssp-json', name: 'System Security Plan (SSP) JSON', format: 'json', description: 'Machine-readable SSP snapshot for integrations and versioning' },
+      { id: 'executive', name: 'Executive Summary', format: 'json', description: 'Cross-framework compliance summary with trend data for executive reporting' },
+      { id: 'scheduled', name: 'Scheduled Report', format: 'various', description: 'Recurring automated report delivery on a configured schedule' },
     ]
   });
+});
+
+// GET /reports/executive — cross-framework executive summary from compliance snapshots
+router.get('/executive', requirePermission('reports.read'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const days = Math.min(365, Math.max(7, parseInt(req.query.days, 10) || 90));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const latestResult = await pool.query(
+      `SELECT DISTINCT ON (cs.framework_id)
+              f.code AS framework_code, f.name AS framework_name,
+              cs.snapshot_date, cs.total_controls, cs.implemented,
+              cs.partial, cs.not_implemented, cs.compliance_pct
+         FROM compliance_snapshots cs
+         JOIN frameworks f ON f.id = cs.framework_id
+        WHERE cs.organization_id = $1
+        ORDER BY cs.framework_id, cs.snapshot_date DESC`,
+      [orgId]
+    );
+
+    const trendResult = await pool.query(
+      `SELECT f.code AS framework_code, cs.snapshot_date, cs.compliance_pct
+         FROM compliance_snapshots cs
+         JOIN frameworks f ON f.id = cs.framework_id
+        WHERE cs.organization_id = $1 AND cs.snapshot_date >= $2
+        ORDER BY f.code, cs.snapshot_date ASC`,
+      [orgId, since]
+    );
+
+    const trendByFramework = {};
+    for (const row of trendResult.rows) {
+      if (!trendByFramework[row.framework_code]) trendByFramework[row.framework_code] = [];
+      trendByFramework[row.framework_code].push({
+        date: row.snapshot_date,
+        compliance_pct: parseFloat(row.compliance_pct)
+      });
+    }
+
+    const frameworks = latestResult.rows.map((row) => ({
+      ...row,
+      compliance_pct: parseFloat(row.compliance_pct),
+      trend: trendByFramework[row.framework_code] || []
+    }));
+
+    const overallPct = frameworks.length > 0
+      ? Math.round(frameworks.reduce((sum, f) => sum + f.compliance_pct, 0) / frameworks.length * 100) / 100
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        generated_at: new Date().toISOString(),
+        period_days: days,
+        overall_compliance_pct: overallPct,
+        framework_count: frameworks.length,
+        frameworks
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /reports/trend/framework/:frameworkId — per-framework compliance trend from snapshots
+router.get('/trend/framework/:frameworkId', requirePermission('reports.read'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const days = Math.min(365, Math.max(7, parseInt(req.query.days, 10) || 90));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const fwCheck = await pool.query(
+      `SELECT f.id, f.code, f.name FROM frameworks f WHERE f.id = $1`,
+      [req.params.frameworkId]
+    );
+    if (fwCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Framework not found' });
+    }
+
+    const trendResult = await pool.query(
+      `SELECT snapshot_date, total_controls, implemented, partial, not_implemented, compliance_pct
+         FROM compliance_snapshots
+        WHERE organization_id = $1 AND framework_id = $2 AND snapshot_date >= $3
+        ORDER BY snapshot_date ASC`,
+      [orgId, req.params.frameworkId, since]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        framework: fwCheck.rows[0],
+        period_days: days,
+        snapshots: trendResult.rows.map((r) => ({
+          ...r,
+          compliance_pct: parseFloat(r.compliance_pct)
+        }))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /reports/scheduled — list scheduled reports for the org
+router.get('/scheduled', requirePermission('reports.read'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM scheduled_reports WHERE organization_id = $1 ORDER BY created_at DESC',
+      [req.user.organization_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /reports/scheduled — create a scheduled report
+router.post('/scheduled', requirePermission('reports.manage'), async (req, res) => {
+  try {
+    const { name, report_type, schedule, format = 'pdf', recipients = [], filters = {} } = req.body;
+    if (!name || !report_type || !schedule) {
+      return res.status(400).json({ error: 'name, report_type, and schedule are required' });
+    }
+    const VALID_SCHEDULES = ['daily', 'weekly', 'monthly', 'quarterly'];
+    if (!VALID_SCHEDULES.includes(schedule)) {
+      return res.status(400).json({ error: `schedule must be one of: ${VALID_SCHEDULES.join(', ')}` });
+    }
+    const result = await pool.query(
+      `INSERT INTO scheduled_reports
+         (organization_id, name, report_type, schedule, format, recipients, filters, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)
+       RETURNING *`,
+      [req.user.organization_id, name.trim(), report_type, schedule, format,
+       JSON.stringify(recipients), JSON.stringify(filters), req.user.id]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /reports/scheduled/:id — update a scheduled report
+router.patch('/scheduled/:id', requirePermission('reports.manage'), async (req, res) => {
+  try {
+    const { name, schedule, format, recipients, filters, is_active } = req.body;
+    const existing = await pool.query(
+      'SELECT id FROM scheduled_reports WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Scheduled report not found' });
+    }
+    const result = await pool.query(
+      `UPDATE scheduled_reports
+         SET name = COALESCE($3, name),
+             schedule = COALESCE($4, schedule),
+             format = COALESCE($5, format),
+             recipients = COALESCE($6::jsonb, recipients),
+             filters = COALESCE($7::jsonb, filters),
+             is_active = COALESCE($8, is_active),
+             updated_at = NOW()
+       WHERE id = $1 AND organization_id = $2
+       RETURNING *`,
+      [req.params.id, req.user.organization_id,
+       name || null, schedule || null, format || null,
+       recipients ? JSON.stringify(recipients) : null,
+       filters ? JSON.stringify(filters) : null,
+       is_active === undefined ? null : is_active]
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /reports/scheduled/:id — delete a scheduled report
+router.delete('/scheduled/:id', requirePermission('reports.manage'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM scheduled_reports WHERE id = $1 AND organization_id = $2 RETURNING id',
+      [req.params.id, req.user.organization_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Scheduled report not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /reports/scheduled/:id/run — manually trigger a scheduled report
+router.post('/scheduled/:id/run', requirePermission('reports.manage'), async (req, res) => {
+  try {
+    const existing = await pool.query(
+      'SELECT id FROM scheduled_reports WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Scheduled report not found' });
+    }
+    const { enqueueJob } = require('../services/jobService');
+    const job = await enqueueJob({
+      organizationId: req.user.organization_id,
+      jobType: 'scheduled_report_run',
+      payload: { scheduledReportId: req.params.id },
+      createdBy: req.user.id
+    });
+    res.json({ success: true, data: { job_id: job.id } });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;

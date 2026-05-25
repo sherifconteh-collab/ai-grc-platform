@@ -1,7 +1,53 @@
-# ControlWeave — Release Notes
 
 > ControlWeave is fully open source. Every feature is available in this build —
 > there are no tier-gated or premium-only capabilities.
+
+---
+
+## [4.2.0] — 2026-05-24
+
+### Added
+
+#### Custom Compliance Framework Builder
+- Organizations can now create fully custom compliance frameworks with org-defined controls.
+- New database tables: `custom_frameworks` and `custom_framework_controls` with full Row-Level Security (migration 113).
+- New API: `GET/POST /api/v1/frameworks/custom`, `GET/PUT/DELETE /api/v1/frameworks/custom/:id`, `POST /api/v1/frameworks/custom/:id/controls`, `POST /api/v1/frameworks/custom/:id/publish`, `POST /api/v1/frameworks/custom/clone/:sourceCode`.
+- New frontend page: `/dashboard/frameworks/custom` — full builder UI with create, edit, delete, publish, and clone workflows.
+
+#### Advanced Analytics & Scheduled Reporting
+- New `compliance_snapshots` table records per-org, per-framework compliance percentages daily (migration 114).
+- New `scheduled_reports` table enables configuring recurring report delivery (migration 114).
+- New API: `GET /api/v1/reports/executive` — cross-framework executive summary with trend data from snapshots.
+- New API: `GET /api/v1/reports/trend/framework/:frameworkId` — per-framework historical compliance trend.
+- New API: `GET/POST/PATCH/DELETE /api/v1/reports/scheduled` — manage scheduled report configurations.
+- New API: `POST /api/v1/reports/scheduled/:id/run` — manually trigger a scheduled report.
+- New `backend/scripts/snapshot-compliance.js` — enqueues `compliance_snapshot` job; designed for daily cron `0 2 * * *`.
+- New frontend page: `/dashboard/reports/executive` — executive analytics dashboard with 30/90/180/365-day period selector and compliance sparklines.
+- New job types: `compliance_snapshot` (runs `runComplianceSnapshot`) and `scheduled_report_run` (runs `runScheduledReport`) added to `jobService.js`.
+- `GET /api/v1/reports/types` updated to include `executive` and `scheduled` entries.
+
+#### MSP Multi-Tenant Org Hierarchy
+- Organizations can now have parent–child relationships via new `parent_org_id` column (migration 115).
+- New `org_delegated_admins` table enables parent org admins to delegate access to child orgs.
+- New API: `GET/POST /api/v1/organizations/children` — list and create child organizations.
+- New API: `GET /api/v1/organizations/children/:childId/summary` — latest compliance snapshots for a child org (verifies parent or delegated access).
+- New API: `POST /api/v1/organizations/children/:childId/delegate` — grant delegated admin to a parent-org user.
+- New API: `DELETE /api/v1/organizations/children/:childId/delegate/:userId` — revoke delegation.
+- New frontend page: `/dashboard/platform/managed-orgs` — MSP dashboard showing child org list, compliance summary, and delegated admin management.
+
+#### Continuous Monitoring Connectors
+- New `aws_security_hub` connector service (`backend/src/services/awsSecurityHubService.js`): AWS SDK v3 Security Hub integration mapping findings to NIST/CIS controls.
+- New `qualys_vmdr` connector service (`backend/src/services/qualysService.js`): Qualys VMDR vulnerability scan import mapped to CIS Controls v8 and NIST 800-53.
+- New `servicenow` connector service (`backend/src/services/serviceNowService.js`): ITSM incident and change record integration for control implementation evidence.
+- Three new connector template entries added to `GET /api/v1/integrations-hub/templates` (total: 15 templates, was 12).
+
+#### New Compliance Frameworks (via seed script)
+- **CIS Controls v8** (`cis_controls_v8`) — 18 top-level Implementation Groups with crosswalk mappings to NIST 800-53 Rev 5 and NIST CSF 2.0.
+- **FedRAMP High Baseline** (`fedramp_high`) — 25 High-only additions (AC, AU, IA, SC, SI, SA, CP, IR, PE, PS, RA, PL families) with crosswalk to NIST 800-53 Rev 5.
+- **203 additional crosswalk mappings** across CMMC 2.0, NIST 800-171, PCI DSS v4, HIPAA, ISO 27701, GDPR, CCPA/CPRA, NERC CIP, and others.
+
+#### FedRAMP Deployment Guide
+- New `docs/FEDRAMP_DEPLOYMENT_GUIDE.md` covering FedRAMP Moderate and High impact levels, architecture requirements, required environment variables, pre-flight security checklist, audit log mapping, backup/recovery objectives (RTO 4h / RPO 1h), and ConMon deliverables checklist.
 
 ---
 

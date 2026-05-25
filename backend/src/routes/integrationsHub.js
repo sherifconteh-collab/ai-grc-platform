@@ -22,7 +22,10 @@ const DEFAULT_CONNECTOR_TEMPLATES = [
   { type: 'mitre_attack', label: 'MITRE ATT&CK', category: 'Threat Intelligence', required: [], supports_realtime: false, description: 'Adversary tactics and techniques' },
   { type: 'alienvault_otx', label: 'AlienVault OTX', category: 'Threat Intelligence', required: ['apiKey'], supports_realtime: true, description: 'Open Threat Exchange' },
   { type: 'securityscorecard', label: 'SecurityScorecard', category: 'Vendor Security', required: ['apiKey'], supports_realtime: false, description: 'Third-party security ratings' },
-  { type: 'bitsight', label: 'BitSight', category: 'Vendor Security', required: ['apiKey'], supports_realtime: false, description: 'Continuous security ratings' }
+  { type: 'bitsight', label: 'BitSight', category: 'Vendor Security', required: ['apiKey'], supports_realtime: false, description: 'Continuous security ratings' },
+  { type: 'aws_security_hub', label: 'AWS Security Hub', category: 'Cloud Security', required: ['region', 'accessKeyId', 'secretAccessKey'], optional: ['assumeRoleArn'], supports_realtime: false, description: 'AWS Security Hub findings — maps severity to control status and links findings to NIST/CIS controls' },
+  { type: 'qualys_vmdr', label: 'Qualys VMDR', category: 'Vulnerability Scanner', required: ['baseUrl', 'username', 'password'], optional: ['tagIds'], supports_realtime: false, description: 'Qualys VMDR vulnerability detections mapped to CIS Controls v8 and NIST 800-53' },
+  { type: 'servicenow', label: 'ITSM / Change Management', category: 'ITSM / Change Management', required: ['instanceUrl', 'username', 'password'], optional: ['changeTableName', 'incidentTableName'], supports_realtime: false, description: 'ITSM incident and change records linked to control implementation evidence' } // ip-hygiene:ignore
 ];
 
 function normalizeStatus(value) {

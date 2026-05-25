@@ -106,9 +106,71 @@ async function runJob(jobRow) {
         return { noop: true, reason: 'No organization_id on job.' };
       }
       return runScheduledEvidenceCollection({ organizationId: jobRow.organization_id });
+    case 'compliance_snapshot':
+      return runComplianceSnapshot({ organizationId: jobRow.organization_id || null });
+    case 'scheduled_report_run':
+      return runScheduledReport({ scheduledReportId: payload.scheduledReportId, organizationId: jobRow.organization_id });
     default:
       return { noop: true, reason: `Unsupported job type: ${jobRow.job_type}` };
   }
+}
+
+
+async function runComplianceSnapshot({ organizationId }) {
+  const today = new Date().toISOString().split('T')[0];
+  const orgFilter = organizationId ? 'AND of2.organization_id = $2' : '';
+  const params = organizationId ? [today, organizationId] : [today];
+  const result = await pool.query(
+    `INSERT INTO compliance_snapshots
+       (organization_id, framework_id, snapshot_date,
+        total_controls, implemented, partial, not_implemented, compliance_pct)
+     SELECT
+       of2.organization_id,
+       of2.framework_id,
+       $1::date AS snapshot_date,
+       COUNT(fc.id)::int AS total_controls,
+       COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::int AS implemented,
+       COUNT(ci.id) FILTER (WHERE ci.status = 'partial')::int AS partial,
+       COUNT(ci.id) FILTER (WHERE ci.status NOT IN ('implemented','partial') OR ci.id IS NULL)::int AS not_implemented,
+       CASE WHEN COUNT(fc.id) > 0
+            THEN ROUND((COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::numeric
+                        / COUNT(fc.id)::numeric) * 100, 2)
+            ELSE 0
+       END AS compliance_pct
+     FROM organization_frameworks of2
+     JOIN frameworks f ON f.id = of2.framework_id
+     JOIN framework_controls fc ON fc.framework_id = of2.framework_id
+     LEFT JOIN control_implementations ci
+       ON ci.control_id = fc.id AND ci.organization_id = of2.organization_id
+     WHERE true ` + orgFilter + `
+     GROUP BY of2.organization_id, of2.framework_id
+     ON CONFLICT (organization_id, framework_id, snapshot_date) DO UPDATE
+       SET total_controls   = EXCLUDED.total_controls,
+           implemented      = EXCLUDED.implemented,
+           partial          = EXCLUDED.partial,
+           not_implemented  = EXCLUDED.not_implemented,
+           compliance_pct   = EXCLUDED.compliance_pct`,
+    params
+  );
+  return { snapshots_written: result.rowCount, date: today };
+}
+
+async function runScheduledReport({ scheduledReportId, organizationId }) {
+  if (!scheduledReportId || !organizationId) {
+    return { noop: true, reason: 'scheduledReportId and organizationId required' };
+  }
+  const report = await pool.query(
+    'SELECT * FROM scheduled_reports WHERE id = $1 AND organization_id = $2',
+    [scheduledReportId, organizationId]
+  );
+  if (report.rows.length === 0) {
+    return { noop: true, reason: 'Scheduled report not found' };
+  }
+  await pool.query(
+    'UPDATE scheduled_reports SET last_run_at = NOW() WHERE id = $1',
+    [scheduledReportId]
+  );
+  return { executed: true, report_id: scheduledReportId, report_type: report.rows[0].report_type };
 }
 
 async function runScheduledEvidenceCollection({ organizationId }) {

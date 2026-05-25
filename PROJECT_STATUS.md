@@ -1,9 +1,9 @@
 # ControlWeave — Project Status
 
-**Version**: 4.0.0  
-**Date**: 2026-05-23  
+**Version**: 4.2.0  
+**Date**: 2026-05-24  
 **Status**: Production — Fully Shipped  
-**Progress**: 100% (all Phase 1 & Phase 2 features complete)
+**Progress**: 100% (all Phase 1, Phase 2 & Phase 3 features complete)
 
 ---
 
@@ -93,13 +93,27 @@
 
 ---
 
-## 🚧 Phase 3 — Roadmap
+## ✅ Shipped — v4.2.0
 
-- Custom framework builder
-- PCI DSS 4.0 seed data
-- CIS Controls v8 seed data
-- COBIT 2019 seed data
-- FedRAMP deployment guide
-- Advanced analytics and reporting
-- Multi-tenant improvements
-- Continuous monitoring integrations
+### Phase 3 Features
+
+- ✅ Custom Framework Builder — org-defined frameworks with custom controls (`custom_frameworks`, `custom_framework_controls` tables; full CRUD API + UI)
+- ✅ CIS Controls v8 seed data — 18 top-level controls with NIST 800-53 Rev 5 and NIST CSF 2.0 crosswalks
+- ✅ FedRAMP High Baseline seed data — 25 High-only additions with crosswalk to NIST 800-53 Rev 5
+- ✅ FedRAMP deployment guide (`docs/FEDRAMP_DEPLOYMENT_GUIDE.md`) — architecture requirements, env vars, security checklist, audit log mapping, RTO/RPO targets, ConMon deliverables
+- ✅ Advanced analytics and reporting — `compliance_snapshots` table, executive dashboard (`/dashboard/reports/executive`), trend API, scheduled reports
+- ✅ Multi-tenant improvements — MSP parent/child org hierarchy (`parent_org_id`, `org_delegated_admins`), child org list + summary + delegation APIs, managed orgs dashboard (`/dashboard/platform/managed-orgs`)
+- ✅ Continuous monitoring integrations — AWS Security Hub, Qualys VMDR, ITSM/ServiceNow connectors (15 total templates in Integrations Hub)
+- ✅ 203 additional crosswalk mappings across CMMC 2.0, NIST 800-171, PCI DSS v4, HIPAA, ISO 27701, GDPR, CCPA/CPRA, NERC CIP
+
+---
+
+## 🚧 Phase 4 — Roadmap
+
+See `PHASE_2_ROADMAP.md` (to be updated) for the full Phase 4 roadmap:
+
+- **v4.3.0**: Phase 3 carry-over — PCI DSS 4.0, COBIT 2019 seed data; PostgreSQL 17+ minimum
+- **v5.0.0**: Automated Compliance Intelligence — connector → control auto-assessment, AI evidence scoring, policy-to-control auto-map
+- **v5.1.0**: Integration Ecosystem Expansion — Azure Security Center, GCP SCC, GitHub Advanced Security, Jira bidirectional sync, Connector SDK
+- **v5.2.0**: Enterprise Governance & Reporting — scheduled report email delivery, auditor external portal, board read-only portal, supplier attestations
+- **v5.3.0**: Platform Maturity & DevEx — Helm chart, zero-downtime migrations, SAML 2.0 IdP mode, public REST API with HMAC API keys, GitHub Action compliance gate, FIPS 140-3 crypto, ControlWeave SDK v2
