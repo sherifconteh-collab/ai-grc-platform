@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-23 | PR #176: fix(ci): split macOS build into native arm64 + x64 jobs; fix framework tiers -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #177: chore(frontend)(deps-dev): bump @types/react from 19.2.14 to 19.2.15 in /frontend -->
 
 ## 🎯 What is This?
 
