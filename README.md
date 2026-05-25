@@ -53,11 +53,11 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-25 | v4.2.0: Custom Framework Builder, Advanced Analytics, MSP Hierarchy, Continuous Monitoring Connectors, CIS Controls v8, FedRAMP High -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #187: feat(v4.2.0): port ControlWeaver-Pro v4.2.0 features + dependency updates -->
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 35+ frameworks with 1,000+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 30+ frameworks with 1,000+ controls. Built to be:
 
 - **Multi-Framework**: 30+ major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
@@ -905,7 +905,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
-- **Tables**: 155+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
+- **Tables**: 160+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 115 sequential, idempotent migrations
 - **API Routes**: 70+ route modules
 - **Services**: 49 service modules

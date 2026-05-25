@@ -179,6 +179,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- feat(v4.2.0): port ControlWeaver-Pro v4.2.0 features + dependency updates ([#187](https://github.com/sherifconteh-collab/ai-grc-platform/pull/187)) — @sherifconteh-collab
 - chore(frontend)(deps): bump lucide-react from 1.14.0 to 1.16.0 in /frontend ([#185](https://github.com/sherifconteh-collab/ai-grc-platform/pull/185)) — @dependabot[bot]
 - chore(backend)(deps-dev): bump globals from 17.5.0 to 17.6.0 in /backend ([#186](https://github.com/sherifconteh-collab/ai-grc-platform/pull/186)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @playwright/test from 1.59.1 to 1.60.0 in /frontend ([#183](https://github.com/sherifconteh-collab/ai-grc-platform/pull/183)) — @dependabot[bot]
