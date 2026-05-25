@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v4.0.1-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v4.2.0-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -67,9 +67,9 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (21 tools)
 - **Enterprise-Grade**: PostgreSQL RLS, Redis caching, automated backups, SSO, Sentry
 
-## ✅ Current Status — v4.0.0 (All Features Shipped)
+## ✅ Current Status — v4.2.0 (All Features Shipped)
 
-The platform is **fully functional** with the complete v4.0.0 feature set. Every capability is available — no tier gating, no feature flags.
+The platform is **fully functional** with the complete v4.2.0 feature set. Every capability is available — no tier gating, no feature flags.
 
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
@@ -789,13 +789,24 @@ controlweave/
 - ✅ SSP auto-generation (NIST 800-171, FedRAMP) — export to Word/PDF
 - ✅ Forgot-password / reset-password self-service flow
 
-### Phase 3: Enterprise & Scale
-- Custom framework builder
-- Advanced analytics and reporting
-- Multi-tenant improvements
-- Continuous monitoring integrations
-- GDPR, PCI DSS 4.0, CIS Controls v8 framework additions
-- FedRAMP-ready deployment guide
+### Phase 3: Enterprise & Scale ✅ (All Complete in v4.2.0)
+- ✅ Custom framework builder (org-defined frameworks with full CRUD, publish, and clone)
+- ✅ Advanced analytics and reporting (compliance snapshots, executive dashboard, scheduled reports)
+- ✅ Multi-tenant MSP hierarchy (parent/child orgs, delegated admin)
+- ✅ Continuous monitoring integrations (AWS Security Hub, Qualys VMDR, ITSM/ServiceNow)
+- ✅ CIS Controls v8 and FedRAMP High Baseline seed data (203 new crosswalk mappings)
+- ✅ FedRAMP-ready deployment guide (`docs/FEDRAMP_DEPLOYMENT_GUIDE.md`)
+
+### Phase 4: Automated Intelligence & Platform Maturity (Planned)
+- Connector → control auto-assessment (AI-driven status updates from connector findings)
+- AI evidence scoring (relevance confidence + gap description)
+- Policy-to-control auto-mapping via RAG
+- Azure Security Center, GCP SCC, GitHub Advanced Security connectors
+- Jira bidirectional POA&M sync
+- Scheduled report email delivery
+- Auditor external portal (time-limited read-only audit links)
+- Helm chart / Kubernetes deployment
+- Public REST API with HMAC-SHA-384 API keys
 
 ## 🤝 Contributing
 

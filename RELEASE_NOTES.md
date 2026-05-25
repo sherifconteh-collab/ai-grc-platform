@@ -49,6 +49,20 @@
 #### FedRAMP Deployment Guide
 - New `docs/FEDRAMP_DEPLOYMENT_GUIDE.md` covering FedRAMP Moderate and High impact levels, architecture requirements, required environment variables, pre-flight security checklist, audit log mapping, backup/recovery objectives (RTO 4h / RPO 1h), and ConMon deliverables checklist.
 
+### Fixed
+
+- **Compliance snapshot accuracy**: `satisfied_via_crosswalk` controls are now correctly counted as implemented in `compliance_snapshots` (both `implemented` column and `compliance_pct` calculation). Previously these controls were classified as `not_implemented`, causing executive dashboards to under-report compliance posture.
+- **SSO OIDC token handling**: `tokens.claims()?.sub` now uses optional chaining so OIDC providers that omit an ID token do not cause a runtime crash during the authorization code exchange.
+- **Qualys VMDR connector hardening**: added 30 s socket timeout, HTTP non-2xx rejection, and parse-error throw (was silently resolving with a `_parseError` sentinel that callers did not check).
+- **ServiceNow ITSM connector hardening**: added 30 s socket timeout, HTTP non-2xx rejection, and parse-error throw to match Qualys connector behaviour.
+- **Scheduled report validation**: `POST /api/v1/reports/scheduled` now validates `report_type` and `format` against allow-lists before writing to the database, returning HTTP 400 with a descriptive message instead of an unhandled DB constraint error.
+
+### Changed
+
+- Dependency bumps (frontend): `@tailwindcss/postcss` → 4.3.0, `lucide-react` → 1.16.0, `@playwright/test` → 1.60.0.
+- Dependency bumps (backend): `@anthropic-ai/sdk` → 0.98.0, `node-cron` → 4.2.1, `globals` → 17.6.0.
+- `openid-client` upgraded to v6; SSO service (`ssoService.js`) migrated to the v6 function-based API (`discovery`, `buildAuthorizationUrl`, `authorizationCodeGrant`, `fetchUserInfo`).
+
 ---
 
 ## [4.0.1] — 2026-05-23
