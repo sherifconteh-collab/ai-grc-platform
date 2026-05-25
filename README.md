@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-25 | PR #183: chore(frontend)(deps-dev): bump @playwright/test from 1.59.1 to 1.60.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #186: chore(backend)(deps-dev): bump globals from 17.5.0 to 17.6.0 in /backend -->
 
 ## 🎯 What is This?
 
