@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-25 | PR #179: chore(frontend)(deps-dev): bump tailwindcss from 4.2.4 to 4.3.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #182: chore(backend)(deps): bump @anthropic-ai/sdk from 0.97.0 to 0.98.0 in /backend -->
 
 ## 🎯 What is This?
 
