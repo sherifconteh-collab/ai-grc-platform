@@ -71,7 +71,7 @@
     "@anthropic-ai/sdk": "^0.97.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@noble/post-quantum": "^0.6.1",
-    "@sentry/node": "^8.55.0",
+    "@sentry/node": "^10.53.1",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.15.2",
