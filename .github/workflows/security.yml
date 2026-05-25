@@ -36,6 +36,31 @@ jobs:
           npm ci
           npm audit --audit-level=moderate
 
+  version-sync:
+    name: Version Sync Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify backend / frontend / electron versions match
+        run: |
+          BACKEND=$(node -p "require('./backend/package.json').version")
+          FRONTEND=$(node -p "require('./frontend/package.json').version")
+          ELECTRON=$(node -p "require('./electron/package.json').version")
+
+          echo "backend:  $BACKEND"
+          echo "frontend: $FRONTEND"
+          echo "electron: $ELECTRON"
+
+          if [ "$BACKEND" != "$FRONTEND" ] || [ "$BACKEND" != "$ELECTRON" ]; then
+            echo ""
+            echo "❌ Version mismatch — all three package.json files must be at the same version."
+            echo "   Update the out-of-sync file(s) and re-push."
+            exit 1
+          fi
+
+          echo "✅ All three packages are at v$BACKEND"
+
   code-quality:
     name: Code Quality (Typecheck & Syntax)
     runs-on: ubuntu-latest
