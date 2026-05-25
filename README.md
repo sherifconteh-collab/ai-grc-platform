@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-25 | PR #182: chore(backend)(deps): bump @anthropic-ai/sdk from 0.97.0 to 0.98.0 in /backend -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #183: chore(frontend)(deps-dev): bump @playwright/test from 1.59.1 to 1.60.0 in /frontend -->
 
 ## 🎯 What is This?
 
