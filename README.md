@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-23 | PR #176: fix(ci): split macOS build into native arm64 + x64 jobs; fix framework tiers -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #186: chore(backend)(deps-dev): bump globals from 17.5.0 to 17.6.0 in /backend -->
 
 ## 🎯 What is This?
 

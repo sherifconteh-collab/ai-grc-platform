@@ -119,6 +119,11 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(backend)(deps-dev): bump globals from 17.5.0 to 17.6.0 in /backend ([#186](https://github.com/sherifconteh-collab/ai-grc-platform/pull/186)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @playwright/test from 1.59.1 to 1.60.0 in /frontend ([#183](https://github.com/sherifconteh-collab/ai-grc-platform/pull/183)) — @dependabot[bot]
+- chore(backend)(deps): bump @anthropic-ai/sdk from 0.97.0 to 0.98.0 in /backend ([#182](https://github.com/sherifconteh-collab/ai-grc-platform/pull/182)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump tailwindcss from 4.2.4 to 4.3.0 in /frontend ([#179](https://github.com/sherifconteh-collab/ai-grc-platform/pull/179)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/react from 19.2.14 to 19.2.15 in /frontend ([#177](https://github.com/sherifconteh-collab/ai-grc-platform/pull/177)) — @dependabot[bot]
 - fix(ci): split macOS build into native arm64 + x64 jobs; fix framework tiers ([#176](https://github.com/sherifconteh-collab/ai-grc-platform/pull/176)) — @sherifconteh-collab
 - feat: ControlWeave 4.0.0 — full open-source parity (de-tier + all features) ([#174](https://github.com/sherifconteh-collab/ai-grc-platform/pull/174)) — @sherifconteh-collab
 

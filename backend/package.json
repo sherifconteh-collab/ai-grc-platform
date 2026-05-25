@@ -68,10 +68,10 @@
     "qa:demo:repair-account": "node scripts/repair-demo-account-via-api.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.97.0",
+    "@anthropic-ai/sdk": "^0.98.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@noble/post-quantum": "^0.6.1",
-    "@sentry/node": "^8.55.0",
+    "@sentry/node": "^10.53.1",
     "@simplewebauthn/server": "^13.2.2",
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.15.2",
@@ -89,7 +89,7 @@
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "openai": "^6.38.0",
     "openid-client": "^6.8.3",
@@ -106,9 +106,9 @@
   },
   "devDependencies": {
     "@babel/preset-env": "^7.29.5",
-    "eslint": "^10.2.1",
+    "eslint": "^10.4.0",
     "eslint-plugin-security": "^4.0.0",
-    "globals": "^17.4.0",
+    "globals": "^17.6.0",
     "jest": "^30.4.2",
     "nodemon": "^3.0.1"
   },
