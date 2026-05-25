@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-25 | PR #177: chore(frontend)(deps-dev): bump @types/react from 19.2.14 to 19.2.15 in /frontend -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #179: chore(frontend)(deps-dev): bump tailwindcss from 4.2.4 to 4.3.0 in /frontend -->
 
 ## 🎯 What is This?
 

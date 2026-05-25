@@ -119,6 +119,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(frontend)(deps-dev): bump tailwindcss from 4.2.4 to 4.3.0 in /frontend ([#179](https://github.com/sherifconteh-collab/ai-grc-platform/pull/179)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @types/react from 19.2.14 to 19.2.15 in /frontend ([#177](https://github.com/sherifconteh-collab/ai-grc-platform/pull/177)) — @dependabot[bot]
 - fix(ci): split macOS build into native arm64 + x64 jobs; fix framework tiers ([#176](https://github.com/sherifconteh-collab/ai-grc-platform/pull/176)) — @sherifconteh-collab
 - feat: ControlWeave 4.0.0 — full open-source parity (de-tier + all features) ([#174](https://github.com/sherifconteh-collab/ai-grc-platform/pull/174)) — @sherifconteh-collab
