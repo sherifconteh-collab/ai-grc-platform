@@ -68,7 +68,7 @@
     "qa:demo:repair-account": "node scripts/repair-demo-account-via-api.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.97.0",
+    "@anthropic-ai/sdk": "^0.98.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@noble/post-quantum": "^0.6.1",
     "@sentry/node": "^10.53.1",
