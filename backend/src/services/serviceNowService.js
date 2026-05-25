@@ -19,6 +19,7 @@ async function snowRequest(config, table, params) {
       hostname: base.hostname,
       path: `/api/now/table/${table}?${qs}`,
       method: 'GET',
+      timeout: 30000,
       headers: {
         'Authorization': `Basic ${auth}`,
         'Accept': 'application/json',
@@ -26,13 +27,18 @@ async function snowRequest(config, table, params) {
       }
     };
     const req = https.request(options, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        return reject(new Error(`ServiceNow API returned HTTP ${res.statusCode}`));
+      }
       const chunks = [];
       res.on('data', (d) => chunks.push(d));
       res.on('end', () => {
         try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
-        catch { resolve({ result: [] }); }
+        catch { reject(new Error('ServiceNow response parse error')); }
       });
     });
+    req.on('timeout', () => { req.destroy(new Error('ServiceNow request timed out')); });
     req.on('error', reject);
     req.end();
   });

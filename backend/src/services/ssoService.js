@@ -146,7 +146,7 @@ async function exchangeOidcCode(discoveryUrl, clientId, clientSecret, redirectUr
     expectedState: checks.state,
     expectedNonce: checks.nonce,
   });
-  const userinfo = await fetchUserInfo(config, tokens.access_token, tokens.claims().sub);
+  const userinfo = await fetchUserInfo(config, tokens.access_token, tokens.claims()?.sub);
   return { tokenSet: tokens, userinfo };
 }
 

@@ -21,6 +21,7 @@ async function qualysRequest(config, path) {
       hostname: baseUrl.hostname,
       path,
       method: 'GET',
+      timeout: 30000,
       headers: {
         'Authorization': `Basic ${auth}`,
         'X-Requested-With': 'ControlWeave',
@@ -28,6 +29,10 @@ async function qualysRequest(config, path) {
       }
     };
     const req = https.request(options, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        return reject(new Error(`Qualys API returned HTTP ${res.statusCode}`));
+      }
       const chunks = [];
       res.on('data', (d) => chunks.push(d));
       res.on('end', () => {
@@ -35,10 +40,11 @@ async function qualysRequest(config, path) {
         try {
           resolve(JSON.parse(body));
         } catch (parseErr) {
-          resolve({ _parseError: parseErr.message, _rawBody: body.slice(0, 200) });
+          reject(new Error(`Qualys response parse error: ${parseErr.message}`));
         }
       });
     });
+    req.on('timeout', () => { req.destroy(new Error('Qualys request timed out')); });
     req.on('error', reject);
     req.end();
   });

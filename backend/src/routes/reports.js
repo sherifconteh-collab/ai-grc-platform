@@ -737,6 +737,14 @@ router.post('/scheduled', requirePermission('reports.manage'), async (req, res) 
     if (!VALID_SCHEDULES.includes(schedule)) {
       return res.status(400).json({ error: `schedule must be one of: ${VALID_SCHEDULES.join(', ')}` });
     }
+    const VALID_TYPES = ['compliance_summary', 'framework_gap', 'evidence_status', 'audit_trail', 'executive'];
+    if (!VALID_TYPES.includes(report_type)) {
+      return res.status(400).json({ error: `report_type must be one of: ${VALID_TYPES.join(', ')}` });
+    }
+    const VALID_FORMATS = ['pdf', 'csv', 'json'];
+    if (!VALID_FORMATS.includes(format)) {
+      return res.status(400).json({ error: `format must be one of: ${VALID_FORMATS.join(', ')}` });
+    }
     const result = await pool.query(
       `INSERT INTO scheduled_reports
          (organization_id, name, report_type, schedule, format, recipients, filters, created_by)

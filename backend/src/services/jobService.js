@@ -129,11 +129,11 @@ async function runComplianceSnapshot({ organizationId }) {
        of2.framework_id,
        $1::date AS snapshot_date,
        COUNT(fc.id)::int AS total_controls,
-       COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::int AS implemented,
+       COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'satisfied_via_crosswalk'))::int AS implemented,
        COUNT(ci.id) FILTER (WHERE ci.status = 'partial')::int AS partial,
-       COUNT(ci.id) FILTER (WHERE ci.status NOT IN ('implemented','partial') OR ci.id IS NULL)::int AS not_implemented,
+       COUNT(ci.id) FILTER (WHERE ci.status NOT IN ('implemented', 'satisfied_via_crosswalk', 'partial') OR ci.id IS NULL)::int AS not_implemented,
        CASE WHEN COUNT(fc.id) > 0
-            THEN ROUND((COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::numeric
+            THEN ROUND((COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'satisfied_via_crosswalk'))::numeric
                         / COUNT(fc.id)::numeric) * 100, 2)
             ELSE 0
        END AS compliance_pct
