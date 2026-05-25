@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-25 | PR #186: chore(backend)(deps-dev): bump globals from 17.5.0 to 17.6.0 in /backend -->
+<!-- LAST_UPDATED: 2026-05-25 | PR #185: chore(frontend)(deps): bump lucide-react from 1.14.0 to 1.16.0 in /frontend -->
 
 ## 🎯 What is This?
 
