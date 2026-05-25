@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v4.0.1-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v4.2.0-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -53,11 +53,11 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-25 | PR #185: chore(frontend)(deps): bump lucide-react from 1.14.0 to 1.16.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-05-25 | v4.2.0: Custom Framework Builder, Advanced Analytics, MSP Hierarchy, Continuous Monitoring Connectors, CIS Controls v8, FedRAMP High -->
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, and 30+ frameworks with 1,000+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 35+ frameworks with 1,000+ controls. Built to be:
 
 - **Multi-Framework**: 30+ major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
@@ -67,9 +67,9 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (21 tools)
 - **Enterprise-Grade**: PostgreSQL RLS, Redis caching, automated backups, SSO, Sentry
 
-## ✅ Current Status — v4.0.0 (All Features Shipped)
+## ✅ Current Status — v4.2.0 (All Features Shipped)
 
-The platform is **fully functional** with the complete v4.0.0 feature set. Every capability is available — no tier gating, no feature flags.
+The platform is **fully functional** with the complete v4.2.0 feature set. Every capability is available — no tier gating, no feature flags.
 
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
@@ -222,11 +222,13 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 - **US State AI Governance Laws** — 47 controls covering 12+ US state AI law jurisdictions (CO, TX, UT, IL, NY, CA, and more)
 - **International AI Governance Laws** — EU AI Act, UK, Canada, Japan, Singapore, Australia, and 30+ jurisdictions
 
+### Added in v4.2.0
+- **CIS Controls v8** (`cis_controls_v8`) — 18 Implementation Groups with crosswalk mappings to NIST 800-53 Rev 5 and NIST CSF 2.0
+- **FedRAMP High Baseline** (`fedramp_high`) — 25 High-only additions (AC, AU, IA, SC, SI, SA, CP, IR, PE, PS, RA, PL families) with crosswalk to NIST 800-53 Rev 5
+
 ### Roadmap (not yet seeded)
 - PCI DSS 4.0
-- CIS Controls v8
 - COBIT 2019
-- FedRAMP
 
 ## 💡 Key Features
 
@@ -401,10 +403,38 @@ Full asset and configuration inventory:
 - User-configurable preferences for in-app vs. email delivery
 - Mobile push notifications (iOS APNs + Android FCM) via device token lifecycle
 
+### 🧩 Custom Compliance Framework Builder *(v4.2.0)*
+- Create fully custom compliance frameworks with org-defined controls
+- Full CRUD for frameworks and individual controls (priority, type, sort order)
+- Publish frameworks to make them available org-wide, or keep in draft
+- Clone any existing framework as a starting point
+- Row-Level Security enforced at the database layer — one org can never see another's custom frameworks
+- Frontend builder at `/dashboard/frameworks/custom`
+
+### 📈 Advanced Analytics & Scheduled Reporting *(v4.2.0)*
+- **Compliance snapshots** — daily cron captures per-org, per-framework compliance percentage for historical trending
+- **Executive dashboard** — cross-framework compliance summary with 30/90/180/365-day trend selector at `/dashboard/reports/executive`
+- **Scheduled reports** — configure recurring report delivery (daily/weekly/monthly/quarterly) with format and recipient lists
+- Manual report trigger API (`POST /api/v1/reports/scheduled/:id/run`)
+- Per-framework trend endpoint (`GET /api/v1/reports/trend/framework/:id`)
+
+### 🏢 MSP Multi-Tenant Org Hierarchy *(v4.2.0)*
+- Organizations can have parent–child relationships (`parent_org_id`)
+- MSP dashboard at `/dashboard/platform/managed-orgs` — view child org list, compliance summaries, delegated admins
+- **Delegated admin** — parent-org users can be granted access to manage child orgs without full auth
+- Child org compliance snapshots visible to parent/delegated admins
+- Full audit trail on delegation grants and revocations
+
+### 🔌 Continuous Monitoring Connectors *(v4.2.0)*
+- **AWS Security Hub** — pull findings from Security Hub, map severity to NIST/CIS controls
+- **Qualys VMDR** — import vulnerability detections mapped to CIS Controls v8 and NIST 800-53
+- **ITSM / ServiceNow** — link incident and change records to control implementation evidence
+- 15 total connector templates in the Integrations Hub (was 12); all with 30 s timeout hardening and HTTP status validation
+
 ### 🏗️ Developer & Integration Features
 - Full REST API for all operations ([OpenAPI spec](./docs/openapi.yaml))
 - MCP server for AI agent integration (21 tools)
-- **Integrations Hub** — connector templates and instances for enterprise integrations (Splunk, SIEM, and more)
+- **Integrations Hub** — 15 connector templates: Splunk, SIEM, BitSight, AWS Security Hub, Qualys VMDR, ITSM/ServiceNow, and more
 - Webhook system for event-driven integrations
 - ControlWeave SDK for programmatic access
 - Dynamic configuration system
@@ -483,8 +513,9 @@ Full asset and configuration inventory:
 | Cost | **Free** | $30K–200K/yr | $50K–150K/yr | $100K+/yr |
 | Open Source | ✅ | ❌ | ❌ | ❌ |
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
-| Frameworks | 30+ | 10–15 | 10–20 | 20+ |
-| Auto-Crosswalk | ✅ | ❌ | ❌ | ❌ |
+| Frameworks | 35+ | 10–15 | 10–20 | 20+ |
+| Auto-Crosswalk | ✅ 280+ mappings | ❌ | ❌ | ❌ |
+| Custom Framework Builder | ✅ | ❌ | Paid Add-on | ❌ |
 | Built-in AI Copilot | ✅ BYOK | ❌ | ❌ | ❌ |
 | RAG + Multi-Agent AI | ✅ | ❌ | ❌ | ❌ |
 | Threat Intelligence | ✅ (NVD, CISA, MITRE, OTX) | Partial | ❌ | ❌ |
@@ -495,6 +526,9 @@ Full asset and configuration inventory:
 | SBOM Integration | ✅ | ❌ | ❌ | ❌ |
 | CMDB | ✅ | Partial | ❌ | Partial |
 | Data Governance | ✅ | ❌ | ❌ | ✅ |
+| MSP Multi-Tenant Hierarchy | ✅ | ❌ | Paid Add-on | ❌ |
+| Continuous Monitoring Connectors | ✅ 15 templates | Partial | ❌ | ❌ |
+| Executive Dashboard + Trend Analytics | ✅ | Paid Add-on | Paid Add-on | ✅ |
 | PostgreSQL RLS | ✅ | N/A | N/A | N/A |
 | Redis Rate Limiting | ✅ | N/A | N/A | N/A |
 | MCP/API-First | ✅ | API Only | Limited API | Limited API |
@@ -588,7 +622,7 @@ controlweave/
 │   │   ├── config/          # Database, Redis, and security configuration
 │   │   └── utils/           # Logging, encryption, TOTP, AI security, password
 │   │                        #   policy, Redis cache, Sentry integration
-│   ├── migrations/          # Database migrations (110+)
+│   ├── migrations/          # Database migrations (115)
 │   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
@@ -655,6 +689,13 @@ controlweave/
 - `llm_configurations` — Per-org LLM API key storage (encrypted) for BYOK providers
 - `integrations_hub_connectors` — Integration hub connector templates and instances
 
+### v4.2.0 Tables
+- `custom_frameworks` — Org-defined compliance frameworks with RLS
+- `custom_framework_controls` — Controls within custom frameworks
+- `compliance_snapshots` — Daily per-org, per-framework compliance percentage snapshots for trending
+- `scheduled_reports` — Recurring report delivery configuration
+- `org_delegated_admins` — MSP delegated admin grants (parent → child org)
+
 ## 🎯 Use Cases
 
 ### For Compliance Officers
@@ -717,6 +758,7 @@ controlweave/
 ## 📖 Documentation
 
 - [Complete App Walkthrough](./docs/COMPLETE_APP_WALKTHROUGH.md)
+- [FedRAMP Deployment Guide](./docs/FEDRAMP_DEPLOYMENT_GUIDE.md) *(v4.2.0)*
 - [Crosswalk Guide](./docs/CROSSWALK_GUIDE.md)
 - [How Crosswalks Work](./docs/HOW_CROSSWALKS_WORK.md)
 - [Database Architecture](./docs/DATABASE_ARCHITECTURE.md)
@@ -789,13 +831,24 @@ controlweave/
 - ✅ SSP auto-generation (NIST 800-171, FedRAMP) — export to Word/PDF
 - ✅ Forgot-password / reset-password self-service flow
 
-### Phase 3: Enterprise & Scale
-- Custom framework builder
-- Advanced analytics and reporting
-- Multi-tenant improvements
-- Continuous monitoring integrations
-- GDPR, PCI DSS 4.0, CIS Controls v8 framework additions
-- FedRAMP-ready deployment guide
+### Phase 3: Enterprise & Scale ✅ (All Complete in v4.2.0)
+- ✅ Custom framework builder (org-defined frameworks with full CRUD, publish, and clone)
+- ✅ Advanced analytics and reporting (compliance snapshots, executive dashboard, scheduled reports)
+- ✅ Multi-tenant MSP hierarchy (parent/child orgs, delegated admin)
+- ✅ Continuous monitoring integrations (AWS Security Hub, Qualys VMDR, ITSM/ServiceNow)
+- ✅ CIS Controls v8 and FedRAMP High Baseline seed data (203 new crosswalk mappings)
+- ✅ FedRAMP-ready deployment guide (`docs/FEDRAMP_DEPLOYMENT_GUIDE.md`)
+
+### Phase 4: Automated Intelligence & Platform Maturity (Planned)
+- Connector → control auto-assessment (AI-driven status updates from connector findings)
+- AI evidence scoring (relevance confidence + gap description)
+- Policy-to-control auto-mapping via RAG
+- Azure Security Center, GCP SCC, GitHub Advanced Security connectors
+- Jira bidirectional POA&M sync
+- Scheduled report email delivery
+- Auditor external portal (time-limited read-only audit links)
+- Helm chart / Kubernetes deployment
+- Public REST API with HMAC-SHA-384 API keys
 
 ## 🤝 Contributing
 
@@ -807,7 +860,7 @@ We welcome contributions! This is an open-source project designed to help organi
 - 💡 **Suggest features** — [Start a discussion](https://github.com/sherifconteh-collab/ai-grc-platform/discussions)
 - 📝 **Improve docs** — Fix typos, add examples, clarify setup steps
 - 🧪 **Add tests** — Coverage is always welcome
-- 🌐 **Add frameworks** — GDPR, PCI DSS 4.0, CIS Controls v8, and more are on the roadmap
+- 🌐 **Add frameworks** — PCI DSS 4.0, COBIT 2019, and more are on the roadmap
 - 🔌 **Extend the SDK** — Contribute to the `controlweave-sdk` for new integrations
 
 ## 📜 License
@@ -845,16 +898,17 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 ## 📈 Stats
 
-- **Frameworks**: 35+ supported
+- **Frameworks**: 37+ supported (including CIS Controls v8 and FedRAMP High added in v4.2.0)
 - **Controls**: 1,000+ controls in database
-- **Crosswalks**: 80+ cross-framework mappings
+- **Crosswalks**: 280+ cross-framework mappings (203 new mappings added in v4.2.0)
+- **Connector Templates**: 15 in the Integrations Hub (AWS Security Hub, Qualys VMDR, ServiceNow added in v4.2.0)
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
-- **Tables**: 150+ database tables
-- **Migrations**: 110+ sequential, idempotent migrations
+- **Tables**: 155+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
+- **Migrations**: 115 sequential, idempotent migrations
 - **API Routes**: 70+ route modules
-- **Services**: 46 service modules
+- **Services**: 49 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)

@@ -338,6 +338,7 @@ app.get('/health', async (req, res) => {
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = safeRequire('./routes/dashboard');
 const frameworksRoutes = require('./routes/frameworks');
+const customFrameworksRoutes = safeRequire('./routes/customFrameworks');
 const organizationsRoutes = require('./routes/organizations');
 const controlsRoutes = require('./routes/controls');
 const implementationsRoutes = require('./routes/implementations');
@@ -419,6 +420,7 @@ app.use('/api/v1/auth', authRoutes);
 if (ssoRoutes) app.use('/api/v1/sso', ssoRoutes);
 if (siemRoutes) app.use('/api/v1/siem', siemRoutes);
 if (dashboardRoutes) app.use('/api/v1/dashboard', dashboardRoutes);
+if (customFrameworksRoutes) app.use('/api/v1/frameworks/custom', customFrameworksRoutes);
 app.use('/api/v1/frameworks', frameworksRoutes);
 app.use('/api/v1/organizations', organizationsRoutes);
 app.use('/api/v1/controls', controlsRoutes);
