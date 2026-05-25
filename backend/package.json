@@ -106,7 +106,7 @@
   },
   "devDependencies": {
     "@babel/preset-env": "^7.29.5",
-    "eslint": "^10.2.1",
+    "eslint": "^10.4.0",
     "eslint-plugin-security": "^4.0.0",
     "globals": "^17.4.0",
     "jest": "^30.4.2",
