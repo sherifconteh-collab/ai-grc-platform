@@ -89,7 +89,7 @@
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "openai": "^6.38.0",
     "openid-client": "^6.8.3",
