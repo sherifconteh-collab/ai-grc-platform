@@ -73,20 +73,66 @@ jobs:
           echo "version=${TAG}" >> "$GITHUB_OUTPUT"
 
   # ────────────────────────────────────────────────────────────────────────────
+  # Create (or update) the GitHub Release and populate it with release notes
+  # extracted from RELEASE_NOTES.md so the Explore feed shows a rich card.
+  # ────────────────────────────────────────────────────────────────────────────
+  create-release:
+    name: Create GitHub Release with changelog
+    runs-on: ubuntu-latest
+    needs: [check-release]
+    if: |
+      always() && (
+        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
+        needs.check-release.result == 'skipped'
+      )
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: version
+        run: |
+          if [ -n "${{ needs.check-release.outputs.version }}" ]; then
+            echo "tag=${{ needs.check-release.outputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract changelog for this version
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          BARE="${TAG#v}"
+          awk "/^## \[${BARE}\]/{found=1; next} found && /^## \[/{exit} found{print}" RELEASE_NOTES.md \
+            | sed '/^[[:space:]]*$/{ N; /^\n[[:space:]]*$/d }' > /tmp/release-notes.md || true
+          if [ ! -s /tmp/release-notes.md ]; then
+            printf "See [RELEASE_NOTES.md](https://github.com/%s/blob/main/RELEASE_NOTES.md) for full details.\n" \
+              "${{ github.repository }}" > /tmp/release-notes.md
+          fi
+
+      - name: Publish release with changelog
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: /tmp/release-notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ────────────────────────────────────────────────────────────────────────────
   # Build Windows installer (.exe)
   # ────────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Windows Installer (.exe)
     runs-on: windows-latest
     timeout-minutes: 30
-    needs: [check-release]
-    # Run when: (a) check-release said yes, (b) check-release was skipped
-    # because the trigger wasn't push-to-main (tag / release / dispatch).
-    if: |
-      always() && (
-        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
-        needs.check-release.result == 'skipped'
-      )
+    needs: [check-release, create-release]
+    if: always() && needs.create-release.result == 'success'
 
     permissions:
       contents: write   # needed to upload release assets
@@ -259,12 +305,8 @@ jobs:
     name: macOS Installer (.dmg — arm64)
     runs-on: macos-latest
     timeout-minutes: 20
-    needs: [check-release]
-    if: |
-      always() && (
-        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
-        needs.check-release.result == 'skipped'
-      )
+    needs: [check-release, create-release]
+    if: always() && needs.create-release.result == 'success'
 
     permissions:
       contents: write
@@ -365,12 +407,8 @@ jobs:
     name: macOS Installer (.dmg — x64)
     runs-on: macos-13
     timeout-minutes: 20
-    needs: [check-release]
-    if: |
-      always() && (
-        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
-        needs.check-release.result == 'skipped'
-      )
+    needs: [check-release, create-release]
+    if: always() && needs.create-release.result == 'success'
 
     permissions:
       contents: write
@@ -468,12 +506,8 @@ jobs:
     name: Linux AppImage
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [check-release]
-    if: |
-      always() && (
-        (needs.check-release.result == 'success' && needs.check-release.outputs.should_release == 'true') ||
-        needs.check-release.result == 'skipped'
-      )
+    needs: [check-release, create-release]
+    if: always() && needs.create-release.result == 'success'
 
     permissions:
       contents: write
