@@ -4,6 +4,17 @@
 
 ---
 
+## [4.2.2] — 2026-05-27
+
+### Changed
+
+- **Build workflow performance**: macOS and Linux installer builds are now scoped to tag pushes and `workflow_dispatch` only. Previously all four platform builds ran on every merge to `main`, competing for scarce macOS runner slots and causing queued jobs to wait 20+ hours. Windows builds still run on every version-bump merge as the primary release artifact.
+- **npm caching**: all build jobs now pass `cache: 'npm'` with `cache-dependency-path` to `actions/setup-node`, eliminating cold `npm ci` downloads for backend and frontend on repeat runs.
+- **Step-level timeouts**: `npm run build` (Next.js), `dist:win/mac/linux` (electron-builder), and each platform's smoke test now have explicit `timeout-minutes` so a hung step fails fast instead of consuming the entire job budget.
+- **Realistic job timeouts**: macOS job-level timeout raised from 20 → 60 minutes; Windows raised from 30 → 45 minutes to account for actual runner and build time.
+
+---
+
 ## [4.2.1] — 2026-05-27
 
 ### Fixed

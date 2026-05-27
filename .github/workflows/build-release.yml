@@ -126,11 +126,12 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # Build Windows installer (.exe)
+  # Runs on every release (push-to-main version bump, tag, dispatch).
   # ────────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Windows Installer (.exe)
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [check-release, create-release]
     if: always() && needs.create-release.result == 'success'
 
@@ -141,10 +142,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       # ── Backend ─────────────────────────────────────────────────────────────
       - name: Install backend dependencies
@@ -157,6 +162,7 @@ jobs:
         working-directory: frontend
 
       - name: Build Next.js frontend (standalone)
+        timeout-minutes: 15
         run: npm run build
         working-directory: frontend
         env:
@@ -211,6 +217,7 @@ jobs:
           "CSC_KEY_PASSWORD=${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build Windows installer
+        timeout-minutes: 20
         run: npm run dist:win
         working-directory: electron
         env:
@@ -299,14 +306,20 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # Build macOS DMG — Apple Silicon (arm64)
-  # Runs on the native ARM64 runner so embedded-postgres downloads arm64 bins.
+  # Scoped to tag pushes and workflow_dispatch only — macOS runners are scarce
+  # and slow to queue; running on every main-branch merge wastes slot budget.
   # ────────────────────────────────────────────────────────────────────────────
   build-macos-arm64:
     name: macOS Installer (.dmg — arm64)
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     needs: [check-release, create-release]
-    if: always() && needs.create-release.result == 'success'
+    if: |
+      always() && needs.create-release.result == 'success' && (
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch'
+      )
 
     permissions:
       contents: write
@@ -315,10 +328,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install backend dependencies
         run: npm ci --prefer-offline
@@ -329,6 +346,7 @@ jobs:
         working-directory: frontend
 
       - name: Build Next.js frontend (standalone)
+        timeout-minutes: 15
         run: npm run build
         working-directory: frontend
         env:
@@ -346,6 +364,7 @@ jobs:
         working-directory: electron
 
       - name: Build macOS arm64 installer
+        timeout-minutes: 20
         run: npm run dist:mac:arm64
         working-directory: electron
         env:
@@ -372,11 +391,6 @@ jobs:
           done
 
       - name: Upload arm64 DMG to GitHub Release
-        if: >-
-          github.event_name == 'release'
-          || startsWith(github.ref, 'refs/tags/v')
-          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
-          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
@@ -401,14 +415,19 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # Build macOS DMG — Intel (x64)
-  # Runs on the Intel runner so embedded-postgres downloads x64 bins.
+  # Scoped to tag pushes and workflow_dispatch only (same rationale as arm64).
   # ────────────────────────────────────────────────────────────────────────────
   build-macos-x64:
     name: macOS Installer (.dmg — x64)
     runs-on: macos-13
-    timeout-minutes: 20
+    timeout-minutes: 60
     needs: [check-release, create-release]
-    if: always() && needs.create-release.result == 'success'
+    if: |
+      always() && needs.create-release.result == 'success' && (
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch'
+      )
 
     permissions:
       contents: write
@@ -417,10 +436,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install backend dependencies
         run: npm ci --prefer-offline
@@ -431,6 +454,7 @@ jobs:
         working-directory: frontend
 
       - name: Build Next.js frontend (standalone)
+        timeout-minutes: 15
         run: npm run build
         working-directory: frontend
         env:
@@ -448,6 +472,7 @@ jobs:
         working-directory: electron
 
       - name: Build macOS x64 installer
+        timeout-minutes: 20
         run: npm run dist:mac:x64
         working-directory: electron
         env:
@@ -473,11 +498,6 @@ jobs:
           done
 
       - name: Upload x64 DMG to GitHub Release
-        if: >-
-          github.event_name == 'release'
-          || startsWith(github.ref, 'refs/tags/v')
-          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
-          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
@@ -501,13 +521,19 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # Build Linux AppImage
+  # Scoped to tag pushes and workflow_dispatch only — consistent with macOS.
   # ────────────────────────────────────────────────────────────────────────────
   build-linux:
     name: Linux AppImage
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [check-release, create-release]
-    if: always() && needs.create-release.result == 'success'
+    if: |
+      always() && needs.create-release.result == 'success' && (
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch'
+      )
 
     permissions:
       contents: write
@@ -516,10 +542,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
       - name: Install backend dependencies
         run: npm ci --prefer-offline
@@ -530,6 +560,7 @@ jobs:
         working-directory: frontend
 
       - name: Build Next.js frontend (standalone)
+        timeout-minutes: 15
         run: npm run build
         working-directory: frontend
         env:
@@ -547,6 +578,7 @@ jobs:
         working-directory: electron
 
       - name: Build Linux AppImage
+        timeout-minutes: 20
         run: npm run dist:linux
         working-directory: electron
         env:
@@ -571,11 +603,6 @@ jobs:
           done
 
       - name: Upload AppImage to GitHub Release
-        if: >-
-          github.event_name == 'release'
-          || startsWith(github.ref, 'refs/tags/v')
-          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
-          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
