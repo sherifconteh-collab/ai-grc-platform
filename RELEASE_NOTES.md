@@ -202,6 +202,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory ([#189](https://github.com/sherifconteh-collab/ai-grc-platform/pull/189)) — @dependabot[bot]
 - chore: v4.2.2 — fix 23-hour build times (npm cache + scoped macOS/Linux triggers) ([#190](https://github.com/sherifconteh-collab/ai-grc-platform/pull/190)) — @sherifconteh-collab
 - chore: release v4.2.1 — CI improvements + release changelog publishing ([#188](https://github.com/sherifconteh-collab/ai-grc-platform/pull/188)) — @sherifconteh-collab
 - feat(v4.2.0): port ControlWeaver-Pro v4.2.0 features + dependency updates ([#187](https://github.com/sherifconteh-collab/ai-grc-platform/pull/187)) — @sherifconteh-collab

@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-27 | PR #190: chore: v4.2.2 — fix 23-hour build times (npm cache + scoped macOS/Linux triggers) -->
+<!-- LAST_UPDATED: 2026-05-27 | PR #189: chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory -->
 
 ## 🎯 What is This?
 
