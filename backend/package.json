@@ -144,6 +144,7 @@
     "follow-redirects": "^1.16.0",
     "uuid": "^14.0.0",
     "qs": ">=6.15.2",
-    "@tootallnate/once": ">=2.0.1"
+    "@tootallnate/once": ">=2.0.1",
+    "tmp": ">=0.2.6"
   }
 }
