@@ -4,6 +4,18 @@
 
 ---
 
+## [4.2.1] — 2026-05-27
+
+### Fixed
+
+- **CI version-sync gate**: added a fast, no-install job (`check-version-sync` in `security.yml`) that reads all three `package.json` files and fails the PR immediately if any version is out of step. Previously a missed bump caused `build-release.yml`'s `check-release` gate to silently skip all installer builds.
+
+### Changed
+
+- **GitHub Release changelogs**: releases now include the full matching `RELEASE_NOTES.md` section as the release body, so the entry is rendered on the GitHub Explore/Activity feed with a rich card instead of appearing blank. A new `create-release` job in `build-release.yml` extracts and publishes the notes before the platform-specific build jobs run.
+
+---
+
 ## [4.2.0] — 2026-05-24
 
 ### Added
