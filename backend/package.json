@@ -84,7 +84,7 @@
     "express": "^5.2.1",
     "geoip-lite": "^2.0.2",
     "hono": "^4.12.19",
-    "ioredis": "^5.10.1",
+    "ioredis": "^5.11.0",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.11.0",
