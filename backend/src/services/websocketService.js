@@ -3,7 +3,7 @@
 
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET, SECURITY_CONFIG } = require('../config/security');
+const { JWT_SECRET, JWT_VERIFY_OPTIONS, SECURITY_CONFIG } = require('../config/security');
 const { log } = require('../utils/logger');
 const pool = require('../config/database');
 
@@ -180,7 +180,7 @@ function initializeWebSocket(httpServer) {
       }
 
       // Verify JWT token
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
 
       // Fetch user from database
       const userResult = await pool.query(

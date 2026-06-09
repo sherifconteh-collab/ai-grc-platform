@@ -10,6 +10,16 @@ const { createRateLimiter } = require('./middleware/rateLimit');
 const { log, requestLogger, serializeError, setSentryClient } = require('./utils/logger');
 const { performanceTracker } = require('./middleware/performanceMonitoring');
 
+// Surface async failures outside route try-catch blocks (background jobs,
+// schedulers, fire-and-forget promises) instead of crashing silently.
+process.on('unhandledRejection', (reason) => {
+  log('error', 'process.unhandled_rejection', { error: serializeError(reason) });
+});
+process.on('uncaughtException', (error) => {
+  log('error', 'process.uncaught_exception', { error: serializeError(error) });
+  process.exit(1);
+});
+
 // Sentry must be initialized before any other instrumented modules
 let _sentry = null;
 if (process.env.SENTRY_DSN) {
@@ -141,6 +151,13 @@ app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
 if (openclawWebhookEnabled) {
   app.use('/api/v1/openclaw/webhook', express.raw({ type: 'application/json' }));
 }
+
+// TPRM public endpoints verify an optional HMAC signature over the exact
+// request bytes, so capture the raw body before JSON parsing consumes it.
+app.use('/api/v1/tprm-public', express.json({
+  limit: '2mb',
+  verify: (req, _res, buf) => { req.rawBody = buf; }
+}));
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));

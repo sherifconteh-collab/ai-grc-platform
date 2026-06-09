@@ -26,8 +26,8 @@ router.use(publicRateLimiter);
 
 // Optional HMAC signature verification (zero-trust layer on top of the token).
 // If a vendor integration has TPRM_HMAC_SECRET configured, every request must
-// include X-TPRM-Signature: sha256=<hex>. Falls back to token-only when the
-// secret is not configured — fully backward compatible.
+// include X-TPRM-Signature: sha384=<hex> (legacy sha256 accepted). Falls back
+// to token-only when the secret is not configured — fully backward compatible.
 async function verifyTprmSignature(req, res, next) {
   const secret = process.env.TPRM_HMAC_SECRET;
   if (!secret) return next();
@@ -37,7 +37,9 @@ async function verifyTprmSignature(req, res, next) {
     return res.status(401).json({ success: false, error: 'Missing HMAC signature' });
   }
 
-  const body = req.rawBody || JSON.stringify(req.body || '');
+  // Sign the exact raw request bytes (captured in server.js); bodyless
+  // requests (GET) sign the empty string.
+  const body = req.rawBody || '';
   // Prefer HMAC-SHA-384 (CNSA 1.0); accept legacy SHA-256 signers transitionally.
   let valid = false;
   for (const alg of ['sha384', 'sha256']) {
