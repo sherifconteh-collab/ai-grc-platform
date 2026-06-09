@@ -115,6 +115,50 @@ async function remindServiceAccountRotations() {
   }
 }
 
+async function remindExpiringEvidence() {
+  // evidence.expires_at ships in migration 116; skip the sweep gracefully on
+  // databases that have not run it yet.
+  const columnCheck = await pool.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'evidence' AND column_name = 'expires_at'`
+  );
+  if (columnCheck.rows.length === 0) return;
+
+  const result = await pool.query(`
+    SELECT organization_id,
+      COUNT(*) FILTER (WHERE expires_at >= CURRENT_DATE AND expires_at <= CURRENT_DATE + INTERVAL '30 days') AS expiring_soon,
+      COUNT(*) FILTER (WHERE expires_at < CURRENT_DATE) AS expired
+    FROM evidence
+    WHERE expires_at IS NOT NULL
+    GROUP BY organization_id
+  `);
+
+  for (const row of result.rows) {
+    const expiringSoon = Number(row.expiring_soon || 0);
+    const expired = Number(row.expired || 0);
+
+    if (expiringSoon > 0) {
+      await createOrgNotificationOncePerDay({
+        organizationId: row.organization_id,
+        type: 'evidence_expiring',
+        title: 'Evidence Expiring Soon',
+        message: `${expiringSoon} evidence item(s) expire within the next 30 days. Refresh them to keep controls compliant.`,
+        link: '/dashboard/evidence'
+      });
+    }
+
+    if (expired > 0) {
+      await createOrgNotificationOncePerDay({
+        organizationId: row.organization_id,
+        type: 'evidence_expired',
+        title: 'Expired Evidence Needs Replacement',
+        message: `${expired} evidence item(s) have expired and no longer demonstrate compliance.`,
+        link: '/dashboard/evidence'
+      });
+    }
+  }
+}
+
 async function remindTrialExpiringSoon() {
   const result = await pool.query(`
     SELECT id, tier, trial_ends_at
@@ -147,6 +191,7 @@ async function runReminderSweep() {
     await remindDueControlReviews();
     await remindAssessmentPlans();
     await remindServiceAccountRotations();
+    await remindExpiringEvidence();
     await remindTrialExpiringSoon();
     log('info', 'reminders.sweep.completed');
   } catch (error) {
