@@ -31,6 +31,8 @@ in the same working session.**
 | Logging convention | structured `log()` from `utils/logger` preferred | `console.*` blessed (observability layer hooks it) |
 | Desktop wrapper | none | Electron |
 | Migration numbering | independent sequence (110+) | independent sequence (116+) |
+| Monolith splits | `routes/assessments/*`, `routes/organizations/*` sub-routers | single-file routes (split not yet ported) |
+| Console bridge | `installConsoleBridge()` rewires console.error/warn to the structured logger | raw `console.*` blessed (observability layer hooks it) |
 
 Migration numbers are repo-local. The same schema change gets a different
 number in each repo (e.g. evidence expiration is 110 in ControlWeaver-Pro and
