@@ -130,7 +130,7 @@ router.get('/llm', requirePermission('settings.manage'), async (req, res) => {
     const result = await pool.query(
       `SELECT setting_key, setting_value, is_encrypted, updated_at
        FROM organization_settings
-       WHERE organization_id = $1 AND setting_key IN ('anthropic_api_key', 'openai_api_key', 'gemini_api_key', 'xai_api_key', 'groq_api_key', 'ollama_base_url', 'default_provider', 'default_model', 'apply_all_framework_guardrails')`,
+       WHERE organization_id = $1 AND setting_key IN ('anthropic_api_key', 'openai_api_key', 'gemini_api_key', 'xai_api_key', 'groq_api_key', 'ollama_base_url', 'default_provider', 'default_model', 'apply_all_framework_guardrails', 'ai_monthly_token_budget')`,
       [orgId]
     );
 
@@ -164,7 +164,8 @@ router.get('/llm', requirePermission('settings.manage'), async (req, res) => {
         hasOllamaUrl:    !!settings.ollama_base_url?.configured,
         defaultProvider: settings.default_provider?.value || 'claude',
         defaultModel:    settings.default_model?.value || null,
-        applyAllFrameworkGuardrails: settings.apply_all_framework_guardrails?.value === 'true'
+        applyAllFrameworkGuardrails: settings.apply_all_framework_guardrails?.value === 'true',
+        aiMonthlyTokenBudget: parseInt(settings.ai_monthly_token_budget?.value, 10) || 0
       }
     });
   } catch (err) {
@@ -184,7 +185,7 @@ router.put('/llm', requirePermission('settings.manage'), validateBody((body) => 
 }), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { anthropic_api_key, openai_api_key, gemini_api_key, xai_api_key, groq_api_key, ollama_base_url, default_provider, default_model, apply_all_framework_guardrails } = req.body;
+    const { anthropic_api_key, openai_api_key, gemini_api_key, xai_api_key, groq_api_key, ollama_base_url, default_provider, default_model, apply_all_framework_guardrails, ai_monthly_token_budget } = req.body;
 
     const upsert = async (key, value, shouldEncrypt = false) => {
       if (value === undefined) return;
@@ -224,6 +225,14 @@ router.put('/llm', requirePermission('settings.manage'), validateBody((body) => 
     // Store the boolean flag as a string 'true'/'false'
     if (apply_all_framework_guardrails !== undefined) {
       await upsert('apply_all_framework_guardrails', apply_all_framework_guardrails ? 'true' : 'false');
+    }
+    // Monthly AI token budget: non-negative integer; 0/null/'' clears the cap.
+    if (ai_monthly_token_budget !== undefined) {
+      const parsed = parseInt(ai_monthly_token_budget, 10);
+      if (ai_monthly_token_budget !== null && ai_monthly_token_budget !== '' && (Number.isNaN(parsed) || parsed < 0)) {
+        return res.status(400).json({ success: false, error: 'ai_monthly_token_budget must be a non-negative integer' });
+      }
+      await upsert('ai_monthly_token_budget', parsed > 0 ? String(parsed) : null);
     }
 
     // Audit log each provider key that was set/updated

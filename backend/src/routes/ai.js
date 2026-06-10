@@ -9,6 +9,7 @@ const pool = require('../config/database');
 const { normalizeTier, shouldEnforceAiLimitForByok, getByokPolicy } = require('../config/tierPolicy');
 const { log } = require('../utils/logger');
 const { validateFeatureOutput, hasFeatureSchema } = require('../services/llmSchemas');
+const aiBudget = require('../services/aiBudget');
 
 // (orgRagService is currently consumed by llm.buildPersonalizedSystem(ragQuery, ...)
 // inside each feature handler; no handler-level auto-wire is needed.)
@@ -114,6 +115,23 @@ function aiHandler(feature, fn, opts = {}) {
     };
     try {
       params = await getAIParams(req);
+
+      // Per-org monthly token budget (cost control). Enforcement is opt-in:
+      // unlimited unless the org or platform sets a budget. Checked before the
+      // provider call so an exhausted org cannot keep accruing spend.
+      const budget = await aiBudget.checkBudget(req.user.organization_id);
+      if (budget.enforced && !budget.allowed) {
+        log('warn', `ai.${feature}.budget_blocked`, {
+          organizationId: req.user.organization_id,
+          budget: budget.budget,
+          used: budget.used
+        });
+        return res.status(429).json({
+          success: false,
+          error: 'Monthly AI token budget exhausted. Raise the budget in Settings or wait for the next month.',
+          data: { budget: budget.budget, used: budget.used, remaining: 0 }
+        });
+      }
 
       // Phase 1.4: RAG is handled downstream by llm.buildPersonalizedSystem(ragQuery, ...)
       // inside each feature handler. We previously auto-fetched a RAG block here and set
@@ -596,6 +614,19 @@ router.post('/analyze/asset/:id', checkAIUsage, aiHandler('asset_risk', (req, pa
 router.post('/generate-policy', checkAIUsage, aiHandler('policy_generator', (req, params) =>
   llm.generatePolicy({ ...params, policyType: req.body.policyType })
 ));
+
+// ======================== AI BUDGET STATUS ========================
+// Returns the org's monthly token budget posture so the UI can surface
+// remaining quota. Any authenticated org member may read it.
+router.get('/budget', async (req, res) => {
+  try {
+    const budget = await aiBudget.checkBudget(req.user.organization_id);
+    res.json({ success: true, data: budget });
+  } catch (err) {
+    console.error('AI budget status error:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch AI budget status' });
+  }
+});
 
 // ======================== ADMIN: AI USAGE REPORT ========================
 // Returns paginated AI usage log for the org — admin only
