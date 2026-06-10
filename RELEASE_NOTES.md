@@ -4,6 +4,24 @@
 
 ---
 
+## [4.3.0] — 2026-06-10
+
+### Added
+
+- **Evidence validity expiration**: migration 116 adds `evidence.expires_at` (nullable `DATE`, partial org-scoped index). `retention_until` continues to govern how long a file is kept; `expires_at` governs when the evidence stops demonstrating compliance. Upload, bulk upload, and update endpoints accept `expires_at`; the reminder sweep now notifies each organization daily about evidence expiring within 30 days and evidence already expired.
+- **Repo parity guide**: `docs/REPO_PARITY.md` documents the sync expectations and intentional deltas between this repo and ControlWeaver-Pro.
+
+### Security
+
+- **TPRM public HMAC**: the optional `X-TPRM-Signature` verification now signs the exact raw request bytes (captured before JSON parsing) instead of a re-serialized body that could never match a legitimate signer. Bodyless requests sign the empty string.
+- **WebSocket auth**: socket connections now pass `JWT_VERIFY_OPTIONS` (explicit algorithms allow-list) to `jwt.verify`, matching HTTP auth.
+
+### Fixed
+
+- Unhandled promise rejections and uncaught exceptions are now logged through the structured logger instead of crashing or failing silently.
+
+---
+
 ## [4.2.2] — 2026-05-27
 
 ### Changed
