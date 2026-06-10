@@ -126,6 +126,7 @@ export default function EvidencePage() {
   const [uploadPiiClassification, setUploadPiiClassification] = useState('none');
   const [uploadDataSensitivity, setUploadDataSensitivity] = useState('internal');
   const [uploadPiiTypes, setUploadPiiTypes] = useState<string[]>([]);
+  const [uploadExpiresAt, setUploadExpiresAt] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadResults, setUploadResults] = useState<BulkUploadResult[] | null>(null);
   const [fileProgress, setFileProgress] = useState<Record<number, 'pending' | 'uploading' | 'done' | 'error'>>({});
@@ -556,6 +557,7 @@ export default function EvidencePage() {
       selectedFiles.forEach(file => formData.append('files', file));
       if (uploadDescription) formData.append('description', uploadDescription);
       if (uploadTags) formData.append('tags', uploadTags);
+      if (uploadExpiresAt) formData.append('expires_at', uploadExpiresAt);
       formData.append('pii_classification', uploadPiiClassification);
       formData.append('data_sensitivity', uploadDataSensitivity);
       if (uploadPiiTypes.length) formData.append('pii_types', uploadPiiTypes.join(','));
@@ -853,6 +855,21 @@ export default function EvidencePage() {
                 placeholder="Comma-separated tags..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
+            </div>
+            <div>
+              <label htmlFor="evidence-expires-at" className="block text-sm font-medium text-gray-700 mb-1">
+                Valid Until <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="evidence-expires-at"
+                type="date"
+                value={uploadExpiresAt}
+                onChange={(e) => setUploadExpiresAt(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                When this evidence stops demonstrating compliance (e.g. cert expiry). You will be reminded 30 days before.
+              </p>
             </div>
           </div>
 

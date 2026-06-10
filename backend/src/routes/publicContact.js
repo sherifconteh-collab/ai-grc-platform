@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate')
+const { createRateLimiter } = require('../middleware/rateLimit')
 const {
   DEMO_ADMIN_ACCOUNTS,
   resolveDemoAccountPassword
@@ -46,8 +47,27 @@ function formatTierLabel(tier) {
   }
 }
 
+// Unauthenticated endpoint — strict per-IP limit to stop credential-farming
+// and contact-form spam.
+const publicContactLimiter = createRateLimiter({
+  label: 'public-contact',
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => req.ip
+})
+
+// Demo credential delivery is opt-in: it requires BOTH the explicit enable
+// flag and a configured password. Without them the prospect gets the sales
+// follow-up email instead — working credentials are never emailed based on
+// the repo's built-in default password.
+function demoAccountDeliveryEnabled() {
+  return String(process.env.DEMO_ACCOUNT_DELIVERY_ENABLED || '').toLowerCase() === 'true'
+    && String(process.env.DEMO_ACCOUNT_PASSWORD || '').trim().length > 0
+}
+
 router.post(
   '/contact',
+  publicContactLimiter,
   validateBody((body) => {
     const errors = requireFields(body, ['name', 'email', 'message'])
 
@@ -70,7 +90,7 @@ router.post(
       const message = String(sanitizeInput(req.body.message || '') || '').trim()
       const requestedTier = normalizeTier(req.body.requestedTier)
       const requestedTierLabel = formatTierLabel(requestedTier)
-      const wantsDemoAccount = req.body.wantsDemoAccount !== false
+      const wantsDemoAccount = req.body.wantsDemoAccount !== false && demoAccountDeliveryEnabled()
 
       const demoAccountEmail = DEMO_ACCOUNT_BY_TIER[requestedTier]
       const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
