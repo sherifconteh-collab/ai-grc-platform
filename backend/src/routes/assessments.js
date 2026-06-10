@@ -18,6 +18,7 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const llm = require('../services/llmService');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { decodeCursor, nextCursorFrom } = require('../utils/keysetPagination');
 const { requireSod } = require('../middleware/sod');
 const { log } = require('../utils/logger');
 
@@ -1107,7 +1108,13 @@ router.delete('/templates/:templateId', requirePermission('assessments.write'), 
 router.get('/engagements', requirePermission('assessments.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { status, engagement_type, search, limit = 50, offset = 0 } = req.query;
+    const { status, engagement_type, search, limit = 50, offset = 0, cursor } = req.query;
+    // Keyset pagination: cursor=<next_cursor from a previous response> gives
+    // O(1) page turns regardless of depth. limit/offset still work.
+    const keyset = cursor ? decodeCursor(cursor) : null;
+    if (cursor && !keyset) {
+      return res.status(400).json({ success: false, error: 'Invalid cursor' });
+    }
 
     let query = `
       SELECT ae.*,
@@ -1141,8 +1148,16 @@ router.get('/engagements', requirePermission('assessments.read'), async (req, re
       idx++;
     }
 
-    query += ` ORDER BY ae.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`;
-    params.push(toInt(limit, 50), toInt(offset, 0));
+    if (keyset) {
+      query += ` AND (ae.created_at, ae.id) < ($${idx}, $${idx + 1})`;
+      params.push(keyset.createdAt, keyset.id);
+      idx += 2;
+      query += ` ORDER BY ae.created_at DESC, ae.id DESC LIMIT $${idx}`;
+      params.push(toInt(limit, 50));
+    } else {
+      query += ` ORDER BY ae.created_at DESC, ae.id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+      params.push(toInt(limit, 50), toInt(offset, 0));
+    }
 
     const rows = await pool.query(query, params);
 
@@ -1165,17 +1180,24 @@ router.get('/engagements', requirePermission('assessments.read'), async (req, re
       cIdx++;
     }
 
-    const countResult = await pool.query(countQuery, countParams);
+    // Cursor mode skips the COUNT(*) scan — avoiding it is the point.
+    const countResult = keyset ? null : await pool.query(countQuery, countParams);
 
     res.json({
       success: true,
       data: {
         engagements: rows.rows,
-        pagination: {
-          total: parseInt(countResult.rows[0].total, 10),
-          limit: toInt(limit, 50),
-          offset: toInt(offset, 0)
-        }
+        pagination: keyset
+          ? {
+              limit: toInt(limit, 50),
+              next_cursor: nextCursorFrom(rows.rows, toInt(limit, 50))
+            }
+          : {
+              total: parseInt(countResult.rows[0].total, 10),
+              limit: toInt(limit, 50),
+              offset: toInt(offset, 0),
+              next_cursor: nextCursorFrom(rows.rows, toInt(limit, 50))
+            }
       }
     });
   } catch (error) {

@@ -8,6 +8,7 @@ const { createHash } = require('crypto');
 const pool = require('../config/database');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { decodeCursor, nextCursorFrom } = require('../utils/keysetPagination');
 const { evidenceUploaded } = require('../services/realtimeEventService');
 const ragService = require('../services/orgRagService');
 const aiSecurity = require('../utils/aiSecurity');
@@ -243,8 +244,15 @@ function normalizeExpirationDate(input) {
 router.get('/', requirePermission('evidence.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { search, tags, limit, offset } = req.query;
+    const { search, tags, limit, offset, cursor } = req.query;
     const evidenceColumns = await getEvidenceColumns();
+    // Keyset pagination: cursor=<next_cursor from a previous response> gives
+    // O(1) page turns on large evidence stores. limit/offset still work.
+    const keyset = cursor ? decodeCursor(cursor) : null;
+    if (cursor && !keyset) {
+      return res.status(400).json({ success: false, error: 'Invalid cursor' });
+    }
+    const normalizedLimit = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
 
     const optionalSelect = [
       evidenceColumns.has('evidence_version') ? 'e.evidence_version' : '1 AS evidence_version',
@@ -281,21 +289,34 @@ router.get('/', requirePermission('evidence.read'), async (req, res) => {
       idx++;
     }
 
-    query += ' ORDER BY e.created_at DESC';
-
-    if (limit) {
-      query += ` LIMIT $${idx}`;
-      params.push(parseInt(limit));
-      idx++;
-    }
-    if (offset) {
-      query += ` OFFSET $${idx}`;
-      params.push(parseInt(offset));
-      idx++;
+    if (keyset) {
+      query += ` AND (e.created_at, e.id) < ($${idx}, $${idx + 1})`;
+      params.push(keyset.createdAt, keyset.id);
+      idx += 2;
+      query += ` ORDER BY e.created_at DESC, e.id DESC LIMIT $${idx}`;
+      params.push(normalizedLimit);
+    } else {
+      query += ' ORDER BY e.created_at DESC, e.id DESC';
+      if (limit) {
+        query += ` LIMIT $${idx}`;
+        params.push(normalizedLimit);
+        idx++;
+      }
+      if (offset) {
+        query += ` OFFSET $${idx}`;
+        params.push(parseInt(offset));
+        idx++;
+      }
     }
 
     const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows });
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: (keyset || limit)
+        ? { limit: normalizedLimit, next_cursor: nextCursorFrom(result.rows, normalizedLimit) }
+        : undefined
+    });
   } catch (error) {
     console.error('Evidence list error:', error);
     res.status(500).json({ success: false, error: 'Failed to load evidence' });
