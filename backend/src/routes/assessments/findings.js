@@ -246,7 +246,7 @@ router.post('/engagements/:id/findings', requirePermission('assessments.write'),
     if (!VALID_FINDING_STATUSES.includes(String(status))) {
       return res.status(400).json({ success: false, error: `status must be one of: ${VALID_FINDING_STATUSES.join(', ')}` });
     }
-    if (!(await ensureOrgUser(req.user.organization_id, owner_user_id))) {
+    if (owner_user_id && !(await ensureOrgUser(req.user.organization_id, owner_user_id))) {
       return res.status(400).json({ success: false, error: 'owner_user_id must reference an active user in this organization' });
     }
 

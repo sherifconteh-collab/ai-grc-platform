@@ -38,7 +38,15 @@ async function verifyTprmSignature(req, res, next) {
   }
 
   // Sign the exact raw request bytes (captured in server.js); bodyless
-  // requests (GET) sign the empty string.
+  // requests (GET) sign the empty string. For body-bearing methods without
+  // rawBody the signature would be computed over '' — allowing any multipart
+  // or non-JSON payload through — so reject instead.
+  if (!req.rawBody && !['GET', 'HEAD', 'DELETE'].includes(req.method)) {
+    return res.status(400).json({
+      success: false,
+      error: 'HMAC verification requires a JSON body; multipart or non-JSON payloads are not supported when TPRM_HMAC_SECRET is configured'
+    });
+  }
   const body = req.rawBody || '';
   // Prefer HMAC-SHA-384 (CNSA 1.0); accept legacy SHA-256 signers transitionally.
   let valid = false;

@@ -455,6 +455,15 @@ router.post('/tprm/analyze-evidence', checkAIUsage, async (req, res) => {
   try {
     const orgId = req.user.organization_id;
 
+    const budget = await aiBudget.checkBudget(orgId);
+    if (budget.enforced && !budget.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'Monthly AI token budget exhausted. Raise the budget in Settings or wait for the next month.',
+        data: { budget: budget.budget, used: budget.used, remaining: 0 }
+      });
+    }
+
     // Load questionnaire + vendor info
     const qResult = await pool.query(
       `SELECT q.id, q.title, q.questions, q.responses,
@@ -1054,6 +1063,15 @@ router.post('/swarm/execute', checkAIUsage, async (req, res) => {
   const { swarmType, provider, model } = req.body;
   if (!swarmType) {
     return res.status(400).json({ success: false, error: 'swarmType is required' });
+  }
+
+  const swarmBudget = await aiBudget.checkBudget(req.user.organization_id);
+  if (swarmBudget.enforced && !swarmBudget.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: 'Monthly AI token budget exhausted. Raise the budget in Settings or wait for the next month.',
+      data: { budget: swarmBudget.budget, used: swarmBudget.used, remaining: 0 }
+    });
   }
 
   // Verify sufficient quota for all agents in the swarm

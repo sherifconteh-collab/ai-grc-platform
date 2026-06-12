@@ -161,13 +161,13 @@ router.post('/engagements', requirePermission('assessments.write'), async (req, 
       return res.status(400).json({ success: false, error: `status must be one of: ${VALID_ENGAGEMENT_STATUSES.join(', ')}` });
     }
 
-    if (!(await ensureOrgUser(orgId, lead_auditor_id))) {
+    if (lead_auditor_id && !(await ensureOrgUser(orgId, lead_auditor_id))) {
       return res.status(400).json({ success: false, error: 'lead_auditor_id must reference an active user in this organization' });
     }
     if (lead_auditor_id && !(await ensureOrgAuditorUser(orgId, lead_auditor_id))) {
       return res.status(400).json({ success: false, error: 'lead_auditor_id must reference an auditor user in this organization' });
     }
-    if (!(await ensureOrgUser(orgId, engagement_owner_id))) {
+    if (engagement_owner_id && !(await ensureOrgUser(orgId, engagement_owner_id))) {
       return res.status(400).json({ success: false, error: 'engagement_owner_id must reference an active user in this organization' });
     }
 

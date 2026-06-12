@@ -794,8 +794,8 @@ router.put('/:id', requirePermission('evidence.write'), async (req, res) => {
       params.push(retention_until || null);
       idx++;
     }
-    if (evidenceColumns.has('expires_at')) {
-      setClauses.push(`expires_at = COALESCE($${idx}, expires_at)`);
+    if (evidenceColumns.has('expires_at') && 'expires_at' in req.body) {
+      setClauses.push(`expires_at = $${idx}`);
       params.push(normalizeExpirationDate(expires_at));
       idx++;
     }

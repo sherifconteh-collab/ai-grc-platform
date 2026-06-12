@@ -16,13 +16,20 @@
 
 ### Security
 
-- **TPRM public HMAC**: the optional `X-TPRM-Signature` verification now signs the exact raw request bytes (captured before JSON parsing) instead of a re-serialized body that could never match a legitimate signer. Bodyless requests sign the empty string.
+- **TPRM public HMAC**: the optional `X-TPRM-Signature` verification now signs the exact raw request bytes (captured before JSON parsing) instead of a re-serialized body that could never match a legitimate signer. Bodyless requests sign the empty string; body-bearing requests without a captured raw body (e.g. multipart uploads) are rejected rather than verified against the empty string.
+- **Dependency CVEs**: bumped `hono` to ^4.12.25 (IP restriction bypass, cookie injection, JWT scheme bypass, percent-encoded routing) and added a `@grpc/grpc-js >=1.14.4` override (server/client crash on malformed messages, via `firebase-admin`). `npm audit` is clean at the moderate gate.
+- **AI budget coverage**: the per-org monthly token budget is now also enforced on `POST /ai/tprm/analyze-evidence` and `POST /ai/swarm/execute`, which call providers outside the `aiHandler` wrapper.
 - **WebSocket auth**: socket connections now pass `JWT_VERIFY_OPTIONS` (explicit algorithms allow-list) to `jwt.verify`, matching HTTP auth.
 - **Public contact hardening**: demo account credentials are emailed only when `DEMO_ACCOUNT_DELIVERY_ENABLED=true` and `DEMO_ACCOUNT_PASSWORD` is set (never from the repo's built-in default), and `POST /public/contact` is rate-limited to 5 requests per IP per 15 minutes.
 
 ### Fixed
 
 - Unhandled promise rejections and uncaught exceptions are now logged through the structured logger instead of crashing or failing silently.
+- Evidence `expires_at` can now be cleared: `PUT /evidence/:id` updates the column only when the field is present in the request and assigns it directly, so `expires_at: null` removes a stale expiration instead of being swallowed by `COALESCE`.
+
+### Changed
+
+- **llmService split**: `services/llmService.js` (2,983 lines) is now a thin facade over cohesive modules under `services/ai/` (key resolution, provider execution, chat core, caching, usage logging, and feature groups). All 58 public exports are re-exported by identity — no behavior change.
 
 ---
 

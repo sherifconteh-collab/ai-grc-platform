@@ -412,7 +412,7 @@ router.post('/engagements/:id/pbc', requirePermission('assessments.write'), asyn
     if (!VALID_PBC_STATUSES.includes(String(status))) {
       return res.status(400).json({ success: false, error: `status must be one of: ${VALID_PBC_STATUSES.join(', ')}` });
     }
-    if (!(await ensureOrgUser(req.user.organization_id, assigned_to))) {
+    if (assigned_to && !(await ensureOrgUser(req.user.organization_id, assigned_to))) {
       return res.status(400).json({ success: false, error: 'assigned_to must reference an active user in this organization' });
     }
     const procedureCheck = await assertProcedureAllowedForEngagement(

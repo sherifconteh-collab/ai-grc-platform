@@ -233,10 +233,10 @@ router.post('/engagements/:id/workpapers', requirePermission('assessments.write'
     if (!VALID_WORKPAPER_STATUSES.includes(String(status))) {
       return res.status(400).json({ success: false, error: `status must be one of: ${VALID_WORKPAPER_STATUSES.join(', ')}` });
     }
-    if (!(await ensureOrgUser(req.user.organization_id, prepared_by))) {
+    if (prepared_by && !(await ensureOrgUser(req.user.organization_id, prepared_by))) {
       return res.status(400).json({ success: false, error: 'prepared_by must reference an active user in this organization' });
     }
-    if (!(await ensureOrgUser(req.user.organization_id, reviewed_by))) {
+    if (reviewed_by && !(await ensureOrgUser(req.user.organization_id, reviewed_by))) {
       return res.status(400).json({ success: false, error: 'reviewed_by must reference an active user in this organization' });
     }
     // SOD: the workpaper preparer cannot also be the reviewer.
