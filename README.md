@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-07 | PR #191: chore(ci): bump gitleaks/gitleaks-action from 2 to 3 -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #192: chore(backend)(deps): bump stripe from 22.1.1 to 22.2.0 in /backend -->
 
 ## 🎯 What is This?
 

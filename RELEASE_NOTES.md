@@ -202,6 +202,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(backend)(deps): bump stripe from 22.1.1 to 22.2.0 in /backend ([#192](https://github.com/sherifconteh-collab/ai-grc-platform/pull/192)) — @dependabot[bot]
 - chore(ci): bump gitleaks/gitleaks-action from 2 to 3 ([#191](https://github.com/sherifconteh-collab/ai-grc-platform/pull/191)) — @dependabot[bot]
 - chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory ([#189](https://github.com/sherifconteh-collab/ai-grc-platform/pull/189)) — @dependabot[bot]
 - chore: v4.2.2 — fix 23-hour build times (npm cache + scoped macOS/Linux triggers) ([#190](https://github.com/sherifconteh-collab/ai-grc-platform/pull/190)) — @sherifconteh-collab
