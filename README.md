@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-07 | PR #196: chore(backend)(deps): bump firebase-admin from 13.8.0 to 13.10.0 in /backend -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #199: chore(frontend)(deps): bump react-dom from 19.2.6 to 19.2.7 in /frontend -->
 
 ## 🎯 What is This?
 
