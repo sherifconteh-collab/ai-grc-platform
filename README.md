@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-07 | PR #192: chore(backend)(deps): bump stripe from 22.1.1 to 22.2.0 in /backend -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #195: chore(frontend)(deps-dev): bump @types/node from 25.9.0 to 25.9.1 in /frontend -->
 
 ## 🎯 What is This?
 
