@@ -202,6 +202,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(ci): bump gitleaks/gitleaks-action from 2 to 3 ([#191](https://github.com/sherifconteh-collab/ai-grc-platform/pull/191)) — @dependabot[bot]
 - chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory ([#189](https://github.com/sherifconteh-collab/ai-grc-platform/pull/189)) — @dependabot[bot]
 - chore: v4.2.2 — fix 23-hour build times (npm cache + scoped macOS/Linux triggers) ([#190](https://github.com/sherifconteh-collab/ai-grc-platform/pull/190)) — @sherifconteh-collab
 - chore: release v4.2.1 — CI improvements + release changelog publishing ([#188](https://github.com/sherifconteh-collab/ai-grc-platform/pull/188)) — @sherifconteh-collab

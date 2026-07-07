@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-27 | PR #189: chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #191: chore(ci): bump gitleaks/gitleaks-action from 2 to 3 -->
 
 ## 🎯 What is This?
 
