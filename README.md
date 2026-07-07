@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-07 | PR #203: chore(deps-dev): bump form-data from 4.0.5 to 4.0.6 in /electron in the npm_and_yarn group across 1 directory -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #205: chore(ci): bump actions/checkout from 4 to 7 -->
 
 ## 🎯 What is This?
 

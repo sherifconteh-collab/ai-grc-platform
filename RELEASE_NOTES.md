@@ -202,6 +202,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(ci): bump actions/checkout from 4 to 7 ([#205](https://github.com/sherifconteh-collab/ai-grc-platform/pull/205)) — @dependabot[bot]
 - chore(deps-dev): bump form-data from 4.0.5 to 4.0.6 in /electron in the npm_and_yarn group across 1 directory ([#203](https://github.com/sherifconteh-collab/ai-grc-platform/pull/203)) — @dependabot[bot]
 - chore(frontend)(deps): bump react and @types/react in /frontend ([#198](https://github.com/sherifconteh-collab/ai-grc-platform/pull/198)) — @dependabot[bot]
 - chore(backend)(deps): bump ioredis from 5.10.1 to 5.11.0 in /backend ([#194](https://github.com/sherifconteh-collab/ai-grc-platform/pull/194)) — @dependabot[bot]
