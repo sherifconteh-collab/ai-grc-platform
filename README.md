@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-27 | PR #189: chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #199: chore(frontend)(deps): bump react-dom from 19.2.6 to 19.2.7 in /frontend -->
 
 ## 🎯 What is This?
 
