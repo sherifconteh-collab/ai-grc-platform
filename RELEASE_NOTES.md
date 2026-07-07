@@ -202,6 +202,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(frontend)(deps): bump react and @types/react in /frontend ([#198](https://github.com/sherifconteh-collab/ai-grc-platform/pull/198)) — @dependabot[bot]
 - chore(backend)(deps): bump ioredis from 5.10.1 to 5.11.0 in /backend ([#194](https://github.com/sherifconteh-collab/ai-grc-platform/pull/194)) — @dependabot[bot]
 - chore(frontend)(deps): bump react-dom from 19.2.6 to 19.2.7 in /frontend ([#199](https://github.com/sherifconteh-collab/ai-grc-platform/pull/199)) — @dependabot[bot]
 - chore(backend)(deps): bump firebase-admin from 13.8.0 to 13.10.0 in /backend ([#196](https://github.com/sherifconteh-collab/ai-grc-platform/pull/196)) — @dependabot[bot]

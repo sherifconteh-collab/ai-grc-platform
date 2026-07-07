@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-07 | PR #194: chore(backend)(deps): bump ioredis from 5.10.1 to 5.11.0 in /backend -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #198: chore(frontend)(deps): bump react and @types/react in /frontend -->
 
 ## 🎯 What is This?
 
