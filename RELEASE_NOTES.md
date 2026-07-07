@@ -202,6 +202,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(backend)(deps): bump firebase-admin from 13.8.0 to 13.10.0 in /backend ([#196](https://github.com/sherifconteh-collab/ai-grc-platform/pull/196)) — @dependabot[bot]
 - chore(frontend)(deps): bump axios from 1.16.0 to 1.16.1 in /frontend ([#193](https://github.com/sherifconteh-collab/ai-grc-platform/pull/193)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @types/node from 25.9.0 to 25.9.1 in /frontend ([#195](https://github.com/sherifconteh-collab/ai-grc-platform/pull/195)) — @dependabot[bot]
 - chore(backend)(deps): bump stripe from 22.1.1 to 22.2.0 in /backend ([#192](https://github.com/sherifconteh-collab/ai-grc-platform/pull/192)) — @dependabot[bot]

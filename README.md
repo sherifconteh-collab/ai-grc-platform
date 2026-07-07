@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-07 | PR #193: chore(frontend)(deps): bump axios from 1.16.0 to 1.16.1 in /frontend -->
+<!-- LAST_UPDATED: 2026-07-07 | PR #196: chore(backend)(deps): bump firebase-admin from 13.8.0 to 13.10.0 in /backend -->
 
 ## 🎯 What is This?
 
