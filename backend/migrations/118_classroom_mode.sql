@@ -100,7 +100,7 @@ VALUES
     'beginner',
     '[
       {"title": "Add a vendor", "description": "Create a TPRM vendor with a type and risk tier.", "hint": "TPRM > Add Vendor.", "target_page": "/dashboard/tprm"},
-      {"title": "Attach a compliance document", "description": "Upload or record a vendor document such as a SOC 2 report with an expiration date.", "hint": "Vendor detail > Documents.", "target_page": "/dashboard/tprm"},
+      {"title": "Attach a compliance document", "description": "Upload or record a vendor compliance report with an expiration date.", "hint": "Vendor detail > Documents.", "target_page": "/dashboard/tprm"},
       {"title": "Send a questionnaire", "description": "Issue a security questionnaire to the vendor.", "hint": "Vendor detail > Questionnaires.", "target_page": "/dashboard/tprm"},
       {"title": "Set the review status", "description": "Move the vendor to approved or conditional based on your review.", "hint": "Review statuses include pending_review, in_review, approved.", "target_page": "/dashboard/tprm"}
     ]'::jsonb

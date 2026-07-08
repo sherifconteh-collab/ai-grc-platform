@@ -473,10 +473,13 @@ router.get('/score', requirePermission('assessments.read'), async (req, res) => 
          SELECT actual_rto_hours, actual_rpo_hours
          FROM resilience_tests rt
          WHERE rt.resilience_plan_id = rp.id
+           AND rt.actual_rto_hours IS NOT NULL
+           AND rt.actual_rpo_hours IS NOT NULL
          ORDER BY rt.test_date DESC
          LIMIT 1
        ) lt ON true
-       WHERE rp.organization_id = $1 AND rp.status = 'active'`,
+       WHERE rp.organization_id = $1 AND rp.status = 'active'
+         AND rp.rto_target_hours IS NOT NULL AND rp.rpo_target_hours IS NOT NULL`,
       [orgId]
     );
     const plansWithTests = attainment.rows[0]?.plans_with_tests || 0;

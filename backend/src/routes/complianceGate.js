@@ -31,6 +31,9 @@ router.get('/gate', async (req, res) => {
     }
 
     const frameworkId = req.query.framework_id ? String(req.query.framework_id) : null;
+    if (frameworkId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(frameworkId)) {
+      return res.status(400).json({ success: false, error: 'framework_id must be a valid UUID' });
+    }
     const frameworkFilter = frameworkId ? 'AND of2.framework_id = $2' : '';
     const params = frameworkId ? [orgId, frameworkId] : [orgId];
 

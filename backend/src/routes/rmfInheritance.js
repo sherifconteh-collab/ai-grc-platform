@@ -50,6 +50,20 @@ function trimStr(val, maxLen = 255) {
 }
 
 /**
+ * Validate a client-supplied YYYY-MM-DD date string. Returns { value } (null
+ * when omitted/empty) or { error } for malformed input, so callers can 400
+ * instead of letting an invalid date reach Postgres as a 500.
+ */
+function toDateString(val) {
+  const trimmed = trimStr(val, 10);
+  if (!trimmed) return { value: null };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return { error: 'must be formatted as YYYY-MM-DD' };
+  }
+  return { value: trimmed };
+}
+
+/**
  * Normalize a client-supplied control-identifier list: trim, uppercase,
  * dedupe, and enforce size caps. Returns { value } (JSON string ready for a
  * JSONB parameter) or { error }.
@@ -204,6 +218,17 @@ router.post('/packages/:id/leveraged-authorizations', requirePermission('assessm
     }
     const controlCount = JSON.parse(controls.value).length;
 
+    const reviewDate = toDateString(req.body.review_date);
+    if (reviewDate.error) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: `review_date ${reviewDate.error}` });
+    }
+    const expirationDate = toDateString(req.body.expiration_date);
+    if (expirationDate.error) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: `expiration_date ${expirationDate.error}` });
+    }
+
     let inserted;
     try {
       inserted = await client.query(
@@ -221,8 +246,8 @@ router.post('/packages/:id/leveraged-authorizations', requirePermission('assessm
           controls.value,
           trimStr(req.body.provider_responsibilities, 5000),
           trimStr(req.body.customer_responsibilities, 5000),
-          trimStr(req.body.review_date, 10),
-          trimStr(req.body.expiration_date, 10),
+          reviewDate.value,
+          expirationDate.value,
           trimStr(req.body.notes, 5000),
           req.user.id
         ]
@@ -319,6 +344,23 @@ router.put('/packages/:id/leveraged-authorizations/:linkId', requirePermission('
       ? trimStr(req.body[field], maxLen)
       : existing[field]);
 
+    let reviewDate = existing.review_date;
+    if (req.body.review_date !== undefined) {
+      const parsed = toDateString(req.body.review_date);
+      if (parsed.error) {
+        return res.status(400).json({ success: false, error: `review_date ${parsed.error}` });
+      }
+      reviewDate = parsed.value;
+    }
+    let expirationDate = existing.expiration_date;
+    if (req.body.expiration_date !== undefined) {
+      const parsed = toDateString(req.body.expiration_date);
+      if (parsed.error) {
+        return res.status(400).json({ success: false, error: `expiration_date ${parsed.error}` });
+      }
+      expirationDate = parsed.value;
+    }
+
     const result = await pool.query(
       `UPDATE rmf_leveraged_authorizations SET
          inheritance_type = $4,
@@ -341,8 +383,8 @@ router.put('/packages/:id/leveraged-authorizations/:linkId', requirePermission('
         controlsValue,
         merge('provider_responsibilities', 5000),
         merge('customer_responsibilities', 5000),
-        req.body.review_date !== undefined ? trimStr(req.body.review_date, 10) : existing.review_date,
-        req.body.expiration_date !== undefined ? trimStr(req.body.expiration_date, 10) : existing.expiration_date,
+        reviewDate,
+        expirationDate,
         merge('notes', 5000),
         req.user.id
       ]

@@ -8,6 +8,8 @@
  * from rmf_leveraged_authorizations.inherited_controls (JSONB string arrays).
  */
 
+const { randomUUID } = require('crypto');
+
 const OSCAL_VERSION = '1.1.2';
 
 const IMPACT_LEVELS = new Set(['low', 'moderate', 'high']);
@@ -106,8 +108,9 @@ function buildSystemSecurityPlan(pkg, leveragedAuths = [], activeDecision = null
     });
   });
 
-  const implementedRequirements = [...controlMap.entries()].map(([controlId, providersById], idx) => ({
-    uuid: `ir-${idx + 1}-${controlId.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+  const implementedRequirements = [...controlMap.entries()].map(([controlId, providersById]) => ({
+    // OSCAL requires uuid fields to be RFC 4122 UUIDs (schema validation fails on slug-style ids).
+    uuid: randomUUID(),
     'control-id': controlId.toLowerCase(),
     props: [
       { name: 'implementation-status', ns: 'https://controlweave.io/ns/oscal', value: 'inherited' }
@@ -115,7 +118,7 @@ function buildSystemSecurityPlan(pkg, leveragedAuths = [], activeDecision = null
     'by-components': [...providersById.values()].map(la => {
       const byComponent = {
         'component-uuid': la.cots_product_id,
-        uuid: `bc-${la.id}-${controlId.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        uuid: randomUUID(),
         description: `Inherited from ${la.product_name} (${la.inheritance_type}).`
       };
       if (la.provider_responsibilities || la.customer_responsibilities) {
