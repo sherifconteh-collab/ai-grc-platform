@@ -4,6 +4,26 @@
 
 ---
 
+## [4.3.0] — 2026-07-08
+
+### Added
+
+- **RMF Leveraged Authorizations**: RMF packages can now inherit controls and authorization posture from COTS/SaaS products, following the FedRAMP-style leveraged-authorization model. New table `rmf_leveraged_authorizations` (migration 116) links `rmf_packages` to `cots_products` with inheritance type (full/partial/hybrid), an inherited-control list, shared-responsibility notes, and expiration tracking. New route module `routes/rmfInheritance.js` provides CRUD, an eligible-products lookup, and at-risk flagging when the underlying COTS product is deprecated/retired or its authorization has lapsed.
+- **Customer Responsibility Matrix (CRM) export**: generate a CRM as JSON, CSV, or PDF directly from a package's leveraged authorizations (`GET /rmf/packages/:id/crm-report`, `/crm-report/pdf`).
+- **OSCAL SSP export**: export an RMF package as a NIST OSCAL 1.1.2 System Security Plan (`GET /rmf/packages/:id/oscal`), including leveraged authorizations and per-control shared-responsibility annotations. New pure serializer `services/oscalService.js`.
+- **Trust Center**: organizations can publish an opt-in, token-gated public page showing aggregate framework compliance and active-authorization counts (migration 117, `routes/trustCenter.js`, public page at `/trust/[token]`). Nothing beyond the enabled toggles is ever exposed.
+- **Classroom mode**: guided, step-by-step training scenarios (migration 118, `routes/training.js`, `dashboard/training`) with three built-in templates (internal audit engagement, taking a system to ATO, vendor risk review) plus an instructor progress view for org-authored scenarios.
+- **Anonymized industry benchmarking**: compare an organization's framework compliance against a k-anonymity-guarded peer aggregate (minimum 5 participating organizations), with an org-level opt-out (`routes/benchmarks.js`, `dashboard/reports`).
+- **Compliance-as-code CI gate**: `GET /compliance/gate` returns HTTP 200/412 based on whether framework compliance meets a threshold, for direct use in CI pipelines with a service-account token. See `docs/COMPLIANCE_AS_CODE.md`.
+- **Cyber Resilience module**: BC/DR, incident-response, and ransomware-playbook plan tracking with tabletop/functional/full-scale exercise logging and RTO/RPO attainment (migration 119, `routes/cyberResilience.js`, `dashboard/resilience`). A computed Cyber Resilience Score blends plan coverage, test cadence, RTO/RPO attainment, and existing backup-log health.
+- COTS products gained `authorization_status`, `authorization_impact_level`, and `external_authorization_id` fields to support leveraged-authorization eligibility.
+
+### Changed
+
+- `GET /rmf/packages`, `/rmf/packages/:id`, and `/rmf/summary` now include leveraged-authorization counts and at-risk entries alongside existing fields.
+
+---
+
 ## [4.2.2] — 2026-05-27
 
 ### Changed

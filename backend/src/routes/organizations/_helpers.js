@@ -61,6 +61,10 @@ const VALID_COTS_DEPLOYMENT_MODELS = new Set([
 ]);
 const VALID_COTS_DATA_ACCESS_LEVELS = new Set(['none', 'metadata', 'limited', 'full']);
 const VALID_COTS_LIFECYCLE_STATUSES = new Set(['planned', 'active', 'deprecated', 'retired']);
+const VALID_COTS_AUTHZ_STATUSES = new Set([
+  'none', 'fedramp_ready', 'fedramp_in_process', 'fedramp_authorized', 'agency_ato', 'dod_il_authorized', 'other'
+]);
+const VALID_COTS_AUTHZ_LEVELS = new Set(['li_saas', 'low', 'moderate', 'high']);
 const VALID_CRITICALITY_LEVELS = new Set(['low', 'medium', 'high', 'critical']);
 const VALID_CONTRACT_TYPES = new Set(['msa', 'sow', 'license', 'dpa', 'baa', 'sla', 'other']);
 const VALID_CONTRACT_STATUSES = new Set(['draft', 'active', 'renewal_pending', 'expired', 'terminated']);
@@ -369,6 +373,12 @@ function normalizeCotsProductInput(input, existing = null) {
   const supportEndDate = input.support_end_date !== undefined
     ? toNullableDateString(input.support_end_date)
     : existing?.support_end_date || null;
+  const authorizationStatus = input.authorization_status !== undefined
+    ? toLowerNullableString(input.authorization_status)
+    : existing?.authorization_status || null;
+  const authorizationImpactLevel = input.authorization_impact_level !== undefined
+    ? toLowerNullableString(input.authorization_impact_level)
+    : existing?.authorization_impact_level || null;
 
   const payload = {
     system_id: input.system_id !== undefined
@@ -389,6 +399,11 @@ function normalizeCotsProductInput(input, existing = null) {
     lifecycle_status: lifecycleStatus,
     criticality,
     support_end_date: supportEndDate,
+    authorization_status: authorizationStatus,
+    authorization_impact_level: authorizationImpactLevel,
+    external_authorization_id: input.external_authorization_id !== undefined
+      ? toNullableString(input.external_authorization_id)
+      : existing?.external_authorization_id || null,
     notes: input.notes !== undefined
       ? toNullableString(input.notes)
       : existing?.notes || null
@@ -418,6 +433,12 @@ function normalizeCotsProductInput(input, existing = null) {
   }
   if (input.support_end_date !== undefined && supportEndDate === undefined) {
     errors.push('support_end_date must be formatted as YYYY-MM-DD');
+  }
+  if (payload.authorization_status && !VALID_COTS_AUTHZ_STATUSES.has(payload.authorization_status)) {
+    errors.push('authorization_status must be one of: none, fedramp_ready, fedramp_in_process, fedramp_authorized, agency_ato, dod_il_authorized, other');
+  }
+  if (payload.authorization_impact_level && !VALID_COTS_AUTHZ_LEVELS.has(payload.authorization_impact_level)) {
+    errors.push('authorization_impact_level must be one of: li_saas, low, moderate, high');
   }
 
   return { payload, errors };

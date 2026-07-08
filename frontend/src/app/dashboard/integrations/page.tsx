@@ -75,6 +75,35 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
+function ComplianceAsCodeCard() {
+  return (
+    <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        <h2 className="font-semibold text-gray-900">Compliance as Code</h2>
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-blue-50 text-blue-700 border-blue-200">
+          CI/CD
+        </span>
+      </div>
+      <p className="text-sm text-gray-500">
+        Gate your CI/CD pipeline on live compliance status. Call{' '}
+        <code className="text-xs bg-gray-100 text-gray-800 px-1 py-0.5 rounded">
+          GET /api/v1/compliance/gate?framework_id=&lt;id&gt;&amp;min_pct=&lt;threshold&gt;
+        </code>{' '}
+        with a service-account token — it returns HTTP 200 when every evaluated framework meets the threshold, or HTTP
+        412 otherwise, so <code className="text-xs bg-gray-100 text-gray-800 px-1 py-0.5 rounded">curl --fail</code>{' '}
+        breaks the build automatically.
+      </p>
+      <div className="mt-3 bg-gray-900 rounded-lg p-4 overflow-x-auto">
+        <pre className="text-xs text-green-400 font-mono leading-relaxed">
+          <code>{`curl --fail -H "Authorization: Bearer $SERVICE_ACCOUNT_TOKEN" \\
+  "https://your-instance/api/v1/compliance/gate?framework_id=<id>&min_pct=80"`}</code>
+        </pre>
+      </div>
+      <p className="text-xs text-gray-400 mt-2">See docs/COMPLIANCE_AS_CODE.md for the full integration guide.</p>
+    </div>
+  );
+}
+
 export default function IntegrationsPage() {
   const { user } = useAuth();
   const canManage = hasPermission(user, 'settings.manage');
@@ -167,6 +196,8 @@ export default function IntegrationsPage() {
             {error}
           </div>
         )}
+
+        <ComplianceAsCodeCard />
 
         {/* Tabs */}
         <div className="flex gap-4 border-b border-gray-200 mb-6">

@@ -766,13 +766,15 @@ router.post('/me/cots-products', requirePermission('organizations.write'), async
          organization_id, system_id,
          product_name, vendor_name, product_version, product_type,
          deployment_model, data_access_level, lifecycle_status, criticality,
-         support_end_date, notes, created_by, updated_by
+         support_end_date, authorization_status, authorization_impact_level,
+         external_authorization_id, notes, created_by, updated_by
        )
        VALUES (
          $1, $2,
          $3, $4, $5, $6,
          $7, $8, $9, $10,
-         $11, $12, $13, $14
+         $11, $12, $13,
+         $14, $15, $16, $17
        )
        RETURNING *`,
       [
@@ -787,6 +789,9 @@ router.post('/me/cots-products', requirePermission('organizations.write'), async
         payload.lifecycle_status,
         payload.criticality,
         payload.support_end_date,
+        payload.authorization_status,
+        payload.authorization_impact_level,
+        payload.external_authorization_id,
         payload.notes,
         req.user.id,
         req.user.id
@@ -853,8 +858,11 @@ router.put('/me/cots-products/:productId', requirePermission('organizations.writ
            lifecycle_status = $10,
            criticality = $11,
            support_end_date = $12,
-           notes = $13,
-           updated_by = $14,
+           authorization_status = $13,
+           authorization_impact_level = $14,
+           external_authorization_id = $15,
+           notes = $16,
+           updated_by = $17,
            updated_at = NOW()
        WHERE id = $1 AND organization_id = $2
        RETURNING *`,
@@ -871,6 +879,9 @@ router.put('/me/cots-products/:productId', requirePermission('organizations.writ
         payload.lifecycle_status,
         payload.criticality,
         payload.support_end_date,
+        payload.authorization_status,
+        payload.authorization_impact_level,
+        payload.external_authorization_id,
         payload.notes,
         req.user.id
       ]
