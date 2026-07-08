@@ -1810,6 +1810,8 @@ export const benchmarksAPI = {
 export const complianceGateAPI = {
   checkGate: (params?: { framework_id?: string; min_pct?: number }) =>
     api.get('/compliance/gate', { params }),
+  exportSnippet: (params?: { framework_id?: string; min_pct?: number; format?: 'github_actions' | 'gitlab_ci' | 'curl' }) =>
+    api.get('/compliance/gate/export', { params }),
 };
 
 // Cyber Resilience — BC/DR plans, tabletop/DR testing, resilience score (routes/cyberResilience.js)

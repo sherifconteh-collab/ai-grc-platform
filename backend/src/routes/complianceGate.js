@@ -18,6 +18,105 @@ const { log } = require('../utils/logger');
 
 router.use(authenticate);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_EXPORT_FORMATS = new Set(['github_actions', 'gitlab_ci', 'curl']);
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
+function buildExportSnippet(format, gateUrl, frameworkName) {
+  const label = frameworkName ? ` — ${frameworkName}` : '';
+  if (format === 'github_actions') {
+    return [
+      `# Compliance gate${label} — paste into a GitHub Actions job step`,
+      '- name: Check compliance gate',
+      '  env:',
+      '    CONTROLWEAVE_TOKEN: ${{ secrets.CONTROLWEAVE_TOKEN }}',
+      '  run: |',
+      '    curl --fail \\',
+      '      -H "Authorization: Bearer $CONTROLWEAVE_TOKEN" \\',
+      `      "${gateUrl}"`,
+      ''
+    ].join('\n');
+  }
+  if (format === 'gitlab_ci') {
+    return [
+      `# Compliance gate${label} — paste into .gitlab-ci.yml`,
+      'compliance_gate:',
+      '  stage: test',
+      '  script:',
+      '    - >',
+      '      curl --fail',
+      '      -H "Authorization: Bearer $CONTROLWEAVE_TOKEN"',
+      `      "${gateUrl}"`,
+      ''
+    ].join('\n');
+  }
+  return [
+    `# Compliance gate${label}`,
+    'curl --fail \\',
+    '  -H "Authorization: Bearer $CONTROLWEAVE_TOKEN" \\',
+    `  "${gateUrl}"`,
+    ''
+  ].join('\n');
+}
+
+// ===========================================================================
+// GET /compliance/gate/export — ready-to-paste CI snippet for this org
+// ===========================================================================
+router.get('/gate/export', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+
+    const format = String(req.query.format || 'curl').toLowerCase();
+    if (!VALID_EXPORT_FORMATS.has(format)) {
+      return res.status(400).json({
+        success: false,
+        error: `format must be one of: ${Array.from(VALID_EXPORT_FORMATS).join(', ')}`
+      });
+    }
+
+    const minPct = Number(req.query.min_pct ?? 80);
+    if (!Number.isFinite(minPct) || minPct < 0 || minPct > 100) {
+      return res.status(400).json({ success: false, error: 'min_pct must be a number between 0 and 100' });
+    }
+
+    const frameworkId = req.query.framework_id ? String(req.query.framework_id) : null;
+    if (frameworkId && !UUID_RE.test(frameworkId)) {
+      return res.status(400).json({ success: false, error: 'framework_id must be a valid UUID' });
+    }
+
+    let frameworkName = null;
+    if (frameworkId) {
+      const fw = await pool.query(
+        `SELECT f.name
+         FROM organization_frameworks of2
+         JOIN frameworks f ON f.id = of2.framework_id
+         WHERE of2.organization_id = $1 AND of2.framework_id = $2`,
+        [orgId, frameworkId]
+      );
+      if (fw.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Framework not found for this organization' });
+      }
+      frameworkName = fw.rows[0].name;
+    }
+
+    const queryString = frameworkId
+      ? `framework_id=${frameworkId}&min_pct=${minPct}`
+      : `min_pct=${minPct}`;
+    const gateUrl = `${BACKEND_URL}/api/v1/compliance/gate?${queryString}`;
+    const snippet = buildExportSnippet(format, gateUrl, frameworkName);
+
+    log('info', 'compliance_gate.export', { orgId, format, frameworkId, userId: req.user.id });
+
+    res.json({
+      success: true,
+      data: { format, snippet, gate_url: gateUrl, framework_name: frameworkName, threshold: minPct }
+    });
+  } catch (error) {
+    log('error', 'compliance_gate.export_failed', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to generate export snippet' });
+  }
+});
+
 // ===========================================================================
 // GET /compliance/gate — evaluate framework compliance against a threshold
 // ===========================================================================

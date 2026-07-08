@@ -800,7 +800,10 @@ app.whenReady().then(async () => {
 
       logStartup('info', 'All critical resources present — smoke test passed');
       process.exitCode = 0;
-      app.quit();
+      // app.quit() is graceful/async and can leave GPU/zygote/crashpad helper
+      // processes running long enough to hang the CI smoke-test step; exit
+      // immediately instead since there is no user session to tear down.
+      app.exit(0);
       return;
     }
 

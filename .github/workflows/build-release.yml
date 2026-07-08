@@ -122,7 +122,15 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A PAT (not the default GITHUB_TOKEN) is required here so the tag this
+          # step creates actually triggers a new `push: tags` workflow run — GitHub
+          # suppresses workflow triggers for refs created via GITHUB_TOKEN to
+          # prevent infinite loops. Without RELEASE_PAT, the macOS/Linux/Windows
+          # build jobs below (gated on a tag-triggered run) never execute. Add a
+          # repo secret named RELEASE_PAT (classic PAT with the `repo` scope, or a
+          # fine-grained PAT with Contents: Read and write on this repo) to enable
+          # them; falls back to GITHUB_TOKEN so behavior is unchanged until then.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────────────────────
   # Build Windows installer (.exe)
