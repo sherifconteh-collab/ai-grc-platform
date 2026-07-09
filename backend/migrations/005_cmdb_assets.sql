@@ -2,7 +2,7 @@
 -- Comprehensive Configuration Management Database for assets, AI agents, service accounts
 
 -- Asset Categories
-CREATE TABLE asset_categories (
+CREATE TABLE IF NOT EXISTS asset_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL UNIQUE,
     code VARCHAR(50) NOT NULL UNIQUE,
@@ -23,7 +23,7 @@ INSERT INTO asset_categories (name, code, description, tier_required) VALUES
     ('Service Account', 'service_account', 'Service accounts and credentials', 'professional');
 
 -- Environments (with IP tracking for AI governance)
-CREATE TABLE environments (
+CREATE TABLE IF NOT EXISTS environments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE environments (
 );
 
 -- Password Vaults
-CREATE TABLE password_vaults (
+CREATE TABLE IF NOT EXISTS password_vaults (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE password_vaults (
 );
 
 -- Assets (unified table for all asset types)
-CREATE TABLE assets (
+CREATE TABLE IF NOT EXISTS assets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     category_id UUID NOT NULL REFERENCES asset_categories(id),
@@ -135,7 +135,7 @@ CREATE TABLE assets (
 );
 
 -- Asset Dependencies (track relationships between assets)
-CREATE TABLE asset_dependencies (
+CREATE TABLE IF NOT EXISTS asset_dependencies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     depends_on_asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
@@ -147,7 +147,7 @@ CREATE TABLE asset_dependencies (
 );
 
 -- Service Accounts (Professional+ tier)
-CREATE TABLE service_accounts (
+CREATE TABLE IF NOT EXISTS service_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
 
@@ -192,7 +192,7 @@ CREATE TABLE service_accounts (
 );
 
 -- Service Account Access (which assets/systems use which service accounts)
-CREATE TABLE service_account_access (
+CREATE TABLE IF NOT EXISTS service_account_access (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     service_account_id UUID NOT NULL REFERENCES service_accounts(id) ON DELETE CASCADE,
     asset_id UUID REFERENCES assets(id) ON DELETE CASCADE,
@@ -206,7 +206,7 @@ CREATE TABLE service_account_access (
 );
 
 -- Asset Control Mappings (link assets to compliance controls)
-CREATE TABLE asset_control_mappings (
+CREATE TABLE IF NOT EXISTS asset_control_mappings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     control_id UUID NOT NULL REFERENCES framework_controls(id) ON DELETE CASCADE,
@@ -221,7 +221,7 @@ CREATE TABLE asset_control_mappings (
 );
 
 -- Asset Access Logs (Enterprise+ tier - who accessed what asset)
-CREATE TABLE asset_access_logs (
+CREATE TABLE IF NOT EXISTS asset_access_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id),
@@ -234,7 +234,7 @@ CREATE TABLE asset_access_logs (
 );
 
 -- Service Account Reviews (Enterprise+ tier - periodic review workflow)
-CREATE TABLE service_account_reviews (
+CREATE TABLE IF NOT EXISTS service_account_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     service_account_id UUID NOT NULL REFERENCES service_accounts(id) ON DELETE CASCADE,
     reviewer_id UUID NOT NULL REFERENCES users(id),
@@ -247,23 +247,23 @@ CREATE TABLE service_account_reviews (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_assets_org ON assets(organization_id);
-CREATE INDEX idx_assets_category ON assets(category_id);
-CREATE INDEX idx_assets_owner ON assets(owner_id);
-CREATE INDEX idx_assets_environment ON assets(environment_id);
-CREATE INDEX idx_assets_status ON assets(status);
-CREATE INDEX idx_environments_org ON environments(organization_id);
-CREATE INDEX idx_service_accounts_org ON service_accounts(organization_id);
-CREATE INDEX idx_service_accounts_owner ON service_accounts(owner_id);
-CREATE INDEX idx_service_accounts_vault ON service_accounts(vault_id);
-CREATE INDEX idx_service_account_access_sa ON service_account_access(service_account_id);
-CREATE INDEX idx_service_account_access_asset ON service_account_access(asset_id);
-CREATE INDEX idx_asset_dependencies_asset ON asset_dependencies(asset_id);
-CREATE INDEX idx_asset_dependencies_depends ON asset_dependencies(depends_on_asset_id);
-CREATE INDEX idx_asset_control_mappings_asset ON asset_control_mappings(asset_id);
-CREATE INDEX idx_asset_control_mappings_control ON asset_control_mappings(control_id);
-CREATE INDEX idx_asset_access_logs_asset ON asset_access_logs(asset_id);
-CREATE INDEX idx_asset_access_logs_created ON asset_access_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_assets_org ON assets(organization_id);
+CREATE INDEX IF NOT EXISTS idx_assets_category ON assets(category_id);
+CREATE INDEX IF NOT EXISTS idx_assets_owner ON assets(owner_id);
+CREATE INDEX IF NOT EXISTS idx_assets_environment ON assets(environment_id);
+CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
+CREATE INDEX IF NOT EXISTS idx_environments_org ON environments(organization_id);
+CREATE INDEX IF NOT EXISTS idx_service_accounts_org ON service_accounts(organization_id);
+CREATE INDEX IF NOT EXISTS idx_service_accounts_owner ON service_accounts(owner_id);
+CREATE INDEX IF NOT EXISTS idx_service_accounts_vault ON service_accounts(vault_id);
+CREATE INDEX IF NOT EXISTS idx_service_account_access_sa ON service_account_access(service_account_id);
+CREATE INDEX IF NOT EXISTS idx_service_account_access_asset ON service_account_access(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_dependencies_asset ON asset_dependencies(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_dependencies_depends ON asset_dependencies(depends_on_asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_control_mappings_asset ON asset_control_mappings(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_control_mappings_control ON asset_control_mappings(control_id);
+CREATE INDEX IF NOT EXISTS idx_asset_access_logs_asset ON asset_access_logs(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_access_logs_created ON asset_access_logs(created_at DESC);
 
 COMMENT ON TABLE assets IS 'CMDB: Unified asset tracking with NIST 800-160 lifecycle management and AI governance';
 COMMENT ON TABLE environments IS 'Environments with IP tracking for AI governance and data classification';

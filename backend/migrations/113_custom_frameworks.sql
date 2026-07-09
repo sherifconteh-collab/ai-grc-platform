@@ -1,5 +1,5 @@
 -- Custom Framework Builder: org-defined frameworks with custom controls
-CREATE TABLE custom_frameworks (
+CREATE TABLE IF NOT EXISTS custom_frameworks (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id  UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     code             TEXT NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE custom_frameworks (
     UNIQUE (organization_id, code)
 );
 
-CREATE TABLE custom_framework_controls (
+CREATE TABLE IF NOT EXISTS custom_framework_controls (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     custom_framework_id UUID NOT NULL REFERENCES custom_frameworks(id) ON DELETE CASCADE,
     organization_id     UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -30,9 +30,9 @@ CREATE TABLE custom_framework_controls (
     UNIQUE (custom_framework_id, control_id)
 );
 
-CREATE INDEX idx_custom_frameworks_org ON custom_frameworks (organization_id);
-CREATE INDEX idx_custom_framework_controls_framework ON custom_framework_controls (custom_framework_id);
-CREATE INDEX idx_custom_framework_controls_org ON custom_framework_controls (organization_id);
+CREATE INDEX IF NOT EXISTS idx_custom_frameworks_org ON custom_frameworks (organization_id);
+CREATE INDEX IF NOT EXISTS idx_custom_framework_controls_framework ON custom_framework_controls (custom_framework_id);
+CREATE INDEX IF NOT EXISTS idx_custom_framework_controls_org ON custom_framework_controls (organization_id);
 
 -- Row-level security (same pattern as migration 104)
 ALTER TABLE custom_frameworks ENABLE ROW LEVEL SECURITY;

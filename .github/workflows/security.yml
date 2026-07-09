@@ -78,6 +78,23 @@ jobs:
           npm ci
           npm run check:syntax
 
+      - name: Check for new duplicate migration numbers
+        run: |
+          cd backend/migrations
+          KNOWN_DUPS="012 013 014 015 016 017 018 019 020 021 022 023 024 048 057 061 072"
+          ALL_DUPS=$(ls *.sql | sed 's/^\([0-9]*\)_.*/\1/' | sort | uniq -d)
+          FAILED=0
+          for dup in $ALL_DUPS; do
+            if ! echo "$KNOWN_DUPS" | grep -qw "$dup"; then
+              echo "New duplicate migration number: $dup"
+              FAILED=1
+            else
+              echo "Known legacy duplicate (grandfathered): $dup"
+            fi
+          done
+          [ "$FAILED" -eq 0 ] && echo "No new duplicate migration numbers"
+          exit $FAILED
+
       - name: Frontend - typecheck
         run: |
           cd frontend
