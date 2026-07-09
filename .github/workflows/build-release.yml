@@ -384,7 +384,13 @@ jobs:
 
       - name: Build macOS arm64 installer
         timeout-minutes: 20
-        run: npm run dist:mac:arm64
+        # asar packing is disabled (see electron-builder config), so electron-builder
+        # signs/copies every individual node_modules file rather than one archive.
+        # The runner's default open-file limit (~256) isn't enough for that many
+        # concurrent handles during signing and trips EMFILE — raise it first.
+        run: |
+          ulimit -n 10240
+          npm run dist:mac:arm64
         working-directory: electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -492,7 +498,11 @@ jobs:
 
       - name: Build macOS x64 installer
         timeout-minutes: 20
-        run: npm run dist:mac:x64
+        # See the arm64 job above: asar is disabled, so signing touches thousands
+        # of individual files and trips the runner's default EMFILE limit.
+        run: |
+          ulimit -n 10240
+          npm run dist:mac:x64
         working-directory: electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
