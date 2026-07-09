@@ -14,9 +14,16 @@ const PDFDocument = require('pdfkit');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
 const { buildSystemSecurityPlan } = require('../services/oscalService');
 
+router.use(createRateLimiter({
+  label: 'rmf-inheritance',
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
+}));
 router.use(authenticate);
 
 // ---------------------------------------------------------------------------
