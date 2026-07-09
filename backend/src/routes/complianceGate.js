@@ -15,14 +15,20 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 const { log } = require('../utils/logger');
 
+// Two layers: the org-scoped Redis-backed limiter above is the real
+// production control (works across instances); express-rate-limit is
+// additionally applied per-process so static analysis (CodeQL) can trace a
+// recognized rate-limiting middleware directly on this router.
 router.use(createRateLimiter({
   label: 'compliance-gate',
   windowMs: 15 * 60 * 1000,
   max: 120,
   keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
 }));
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 120 }));
 router.use(authenticate);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
