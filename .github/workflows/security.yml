@@ -123,7 +123,7 @@ jobs:
       - name: Run all migrations against a fresh Postgres 16 instance
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/grc_ci_test
+          DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
         run: node scripts/migrate-all.js
 
   secret-scanning:

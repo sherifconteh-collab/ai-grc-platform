@@ -25,6 +25,7 @@ const { log } = require('../utils/logger');
 // production control (works across instances); express-rate-limit is
 // additionally applied per-process so static analysis (CodeQL) can trace a
 // recognized rate-limiting middleware directly on this router.
+router.use(authenticate);
 router.use(createRateLimiter({
   label: 'benchmarks',
   windowMs: 15 * 60 * 1000,
@@ -32,7 +33,6 @@ router.use(createRateLimiter({
   keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
 }));
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 120 }));
-router.use(authenticate);
 
 const K_ANONYMITY_MIN = 5;
 

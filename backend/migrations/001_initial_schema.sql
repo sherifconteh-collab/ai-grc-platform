@@ -5,7 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Organizations (multi-tenant)
-CREATE TABLE IF NOT EXISTS organizations (
+CREATE TABLE organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     tier VARCHAR(50) NOT NULL DEFAULT 'free', -- 'free', 'starter', 'professional', 'enterprise', 'utilities'
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS organizations (
 );
 
 -- Users
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Roles and Permissions
-CREATE TABLE IF NOT EXISTS roles (
+CREATE TABLE roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS roles (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS permissions (
+CREATE TABLE permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL UNIQUE,
     resource VARCHAR(100) NOT NULL,
@@ -46,20 +46,20 @@ CREATE TABLE IF NOT EXISTS permissions (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS role_permissions (
+CREATE TABLE role_permissions (
     role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
     permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
     PRIMARY KEY (role_id, permission_id)
 );
 
-CREATE TABLE IF NOT EXISTS user_roles (
+CREATE TABLE user_roles (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, role_id)
 );
 
 -- Frameworks
-CREATE TABLE IF NOT EXISTS frameworks (
+CREATE TABLE frameworks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     version VARCHAR(50),
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS frameworks (
 );
 
 -- Framework Controls
-CREATE TABLE IF NOT EXISTS framework_controls (
+CREATE TABLE framework_controls (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     framework_id UUID NOT NULL REFERENCES frameworks(id) ON DELETE CASCADE,
     control_id VARCHAR(100) NOT NULL,
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS framework_controls (
 );
 
 -- Control Implementations (per organization)
-CREATE TABLE IF NOT EXISTS control_implementations (
+CREATE TABLE control_implementations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     control_id UUID NOT NULL REFERENCES framework_controls(id) ON DELETE CASCADE,
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS control_implementations (
 );
 
 -- Control Mappings (crosswalk between frameworks)
-CREATE TABLE IF NOT EXISTS control_mappings (
+CREATE TABLE control_mappings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_control_id UUID NOT NULL REFERENCES framework_controls(id) ON DELETE CASCADE,
     target_control_id UUID NOT NULL REFERENCES framework_controls(id) ON DELETE CASCADE,
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS control_mappings (
 );
 
 -- Audit Log
-CREATE TABLE IF NOT EXISTS audit_logs (
+CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -123,14 +123,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_users_org ON users(organization_id);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_framework_controls_framework ON framework_controls(framework_id);
-CREATE INDEX IF NOT EXISTS idx_control_implementations_org ON control_implementations(organization_id);
-CREATE INDEX IF NOT EXISTS idx_control_implementations_control ON control_implementations(control_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_org ON audit_logs(organization_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
+CREATE INDEX idx_users_org ON users(organization_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_framework_controls_framework ON framework_controls(framework_id);
+CREATE INDEX idx_control_implementations_org ON control_implementations(organization_id);
+CREATE INDEX idx_control_implementations_control ON control_implementations(control_id);
+CREATE INDEX idx_audit_logs_org ON audit_logs(organization_id);
+CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_created ON audit_logs(created_at DESC);
 
 COMMENT ON TABLE organizations IS 'Multi-tenant organizations with tier-based access control';
 COMMENT ON TABLE users IS 'User accounts with organization association';

@@ -22,6 +22,7 @@ const { log } = require('../utils/logger');
 // production control (works across instances); express-rate-limit is
 // additionally applied per-process so static analysis (CodeQL) can trace a
 // recognized rate-limiting middleware directly on this router.
+router.use(authenticate);
 router.use(createRateLimiter({
   label: 'compliance-gate',
   windowMs: 15 * 60 * 1000,
@@ -29,7 +30,6 @@ router.use(createRateLimiter({
   keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
 }));
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 120 }));
-router.use(authenticate);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_EXPORT_FORMATS = new Set(['github_actions', 'gitlab_ci', 'curl']);
@@ -155,9 +155,9 @@ router.get('/gate', async (req, res) => {
          of2.framework_id,
          f.name AS framework_name,
          COUNT(fc.id)::int AS total_controls,
-         COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'satisfied_via_crosswalk'))::int AS implemented,
+         COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'verified', 'satisfied_via_crosswalk'))::int AS implemented,
          CASE WHEN COUNT(fc.id) > 0
-              THEN ROUND((COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'satisfied_via_crosswalk'))::numeric
+              THEN ROUND((COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'verified', 'satisfied_via_crosswalk'))::numeric
                           / COUNT(fc.id)::numeric) * 100, 2)
               ELSE 0
          END AS compliance_pct

@@ -1,5 +1,5 @@
 -- Compliance snapshots for historical trending
-CREATE TABLE IF NOT EXISTS compliance_snapshots (
+CREATE TABLE compliance_snapshots (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id  UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     framework_id     UUID REFERENCES frameworks(id) ON DELETE CASCADE,
@@ -13,15 +13,15 @@ CREATE TABLE IF NOT EXISTS compliance_snapshots (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_compliance_snapshots_unique
+CREATE UNIQUE INDEX idx_compliance_snapshots_unique
     ON compliance_snapshots (organization_id, framework_id, snapshot_date);
-CREATE INDEX IF NOT EXISTS idx_compliance_snapshots_org_date
+CREATE INDEX idx_compliance_snapshots_org_date
     ON compliance_snapshots (organization_id, snapshot_date DESC);
-CREATE INDEX IF NOT EXISTS idx_compliance_snapshots_org_framework
+CREATE INDEX idx_compliance_snapshots_org_framework
     ON compliance_snapshots (organization_id, framework_id, snapshot_date DESC);
 
 -- Scheduled report delivery
-CREATE TABLE IF NOT EXISTS scheduled_reports (
+CREATE TABLE scheduled_reports (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id  UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name             TEXT NOT NULL,
@@ -41,6 +41,6 @@ CREATE TABLE IF NOT EXISTS scheduled_reports (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_scheduled_reports_org ON scheduled_reports (organization_id);
-CREATE INDEX IF NOT EXISTS idx_scheduled_reports_next_run ON scheduled_reports (next_run_at)
+CREATE INDEX idx_scheduled_reports_org ON scheduled_reports (organization_id);
+CREATE INDEX idx_scheduled_reports_next_run ON scheduled_reports (next_run_at)
     WHERE is_active = true;

@@ -22,6 +22,7 @@ const { log } = require('../utils/logger');
 // production control (works across instances); express-rate-limit is
 // additionally applied per-process so static analysis (CodeQL) can trace a
 // recognized rate-limiting middleware directly on this router.
+router.use(authenticate);
 router.use(createRateLimiter({
   label: 'cyber-resilience',
   windowMs: 15 * 60 * 1000,
@@ -29,7 +30,6 @@ router.use(createRateLimiter({
   keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
 }));
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 120 }));
-router.use(authenticate);
 
 const VALID_PLAN_TYPES = new Set([
   'incident_response', 'business_continuity', 'disaster_recovery', 'ransomware_playbook'
@@ -364,7 +364,12 @@ router.post('/plans/:id/tests', requirePermission('assessments.write'), async (r
       });
     }
 
-    const testDate = toDateString(req.body.test_date) || new Date().toISOString().slice(0, 10);
+    const testDate = toDateString(req.body.test_date);
+    if (testDate === undefined) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'test_date must be formatted as YYYY-MM-DD' });
+    }
+    const resolvedTestDate = testDate || new Date().toISOString().slice(0, 10);
     const actualRto = toNumber(req.body.actual_rto_hours);
     const actualRpo = toNumber(req.body.actual_rpo_hours);
     if (actualRto === undefined || actualRpo === undefined) {
@@ -396,20 +401,20 @@ router.post('/plans/:id/tests', requirePermission('assessments.write'), async (r
        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
-        orgId, plan.id, testType, scenario, testDate,
+        orgId, plan.id, testType, scenario, resolvedTestDate,
         JSON.stringify(participants), outcome, actualRto, actualRpo,
         trimStr(req.body.findings, 5000), remediationPoamId, req.user.id
       ]
     );
 
-    const nextTestDue = new Date(testDate);
+    const nextTestDue = new Date(resolvedTestDate);
     nextTestDue.setDate(nextTestDue.getDate() + DEFAULT_TEST_CADENCE_DAYS);
 
     await client.query(
       `UPDATE resilience_plans SET
          last_tested_date = $3, next_test_due = $4, updated_by = $5, updated_at = NOW()
        WHERE id = $1 AND organization_id = $2`,
-      [plan.id, orgId, testDate, nextTestDue.toISOString().slice(0, 10), req.user.id]
+      [plan.id, orgId, resolvedTestDate, nextTestDue.toISOString().slice(0, 10), req.user.id]
     );
 
     await client.query('COMMIT');

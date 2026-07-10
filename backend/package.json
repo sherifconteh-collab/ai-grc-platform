@@ -90,7 +90,7 @@
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
-    "nodemailer": "^8.0.5",
+    "nodemailer": "^9.0.3",
     "openai": "^6.38.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
