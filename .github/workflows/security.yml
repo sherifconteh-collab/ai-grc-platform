@@ -101,6 +101,31 @@ jobs:
           npm ci
           npm run typecheck
 
+  migration-integrity:
+    name: Migration Integrity (Real Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: grc_ci_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: '20' }
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+      - name: Run all migrations against a fresh Postgres 16 instance
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/grc_ci_test
+        run: node scripts/migrate-all.js
+
   secret-scanning:
     name: Scan for Hardcoded Secrets
     runs-on: ubuntu-latest
