@@ -18,10 +18,13 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const rateLimit = require('express-rate-limit');
 const { log } = require('../utils/logger');
 
-// Two layers: the org-scoped Redis-backed limiter above is the real
-// production control (works across instances); express-rate-limit is
-// additionally applied per-process so static analysis (CodeQL) can trace a
-// recognized rate-limiting middleware directly on this router.
+// Three layers, in this specific order: (1) a cheap per-process IP-based
+// limiter first, so unauthenticated requests are bounded before they reach
+// authenticate's JWT/DB work (also the middleware CodeQL's static analysis
+// can trace as guarding this router); (2) authenticate; (3) the org-scoped
+// Redis-backed limiter, which needs req.user for its key and so must run
+// after auth -- this is the real production control across instances.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 120 }));
 router.use(authenticate);
 router.use(createRateLimiter({
   label: 'compliance-gate',
@@ -29,7 +32,6 @@ router.use(createRateLimiter({
   max: 120,
   keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
 }));
-router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 120 }));
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_EXPORT_FORMATS = new Set(['github_actions', 'gitlab_ci', 'curl']);

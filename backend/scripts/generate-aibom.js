@@ -11,6 +11,18 @@
  * that isn't naturally expressed in code — stays hand-authored, keyed by the
  * same provider ids so a provider removed from providerConfig.js disappears
  * from the AIBOM automatically instead of silently going stale here.
+ *
+ * SDK-backed vs. service-only providers are deliberately NOT both emitted as
+ * `components`: only claude/openai are real npm dependencies physically
+ * shipped in package.json/node_modules, so only those two are
+ * machine-learning-model *components* (CycloneDX's term for material bundled
+ * with the application). gemini/grok/groq/ollama have no SDK at all — they're
+ * called over plain HTTP if and only if an operator supplies a BYOK key for
+ * them — so they're modeled as CycloneDX `services` (external things the
+ * software can call, not things it embeds). Every provider here reflects
+ * supported integration surface in the code, not runtime usage by any given
+ * deployment — a build-time SBOM has no visibility into which providers an
+ * operator has actually configured a key for.
  */
 
 'use strict';
@@ -68,6 +80,7 @@ const PROVIDER_METADATA = {
     supplier: 'Google',
     website: 'https://ai.google.dev',
     sdk_dep: null,
+    endpoint: 'https://generativelanguage.googleapis.com',
     description:
       'Google Gemini accessed via Google AI REST API (BYOK). Used as an alternative LLM ' +
       'provider for all AI analysis features.',
@@ -87,6 +100,7 @@ const PROVIDER_METADATA = {
     supplier: 'xAI',
     website: 'https://x.ai',
     sdk_dep: null,
+    endpoint: 'https://api.x.ai',
     description: 'xAI Grok accessed via REST API (BYOK). Alternative LLM provider for AI analysis features.',
     use_cases: ['AI Copilot conversations', 'Compliance gap analysis'],
     limitations: [
@@ -98,6 +112,7 @@ const PROVIDER_METADATA = {
     supplier: 'Groq',
     website: 'https://groq.com',
     sdk_dep: null,
+    endpoint: 'https://api.groq.com',
     description:
       'Groq LPU inference service accessed via REST API (BYOK). Provides high-speed inference ' +
       'for open-weight models as an alternative provider.',
@@ -112,6 +127,7 @@ const PROVIDER_METADATA = {
     supplier: 'Ollama (open-source)',
     website: 'https://ollama.com',
     sdk_dep: null,
+    endpoint: 'http://localhost:11434 (operator-configurable, self-hosted)',
     description:
       'Ollama local inference server accessed via REST API. Allows fully on-premises LLM ' +
       'deployment with no data leaving the operator network.',
@@ -192,6 +208,24 @@ function buildAiComponent(providerId, provider, meta) {
   return comp;
 }
 
+function buildAiService(providerId, provider, meta) {
+  return {
+    'bom-ref': `ai-service:${providerId}`,
+    name: provider.name,
+    description: meta.description,
+    provider: { name: meta.supplier, url: meta.website },
+    endpoints: [meta.endpoint],
+    data: [{ flow: 'bi-directional', classification: 'organization-compliance-data' }],
+    externalReferences: [{ type: 'website', url: meta.website }],
+    properties: [
+      { name: 'ai:models', value: provider.models.join(', ') },
+      { name: 'ai:integration', value: 'HTTP API (no bundled SDK) — BYOK, opt-in per organization' },
+      { name: 'ai:use-cases', value: meta.use_cases.join('; ') },
+      { name: 'ai:limitations', value: meta.limitations.join('; ') },
+    ],
+  };
+}
+
 function buildAibom() {
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'backend/package.json'), 'utf8'));
   const appVersion = pkg.version || '0.0.0';
@@ -203,6 +237,11 @@ function buildAibom() {
   if (missingMetadata.length > 0) {
     console.warn(`Warning: no curated AIBOM metadata for provider(s): ${missingMetadata.join(', ')} — omitted from AIBOM`);
   }
+  // Only providers with a real npm SDK dependency are "components" (material
+  // actually bundled with the application). Providers reachable only over
+  // plain HTTP have no shipped artifact and belong in `services` instead.
+  const sdkProviderIds = providerIds.filter((id) => PROVIDER_METADATA[id].sdk_dep);
+  const httpProviderIds = providerIds.filter((id) => !PROVIDER_METADATA[id].sdk_dep);
 
   const sdkComponent = {
     type: 'library',
@@ -216,15 +255,15 @@ function buildAibom() {
     externalReferences: [{ type: 'vcs', url: 'https://github.com/sherifconteh-collab/ai-grc-platform' }],
   };
 
-  const aiComponents = providerIds.map((id) =>
+  const aiComponents = sdkProviderIds.map((id) =>
     buildAiComponent(id, PROVIDERS[id], {
       ...PROVIDER_METADATA[id],
-      // For SDK-backed providers, resolve the real npm dependency version
-      // instead of duplicating it in the hand-authored metadata table.
-      version: PROVIDER_METADATA[id].sdk_dep
-        ? getPackageVersion('backend/package.json', PROVIDER_METADATA[id].sdk_dep)
-        : undefined,
+      version: getPackageVersion('backend/package.json', PROVIDER_METADATA[id].sdk_dep),
     })
+  );
+
+  const aiServices = httpProviderIds.map((id) =>
+    buildAiService(id, PROVIDERS[id], PROVIDER_METADATA[id])
   );
 
   const components = [sdkComponent, ...aiComponents];
@@ -257,15 +296,25 @@ function buildAibom() {
       properties: [
         { name: 'ControlWeave:edition', value: 'open' },
         { name: 'ControlWeave:ai-integration', value: 'BYOK (Bring Your Own Key)' },
-        { name: 'ControlWeave:ai-providers', value: providerIds.join(',') },
+        {
+          name: 'ControlWeave:ai-integration-note',
+          value:
+            'All AI providers listed here are opt-in, BYOK integrations disabled until an ' +
+            'operator supplies an API key. This AIBOM reflects the code\'s supported AI ' +
+            'integration surface, not which providers any given deployment has actually ' +
+            'configured or is actively using at runtime.',
+        },
+        { name: 'ControlWeave:ai-sdk-providers', value: sdkProviderIds.join(',') || 'none' },
+        { name: 'ControlWeave:ai-service-providers', value: httpProviderIds.join(',') || 'none' },
         { name: 'ControlWeave:governance-framework', value: 'NIST AI RMF 1.0, EU AI Act, ISO 42001' },
       ],
     },
     components,
+    services: aiServices,
     dependencies: [
       {
         ref: `app:${appName.toLowerCase().replace(/\s+/g, '-')}`,
-        dependsOn: components.map((c) => c['bom-ref']),
+        dependsOn: [...components.map((c) => c['bom-ref']), ...aiServices.map((s) => s['bom-ref'])],
       },
     ],
   };
@@ -280,7 +329,8 @@ function main() {
 
   console.log(`AIBOM generated -> ${outPath}`);
   console.log(`  Application : ${aibom.metadata.component.name} v${aibom.metadata.component.version}`);
-  console.log(`  Components  : ${aibom.components.length} total (${aibom.components.length - 1} AI providers + 1 SDK)`);
+  console.log(`  Components  : ${aibom.components.length} total (${aibom.components.length - 1} SDK-backed AI providers + 1 internal SDK)`);
+  console.log(`  Services    : ${aibom.services.length} total (HTTP-only BYOK AI providers, no bundled SDK)`);
   return 0;
 }
 
