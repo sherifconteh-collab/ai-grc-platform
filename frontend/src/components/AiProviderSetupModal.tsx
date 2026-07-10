@@ -12,14 +12,14 @@ const FREE_PROVIDERS = [
     id: 'gemini',
     name: 'Google Gemini',
     badge: 'Free tier',
-    description: 'Gemini 2.5 Pro & Flash — free API key at aistudio.google.com',
+    description: 'Gemini 3.1 Pro & Flash — free API key at aistudio.google.com',
     signupUrl: 'https://aistudio.google.com/app/apikey',
   },
   {
     id: 'groq',
     name: 'Groq',
     badge: 'Free tier',
-    description: 'Llama 3.3, Mixtral, Gemma — free API key at console.groq.com',
+    description: 'GPT-OSS, Llama 4, Groq Compound — free API key at console.groq.com',
     signupUrl: 'https://console.groq.com/keys',
   },
   {
@@ -32,9 +32,9 @@ const FREE_PROVIDERS = [
 ];
 
 const PAID_PROVIDERS = [
-  { id: 'claude', name: 'Anthropic Claude', description: 'claude-opus-4-7, claude-sonnet-4-6', signupUrl: 'https://console.anthropic.com/settings/keys' },
-  { id: 'openai', name: 'OpenAI', description: 'gpt-4.1, gpt-4o, o3', signupUrl: 'https://platform.openai.com/api-keys' },
-  { id: 'grok', name: 'xAI Grok', description: 'grok-4-latest, grok-3-latest', signupUrl: 'https://console.x.ai/' },
+  { id: 'claude', name: 'Anthropic Claude', description: 'claude-opus-4-8, claude-sonnet-5', signupUrl: 'https://console.anthropic.com/settings/keys' },
+  { id: 'openai', name: 'OpenAI', description: 'gpt-5.5, gpt-5.4-mini, gpt-5.3-codex', signupUrl: 'https://platform.openai.com/api-keys' },
+  { id: 'grok', name: 'xAI Grok', description: 'grok-4.5, grok-4.1-fast', signupUrl: 'https://console.x.ai/' },
 ];
 
 export default function AiProviderSetupModal({ open, onClose }: AiProviderSetupModalProps) {

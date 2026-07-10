@@ -11,32 +11,29 @@
 
 const PROVIDERS = {
   claude:  { name: 'Claude (Anthropic)',  models: [
-    'claude-opus-4-7',
-    'claude-sonnet-4-6',
-    'claude-sonnet-4-5-20250929',
-    'claude-haiku-4-5-20251001'
+    'claude-opus-4-8',
+    'claude-sonnet-5',
+    'claude-haiku-4-5-20251001',
+    'claude-fable-5'
   ] },
   openai:  { name: 'OpenAI',              models: [
-    'gpt-4.1',
-    'gpt-4.1-mini',
-    'gpt-4o',
-    'gpt-4o-mini',
-    'o3',
-    'o4-mini'
+    'gpt-5.5',
+    'gpt-5.4-mini',
+    'gpt-5.4-nano',
+    'gpt-5.3-codex'
   ] },
   gemini:  { name: 'Google Gemini',       models: [
-    'gemini-2.5-pro',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite'
+    'gemini-3.1-pro-preview',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite'
   ] },
-  grok:    { name: 'xAI Grok',            models: ['grok-4-latest', 'grok-3-latest'] },
+  grok:    { name: 'xAI Grok',            models: ['grok-4.5', 'grok-4.3', 'grok-4.1-fast'] },
   groq:    { name: 'Groq (Free Tier)',    models: [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant',
-    'mixtral-8x7b-32768',
-    'gemma2-9b-it',
-    'deepseek-r1-distill-llama-70b'
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'groq/compound',
+    'groq/compound-mini',
+    'meta-llama/llama-4-scout-17b-16e-instruct'
   ] },
   ollama:  { name: 'Ollama (Local)',      models: [
     'llama3.2',
@@ -63,11 +60,11 @@ const TASK_PROFILES = {
   reasoning: {
     temperature: 0.4,
     models: {
-      claude: 'claude-sonnet-4-6',
-      openai: 'gpt-4.1',
-      gemini: 'gemini-2.5-pro',
-      grok:   'grok-4-latest',
-      groq:   'llama-3.3-70b-versatile',
+      claude: 'claude-sonnet-5',
+      openai: 'gpt-5.5',
+      gemini: 'gemini-3.1-pro-preview',
+      grok:   'grok-4.5',
+      groq:   'openai/gpt-oss-120b',
       ollama: null
     }
   },
@@ -75,32 +72,32 @@ const TASK_PROFILES = {
     temperature: 0.2,
     models: {
       claude: 'claude-haiku-4-5-20251001',
-      openai: 'gpt-4.1-mini',
-      gemini: 'gemini-2.5-flash',
-      grok:   'grok-3-latest',
-      groq:   'llama-3.1-8b-instant',
+      openai: 'gpt-5.4-mini',
+      gemini: 'gemini-3.5-flash',
+      grok:   'grok-4.1-fast',
+      groq:   'openai/gpt-oss-20b',
       ollama: null
     }
   },
   chat: {
     temperature: 0.4,
     models: {
-      claude: 'claude-sonnet-4-6',
-      openai: 'gpt-4.1',
-      gemini: 'gemini-2.5-pro',
-      grok:   'grok-4-latest',
-      groq:   'llama-3.3-70b-versatile',
+      claude: 'claude-sonnet-5',
+      openai: 'gpt-5.5',
+      gemini: 'gemini-3.1-pro-preview',
+      grok:   'grok-4.5',
+      groq:   'openai/gpt-oss-120b',
       ollama: null
     }
   },
   ideation: {
     temperature: 0.7,
     models: {
-      claude: 'claude-sonnet-4-6',
-      openai: 'gpt-4.1',
-      gemini: 'gemini-2.5-pro',
-      grok:   'grok-4-latest',
-      groq:   'llama-3.3-70b-versatile',
+      claude: 'claude-sonnet-5',
+      openai: 'gpt-5.5',
+      gemini: 'gemini-3.1-pro-preview',
+      grok:   'grok-4.5',
+      groq:   'openai/gpt-oss-120b',
       ollama: null
     }
   }

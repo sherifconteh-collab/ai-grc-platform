@@ -180,11 +180,11 @@ type SettingsTab =
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROVIDER_MODEL_OPTIONS: Record<string, string[]> = {
-  claude: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001'],
-  openai: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
-  grok: ['grok-4-latest', 'grok-3-latest'],
-  groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it', 'deepseek-r1-distill-llama-70b'],
+  claude: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-fable-5'],
+  openai: ['gpt-5.5', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.3-codex'],
+  gemini: ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'],
+  grok: ['grok-4.5', 'grok-4.3', 'grok-4.1-fast'],
+  groq: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound', 'groq/compound-mini', 'meta-llama/llama-4-scout-17b-16e-instruct'],
   // NOTE: The full Ollama model list is sourced from /api/v1/ai/status at runtime.
   // This array is intentionally kept as a minimal local fallback only.
   ollama: ['llama3.2']
@@ -2226,7 +2226,7 @@ function SettingsPageInner() {
                         <h3 className="font-semibold text-gray-900">Google Gemini</h3>
                         <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Free Tier Available</span>
                       </div>
-                      <p className="text-xs text-gray-500">gemini-2.5-flash, gemini-2.5-pro · Get a free key at aistudio.google.com</p>
+                      <p className="text-xs text-gray-500">gemini-3.5-flash, gemini-3.1-pro-preview · Get a free key at aistudio.google.com</p>
                     </div>
                   </div>
                   {llmSettings?.hasGeminiKey ? (
@@ -2264,7 +2264,7 @@ function SettingsPageInner() {
                     <span className="text-2xl">⚫</span>
                     <div>
                       <h3 className="font-semibold text-gray-900">xAI Grok</h3>
-                      <p className="text-xs text-gray-500">grok-3-latest, grok-4-latest</p>
+                      <p className="text-xs text-gray-500">grok-4.1-fast, grok-4.5</p>
                     </div>
                   </div>
                   {llmSettings?.hasGrokKey ? (
@@ -2305,7 +2305,7 @@ function SettingsPageInner() {
                         <h3 className="font-semibold text-gray-900">Groq</h3>
                         <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Free Tier Available</span>
                       </div>
-                      <p className="text-xs text-gray-500">llama-3.3-70b-versatile, llama-3.1-8b-instant · Get a free key at console.groq.com</p>
+                      <p className="text-xs text-gray-500">openai/gpt-oss-120b, openai/gpt-oss-20b · Get a free key at console.groq.com</p>
                     </div>
                   </div>
                   {llmSettings?.hasGroqKey ? (

@@ -1159,13 +1159,13 @@ router.get('/llm/status', async (req, res) => {
             const OpenAI = require('openai');
             const client = new OpenAI.default({ apiKey });
             await client.chat.completions.create({
-              model: 'gpt-4o-mini',
+              model: 'gpt-5.4-mini',
               max_tokens: 10,
               messages: [{ role: 'user', content: 'Respond with OK.' }]
             });
           } else if (provider === 'gemini') {
             const response = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1183,7 +1183,7 @@ router.get('/llm/status', async (req, res) => {
             const OpenAI = require('openai');
             const client = new OpenAI.default({ apiKey, baseURL: process.env.XAI_API_BASE || 'https://api.x.ai/v1' });
             await client.chat.completions.create({
-              model: 'grok-3-latest',
+              model: 'grok-4.1-fast',
               max_tokens: 10,
               messages: [{ role: 'user', content: 'Respond with OK.' }]
             });
@@ -1191,7 +1191,7 @@ router.get('/llm/status', async (req, res) => {
             const OpenAI = require('openai');
             const client = new OpenAI.default({ apiKey, baseURL: 'https://api.groq.com/openai/v1' });
             await client.chat.completions.create({
-              model: 'llama-3.1-8b-instant',
+              model: 'openai/gpt-oss-20b',
               max_tokens: 10,
               messages: [{ role: 'user', content: 'Respond with OK.' }]
             });

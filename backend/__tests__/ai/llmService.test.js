@@ -54,12 +54,12 @@ describe('TASK_PROFILES', () => {
     expect(TASK_PROFILES.extraction.models.claude).toContain('haiku');
   });
 
-  test('reasoning uses gpt-4.1 for openai provider', () => {
-    expect(TASK_PROFILES.reasoning.models.openai).toBe('gpt-4.1');
+  test('reasoning uses gpt-5.5 for openai provider', () => {
+    expect(TASK_PROFILES.reasoning.models.openai).toBe('gpt-5.5');
   });
 
-  test('extraction uses gpt-4.1-mini for openai provider', () => {
-    expect(TASK_PROFILES.extraction.models.openai).toBe('gpt-4.1-mini');
+  test('extraction uses gpt-5.4-mini for openai provider', () => {
+    expect(TASK_PROFILES.extraction.models.openai).toBe('gpt-5.4-mini');
   });
 });
 
@@ -113,8 +113,8 @@ describe('resolveTaskModel', () => {
   });
 
   test('orgModel overrides profile model but uses profile temperature', () => {
-    const { model, temperature } = resolveTaskModel('openai', 'evidence_suggestion', null, 'gpt-4o');
-    expect(model).toBe('gpt-4o');
+    const { model, temperature } = resolveTaskModel('openai', 'evidence_suggestion', null, 'org-custom-model');
+    expect(model).toBe('org-custom-model');
     expect(temperature).toBe(0.2); // extraction profile temperature preserved
   });
 
