@@ -245,6 +245,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- feat(rmf): package inheritance from COTS products + flagship GRC differentiators ([#207](https://github.com/sherifconteh-collab/ai-grc-platform/pull/207)) — @sherifconteh-collab
 - chore(backend)(deps): bump redis from 5.12.1 to 6.0.0 in /backend ([#200](https://github.com/sherifconteh-collab/ai-grc-platform/pull/200)) — @dependabot[bot]
 - chore(ci): bump actions/checkout from 4 to 7 ([#205](https://github.com/sherifconteh-collab/ai-grc-platform/pull/205)) — @dependabot[bot]
 - chore(deps-dev): bump form-data from 4.0.5 to 4.0.6 in /electron in the npm_and_yarn group across 1 directory ([#203](https://github.com/sherifconteh-collab/ai-grc-platform/pull/203)) — @dependabot[bot]

@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v4.2.2-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v4.3.0-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-10 | PR #200: chore(backend)(deps): bump redis from 5.12.1 to 6.0.0 in /backend -->
+<!-- LAST_UPDATED: 2026-07-10 | PR #207: feat(rmf): package inheritance from COTS products + flagship GRC differentiators -->
 
 ## 🎯 What is This?
 
@@ -915,10 +915,10 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
-- **Tables**: 160+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
+- **Tables**: 170+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 115 sequential, idempotent migrations
 - **API Routes**: 70+ route modules
-- **Services**: 49 service modules
+- **Services**: 50 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
