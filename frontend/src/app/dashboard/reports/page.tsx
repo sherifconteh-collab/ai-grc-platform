@@ -1,12 +1,118 @@
 // @tier: pro
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
-import { reportsAPI } from '@/lib/api';
+import { reportsAPI, benchmarksAPI } from '@/lib/api';
 
 type ReportType = 'compliance-pdf' | 'compliance-excel' | 'ssp-pdf' | 'ssp-json';
+
+interface FrameworkBenchmarkInsufficient {
+  framework_id: string;
+  framework_name: string;
+  own_pct: number;
+  insufficient_data: true;
+  minimum_participants: number;
+}
+
+interface FrameworkBenchmarkComparison {
+  framework_id: string;
+  framework_name: string;
+  own_pct: number;
+  insufficient_data?: false;
+  participants: number;
+  average_pct: number;
+  median_pct: number;
+  percentile_rank: number;
+}
+
+type FrameworkBenchmark = FrameworkBenchmarkInsufficient | FrameworkBenchmarkComparison;
+
+function BenchmarkBar({ label, pct, highlight }: { label: string; pct: number; highlight?: boolean }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span className={highlight ? 'font-semibold text-gray-900' : ''}>{label}</span>
+        <span className={highlight ? 'font-semibold text-gray-900' : ''}>{pct.toFixed(0)}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2" aria-label={`${label} compliance ${pct.toFixed(0)} percent`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div
+          className={highlight ? 'bg-blue-600 h-2 rounded-full' : 'bg-slate-400 h-2 rounded-full'}
+          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function IndustryBenchmarkPanel() {
+  const [benchmarks, setBenchmarks] = useState<FrameworkBenchmark[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setLoadError('');
+        const response = await benchmarksAPI.getFrameworkBenchmarks();
+        const data = Array.isArray(response.data?.data) ? response.data.data : [];
+        if (!cancelled) setBenchmarks(data);
+      } catch {
+        if (!cancelled) setLoadError('Failed to load industry benchmark data.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <h3 className="text-lg font-bold text-gray-900">Industry Benchmark</h3>
+      <p className="text-sm text-gray-600 mt-1">
+        See how your compliance percentage compares to anonymized peer organizations tracking the same frameworks.
+      </p>
+
+      {loading ? (
+        <div className="mt-4 animate-pulse h-24 rounded bg-gray-100" />
+      ) : loadError ? (
+        <div className="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+          {loadError}
+        </div>
+      ) : benchmarks.length === 0 ? (
+        <p className="mt-4 text-sm text-gray-500">No benchmark data available yet. Track a framework to see how you compare.</p>
+      ) : (
+        <div className="mt-4 space-y-5">
+          {benchmarks.map((benchmark) => (
+            <div key={benchmark.framework_id} className="border-t border-gray-100 pt-4 first:border-t-0 first:pt-0">
+              <p className="text-sm font-medium text-gray-900">{benchmark.framework_name}</p>
+              {benchmark.insufficient_data ? (
+                <p className="mt-2 text-sm text-gray-500">
+                  Not enough participating organizations yet (minimum {benchmark.minimum_participants}) to show a benchmark for this framework.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  <BenchmarkBar label="You" pct={benchmark.own_pct} highlight />
+                  <BenchmarkBar label="Peer Median" pct={benchmark.median_pct} />
+                  <BenchmarkBar label="Peer Average" pct={benchmark.average_pct} />
+                  <p className="text-xs text-gray-500">
+                    Compared against {benchmark.participants} organizations
+                    {typeof benchmark.percentile_rank === 'number' ? ` — you rank in the ${benchmark.percentile_rank}th percentile` : ''}.
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ReportsPage() {
   const [generating, setGenerating] = useState<string | null>(null);
@@ -239,6 +345,8 @@ export default function ReportsPage() {
             </div>
           </div>
         </div>
+
+        <IndustryBenchmarkPanel />
 
         {/* Tier info */}
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">

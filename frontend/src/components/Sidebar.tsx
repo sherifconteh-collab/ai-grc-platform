@@ -37,9 +37,11 @@ const navigationSections: NavigationSection[] = [
       { name: 'Assessments', href: '/dashboard/assessments', icon: '📋', requiredPermissions: ['assessments.read'] },
       { name: 'Reports', href: '/dashboard/reports', icon: '📑', requiredPermissions: ['reports.read'] },
       { name: 'RMF Lifecycle', href: '/dashboard/rmf', icon: '🔄', requiredPermissions: ['assessments.read'], isVisible: (u) => hasRmfFramework(u) },
+      { name: 'Cyber Resilience', href: '/dashboard/resilience', icon: '🛟', requiredPermissions: ['assessments.read'] },
       { name: 'Auditor Workspace', href: '/dashboard/auditor-workspace', icon: '🗂️', requiredPermissions: ['assessments.read'], isVisible: (u) => canAccessAuditorWorkspace(u) },
       { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },
       { name: 'AI Insights', href: '/dashboard/ai-insights', icon: '📈', requiredPermissions: ['ai.use'] },
+      { name: 'Training', href: '/dashboard/training', icon: '🎓', requiredPermissions: ['dashboard.read'] },
     ],
   },
   {

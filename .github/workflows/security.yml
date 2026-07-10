@@ -78,11 +78,53 @@ jobs:
           npm ci
           npm run check:syntax
 
+      - name: Check for new duplicate migration numbers
+        run: |
+          cd backend/migrations
+          KNOWN_DUPS="012 013 014 015 016 017 018 019 020 021 022 023 024 048 057 061 072"
+          ALL_DUPS=$(ls *.sql | sed 's/^\([0-9]*\)_.*/\1/' | sort | uniq -d)
+          FAILED=0
+          for dup in $ALL_DUPS; do
+            if ! echo "$KNOWN_DUPS" | grep -qw "$dup"; then
+              echo "New duplicate migration number: $dup"
+              FAILED=1
+            else
+              echo "Known legacy duplicate (grandfathered): $dup"
+            fi
+          done
+          [ "$FAILED" -eq 0 ] && echo "No new duplicate migration numbers"
+          exit $FAILED
+
       - name: Frontend - typecheck
         run: |
           cd frontend
           npm ci
           npm run typecheck
+
+  migration-integrity:
+    name: Migration Integrity (Real Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_DB: grc_ci_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: '20' }
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+      - name: Run all migrations against a fresh Postgres 16 instance
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
+        run: node scripts/migrate-all.js
 
   secret-scanning:
     name: Scan for Hardcoded Secrets

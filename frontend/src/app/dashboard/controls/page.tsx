@@ -402,10 +402,16 @@ export default function ControlsPage() {
     switch (status) {
       case 'implemented':
         return 'bg-green-100 text-green-800';
+      case 'verified':
+        return 'bg-emerald-100 text-emerald-800';
       case 'satisfied_via_crosswalk':
         return 'bg-blue-100 text-blue-800';
       case 'in_progress':
         return 'bg-yellow-100 text-yellow-800';
+      case 'needs_review':
+        return 'bg-orange-100 text-orange-800';
+      case 'not_applicable':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -415,10 +421,16 @@ export default function ControlsPage() {
     switch (status) {
       case 'implemented':
         return 'Implemented';
+      case 'verified':
+        return 'Verified';
       case 'satisfied_via_crosswalk':
         return 'Auto-Crosswalked';
       case 'in_progress':
         return 'In Progress';
+      case 'needs_review':
+        return 'Needs Review';
+      case 'not_applicable':
+        return 'Not Applicable';
       default:
         return 'Not Started';
     }
@@ -631,8 +643,11 @@ export default function ControlsPage() {
               >
                 <option value="all">All Statuses</option>
                 <option value="implemented">Implemented</option>
+                <option value="verified">Verified</option>
                 <option value="satisfied_via_crosswalk">Auto-Crosswalked</option>
                 <option value="in_progress">In Progress</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="not_applicable">Not Applicable</option>
                 <option value="not_started">Not Started</option>
               </select>
             </div>
@@ -816,8 +831,11 @@ export default function ControlsPage() {
                                           >
                                             <option value="not_started">Not Started</option>
                                             <option value="in_progress">In Progress</option>
+                                            <option value="needs_review">Needs Review</option>
                                             <option value="implemented">Implemented</option>
+                                            <option value="verified">Verified</option>
                                             <option value="satisfied_via_crosswalk">Auto-Crosswalked</option>
+                                            <option value="not_applicable">Not Applicable</option>
                                           </select>
                                           {statusSaving === control.id && <span className="text-xs text-gray-500">Saving…</span>}
                                         </div>
@@ -900,8 +918,11 @@ export default function ControlsPage() {
                                                     >
                                                       <option value="not_started">Not Started</option>
                                                       <option value="in_progress">In Progress</option>
+                                                      <option value="needs_review">Needs Review</option>
                                                       <option value="implemented">Implemented</option>
+                                                      <option value="verified">Verified</option>
                                                       <option value="satisfied_via_crosswalk">Auto-Crosswalked</option>
+                                                      <option value="not_applicable">Not Applicable</option>
                                                     </select>
                                                   )}
                                                 </div>

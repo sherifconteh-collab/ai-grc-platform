@@ -67,9 +67,19 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (21 tools)
 - **Enterprise-Grade**: PostgreSQL RLS, Redis caching, automated backups, SSO, Sentry
 
-## ✅ Current Status — v4.2.0 (All Features Shipped)
+## ✅ Current Status — v4.3.0 (All Features Shipped)
 
-The platform is **fully functional** with the complete v4.2.0 feature set. Every capability is available — no tier gating, no feature flags.
+The platform is **fully functional** with the complete v4.3.0 feature set. Every capability is available — no tier gating, no feature flags.
+
+### RMF & GRC Differentiators (v4.3.0)
+- 🔗 **RMF Leveraged Authorizations** — RMF packages inherit controls and authorization posture from COTS/SaaS products (FedRAMP-style leveraged authorization), with at-risk flagging when a provider product is deprecated or its authorization has lapsed
+- 📄 **Customer Responsibility Matrix (CRM) export** — JSON/CSV/PDF, generated directly from a package's leveraged authorizations
+- 📤 **OSCAL SSP export** — NIST OSCAL 1.1.2 System Security Plan export with leveraged authorizations and shared-responsibility annotations
+- 🌐 **Trust Center** — opt-in, token-gated public page showing aggregate compliance posture and active-authorization counts
+- 🎓 **Classroom mode** — guided training scenarios (internal audit engagement, taking a system to ATO, vendor risk review) with an instructor progress view
+- 📊 **Anonymized industry benchmarking** — k-anonymity-guarded peer compliance comparison (minimum 5 participating organizations), with an org-level opt-out
+- 🚦 **Compliance-as-code CI gate** — `GET /compliance/gate` returns 200/412 based on a compliance threshold, for direct use in CI pipelines
+- 🛡️ **Cyber Resilience module** — BC/DR, incident-response, and ransomware-playbook plan tracking with tabletop/functional/full-scale exercise logging, RTO/RPO attainment, and a computed Cyber Resilience Score
 
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
@@ -254,11 +264,11 @@ The platform ships with a **built-in AI layer** that any user can activate with 
 
 | Provider | Models |
 |---|---|
-| Anthropic (Claude) | `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-3-5-haiku-20241022` |
-| OpenAI | `gpt-4.1`, `gpt-4.1-mini`, `o3`, `o4-mini` |
-| Google Gemini | `gemini-2.0-flash-lite`, Gemini 2.x family |
-| Grok | xAI Grok family |
-| Groq | Llama, Mixtral, and extended Groq model catalog |
+| Anthropic (Claude) | `claude-opus-4-8`, `claude-sonnet-5`, `claude-haiku-4-5-20251001`, `claude-fable-5` |
+| OpenAI | `gpt-5.5`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.3-codex` |
+| Google Gemini | `gemini-3.1-pro-preview`, `gemini-3.5-flash`, `gemini-3.1-flash-lite` |
+| xAI Grok | `grok-4.5`, `grok-4.3`, `grok-4.1-fast` |
+| Groq | `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `groq/compound`, `groq/compound-mini`, `meta-llama/llama-4-scout-17b-16e-instruct` |
 | Ollama (local) | Any model — quantized GGUF supported for reduced memory footprint |
 
 - **BYOK-required enforcement** — when no API key is configured, the UI surfaces `AiProviderSetupModal` automatically, guiding users to add a free provider (Gemini, Groq, Ollama)
@@ -588,7 +598,7 @@ await logger.logDecision({
   input_data: { alertId: 'A-123' },
   output_data: { priority: 'high' },
   external_provider: 'openai',
-  external_model: 'gpt-4.1',
+  external_model: 'gpt-5.5',
   external_decision_id: 'ext-789',
   risk_level: 'medium'
 });

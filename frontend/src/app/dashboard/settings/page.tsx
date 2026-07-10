@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import api, { aiAPI, aiDecisionsAPI, auditAPI, billingAPI, dynamicConfigAPI, integrationsAPI, licenseAPI, notificationsAPI, opsAPI, passkeyAPI, platformAdminAPI, rolesAPI, settingsAPI, siemAPI, ssoAPI, totpAPI, usersAPI } from '@/lib/api';
+import api, { aiAPI, aiDecisionsAPI, auditAPI, billingAPI, dynamicConfigAPI, integrationsAPI, licenseAPI, notificationsAPI, opsAPI, passkeyAPI, platformAdminAPI, rolesAPI, settingsAPI, siemAPI, ssoAPI, totpAPI, trustCenterAPI, usersAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission, isPlatformAdmin } from '@/lib/access';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
@@ -59,6 +59,20 @@ interface SplunkSettings {
   base_url: string | null;
   default_index: string | null;
   token_masked: string | null;
+}
+
+interface TrustCenterConfig {
+  id: string;
+  organization_id: string;
+  enabled: boolean;
+  display_name: string | null;
+  description: string | null;
+  contact_email: string | null;
+  show_frameworks: boolean;
+  show_compliance_scores: boolean;
+  show_authorizations: boolean;
+  public_token: string;
+  published_at: string | null;
 }
 
 interface ContentPack {
@@ -166,11 +180,11 @@ type SettingsTab =
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROVIDER_MODEL_OPTIONS: Record<string, string[]> = {
-  claude: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001'],
-  openai: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
-  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
-  grok: ['grok-4-latest', 'grok-3-latest'],
-  groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it', 'deepseek-r1-distill-llama-70b'],
+  claude: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-fable-5'],
+  openai: ['gpt-5.5', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.3-codex'],
+  gemini: ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'],
+  grok: ['grok-4.5', 'grok-4.3', 'grok-4.1-fast'],
+  groq: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound', 'groq/compound-mini', 'meta-llama/llama-4-scout-17b-16e-instruct'],
   // NOTE: The full Ollama model list is sourced from /api/v1/ai/status at runtime.
   // This array is intentionally kept as a minimal local fallback only.
   ollama: ['llama3.2']
@@ -346,6 +360,21 @@ function SettingsPageInner() {
   const [crosswalkThreshold, setCrosswalkThreshold] = useState(90);
   const [crosswalkThresholdSaving, setCrosswalkThresholdSaving] = useState(false);
   const [crosswalkThresholdMsg, setCrosswalkThresholdMsg] = useState('');
+
+  // Trust Center config
+  const [trustCenterConfig, setTrustCenterConfig] = useState<TrustCenterConfig | null>(null);
+  const [trustCenterLoading, setTrustCenterLoading] = useState(false);
+  const [trustCenterSaving, setTrustCenterSaving] = useState(false);
+  const [trustCenterMsg, setTrustCenterMsg] = useState('');
+  const [trustCenterRegenerating, setTrustCenterRegenerating] = useState(false);
+  const [trustCenterCopied, setTrustCenterCopied] = useState(false);
+  const [tcEnabled, setTcEnabled] = useState(false);
+  const [tcDisplayName, setTcDisplayName] = useState('');
+  const [tcDescription, setTcDescription] = useState('');
+  const [tcContactEmail, setTcContactEmail] = useState('');
+  const [tcShowFrameworks, setTcShowFrameworks] = useState(false);
+  const [tcShowComplianceScores, setTcShowComplianceScores] = useState(false);
+  const [tcShowAuthorizations, setTcShowAuthorizations] = useState(false);
 
   // Splunk integration state
   const [splunkSettings, setSplunkSettings] = useState<SplunkSettings | null>(null);
@@ -1069,6 +1098,9 @@ function SettingsPageInner() {
     }
     if (activeTab === 'integrations' && canUseSiem && siemConfigs.length === 0) {
       loadSiemConfigs();
+    }
+    if (activeTab === 'integrations' && canManageSettings && !trustCenterConfig && !trustCenterLoading) {
+      loadTrustCenterConfig();
     }
     if (activeTab === 'notifications' && notifPrefs.length === 0) {
       loadNotifPrefs();
@@ -1820,6 +1852,82 @@ function SettingsPageInner() {
     }
   };
 
+  const applyTrustCenterConfig = (data: TrustCenterConfig) => {
+    setTrustCenterConfig(data);
+    setTcEnabled(Boolean(data.enabled));
+    setTcDisplayName(data.display_name || '');
+    setTcDescription(data.description || '');
+    setTcContactEmail(data.contact_email || '');
+    setTcShowFrameworks(Boolean(data.show_frameworks));
+    setTcShowComplianceScores(Boolean(data.show_compliance_scores));
+    setTcShowAuthorizations(Boolean(data.show_authorizations));
+  };
+
+  const loadTrustCenterConfig = async () => {
+    try {
+      setTrustCenterLoading(true);
+      const res = await trustCenterAPI.getConfig();
+      const data = res.data?.data;
+      if (data) applyTrustCenterConfig(data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load Trust Center configuration');
+    } finally {
+      setTrustCenterLoading(false);
+    }
+  };
+
+  const saveTrustCenterConfig = async () => {
+    if (!canManageSettings) return;
+    setTrustCenterSaving(true);
+    setTrustCenterMsg('');
+    try {
+      const res = await trustCenterAPI.updateConfig({
+        enabled: tcEnabled,
+        display_name: tcDisplayName || null,
+        description: tcDescription || null,
+        contact_email: tcContactEmail || null,
+        show_frameworks: tcShowFrameworks,
+        show_compliance_scores: tcShowComplianceScores,
+        show_authorizations: tcShowAuthorizations
+      });
+      const data = res.data?.data;
+      if (data) applyTrustCenterConfig(data);
+      setTrustCenterMsg('Saved!');
+    } catch (err: any) {
+      setTrustCenterMsg(err.response?.data?.error || 'Failed to save.');
+    } finally {
+      setTrustCenterSaving(false);
+      setTimeout(() => setTrustCenterMsg(''), 3000);
+    }
+  };
+
+  const regenerateTrustCenterToken = async () => {
+    if (!canManageSettings) return;
+    if (!confirm('Regenerating the token will invalidate the current public Trust Center URL. Continue?')) return;
+    setTrustCenterRegenerating(true);
+    try {
+      await trustCenterAPI.regenerateToken();
+      await loadTrustCenterConfig();
+      showToast('Trust Center token regenerated');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to regenerate Trust Center token');
+    } finally {
+      setTrustCenterRegenerating(false);
+    }
+  };
+
+  const copyTrustCenterUrl = async () => {
+    if (!trustCenterConfig) return;
+    const url = `${window.location.origin}/trust/${trustCenterConfig.public_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setTrustCenterCopied(true);
+      setTimeout(() => setTrustCenterCopied(false), 2000);
+    } catch {
+      // Clipboard access denied — silently ignore.
+    }
+  };
+
   const PermissionCheckboxes = ({ selected, onToggle }: { selected: string[]; onToggle: (perm: string) => void }) => (
     <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
       {Object.entries(allPermissions).map(([resource, perms]) => (
@@ -2118,7 +2226,7 @@ function SettingsPageInner() {
                         <h3 className="font-semibold text-gray-900">Google Gemini</h3>
                         <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Free Tier Available</span>
                       </div>
-                      <p className="text-xs text-gray-500">gemini-2.5-flash, gemini-2.5-pro · Get a free key at aistudio.google.com</p>
+                      <p className="text-xs text-gray-500">gemini-3.5-flash, gemini-3.1-pro-preview · Get a free key at aistudio.google.com</p>
                     </div>
                   </div>
                   {llmSettings?.hasGeminiKey ? (
@@ -2156,7 +2264,7 @@ function SettingsPageInner() {
                     <span className="text-2xl">⚫</span>
                     <div>
                       <h3 className="font-semibold text-gray-900">xAI Grok</h3>
-                      <p className="text-xs text-gray-500">grok-3-latest, grok-4-latest</p>
+                      <p className="text-xs text-gray-500">grok-4.1-fast, grok-4.5</p>
                     </div>
                   </div>
                   {llmSettings?.hasGrokKey ? (
@@ -2197,7 +2305,7 @@ function SettingsPageInner() {
                         <h3 className="font-semibold text-gray-900">Groq</h3>
                         <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Free Tier Available</span>
                       </div>
-                      <p className="text-xs text-gray-500">llama-3.3-70b-versatile, llama-3.1-8b-instant · Get a free key at console.groq.com</p>
+                      <p className="text-xs text-gray-500">openai/gpt-oss-120b, openai/gpt-oss-20b · Get a free key at console.groq.com</p>
                     </div>
                   </div>
                   {llmSettings?.hasGroqKey ? (
@@ -2966,6 +3074,146 @@ function SettingsPageInner() {
                 <strong>Syslog:</strong> UDP/TCP/TLS syslog receiver (e.g. rsyslog, syslog-ng, Graylog).
               </div>
             </div>
+            )}
+
+            {canManageSettings && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900 mb-1">Trust Center</h2>
+                    <p className="text-sm text-gray-500">
+                      Publish a read-only, token-gated page showing your compliance posture to customers and prospects.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={tcEnabled}
+                      onChange={(e) => setTcEnabled(e.target.checked)}
+                      className="h-4 w-4"
+                      aria-label="Enable Trust Center"
+                    />
+                    <span className="text-sm text-gray-700">Enabled</span>
+                  </label>
+                </div>
+
+                {trustCenterLoading ? (
+                  <div className="py-6 text-center text-sm text-gray-400">Loading...</div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label htmlFor="tc-display-name" className="block text-xs font-medium text-gray-600 mb-1">Display Name</label>
+                      <input
+                        id="tc-display-name"
+                        type="text"
+                        value={tcDisplayName}
+                        onChange={(e) => setTcDisplayName(e.target.value)}
+                        placeholder="Your organization name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="tc-description" className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+                      <textarea
+                        id="tc-description"
+                        value={tcDescription}
+                        onChange={(e) => setTcDescription(e.target.value)}
+                        rows={3}
+                        placeholder="A short description of your compliance program"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="tc-contact-email" className="block text-xs font-medium text-gray-600 mb-1">Contact Email</label>
+                      <input
+                        id="tc-contact-email"
+                        type="email"
+                        value={tcContactEmail}
+                        onChange={(e) => setTcContactEmail(e.target.value)}
+                        placeholder="security@yourcompany.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg p-4 space-y-2">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1">What to show</h3>
+                      <label htmlFor="tc-show-frameworks" className="flex items-center gap-2">
+                        <input
+                          id="tc-show-frameworks"
+                          type="checkbox"
+                          checked={tcShowFrameworks}
+                          onChange={(e) => setTcShowFrameworks(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm text-gray-700">Framework names</span>
+                      </label>
+                      <label htmlFor="tc-show-scores" className="flex items-center gap-2">
+                        <input
+                          id="tc-show-scores"
+                          type="checkbox"
+                          checked={tcShowComplianceScores}
+                          onChange={(e) => setTcShowComplianceScores(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm text-gray-700">Compliance scores</span>
+                      </label>
+                      <label htmlFor="tc-show-authorizations" className="flex items-center gap-2">
+                        <input
+                          id="tc-show-authorizations"
+                          type="checkbox"
+                          checked={tcShowAuthorizations}
+                          onChange={(e) => setTcShowAuthorizations(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm text-gray-700">Active authorizations count</span>
+                      </label>
+                    </div>
+
+                    {trustCenterConfig && (
+                      <div>
+                        <label htmlFor="tc-public-url" className="block text-xs font-medium text-gray-600 mb-1">Public URL</label>
+                        <div className="flex gap-2">
+                          <input
+                            id="tc-public-url"
+                            type="text"
+                            readOnly
+                            value={`${typeof window !== 'undefined' ? window.location.origin : ''}/trust/${trustCenterConfig.public_token}`}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 text-gray-600"
+                          />
+                          <button
+                            onClick={copyTrustCenterUrl}
+                            className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 shrink-0"
+                          >
+                            {trustCenterCopied ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <button
+                        onClick={saveTrustCenterConfig}
+                        disabled={trustCenterSaving}
+                        className="px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+                      >
+                        {trustCenterSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={regenerateTrustCenterToken}
+                        disabled={trustCenterRegenerating}
+                        className="px-4 py-2 text-sm border border-red-300 text-red-600 rounded-md hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {trustCenterRegenerating ? 'Regenerating...' : 'Regenerate Token'}
+                      </button>
+                      {trustCenterMsg && (
+                        <span className={`text-xs font-medium ${trustCenterMsg === 'Saved!' ? 'text-green-600' : 'text-red-600'}`}>{trustCenterMsg}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-blue-800">

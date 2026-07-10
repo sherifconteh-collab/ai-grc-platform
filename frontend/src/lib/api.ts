@@ -346,6 +346,9 @@ export const organizationAPI = {
     lifecycle_status?: 'planned' | 'active' | 'deprecated' | 'retired' | null;
     criticality?: 'low' | 'medium' | 'high' | 'critical' | null;
     support_end_date?: string | null;
+    authorization_status?: 'none' | 'fedramp_ready' | 'fedramp_in_process' | 'fedramp_authorized' | 'agency_ato' | 'dod_il_authorized' | 'other' | null;
+    authorization_impact_level?: 'li_saas' | 'low' | 'moderate' | 'high' | null;
+    external_authorization_id?: string | null;
     notes?: string | null;
   }) => api.post('/organizations/me/cots-products', data),
 
@@ -360,6 +363,9 @@ export const organizationAPI = {
     lifecycle_status?: 'planned' | 'active' | 'deprecated' | 'retired' | null;
     criticality?: 'low' | 'medium' | 'high' | 'critical' | null;
     support_end_date?: string | null;
+    authorization_status?: 'none' | 'fedramp_ready' | 'fedramp_in_process' | 'fedramp_authorized' | 'agency_ato' | 'dod_il_authorized' | 'other' | null;
+    authorization_impact_level?: 'li_saas' | 'low' | 'moderate' | 'high' | null;
+    external_authorization_id?: string | null;
     notes?: string | null;
   }) => api.put(`/organizations/me/cots-products/${productId}`, data),
 
@@ -1726,6 +1732,119 @@ export const rmfAPI = {
   getHistory: (id: string) => api.get(`/rmf/packages/${id}/history`),
   createAuthorization: (id: string, data: Record<string, unknown>) =>
     api.post(`/rmf/packages/${id}/authorization`, data),
+};
+
+export interface LeveragedAuthorizationInput {
+  cots_product_id: string;
+  inheritance_type?: 'full' | 'partial' | 'hybrid';
+  status?: 'active' | 'pending' | 'expired' | 'revoked';
+  authorization_reference?: string | null;
+  inherited_controls?: string[];
+  provider_responsibilities?: string | null;
+  customer_responsibilities?: string | null;
+  review_date?: string | null;
+  expiration_date?: string | null;
+  notes?: string | null;
+}
+
+// RMF Leveraged Authorizations — package inheritance from COTS products (routes/rmfInheritance.js)
+export const rmfInheritanceAPI = {
+  getLeveragedAuthorizations: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/leveraged-authorizations`),
+  getEligibleCotsProducts: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/eligible-cots-products`),
+  createLeveragedAuthorization: (packageId: string, data: LeveragedAuthorizationInput) =>
+    api.post(`/rmf/packages/${packageId}/leveraged-authorizations`, data),
+  updateLeveragedAuthorization: (packageId: string, linkId: string, data: Partial<LeveragedAuthorizationInput>) =>
+    api.put(`/rmf/packages/${packageId}/leveraged-authorizations/${linkId}`, data),
+  deleteLeveragedAuthorization: (packageId: string, linkId: string) =>
+    api.delete(`/rmf/packages/${packageId}/leveraged-authorizations/${linkId}`),
+  getCrmReport: (packageId: string) => api.get(`/rmf/packages/${packageId}/crm-report`),
+  downloadCrmReportCsv: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/crm-report`, { params: { format: 'csv' }, responseType: 'blob' }),
+  downloadCrmReportPdf: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/crm-report/pdf`, { responseType: 'blob' }),
+  downloadOscalSsp: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/oscal`, { responseType: 'blob' }),
+};
+
+// Trust Center — public compliance-posture page (routes/trustCenter.js)
+export const trustCenterAPI = {
+  getConfig: () => api.get('/trust-center/config'),
+  updateConfig: (data: {
+    enabled?: boolean;
+    display_name?: string | null;
+    description?: string | null;
+    contact_email?: string | null;
+    show_frameworks?: boolean;
+    show_compliance_scores?: boolean;
+    show_authorizations?: boolean;
+  }) => api.put('/trust-center/config', data),
+  regenerateToken: () => api.post('/trust-center/config/regenerate-token'),
+  getPublicPage: (token: string) =>
+    fetch(`${API_BASE_URL}/trust-center/public/${token}`).then(res => res.json()),
+};
+
+// Classroom mode — guided training scenarios (routes/training.js)
+export const trainingAPI = {
+  getScenarios: () => api.get('/training/scenarios'),
+  createScenario: (data: {
+    title: string;
+    description?: string | null;
+    difficulty?: 'beginner' | 'intermediate' | 'advanced';
+    steps?: Array<{ title: string; description?: string | null; hint?: string | null; target_page?: string | null }>;
+  }) => api.post('/training/scenarios', data),
+  updateScenario: (id: string, data: Record<string, unknown>) => api.put(`/training/scenarios/${id}`, data),
+  deleteScenario: (id: string) => api.delete(`/training/scenarios/${id}`),
+  updateProgress: (id: string, completedSteps: number[]) =>
+    api.post(`/training/scenarios/${id}/progress`, { completed_steps: completedSteps }),
+  getProgress: (id: string) => api.get(`/training/scenarios/${id}/progress`),
+};
+
+// Anonymized industry benchmarking (routes/benchmarks.js)
+export const benchmarksAPI = {
+  getFrameworkBenchmarks: () => api.get('/benchmarks/frameworks'),
+};
+
+// Compliance-as-code CI gate (routes/complianceGate.js)
+export const complianceGateAPI = {
+  checkGate: (params?: { framework_id?: string; min_pct?: number }) =>
+    api.get('/compliance/gate', { params }),
+  exportSnippet: (params?: { framework_id?: string; min_pct?: number; format?: 'github_actions' | 'gitlab_ci' | 'curl' }) =>
+    api.get('/compliance/gate/export', { params }),
+};
+
+// Cyber Resilience — BC/DR plans, tabletop/DR testing, resilience score (routes/cyberResilience.js)
+export const cyberResilienceAPI = {
+  getPlans: () => api.get('/resilience/plans'),
+  createPlan: (data: {
+    plan_type: 'incident_response' | 'business_continuity' | 'disaster_recovery' | 'ransomware_playbook';
+    title: string;
+    description?: string | null;
+    status?: 'draft' | 'active' | 'under_review' | 'retired';
+    system_id?: string | null;
+    rto_target_hours?: number | null;
+    rpo_target_hours?: number | null;
+    owner_id?: string | null;
+    last_tested_date?: string | null;
+    next_test_due?: string | null;
+    document_url?: string | null;
+  }) => api.post('/resilience/plans', data),
+  updatePlan: (id: string, data: Record<string, unknown>) => api.put(`/resilience/plans/${id}`, data),
+  deletePlan: (id: string) => api.delete(`/resilience/plans/${id}`),
+  getTests: (planId: string) => api.get(`/resilience/plans/${planId}/tests`),
+  createTest: (planId: string, data: {
+    test_type: 'tabletop' | 'functional' | 'full_scale';
+    scenario: string;
+    test_date?: string;
+    participants?: string[];
+    outcome: 'passed' | 'partial' | 'failed';
+    actual_rto_hours?: number | null;
+    actual_rpo_hours?: number | null;
+    findings?: string | null;
+    remediation_poam_id?: string | null;
+  }) => api.post(`/resilience/plans/${planId}/tests`, data),
+  getScore: () => api.get('/resilience/score'),
 };
 
 // PLOT4ai Threat Library API (Community tier — AI Threat Modeling)
