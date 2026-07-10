@@ -17,7 +17,7 @@ jobs:
     name: Dependency Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -40,7 +40,7 @@ jobs:
     name: Version Sync Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Verify backend / frontend / electron versions match
         run: |
@@ -65,7 +65,7 @@ jobs:
     name: Code Quality (Typecheck & Syntax)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -130,12 +130,12 @@ jobs:
     name: Scan for Hardcoded Secrets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Gitleaks - Detect secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -143,7 +143,7 @@ jobs:
     name: Detect Suspicious Code Patterns
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Check for dangerous functions
         run: |
@@ -204,7 +204,7 @@ jobs:
     name: "NIST 800-160 SC-13: Cryptographic Controls"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Check for weak or broken cryptographic algorithms
         run: |
@@ -264,7 +264,7 @@ jobs:
     name: "NIST 800-160 SI-10: Information Input Validation"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Check for SQL injection and missing input validation
         run: |
@@ -300,7 +300,7 @@ jobs:
     name: "NIST 800-160 AC-6: Least Privilege"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Verify authentication and authorization middleware coverage
         run: |
@@ -333,7 +333,7 @@ jobs:
     name: "NIST 800-160 AU-2: Audit Events"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Verify audit logging infrastructure and coverage
         run: |
@@ -378,7 +378,7 @@ jobs:
     name: "NIST 800-160 SI-11: Error Handling"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Check that error internals are not exposed in HTTP responses
         run: |
@@ -408,7 +408,7 @@ jobs:
     name: "NIST 800-160 SC-8: Security Headers"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Verify HTTP security headers are configured in server
         run: |
@@ -440,7 +440,7 @@ jobs:
     name: "NIST 800-160 SC-5: Denial-of-Service Protection"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Verify rate limiting is applied to sensitive endpoints
         run: |
@@ -490,7 +490,7 @@ jobs:
     name: "NIST 800-160 SA-12: Supply Chain Protection"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -547,7 +547,7 @@ jobs:
     name: Check Dependency Licenses
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

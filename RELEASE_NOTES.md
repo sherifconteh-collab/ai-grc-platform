@@ -245,6 +245,17 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(backend)(deps): bump redis from 5.12.1 to 6.0.0 in /backend ([#200](https://github.com/sherifconteh-collab/ai-grc-platform/pull/200)) — @dependabot[bot]
+- chore(ci): bump actions/checkout from 4 to 7 ([#205](https://github.com/sherifconteh-collab/ai-grc-platform/pull/205)) — @dependabot[bot]
+- chore(deps-dev): bump form-data from 4.0.5 to 4.0.6 in /electron in the npm_and_yarn group across 1 directory ([#203](https://github.com/sherifconteh-collab/ai-grc-platform/pull/203)) — @dependabot[bot]
+- chore(frontend)(deps): bump react and @types/react in /frontend ([#198](https://github.com/sherifconteh-collab/ai-grc-platform/pull/198)) — @dependabot[bot]
+- chore(backend)(deps): bump ioredis from 5.10.1 to 5.11.0 in /backend ([#194](https://github.com/sherifconteh-collab/ai-grc-platform/pull/194)) — @dependabot[bot]
+- chore(frontend)(deps): bump react-dom from 19.2.6 to 19.2.7 in /frontend ([#199](https://github.com/sherifconteh-collab/ai-grc-platform/pull/199)) — @dependabot[bot]
+- chore(backend)(deps): bump firebase-admin from 13.8.0 to 13.10.0 in /backend ([#196](https://github.com/sherifconteh-collab/ai-grc-platform/pull/196)) — @dependabot[bot]
+- chore(frontend)(deps): bump axios from 1.16.0 to 1.16.1 in /frontend ([#193](https://github.com/sherifconteh-collab/ai-grc-platform/pull/193)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/node from 25.9.0 to 25.9.1 in /frontend ([#195](https://github.com/sherifconteh-collab/ai-grc-platform/pull/195)) — @dependabot[bot]
+- chore(backend)(deps): bump stripe from 22.1.1 to 22.2.0 in /backend ([#192](https://github.com/sherifconteh-collab/ai-grc-platform/pull/192)) — @dependabot[bot]
+- chore(ci): bump gitleaks/gitleaks-action from 2 to 3 ([#191](https://github.com/sherifconteh-collab/ai-grc-platform/pull/191)) — @dependabot[bot]
 - chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory ([#189](https://github.com/sherifconteh-collab/ai-grc-platform/pull/189)) — @dependabot[bot]
 - chore: v4.2.2 — fix 23-hour build times (npm cache + scoped macOS/Linux triggers) ([#190](https://github.com/sherifconteh-collab/ai-grc-platform/pull/190)) — @sherifconteh-collab
 - chore: release v4.2.1 — CI improvements + release changelog publishing ([#188](https://github.com/sherifconteh-collab/ai-grc-platform/pull/188)) — @sherifconteh-collab

@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-05-27 | PR #189: chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory -->
+<!-- LAST_UPDATED: 2026-07-10 | PR #200: chore(backend)(deps): bump redis from 5.12.1 to 6.0.0 in /backend -->
 
 ## 🎯 What is This?
 
