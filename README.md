@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-07 | PR #205: chore(ci): bump actions/checkout from 4 to 7 -->
+<!-- LAST_UPDATED: 2026-07-10 | PR #200: chore(backend)(deps): bump redis from 5.12.1 to 6.0.0 in /backend -->
 
 ## 🎯 What is This?
 
