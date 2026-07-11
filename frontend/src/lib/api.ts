@@ -243,7 +243,7 @@ export const organizationAPI = {
   removeFramework: (orgId: string, frameworkId: string) =>
     api.delete(`/organizations/${orgId}/frameworks/${frameworkId}`),
 
-  getControls: (orgId: string, params?: { frameworkId?: string; status?: string }) =>
+  getControls: (orgId: string, params?: { frameworkId?: string; status?: string; page?: number; limit?: number }) =>
     api.get(`/organizations/${orgId}/controls`, { params }),
 
   exportControlAnswers: (
@@ -548,7 +548,7 @@ export const sbomAPI = {
 
 // Implementations APIs
 export const implementationsAPI = {
-  getAll: (params?: { frameworkId?: string; status?: string; assignedTo?: string; priority?: string; controlId?: string }) =>
+  getAll: (params?: { frameworkId?: string; status?: string; assignedTo?: string; priority?: string; controlId?: string; page?: number; limit?: number }) =>
     api.get('/implementations', { params }),
 
   ensureForControl: (controlId: string) =>
@@ -1783,6 +1783,12 @@ export const trustCenterAPI = {
   regenerateToken: () => api.post('/trust-center/config/regenerate-token'),
   getPublicPage: (token: string) =>
     fetch(`${API_BASE_URL}/trust-center/public/${token}`).then(res => res.json()),
+};
+
+// Auditor Workspace — public read-only share links (routes/auditorWorkspace.js)
+export const auditorWorkspacePublicAPI = {
+  getPublicWorkspace: (token: string) =>
+    fetch(`${API_BASE_URL}/auditor-workspace/public/${token}`).then((res) => res.json()),
 };
 
 // Classroom mode — guided training scenarios (routes/training.js)
