@@ -1254,6 +1254,25 @@ export const reportsAPI = {
     api.get('/reports/ssp/json', { responseType: 'blob' }),
 };
 
+// Scheduled Reports API
+export interface ScheduledReportInput {
+  name: string;
+  report_type: 'compliance_summary' | 'framework_gap' | 'evidence_status' | 'audit_trail' | 'executive';
+  schedule: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+  format?: 'pdf' | 'csv' | 'json';
+  recipients?: string[];
+  filters?: Record<string, unknown>;
+  is_active?: boolean;
+}
+
+export const scheduledReportsAPI = {
+  getAll: () => api.get('/reports/scheduled'),
+  create: (data: ScheduledReportInput) => api.post('/reports/scheduled', data),
+  update: (id: string, data: Partial<ScheduledReportInput>) => api.patch(`/reports/scheduled/${id}`, data),
+  remove: (id: string) => api.delete(`/reports/scheduled/${id}`),
+  runNow: (id: string) => api.post(`/reports/scheduled/${id}/run`),
+};
+
 // Issue Reporting APIs
 export const issueReportAPI = {
   submit: (data: {
@@ -1607,7 +1626,8 @@ export const exceptionsAPI = {
   create: (data: Record<string, unknown>) => api.post('/exceptions', data),
   update: (id: string, data: Record<string, unknown>) => api.patch(`/exceptions/${id}`, data),
   approve: (id: string, data?: { notes?: string }) => api.post(`/exceptions/${id}/approve`, data || {}),
-  revoke: (id: string, data?: { notes?: string }) => api.post(`/exceptions/${id}/revoke`, data || {}),
+  // Note: backend reads `note` (singular) from the request body, not `notes`.
+  revoke: (id: string, data?: { note?: string }) => api.post(`/exceptions/${id}/revoke`, data || {}),
 };
 
 // Data Sovereignty API

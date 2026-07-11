@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
-import { tprmAPI, aiAPI, tprmPublicAPI } from '@/lib/api';
+import { tprmAPI, aiAPI, tprmPublicAPI, vendorSecurityAPI } from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
 
 type RiskTier = 'critical' | 'high' | 'medium' | 'low';
@@ -167,7 +167,7 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
   other: 'Other',
 };
 
-type ActiveTab = 'vendors' | 'questionnaires' | 'documents';
+type ActiveTab = 'vendors' | 'questionnaires' | 'documents' | 'security_ratings';
 
 const emptyVendorForm = {
   vendor_name: '',
@@ -603,7 +603,7 @@ export default function TprmPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
             <nav className="flex gap-0">
-              {(['vendors', 'questionnaires', 'documents'] as ActiveTab[]).map(tab => (
+              {(['vendors', 'questionnaires', 'documents', 'security_ratings'] as ActiveTab[]).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -616,6 +616,7 @@ export default function TprmPage() {
                   {tab === 'vendors' && '🏢 Vendors'}
                   {tab === 'questionnaires' && '📋 Questionnaires'}
                   {tab === 'documents' && '📄 Documents'}
+                  {tab === 'security_ratings' && '🛡️ Security Ratings'}
                 </button>
               ))}
             </nav>
@@ -1094,6 +1095,9 @@ export default function TprmPage() {
                     )}
                   </div>
                 )}
+
+                {/* ===== SECURITY RATINGS TAB ===== */}
+                {activeTab === 'security_ratings' && <VendorSecurityRatingsPanel />}
               </>
             )}
           </div>
@@ -1476,5 +1480,505 @@ export default function TprmPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+type SecurityScoreProvider = 'securityscorecard' | 'bitsight';
+
+interface VendorSecurityScore {
+  id: string;
+  vendor_name: string;
+  vendor_domain?: string | null;
+  score_provider: SecurityScoreProvider;
+  score_value: number;
+  score_grade?: string | null;
+  score_date: string;
+  score_trend?: 'improving' | 'declining' | 'stable' | null;
+  previous_score?: number | null;
+}
+
+interface ManualScoreFormState {
+  vendor_name: string;
+  score_provider: SecurityScoreProvider;
+  score_value: string;
+  score_date: string;
+  vendor_domain: string;
+}
+
+const EMPTY_MANUAL_SCORE_FORM: ManualScoreFormState = {
+  vendor_name: '',
+  score_provider: 'securityscorecard',
+  score_value: '',
+  score_date: new Date().toISOString().split('T')[0],
+  vendor_domain: '',
+};
+
+interface MonitorFormState {
+  vendor_domain: string;
+  score_provider: SecurityScoreProvider;
+  api_key: string;
+}
+
+const EMPTY_MONITOR_FORM: MonitorFormState = {
+  vendor_domain: '',
+  score_provider: 'securityscorecard',
+  api_key: '',
+};
+
+const TREND_LABEL: Record<string, string> = {
+  improving: '↑ Improving',
+  declining: '↓ Declining',
+  stable: '→ Stable',
+};
+
+function VendorSecurityRatingsPanel() {
+  const [scores, setScores] = useState<VendorSecurityScore[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualForm, setManualForm] = useState<ManualScoreFormState>(EMPTY_MANUAL_SCORE_FORM);
+  const [manualFormError, setManualFormError] = useState('');
+  const [submittingManual, setSubmittingManual] = useState(false);
+
+  const [showMonitorForm, setShowMonitorForm] = useState(false);
+  const [monitorForm, setMonitorForm] = useState<MonitorFormState>(EMPTY_MONITOR_FORM);
+  const [monitorFormError, setMonitorFormError] = useState('');
+  const [submittingMonitor, setSubmittingMonitor] = useState(false);
+
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [refreshApiKey, setRefreshApiKey] = useState('');
+
+  const loadScores = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await vendorSecurityAPI.getScores();
+      const data = Array.isArray(response.data?.data) ? response.data.data : [];
+      setScores(data);
+    } catch {
+      setError('Failed to load vendor security ratings.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await loadScores();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const submitManualEntry = async () => {
+    const scoreValue = Number(manualForm.score_value);
+    if (!manualForm.vendor_name.trim() || !manualForm.score_date || Number.isNaN(scoreValue)) {
+      setManualFormError('Vendor name, a numeric score, and score date are required.');
+      return;
+    }
+    setSubmittingManual(true);
+    setManualFormError('');
+    try {
+      await vendorSecurityAPI.createScore({
+        vendor_name: manualForm.vendor_name.trim(),
+        score_provider: manualForm.score_provider,
+        score_value: scoreValue,
+        score_date: manualForm.score_date,
+        vendor_domain: manualForm.vendor_domain.trim() || undefined,
+      });
+      setShowManualForm(false);
+      setManualForm(EMPTY_MANUAL_SCORE_FORM);
+      await loadScores();
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { error?: string } } };
+      setManualFormError(errObj.response?.data?.error || 'Failed to save the score.');
+    } finally {
+      setSubmittingManual(false);
+    }
+  };
+
+  const submitMonitoring = async () => {
+    if (!monitorForm.vendor_domain.trim() || !monitorForm.api_key.trim()) {
+      setMonitorFormError('Vendor domain and your provider API key are required.');
+      return;
+    }
+    setSubmittingMonitor(true);
+    setMonitorFormError('');
+    try {
+      await vendorSecurityAPI.setupMonitoring({
+        vendor_domain: monitorForm.vendor_domain.trim(),
+        score_provider: monitorForm.score_provider,
+        api_key: monitorForm.api_key.trim(),
+      });
+      setShowMonitorForm(false);
+      setMonitorForm(EMPTY_MONITOR_FORM);
+      await loadScores();
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { error?: string } } };
+      setMonitorFormError(
+        errObj.response?.data?.error || 'Failed to start live monitoring. Verify the API key and domain.'
+      );
+    } finally {
+      setSubmittingMonitor(false);
+    }
+  };
+
+  const refreshScore = async (id: string) => {
+    if (!refreshApiKey.trim()) {
+      setNotice('Enter your provider API key above before refreshing.');
+      return;
+    }
+    setRefreshingId(id);
+    setNotice('');
+    try {
+      await vendorSecurityAPI.refreshScore(id);
+      setNotice('Score refreshed.');
+      await loadScores();
+    } catch {
+      setNotice('Failed to refresh score. Verify the stored vendor domain and API key.');
+    } finally {
+      setRefreshingId(null);
+    }
+  };
+
+  const deleteScore = async (id: string) => {
+    try {
+      await vendorSecurityAPI.deleteScore(id);
+      await loadScores();
+    } catch {
+      setNotice('Failed to delete the score.');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <p className="text-sm text-gray-600 max-w-2xl">
+          Track vendor security ratings from SecurityScorecard or BitSight. Manual entry always works with no
+          external dependency; live refresh is optional and requires your organization&apos;s own provider API key.
+        </p>
+        <button
+          onClick={() => {
+            setManualForm(EMPTY_MANUAL_SCORE_FORM);
+            setManualFormError('');
+            setShowManualForm(true);
+          }}
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+        >
+          + Manual Entry
+        </button>
+      </div>
+
+      {notice && (
+        <div className="bg-purple-50 border border-purple-200 text-purple-700 px-4 py-3 rounded text-sm">
+          {notice}
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">{error}</div>
+      )}
+
+      {loading ? (
+        <div className="animate-pulse h-32 rounded-lg bg-gray-100" />
+      ) : scores.length === 0 ? (
+        <div className="text-center py-10 text-gray-400 text-sm">
+          No vendor security ratings recorded yet. Add one manually to get started.
+        </div>
+      ) : (
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Vendor</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Provider</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Score</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Trend</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scores.map((score) => (
+                <tr key={score.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {score.vendor_name}
+                    {score.vendor_domain && (
+                      <div className="text-xs text-gray-400">{score.vendor_domain}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 capitalize">{score.score_provider}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    {score.score_value}
+                    {score.score_grade ? ` (${score.score_grade})` : ''}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{score.score_date}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {score.score_trend ? TREND_LABEL[score.score_trend] || score.score_trend : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => refreshScore(score.id)}
+                        disabled={refreshingId === score.id || !score.vendor_domain}
+                        title={!score.vendor_domain ? 'vendor_domain is required to refresh' : undefined}
+                        className="text-purple-600 hover:text-purple-800 text-xs font-medium disabled:opacity-40"
+                      >
+                        {refreshingId === score.id ? 'Refreshing...' : 'Refresh'}
+                      </button>
+                      <button
+                        onClick={() => deleteScore(score.id)}
+                        className="text-red-600 hover:text-red-800 text-xs font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {scores.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <label htmlFor="refresh-api-key" className="block text-xs font-medium text-gray-700 mb-1">
+            Provider API key (used for the Refresh action above — never stored by this form)
+          </label>
+          <input
+            id="refresh-api-key"
+            type="password"
+            value={refreshApiKey}
+            onChange={(e) => setRefreshApiKey(e.target.value)}
+            placeholder="Enter your SecurityScorecard or BitSight API key"
+            className="w-full max-w-md border border-gray-300 rounded px-3 py-2 text-sm"
+          />
+        </div>
+      )}
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800">Live Refresh (optional)</h3>
+            <p className="text-xs text-gray-500 mt-1 max-w-xl">
+              Start automated monitoring of a vendor domain via SecurityScorecard or BitSight. This requires
+              your organization&apos;s own API key for that provider and will not work out of the box.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setMonitorForm(EMPTY_MONITOR_FORM);
+              setMonitorFormError('');
+              setShowMonitorForm(true);
+            }}
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+          >
+            Set Up Live Monitoring
+          </button>
+        </div>
+      </div>
+
+      {showManualForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Manual Score Entry</h2>
+              <button
+                onClick={() => setShowManualForm(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+
+            {manualFormError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                {manualFormError}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="manual-vendor-name" className="block text-sm font-medium text-gray-700 mb-1">
+                Vendor Name
+              </label>
+              <input
+                id="manual-vendor-name"
+                type="text"
+                value={manualForm.vendor_name}
+                onChange={(e) => setManualForm({ ...manualForm, vendor_name: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="manual-provider" className="block text-sm font-medium text-gray-700 mb-1">
+                Provider
+              </label>
+              <select
+                id="manual-provider"
+                value={manualForm.score_provider}
+                onChange={(e) =>
+                  setManualForm({ ...manualForm, score_provider: e.target.value as SecurityScoreProvider })
+                }
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              >
+                <option value="securityscorecard">SecurityScorecard</option>
+                <option value="bitsight">BitSight</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="manual-score" className="block text-sm font-medium text-gray-700 mb-1">
+                Score
+              </label>
+              <input
+                id="manual-score"
+                type="number"
+                value={manualForm.score_value}
+                onChange={(e) => setManualForm({ ...manualForm, score_value: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="manual-score-date" className="block text-sm font-medium text-gray-700 mb-1">
+                Score Date
+              </label>
+              <input
+                id="manual-score-date"
+                type="date"
+                value={manualForm.score_date}
+                onChange={(e) => setManualForm({ ...manualForm, score_date: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="manual-domain" className="block text-sm font-medium text-gray-700 mb-1">
+                Vendor Domain (optional, needed for future live refresh)
+              </label>
+              <input
+                id="manual-domain"
+                type="text"
+                value={manualForm.vendor_domain}
+                onChange={(e) => setManualForm({ ...manualForm, vendor_domain: e.target.value })}
+                placeholder="vendor.com"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowManualForm(false)}
+                className="px-4 py-2 rounded text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitManualEntry}
+                disabled={submittingManual}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+              >
+                {submittingManual ? 'Saving...' : 'Save Score'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMonitorForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Live Monitoring (Optional)</h2>
+              <button
+                onClick={() => setShowMonitorForm(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Requires your own SecurityScorecard or BitSight API key. This calls the live provider API and
+              will fail without a valid key for a domain your account has access to.
+            </p>
+
+            {monitorFormError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                {monitorFormError}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="monitor-domain" className="block text-sm font-medium text-gray-700 mb-1">
+                Vendor Domain
+              </label>
+              <input
+                id="monitor-domain"
+                type="text"
+                value={monitorForm.vendor_domain}
+                onChange={(e) => setMonitorForm({ ...monitorForm, vendor_domain: e.target.value })}
+                placeholder="vendor.com"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="monitor-provider" className="block text-sm font-medium text-gray-700 mb-1">
+                Provider
+              </label>
+              <select
+                id="monitor-provider"
+                value={monitorForm.score_provider}
+                onChange={(e) =>
+                  setMonitorForm({ ...monitorForm, score_provider: e.target.value as SecurityScoreProvider })
+                }
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              >
+                <option value="securityscorecard">SecurityScorecard</option>
+                <option value="bitsight">BitSight</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="monitor-api-key" className="block text-sm font-medium text-gray-700 mb-1">
+                API Key
+              </label>
+              <input
+                id="monitor-api-key"
+                type="password"
+                value={monitorForm.api_key}
+                onChange={(e) => setMonitorForm({ ...monitorForm, api_key: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowMonitorForm(false)}
+                className="px-4 py-2 rounded text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitMonitoring}
+                disabled={submittingMonitor}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+              >
+                {submittingMonitor ? 'Starting...' : 'Start Monitoring'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
