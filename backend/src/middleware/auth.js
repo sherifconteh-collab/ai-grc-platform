@@ -37,6 +37,7 @@ const ROLE_FALLBACK_PERMISSIONS = new Map([
     'environments.read',
     'service_accounts.read',
     'audit.read',
+    'audit.write',
     'reports.read',
     'assessments.read',
     'assessments.write',

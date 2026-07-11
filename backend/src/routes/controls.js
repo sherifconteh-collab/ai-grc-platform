@@ -23,7 +23,7 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
              fc.control_type, fc.priority,
              f.id as framework_id, f.name as framework_name, f.code as framework_code,
              COALESCE(ci.status, 'not_started') as implementation_status,
-             ci.implementation_notes, ci.evidence_location, ci.assigned_to, ci.notes, ci.implementation_date,
+             ci.implementation_notes, ci.evidence_location, ci.assigned_to, ci.notes, ci.implementation_date, ci.due_date,
              u.first_name || ' ' || u.last_name as assigned_to_name, u.email as assigned_to_email
       FROM framework_controls fc
       JOIN frameworks f ON f.id = fc.framework_id
@@ -579,7 +579,7 @@ router.get('/:id/history', requirePermission('controls.read'), async (req, res) 
              u.first_name || ' ' || u.last_name as changed_by
       FROM audit_logs al
       LEFT JOIN users u ON u.id = al.user_id
-      WHERE al.resource_id = $1
+      WHERE (al.resource_id = $1 OR al.resource_id IN (SELECT id FROM control_implementations WHERE control_id = $1 AND organization_id = $2))
         AND al.resource_type = 'control'
         AND al.organization_id = $2
       ORDER BY al.created_at DESC

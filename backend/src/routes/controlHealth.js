@@ -105,6 +105,12 @@ async function fetchControlRows(orgId, specificControlId = null) {
     whereSpecific = `AND fc.id = $2`;
   }
 
+  // Each related table is joined via a LATERAL subquery scoped to fc.id (and
+  // org) rather than a direct one-to-many JOIN. This keeps the aggregates
+  // (evidence recency, impact counts, POA&M counts, exception flag)
+  // independent of one another — a direct multi-JOIN + GROUP BY approach
+  // cross-multiplies rows whenever a control has more than one row in more
+  // than one of these tables, inflating COUNT(...) FILTER(...) results.
   const result = await pool.query(
     `SELECT
        fc.id,
@@ -112,8 +118,8 @@ async function fetchControlRows(orgId, specificControlId = null) {
        fc.title,
        f.code AS framework_code,
        COALESCE(ci.status, 'not_started') AS implementation_status,
-       MAX(e.created_at) AS last_evidence_at,
-       MAX(ar.assessed_at) AS last_assessed_at,
+       evstats.last_evidence_at,
+       assessstats.last_assessed_at,
        (
          SELECT ar2.status
          FROM assessment_procedures ap2
@@ -123,45 +129,62 @@ async function fetchControlRows(orgId, specificControlId = null) {
          ORDER BY COALESCE(ar2.assessed_at, ar2.updated_at, ar2.created_at) DESC
          LIMIT 1
        ) AS last_assessment_status,
-       COUNT(vw.id) FILTER (WHERE vw.action_status IN ('open','in_progress'))::int AS open_control_impacts,
-       COUNT(vw.id) FILTER (
-         WHERE vw.action_status IN ('open','in_progress')
-           AND vw.control_effect = 'non_compliant'
-       )::int AS non_compliant_impacts,
-       COUNT(p.id) FILTER (
-         WHERE p.status IN ('open','in_progress','pending_review')
-       )::int AS open_poam_items,
-       BOOL_OR(
-         ce.status = 'active'
-         AND (ce.expires_at IS NULL OR ce.expires_at >= CURRENT_DATE)
-       ) AS has_active_exception
+       COALESCE(vwstats.open_control_impacts, 0) AS open_control_impacts,
+       COALESCE(vwstats.non_compliant_impacts, 0) AS non_compliant_impacts,
+       COALESCE(poamstats.open_poam_items, 0) AS open_poam_items,
+       COALESCE(excstats.has_active_exception, false) AS has_active_exception
      FROM organization_frameworks ofw
      JOIN frameworks f ON f.id = ofw.framework_id
      JOIN framework_controls fc ON fc.framework_id = f.id
      LEFT JOIN control_implementations ci
        ON ci.organization_id = ofw.organization_id
       AND ci.control_id = fc.id
-     LEFT JOIN evidence_control_links ecl ON ecl.control_id = fc.id
-     LEFT JOIN evidence e
-       ON e.id = ecl.evidence_id
-      AND e.organization_id = ofw.organization_id
-     LEFT JOIN assessment_procedures ap
-       ON ap.framework_control_id = fc.id
-     LEFT JOIN assessment_results ar
-       ON ar.assessment_procedure_id = ap.id
-      AND ar.organization_id = ofw.organization_id
-     LEFT JOIN vulnerability_control_work_items vw
-       ON vw.organization_id = ofw.organization_id
-      AND vw.framework_control_id = fc.id
-     LEFT JOIN poam_items p
-       ON p.organization_id = ofw.organization_id
-      AND p.control_id = fc.id
-     LEFT JOIN control_exceptions ce
-       ON ce.organization_id = ofw.organization_id
-      AND ce.control_id = fc.id
+     LEFT JOIN LATERAL (
+       SELECT MAX(e.created_at) AS last_evidence_at
+       FROM evidence_control_links ecl
+       JOIN evidence e
+         ON e.id = ecl.evidence_id
+        AND e.organization_id = ofw.organization_id
+       WHERE ecl.control_id = fc.id
+     ) evstats ON true
+     LEFT JOIN LATERAL (
+       SELECT MAX(ar.assessed_at) AS last_assessed_at
+       FROM assessment_procedures ap
+       JOIN assessment_results ar
+         ON ar.assessment_procedure_id = ap.id
+        AND ar.organization_id = ofw.organization_id
+       WHERE ap.framework_control_id = fc.id
+     ) assessstats ON true
+     LEFT JOIN LATERAL (
+       SELECT
+         COUNT(*) FILTER (WHERE vw.action_status IN ('open','in_progress'))::int AS open_control_impacts,
+         COUNT(*) FILTER (
+           WHERE vw.action_status IN ('open','in_progress')
+             AND vw.control_effect = 'non_compliant'
+         )::int AS non_compliant_impacts
+       FROM vulnerability_control_work_items vw
+       WHERE vw.organization_id = ofw.organization_id
+         AND vw.framework_control_id = fc.id
+     ) vwstats ON true
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*) FILTER (
+         WHERE p.status IN ('open','in_progress','pending_review')
+       )::int AS open_poam_items
+       FROM poam_items p
+       WHERE p.organization_id = ofw.organization_id
+         AND p.control_id = fc.id
+     ) poamstats ON true
+     LEFT JOIN LATERAL (
+       SELECT BOOL_OR(
+         ce.status = 'active'
+         AND (ce.expires_at IS NULL OR ce.expires_at >= CURRENT_DATE)
+       ) AS has_active_exception
+       FROM control_exceptions ce
+       WHERE ce.organization_id = ofw.organization_id
+         AND ce.control_id = fc.id
+     ) excstats ON true
      WHERE ofw.organization_id = $1
-     ${whereSpecific}
-     GROUP BY fc.id, fc.control_id, fc.title, f.code, ci.status`,
+     ${whereSpecific}`,
     params
   );
   return result.rows;

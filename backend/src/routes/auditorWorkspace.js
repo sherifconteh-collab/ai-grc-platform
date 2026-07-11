@@ -132,7 +132,7 @@ router.get('/links', requirePermission('audit.read'), async (req, res) => {
 });
 
 // POST /api/v1/auditor-workspace/links
-router.post('/links', requirePermission('audit.read'), async (req, res) => {
+router.post('/links', requirePermission('audit.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { name, engagement_id = null, days_valid = 30 } = req.body || {};
@@ -170,7 +170,7 @@ router.post('/links', requirePermission('audit.read'), async (req, res) => {
 });
 
 // PATCH /api/v1/auditor-workspace/links/:id
-router.patch('/links/:id', requirePermission('audit.read'), async (req, res) => {
+router.patch('/links/:id', requirePermission('audit.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const id = req.params.id;
