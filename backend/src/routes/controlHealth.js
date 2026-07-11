@@ -120,15 +120,7 @@ async function fetchControlRows(orgId, specificControlId = null) {
        COALESCE(ci.status, 'not_started') AS implementation_status,
        evstats.last_evidence_at,
        assessstats.last_assessed_at,
-       (
-         SELECT ar2.status
-         FROM assessment_procedures ap2
-         JOIN assessment_results ar2 ON ar2.assessment_procedure_id = ap2.id
-         WHERE ap2.framework_control_id = fc.id
-           AND ar2.organization_id = $1
-         ORDER BY COALESCE(ar2.assessed_at, ar2.updated_at, ar2.created_at) DESC
-         LIMIT 1
-       ) AS last_assessment_status,
+       assessstats.last_assessment_status,
        COALESCE(vwstats.open_control_impacts, 0) AS open_control_impacts,
        COALESCE(vwstats.non_compliant_impacts, 0) AS non_compliant_impacts,
        COALESCE(poamstats.open_poam_items, 0) AS open_poam_items,
@@ -148,12 +140,16 @@ async function fetchControlRows(orgId, specificControlId = null) {
        WHERE ecl.control_id = fc.id
      ) evstats ON true
      LEFT JOIN LATERAL (
-       SELECT MAX(ar.assessed_at) AS last_assessed_at
+       SELECT
+         ar.assessed_at AS last_assessed_at,
+         ar.status AS last_assessment_status
        FROM assessment_procedures ap
        JOIN assessment_results ar
          ON ar.assessment_procedure_id = ap.id
         AND ar.organization_id = ofw.organization_id
        WHERE ap.framework_control_id = fc.id
+       ORDER BY COALESCE(ar.assessed_at, ar.updated_at, ar.created_at) DESC
+       LIMIT 1
      ) assessstats ON true
      LEFT JOIN LATERAL (
        SELECT

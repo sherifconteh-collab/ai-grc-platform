@@ -76,9 +76,16 @@ function labelize(value: string) {
     .join(' ');
 }
 
+const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '—';
+  // Use UTC getters (not toLocaleDateString) so server and client render the
+  // same string regardless of the runtime's local timezone — avoids Next.js
+  // hydration mismatches on this public, unauthenticated page.
+  return `${MONTH_ABBREVIATIONS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
 function formatFileSize(bytes: number) {
