@@ -1891,6 +1891,15 @@ export const stateAiLawsAPI = {
   getSummary: () => api.get('/state-ai-laws/summary'),
 };
 
+// International AI Laws API — EU AI Act, UK, Canada, Brazil, Singapore, Japan, South Korea, China, Australia, India
+export const internationalAiLawsAPI = {
+  getJurisdictions: () => api.get('/international-ai-laws/jurisdictions'),
+  getControls: (params?: { jurisdiction?: string; region?: string; control_type?: string; priority?: string; search?: string }) =>
+    api.get('/international-ai-laws/controls', { params }),
+  getControl: (controlId: string) => api.get(`/international-ai-laws/controls/${controlId}`),
+  getSummary: () => api.get('/international-ai-laws/summary'),
+};
+
 // Push Tokens API — device push token registration for mobile apps (iOS APNs / Android FCM)
 export const pushTokensAPI = {
   register: (data: { token: string; platform: 'ios' | 'android' }) =>

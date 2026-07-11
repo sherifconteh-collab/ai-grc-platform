@@ -42,6 +42,8 @@ const navigationSections: NavigationSection[] = [
       { name: 'Auditor Workspace', href: '/dashboard/auditor-workspace', icon: '🗂️', requiredPermissions: ['assessments.read'], isVisible: (u) => canAccessAuditorWorkspace(u) },
       { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },
       { name: 'AI Insights', href: '/dashboard/ai-insights', icon: '📈', requiredPermissions: ['ai.use'] },
+      { name: 'AI Laws', href: '/dashboard/ai-laws', icon: '⚖️', requiredPermissions: ['frameworks.read'] },
+      { name: 'Dashboard Views', href: '/dashboard/views', icon: '🧩', requiredPermissions: ['dashboard.read'] },
       { name: 'Training', href: '/dashboard/training', icon: '🎓', requiredPermissions: ['dashboard.read'] },
     ],
   },
