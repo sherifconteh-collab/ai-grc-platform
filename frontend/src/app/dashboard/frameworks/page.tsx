@@ -10,6 +10,8 @@ import { hasPermission } from '@/lib/access';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
 
 
+type FrameworkCoverageStatus = 'comprehensive' | 'core_controls' | 'representative';
+
 interface Framework {
   id: string;
   code: string;
@@ -21,6 +23,37 @@ interface Framework {
   tierRequired?: string | null;
   version?: string | null;
   selected?: boolean;
+  coverageStatus?: FrameworkCoverageStatus;
+}
+
+const COVERAGE_BADGE: Record<FrameworkCoverageStatus, { label: string; className: string; title: string }> = {
+  comprehensive: {
+    label: 'Comprehensive',
+    className: 'bg-green-50 text-green-700',
+    title: 'This catalog matches its full official/defined control set.',
+  },
+  core_controls: {
+    label: 'Core control set',
+    className: 'bg-amber-50 text-amber-700',
+    title: 'A curated subset of the official catalog is seeded today; full coverage is being expanded over time.',
+  },
+  representative: {
+    label: 'Representative',
+    className: 'bg-slate-100 text-slate-600',
+    title: 'This is a guidance/examination-handbook framework with no single canonical control list -- controls shown are illustrative key areas, not a full transcription.',
+  },
+};
+
+function CoverageBadge({ status }: { status?: FrameworkCoverageStatus }) {
+  const info = COVERAGE_BADGE[status || 'core_controls'];
+  return (
+    <span
+      className={`px-2 py-1 rounded-full text-xs font-medium ${info.className}`}
+      title={info.title}
+    >
+      {info.label}
+    </span>
+  );
 }
 
 interface NistPublication {
@@ -89,7 +122,8 @@ export default function FrameworksPage() {
         category: f.category || null,
         tierRequired: f.tier_required || null,
         controlCount: parseInt(f.control_count) || 0,
-        procedureCount: null
+        procedureCount: null,
+        coverageStatus: (f.coverage_status || 'core_controls') as FrameworkCoverageStatus
       }));
       setFrameworks(backendFrameworks);
     } catch (err) {
@@ -411,6 +445,7 @@ export default function FrameworksPage() {
                           <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700 font-semibold">
                             {framework.controlCount} controls
                           </span>
+                          <CoverageBadge status={framework.coverageStatus} />
                           {procedureCount !== null && (
                             <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 font-medium">
                               {procedureCount} procedures
@@ -676,6 +711,7 @@ export default function FrameworksPage() {
                       <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded">
                         {framework.controlCount} controls
                       </span>
+                      <CoverageBadge status={framework.coverageStatus} />
                       {procedureCount !== null && (
                         <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-medium rounded">
                           {procedureCount} procedures
