@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-13 | PR #211: chore(frontend)(deps-dev): bump eslint from 10.3.0 to 10.7.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-07-13 | PR #215: chore(frontend)(deps): bump date-fns from 4.1.0 to 4.4.0 in /frontend -->
 
 ## 🎯 What is This?
 
