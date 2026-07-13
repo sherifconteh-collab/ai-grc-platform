@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-10 | PR #207: feat(rmf): package inheritance from COTS products + flagship GRC differentiators -->
+<!-- LAST_UPDATED: 2026-07-13 | PR #211: chore(frontend)(deps-dev): bump eslint from 10.3.0 to 10.7.0 in /frontend -->
 
 ## 🎯 What is This?
 

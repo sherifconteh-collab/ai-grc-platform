@@ -245,6 +245,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(frontend)(deps-dev): bump eslint from 10.3.0 to 10.7.0 in /frontend ([#211](https://github.com/sherifconteh-collab/ai-grc-platform/pull/211)) — @dependabot[bot]
 - feat(rmf): package inheritance from COTS products + flagship GRC differentiators ([#207](https://github.com/sherifconteh-collab/ai-grc-platform/pull/207)) — @sherifconteh-collab
 - chore(backend)(deps): bump redis from 5.12.1 to 6.0.0 in /backend ([#200](https://github.com/sherifconteh-collab/ai-grc-platform/pull/200)) — @dependabot[bot]
 - chore(ci): bump actions/checkout from 4 to 7 ([#205](https://github.com/sherifconteh-collab/ai-grc-platform/pull/205)) — @dependabot[bot]
