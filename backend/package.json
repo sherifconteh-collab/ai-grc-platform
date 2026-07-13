@@ -1,6 +1,6 @@
 {
   "name": "controlweave-backend",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
