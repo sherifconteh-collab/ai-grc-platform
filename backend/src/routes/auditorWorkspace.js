@@ -4,6 +4,12 @@ const crypto = require('crypto');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const rateLimit = require('express-rate-limit');
+
+// express-rate-limit applied to the public token-lookup route specifically —
+// it's the one endpoint here with no authentication gate at all, so it's the
+// most exposed to abuse.
+const publicRateLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60 });
 
 function newToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -11,7 +17,7 @@ function newToken() {
 
 // Public token-based read-only workspace
 // GET /api/v1/auditor-workspace/public/:token
-router.get('/public/:token', async (req, res) => {
+router.get('/public/:token', publicRateLimiter, async (req, res) => {
   try {
     const token = req.params.token;
 
@@ -110,6 +116,13 @@ router.get('/public/:token', async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to load auditor workspace' });
   }
 });
+
+// express-rate-limit applied router-wide to everything below, ahead of
+// authenticate, so a cheap IP-based bound is in place before authenticate's
+// own DB/JWT work runs, and so static analysis (CodeQL) can trace a
+// recognized rate-limiting middleware covering these routes. Matches the
+// pattern already established in trustCenter.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 router.use(authenticate);
 

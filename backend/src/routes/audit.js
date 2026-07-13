@@ -8,12 +8,21 @@ const splunk = require('../services/splunkService');
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { decodeCursor, nextCursorFrom } = require('../utils/keysetPagination');
+const rateLimit = require('express-rate-limit');
 
 const auditWriteLimiter = createRateLimiter({
   label: 'audit-log-write',
   windowMs: 60 * 1000,
   max: 60
 });
+
+// express-rate-limit applied router-wide, ahead of authenticate, so a cheap
+// IP-based bound is in place before authenticate's own DB/JWT work runs, and
+// so static analysis (CodeQL) can trace a recognized rate-limiting
+// middleware covering every route below — the Redis-backed auditWriteLimiter
+// above remains the real per-org production control on the write route.
+// Matches the pattern already established in trustCenter.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 router.use(authenticate);
 
