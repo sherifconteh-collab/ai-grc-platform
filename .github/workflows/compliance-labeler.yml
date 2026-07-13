@@ -1,0 +1,61 @@
+name: Compliance Labeler
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply compliance labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isPR = !!context.payload.pull_request;
+            const item = context.payload.pull_request || context.payload.issue;
+            if (!item) return;
+
+            const title = (item.title || '').toLowerCase();
+            const body = (item.body || '').toLowerCase();
+            const combined = `${title} ${body}`;
+            const number = item.number;
+
+            // Mapping of keywords to compliance labels
+            const rules = [
+              { keywords: ['vulnerability', 'cve', 'vuln', 'security scan'], label: 'compliance:RA-5' },
+              { keywords: ['flaw', 'bug fix', 'patch', 'remediation'], label: 'compliance:SI-2' },
+              { keywords: ['documentation', 'docs', 'doc review', 'wiki'], label: 'compliance:SA-5' },
+              { keywords: ['configuration', 'config change', 'env var'], label: 'compliance:CM-3' },
+              { keywords: ['security test', 'sast', 'dast', 'codeql', 'pentest'], label: 'compliance:SA-11' },
+              { keywords: ['audit', 'logging', 'audit log'], label: 'compliance:AU-2' },
+              { keywords: ['access control', 'authentication', 'authorization', 'rbac', 'jwt'], label: 'compliance:AC' },
+              { keywords: ['input validation', 'sanitiz', 'xss', 'injection'], label: 'compliance:SI-10' },
+              { keywords: ['sdlc', 'pipeline', 'ci/cd', 'build', 'deploy'], label: 'compliance:SA-3' }
+            ];
+
+            const labelsToAdd = [];
+            for (const rule of rules) {
+              if (rule.keywords.some(kw => combined.includes(kw))) {
+                labelsToAdd.push(rule.label);
+              }
+            }
+
+            if (labelsToAdd.length > 0) {
+              console.log(`Adding compliance labels to #${number}: ${labelsToAdd.join(', ')}`);
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: number,
+                labels: labelsToAdd
+              });
+            } else {
+              console.log(`No compliance labels matched for #${number}`);
+            }
