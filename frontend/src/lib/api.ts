@@ -1808,7 +1808,7 @@ export const trustCenterAPI = {
 // Auditor Workspace — public read-only share links (routes/auditorWorkspace.js)
 export const auditorWorkspacePublicAPI = {
   getPublicWorkspace: (token: string) =>
-    fetch(`${API_BASE_URL}/auditor-workspace/public/${token}`).then((res) => res.json()),
+    fetch(`${API_BASE_URL}/auditor-workspace/public/${encodeURIComponent(token)}`).then((res) => res.json()),
 };
 
 // Classroom mode — guided training scenarios (routes/training.js)
