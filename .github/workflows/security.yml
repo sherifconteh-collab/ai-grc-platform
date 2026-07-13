@@ -503,6 +503,44 @@ jobs:
             FAIL=1
           fi
 
+          # ── Regression guard: per-router rate limiting (CodeQL js/missing-rate-limiting) ──
+          # The app-wide apiRateLimiter in server.js covers every route at runtime, but
+          # CodeQL's static analysis can't trace across that file boundary — it only
+          # recognizes well-known rate-limiting libraries it has a model for, and flags
+          # every DB-touching route handler in a file that doesn't import one. This
+          # repo's custom Redis-backed createRateLimiter() (middleware/rateLimit.js) is
+          # NOT built on express-rate-limit and is NOT something CodeQL recognizes —
+          # confirmed by testing: a file using only createRateLimiter() still gets
+          # flagged. Only an actual `require('express-rate-limit')` import (as used
+          # router-wide in trustCenter.js, audit.js, auditorWorkspace.js) satisfies it.
+          # This already caused a real CI failure once (37 alerts, fixed per
+          # RELEASE_NOTES.md v4.3.0) and again on PR #209 (audit.js,
+          # auditorWorkspace.js) — this check exists so it can't happen a third time
+          # silently. A full retroactive fix across every route file is a separate,
+          # larger effort (65 files as of this check's introduction, listed below as a
+          # grandfathered baseline) — this only blocks NEW route files from being added
+          # without it, the same way TEVV-DB's duplicate-migration guard grandfathers
+          # pre-existing collisions but blocks new ones.
+          BASELINE_NO_EXPRESS_RATE_LIMIT="ai.js aiGovernance.js aiMonitoring.js assessments.js assets.js auditFields.js auth.js autoEvidenceCollection.js billing.js cmdb.js contacts.js controlHealth.js controls.js customFrameworks.js dashboard.js dashboardBuilder.js dataGovernance.js dataSovereignty.js dynamicConfig.js environments.js evidence.js exceptions.js externalAi.js externalAiKeys.js frameworks.js help.js implementations.js integrationsHub.js internationalAiLaws.js issueReport.js license.js notifications.js openclawWebhook.js ops.js orgSettings.js organizations.js passkeys.js pendingEvidence.js performance.js phase6.js platformAdmin.js plot4ai.js poam.js policies.js publicContact.js pushTokens.js rag.js realtime.js regulatoryNews.js reports.js roles.js sbom.js serviceAccounts.js siem.js splunk.js sso.js stateAiLaws.js threatIntel.js totp.js tprm.js tprmPublic.js users.js vendorSecurity.js vulnerabilities.js webhooks.js"
+
+          echo ""
+          echo "Checking express-rate-limit coverage (new route files only)..."
+          for f in backend/src/routes/*.js; do
+            name=$(basename "$f")
+            echo "$BASELINE_NO_EXPRESS_RATE_LIMIT" | grep -qw "$name" && continue
+            if ! grep -q "require('express-rate-limit')" "$f"; then
+              echo "❌ $name has no express-rate-limit import and is not in the" \
+                   "grandfathered baseline — CodeQL will flag its DB-touching route" \
+                   "handlers as js/missing-rate-limiting. createRateLimiter() does NOT" \
+                   "satisfy this (CodeQL doesn't recognize it). Add" \
+                   "\`const rateLimit = require('express-rate-limit'); router.use(rateLimit({...}))\`" \
+                   "before authenticate — see audit.js or auditorWorkspace.js for the" \
+                   "pattern (NIST 800-160 SC-5)."
+              FAIL=1
+            fi
+          done
+          [ $FAIL -eq 0 ] && echo "✅ No new route files are missing an express-rate-limit import"
+
           exit $FAIL
 
   nist-800-160-supply-chain:
