@@ -15,7 +15,15 @@ Use when shipping a release. Single commit, all four files in lock-step.
 4. Regenerate lockfiles:
    ```
    cd backend && npm install --package-lock-only
-   cd ../frontend && npm install --package-lock-only
+   ```
+   For `frontend/`, use a **full** `npm install` (not `--package-lock-only`) — the frontend
+   depends on multi-platform native packages (`lightningcss`, `@tailwindcss/oxide`, `sharp`,
+   `unrs-resolver`) that the Windows/macOS/Linux Electron release build all need. Lockfile-only
+   mode silently drops every platform variant except the one it ran on, which broke v4.3.0's
+   release (shipped with zero installer assets). Verify with
+   `node scripts/check-lockfile-platforms.js` (also enforced by CI in `build-release.yml`):
+   ```
+   cd ../frontend && npm install && node scripts/check-lockfile-platforms.js
    ```
 5. Validate:
    ```
