@@ -191,6 +191,20 @@ jobs:
             echo ""
             echo "⚠️  Suspicious patterns found - manual security review required"
             echo "This PR needs careful review before merging"
+            # These patterns (eval, child_process, dynamic require, non-HTTPS URLs,
+            # base64) have legitimate uses elsewhere in this codebase, so this check
+            # stays advisory rather than blocking — but it must not silently hide the
+            # finding behind an unqualified green checkmark. Surface it on the Actions
+            # run summary, which the previous version of this job never did (the
+            # warning only ever reached raw step logs, so nothing about it was visible
+            # from the PR checks list or the summary page).
+            {
+              echo "### ⚠️ Suspicious Code Patterns Detected"
+              echo ""
+              echo "This check does not block merges (the patterns above have legitimate"
+              echo "uses elsewhere in this codebase), but a human should review the matches"
+              echo "in the job log before merging."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "✅ No suspicious patterns detected"
           fi
@@ -307,19 +321,24 @@ jobs:
           echo "🔑 NIST 800-160 AC-6 — Least Privilege"
           FAIL=0
 
-          # Routes that intentionally bypass auth (login, webhooks, health, public ops)
-          SKIP_ROUTES="auth.js openclawWebhook.js help.js ops.js"
+          # Routes that intentionally bypass auth (login, webhooks, health, public ops,
+          # public contact/demo-request form). Every entry here must be a route file
+          # that is genuinely meant to be reachable without authentication.
+          SKIP_ROUTES="auth.js openclawWebhook.js help.js ops.js publicContact.js"
 
           echo "Checking auth middleware coverage per route file..."
           for f in backend/src/routes/*.js; do
             name=$(basename "$f")
             echo "$SKIP_ROUTES" | grep -qw "$name" && continue
             if ! grep -qE "authenticate|requirePermission|requireRole|requireAnyPermission|requireAllPermissions" "$f"; then
-              echo "⚠️  WARNING: $name registers routes but has no auth/permission middleware (NIST 800-160 AC-6)"
+              echo "❌ $name registers routes but has no auth/permission middleware (NIST 800-160 AC-6) — add auth middleware, or add it to SKIP_ROUTES above if it is genuinely meant to be public"
+              FAIL=1
             fi
           done
 
-          # Wildcard '*' permission grants must be restricted to the 'admin' role block only
+          # Wildcard '*' permission grants must be restricted to the 'admin' role block only.
+          # Left as an advisory warning (not blocking) — legitimate role configs can vary
+          # in structure, so this needs a human's judgment rather than an automatic gate.
           WILDCARD_LINES=$(grep -n "'\\*'\|\"\\*\"" backend/src/middleware/auth.js | grep -v "admin:")
           if [ -n "$WILDCARD_LINES" ]; then
             echo "⚠️  WARNING: Wildcard permission '*' found outside admin role block — review carefully:"
