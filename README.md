@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-13 | PR #215: chore(frontend)(deps): bump date-fns from 4.1.0 to 4.4.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-07-14 | PR #209: fix(compliance): platform-wide feature audit — linkage, controls, catalog, UI build-out -->
 
 ## 🎯 What is This?
 
