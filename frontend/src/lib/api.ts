@@ -1802,7 +1802,7 @@ export const trustCenterAPI = {
   }) => api.put('/trust-center/config', data),
   regenerateToken: () => api.post('/trust-center/config/regenerate-token'),
   getPublicPage: (token: string) =>
-    fetch(`${API_BASE_URL}/trust-center/public/${token}`).then(res => res.json()),
+    fetch(`${API_BASE_URL}/trust-center/public/${encodeURIComponent(token)}`).then(res => res.json()),
 };
 
 // Auditor Workspace — public read-only share links (routes/auditorWorkspace.js)
