@@ -15,6 +15,7 @@ interface WorkspaceSummary {
 
 interface WorkspaceEngagement {
   id: string;
+  name: string;
   engagement_type: string;
   scope: string | null;
   status: string;
@@ -204,11 +205,12 @@ export default function AuditorWorkspaceSharedPage() {
               <h2 className="text-lg font-bold text-gray-900 mb-4">Engagement</h2>
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-gray-800">{labelize(engagement.engagement_type)}</span>
+                  <span className="font-semibold text-gray-900">{engagement.name}</span>
                   <span className="text-xs px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 font-semibold">
                     {labelize(engagement.status)}
                   </span>
                 </div>
+                <p className="text-xs text-gray-500 mb-2">{labelize(engagement.engagement_type)}</p>
                 {engagement.scope && (
                   <p className="text-sm text-gray-600 mb-2">{engagement.scope}</p>
                 )}

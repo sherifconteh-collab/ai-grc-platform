@@ -62,7 +62,7 @@ router.get('/public/:token', publicRateLimiter, async (req, res) => {
     let pbcRequests = [];
     if (engagementId) {
       const engagementResult = await pool.query(
-        `SELECT *
+        `SELECT id, name, engagement_type, scope, status, period_start, period_end
          FROM audit_engagements
          WHERE organization_id = $1 AND id = $2
          LIMIT 1`,
