@@ -330,7 +330,7 @@ jobs:
           for f in backend/src/routes/*.js; do
             name=$(basename "$f")
             echo "$SKIP_ROUTES" | grep -qw "$name" && continue
-            if ! grep -qE "authenticate|requirePermission|requireRole|requireAnyPermission|requireAllPermissions" "$f"; then
+            if ! grep -qE "authenticate|requirePermission|requireRole|requireAnyPermission|requireAllPermissions|requireAdmin" "$f"; then
               echo "❌ $name registers routes but has no auth/permission middleware (NIST 800-160 AC-6) — add auth middleware, or add it to SKIP_ROUTES above if it is genuinely meant to be public"
               FAIL=1
             fi
