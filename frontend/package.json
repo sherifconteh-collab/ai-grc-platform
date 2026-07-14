@@ -17,7 +17,7 @@
   "dependencies": {
     "@simplewebauthn/browser": "^13.2.2",
     "axios": "^1.16.1",
-    "date-fns": "^4.1.0",
+    "date-fns": "^4.4.0",
     "lucide-react": "^1.16.0",
     "next": "16.2.7",
     "react": "^19.2.7",
@@ -31,7 +31,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.16",
     "@types/react-dom": "^19.0.0",
-    "eslint": "^10.2.1",
+    "eslint": "^10.7.0",
     "eslint-config-next": "^16.2.6",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.3.0",
