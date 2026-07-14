@@ -4,6 +4,15 @@
 
 ---
 
+## [4.5.1] — 2026-07-14
+
+### Changed
+
+- **Documentation accuracy pass**: `docs/SELF_HOSTED_INSTALL.md` and `STAGING_ENVIRONMENT.md` described a defunct "community mirror vs. commercial Docker image" distribution model with paid license-key feature unlocks, contradicting the actual fully open source, no-tier-gating reality already documented in `.claude/rules/tier-system.md` and this repo's own `CLAUDE.md`. Rewrote both to describe the real single-build, dual-license (AGPL v3 / commercial) model.
+- Mirrors the equivalent cleanup done in the sibling `ControlWeaver-Pro` repo, where the same stale tier/billing language was scattered across dozens of `docs/guides/*.md` files, the GitHub Wiki source tree, and the Settings page itself.
+
+---
+
 ## [4.5.0] — 2026-07-14
 
 ### Added
