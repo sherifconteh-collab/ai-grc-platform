@@ -4,6 +4,28 @@
 
 ---
 
+## [4.5.0] — 2026-07-14
+
+### Added
+
+- **Claude-triggered PR documentation review** (`claude-doc-review.yml`): runs `anthropics/claude-code-action@v1` on every non-draft PR with a fixed doc-focused prompt, alongside the existing Copilot code-review bot. Requires a one-time manual setup by a repo admin (install the Claude GitHub App, add `ANTHROPIC_API_KEY`) before it can run.
+- **`roles.manage` and `users.manage` now check the caller's own permissions before granting new ones**: `POST/PUT /roles` and `POST /roles/assign` reject any permission (direct or via an assigned role) the requester doesn't already hold; `PATCH /users/:userId` requires the caller to already be an admin before granting the `admin` role, and blocks self role-changes outright. Role/permission changes are now audit-logged (`role.created`, `role.updated`, `role.assigned`, `user.role_changed`).
+- Seeded `ai.read`, `ai.write`, `organizations.write`, and `reports.manage` permissions (migration) — used in route gates since these features shipped but never seeded, so every non-admin user was silently 403'd on all AI-governance/monitoring endpoints and most of the Organizations write surface.
+
+### Changed
+
+- **`ROLE_FALLBACK_PERMISSIONS` fallback is now a true fallback**: it only applies when a user has zero rows in `role_permissions` (accounts never migrated onto the roles system). Previously it was unconditionally unioned on top of real custom-role permissions, which meant a custom role could only ever add permissions on top of the legacy `admin`/`auditor`/`user` floor — never restrict below it. This silently defeated the shipped `auditor_observer` role's `assessments.write` restriction; it now actually restricts.
+- **`DELETE /ai/reasoning-memory`** (bulk-wipes org-wide AI memory) now requires `assessments.write` instead of the low-bar router-wide `ai.use` gate, matching every other mutating action in that file.
+- **`performance.js`** now uses `requireAdmin` instead of `requirePermission('admin')` — the latter checked a string that was never a real seeded permission, so it only ever worked by coincidentally matching the `'*'` wildcard.
+
+### Fixed
+
+- **Login timing oracle**: the "no such user" branch of `POST /auth/login` now runs a dummy `bcrypt.compare` against a fixed hash so it costs the same as a real wrong-password check, closing an email-enumeration timing side-channel.
+- **Password complexity was only enforced on invite acceptance**, not on self-registration or password reset (both only checked length). All three paths now require the same complexity policy.
+- **Failed logins and account lockouts were never audit-logged** — only successful logins were. Both now write `user.login_failed` / `user.login_blocked_locked` audit events.
+- **Registration/invite-acceptance email races returned a misleading 500** instead of 409 when two concurrent requests for the same email both passed the initial existence check (the DB unique constraint still prevented the duplicate — only the response code was wrong).
+- `organization_name` is now sanitized the same way `email`/`full_name` already were on registration.
+
 ## [4.4.0] — 2026-07-13
 
 ### Added
