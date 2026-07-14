@@ -987,7 +987,8 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
     model: params.model,
     organizationId: orgId,
     systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }]
+    messages: [{ role: 'user', content: userPrompt }],
+    feature: 'security_posture'
   });
 
   // Parse JSON from LLM response

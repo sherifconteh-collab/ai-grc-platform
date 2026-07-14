@@ -27,7 +27,7 @@ import React from 'react';
 // Allow-list the link protocols we permit. Anything else (javascript:,
 // data:, file:, vbscript:, etc.) is rendered as plain text — never as an
 // <a href=...>.
-const SAFE_URL = /^(https?:|mailto:)/i;
+const SAFE_URL = /^(https?:|mailto:|tel:)/i;
 
 // Inline formatting: runs over a single line of text and yields React nodes.
 function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
