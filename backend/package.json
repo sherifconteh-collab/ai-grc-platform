@@ -1,6 +1,6 @@
 {
   "name": "controlweave-backend",
-  "version": "4.3.0",
+  "version": "4.5.1",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
@@ -56,6 +56,7 @@
     "seed:assessment-ai-governance": "node scripts/seed-assessment-procedures-ai-governance.js",
     "seed:cyber-ai-profile": "node scripts/seed-cyber-ai-profile.js",
     "seed:aiuc1": "node scripts/seed-aiuc1-framework.js",
+    "seed:frameworks": "node scripts/seed-frameworks.js && node scripts/seed-missing-controls.js",
     "seed:assessment-rich-all": "node scripts/seed-assessment-procedures-rich-all.js",
     "seed:assessment-remaining": "node scripts/seed-assessment-procedures-remaining.js",
     "security:generate-jwt-secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",

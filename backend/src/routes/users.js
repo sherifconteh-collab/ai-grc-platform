@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const { authenticate, requireAnyPermission, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
+const auditService = require('../services/auditService');
 const {
   MIN_PASSWORD_LENGTH,
   PASSWORD_COMPLEXITY_ERROR_MESSAGE,
@@ -253,6 +254,22 @@ router.patch('/:userId', requirePermission('users.manage'), validateBody((body, 
     const roleIdsInput = Array.isArray(req.body.role_ids) ? req.body.role_ids : null;
     const autoGenerateAuditorSubroles = req.body.auto_generate_auditor_subroles !== false;
 
+    if (req.body.primary_role !== undefined) {
+      const requestedRole = String(req.body.primary_role).toLowerCase();
+      const callerIsAdmin = req.user.role === 'admin' || (req.user.permissions || []).includes('*');
+      // Granting the admin role (which resolves to the '*' wildcard) is
+      // itself an admin-only action — otherwise a users.manage holder could
+      // promote any account, including their own, straight to full admin.
+      if (requestedRole === 'admin' && !callerIsAdmin) {
+        return res.status(403).json({ success: false, error: 'Only an existing admin can grant the admin role' });
+      }
+      // No self role changes, regardless of the requested role or the
+      // caller's current privilege level.
+      if (userId === req.user.id) {
+        return res.status(403).json({ success: false, error: 'You cannot change your own role' });
+      }
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -342,6 +359,20 @@ router.patch('/:userId', requirePermission('users.manage'), validateBody((body, 
       }
 
       await client.query('COMMIT');
+
+      if (req.body.primary_role !== undefined || roleIdsInput !== null) {
+        auditService.logFromRequest(req, {
+          eventType: 'user.role_changed',
+          resourceType: 'user',
+          resourceId: userId,
+          details: {
+            primary_role: req.body.primary_role !== undefined ? nextRole : undefined,
+            role_ids: roleIdsInput || undefined
+          },
+          success: true
+        }).catch(() => {});
+      }
+
       res.json({
         success: true,
         data: {

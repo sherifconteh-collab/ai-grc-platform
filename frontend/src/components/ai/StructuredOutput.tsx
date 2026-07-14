@@ -374,6 +374,178 @@ function TestProcedureCard({ data }: { data: TestProcedureData }) {
 }
 
 // ---------------------------------------------------------------------------
+// Evidence suggestion card
+// ---------------------------------------------------------------------------
+interface EvidenceItem {
+  title: string;
+  description: string;
+  collection_method: string;
+  format?: string;
+  freshness_days?: number;
+  automation_possible?: boolean;
+  automation_hint?: string;
+  example_filename?: string;
+  sufficiency_criteria?: string;
+}
+
+interface EvidenceSuggestionData {
+  control_id?: string;
+  control_title?: string;
+  framework?: string;
+  evidence_items?: EvidenceItem[];
+  collection_notes?: string;
+  estimated_collection_hours?: number;
+}
+
+function EvidenceSuggestionCard({ data }: { data: EvidenceSuggestionData }) {
+  return (
+    <div className="space-y-4">
+      {(data.control_title || data.framework || data.estimated_collection_hours !== undefined) && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 flex items-start justify-between gap-4">
+          <div>
+            {data.control_title && <h3 className="font-semibold text-gray-900 mb-1">{data.control_title}</h3>}
+            {data.framework && (
+              <span className="text-xs text-gray-500 font-mono">{data.control_id} · {data.framework}</span>
+            )}
+          </div>
+          {data.estimated_collection_hours !== undefined && (
+            <span className="text-sm text-gray-500 whitespace-nowrap">{data.estimated_collection_hours}h est. collection</span>
+          )}
+        </div>
+      )}
+
+      {data.evidence_items && data.evidence_items.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h4 className="text-sm font-semibold text-gray-900">Suggested Evidence ({data.evidence_items.length})</h4>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {data.evidence_items.map((item, i) => (
+              <div key={i} className="px-5 py-4">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                  {item.format && (
+                    <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">{item.format}</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                <p className="text-xs text-gray-500 mb-1">
+                  <span className="font-medium">Collection: </span>{item.collection_method}
+                  {item.freshness_days !== undefined && <span> · Refresh every {item.freshness_days}d</span>}
+                </p>
+                {item.automation_possible && item.automation_hint && (
+                  <p className="text-xs text-green-700 flex items-center gap-1">
+                    <span aria-hidden="true">⚙</span> Automatable: {item.automation_hint}
+                  </p>
+                )}
+                {item.sufficiency_criteria && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    <span className="font-medium">Sufficiency: </span>{item.sufficiency_criteria}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.collection_notes && (
+        <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-600">{data.collection_notes}</div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Audit finding draft card
+// ---------------------------------------------------------------------------
+interface FindingData {
+  title?: string;
+  severity?: string;
+  criteria?: string;
+  condition?: string;
+  cause?: string;
+  effect?: string;
+  recommendation?: string;
+  management_response_placeholder?: string;
+  related_controls?: string[];
+  evidence_of_exception?: string[];
+  repeat_finding?: boolean;
+  finding_id_hint?: string;
+}
+
+function FindingCard({ data }: { data: FindingData }) {
+  const rows: Array<{ label: string; value?: string }> = [
+    { label: 'Criteria', value: data.criteria },
+    { label: 'Condition', value: data.condition },
+    { label: 'Cause', value: data.cause },
+    { label: 'Effect', value: data.effect },
+    { label: 'Recommendation', value: data.recommendation },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {(data.title || data.severity) && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            {data.title && <h3 className="font-semibold text-gray-900">{data.title}</h3>}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {data.repeat_finding && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Repeat</span>
+              )}
+              {data.severity && <SeverityChip severity={data.severity} />}
+            </div>
+          </div>
+          {data.finding_id_hint && (
+            <p className="text-xs text-gray-500 font-mono">{data.finding_id_hint}</p>
+          )}
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-50">
+        {rows.filter(r => r.value).map((r) => (
+          <div key={r.label} className="px-5 py-3">
+            <p className="text-xs font-semibold text-gray-500 mb-1">{r.label}</p>
+            <p className="text-sm text-gray-700">{r.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {data.related_controls && data.related_controls.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {data.related_controls.map((c, i) => (
+            <span key={i} className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {data.evidence_of_exception && data.evidence_of_exception.length > 0 && (
+        <div className="bg-gray-50 rounded-xl p-4">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Evidence of Exception</p>
+          <ul className="space-y-1">
+            {data.evidence_of_exception.map((e, i) => (
+              <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
+                {e}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {data.management_response_placeholder && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-xs font-semibold text-amber-800 mb-1">Management Response (placeholder)</p>
+          <p className="text-sm text-amber-700">{data.management_response_placeholder}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Action bar — copy / export / insert actions
 // ---------------------------------------------------------------------------
 interface ActionBarProps {
@@ -492,6 +664,12 @@ export default function StructuredOutput({
       if (feature === 'test_procedures') {
         return <TestProcedureCard data={parsed as TestProcedureData} />;
       }
+      if (feature === 'evidence_suggestion' || feature === 'evidence_suggest') {
+        return <EvidenceSuggestionCard data={parsed as EvidenceSuggestionData} />;
+      }
+      if (feature === 'finding_analysis' || feature === 'audit_finding_draft' || feature === 'finding') {
+        return <FindingCard data={parsed as FindingData} />;
+      }
       // Unknown structured feature — render as formatted JSON
       return (
         <pre className="bg-gray-900 text-green-300 text-xs p-4 rounded-xl overflow-x-auto">
@@ -518,4 +696,4 @@ export default function StructuredOutput({
   );
 }
 
-export { GapAnalysisCard, PlaybookCard, TestProcedureCard, ActionBar };
+export { GapAnalysisCard, PlaybookCard, TestProcedureCard, EvidenceSuggestionCard, FindingCard, ActionBar };

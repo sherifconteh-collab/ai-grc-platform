@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import OrganizationSystemsAndVendors from '@/components/OrganizationSystemsAndVendors';
-import { frameworkAPI, organizationAPI } from '@/lib/api';
+import { frameworkAPI, organizationAPI, contactsAPI } from '@/lib/api';
 import { hasPermission } from '@/lib/access';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -72,6 +72,7 @@ export default function OrganizationProfilePage() {
   const canReadOrganization = hasPermission(user, 'organizations.read');
   const canManageFrameworks = hasPermission(user, 'frameworks.manage');
 
+  const [activeTab, setActiveTab] = useState<'profile' | 'contacts'>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -343,6 +344,35 @@ export default function OrganizationProfilePage() {
           </button>
         </div>
 
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-6">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'profile'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Profile
+            </button>
+            <button
+              onClick={() => setActiveTab('contacts')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'contacts'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Contacts
+            </button>
+          </nav>
+        </div>
+
+        {activeTab === 'contacts' && <ContactsPanel />}
+
+        {activeTab === 'profile' && (
+        <>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-sm text-gray-600">
             Active frameworks:{' '}
@@ -718,6 +748,8 @@ export default function OrganizationProfilePage() {
         )}
 
         <OrganizationSystemsAndVendors canReadOrganization={canReadOrganization} />
+        </>
+        )}
       </div>
     </DashboardLayout>
   );
@@ -798,5 +830,290 @@ function TextArea({
         className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
     </label>
+  );
+}
+
+interface OrganizationContact {
+  id: string;
+  full_name: string;
+  email?: string | null;
+  title?: string | null;
+  team?: string | null;
+  notes?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface ContactFormState {
+  full_name: string;
+  email: string;
+  title: string;
+  team: string;
+  notes: string;
+}
+
+const EMPTY_CONTACT_FORM: ContactFormState = {
+  full_name: '',
+  email: '',
+  title: '',
+  team: '',
+  notes: '',
+};
+
+function ContactsPanel() {
+  const { user } = useAuth();
+  const canManageContacts = hasPermission(user, 'users.manage');
+
+  const [contacts, setContacts] = useState<OrganizationContact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<ContactFormState>(EMPTY_CONTACT_FORM);
+  const [formError, setFormError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [deactivateTargetId, setDeactivateTargetId] = useState<string | null>(null);
+
+  const loadContacts = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await contactsAPI.getList();
+      const data = Array.isArray(response.data?.data) ? response.data.data : [];
+      setContacts(data);
+    } catch {
+      setError('Failed to load contacts.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await loadContacts();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setForm(EMPTY_CONTACT_FORM);
+    setFormError('');
+    setShowForm(true);
+  };
+
+  const openEditForm = (contact: OrganizationContact) => {
+    setEditingId(contact.id);
+    setForm({
+      full_name: contact.full_name,
+      email: contact.email || '',
+      title: contact.title || '',
+      team: contact.team || '',
+      notes: contact.notes || '',
+    });
+    setFormError('');
+    setShowForm(true);
+  };
+
+  const submitForm = async () => {
+    if (!form.full_name.trim()) {
+      setFormError('Full name is required.');
+      return;
+    }
+    setSubmitting(true);
+    setFormError('');
+    try {
+      const payload = {
+        full_name: form.full_name.trim(),
+        email: form.email.trim() || undefined,
+        title: form.title.trim() || undefined,
+        team: form.team.trim() || undefined,
+        notes: form.notes.trim() || undefined,
+      };
+      if (editingId) {
+        await contactsAPI.update(editingId, payload);
+      } else {
+        await contactsAPI.create(payload);
+      }
+      setShowForm(false);
+      await loadContacts();
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { error?: string } } };
+      setFormError(errObj.response?.data?.error || 'Failed to save contact.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deactivateContact = async () => {
+    if (!deactivateTargetId) return;
+    try {
+      await contactsAPI.remove(deactivateTargetId);
+      setDeactivateTargetId(null);
+      await loadContacts();
+    } catch {
+      setError('Failed to deactivate contact.');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-sm text-gray-600">
+          Key stakeholders and points of contact for audits, assessments, and reporting.
+        </p>
+        {canManageContacts && (
+          <button
+            onClick={openCreateForm}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            Add Contact
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">{error}</div>
+      )}
+
+      {loading ? (
+        <div className="animate-pulse h-32 rounded-lg bg-gray-100" />
+      ) : contacts.length === 0 ? (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-500">
+          No contacts recorded yet.
+        </div>
+      ) : (
+        <div className="rounded-lg border border-gray-200 bg-white overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">Team</th>
+                <th className="px-4 py-3">Status</th>
+                {canManageContacts && <th className="px-4 py-3">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {contacts.map((contact) => (
+                <tr key={contact.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-4 py-3 font-medium text-gray-900">{contact.full_name}</td>
+                  <td className="px-4 py-3 text-gray-600">{contact.email || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{contact.title || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{contact.team || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        contact.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
+                      }`}
+                      aria-label={`Contact status: ${contact.is_active ? 'active' : 'inactive'}`}
+                    >
+                      {contact.is_active ? 'active' : 'inactive'}
+                    </span>
+                  </td>
+                  {canManageContacts && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEditForm(contact)}
+                          className="text-gray-600 hover:text-gray-900 text-xs font-medium"
+                        >
+                          Edit
+                        </button>
+                        {contact.is_active && (
+                          <button
+                            onClick={() => setDeactivateTargetId(contact.id)}
+                            className="text-red-600 hover:text-red-800 text-xs font-medium"
+                          >
+                            Deactivate
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">{editingId ? 'Edit Contact' : 'Add Contact'}</h2>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+
+            {formError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                {formError}
+              </div>
+            )}
+
+            <Input label="Full Name" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} />
+            <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
+            <Input label="Title" value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
+            <Input label="Team" value={form.team} onChange={(v) => setForm({ ...form, team: v })} />
+            <TextArea label="Notes" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} rows={3} />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 rounded text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitForm}
+                disabled={submitting}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+              >
+                {submitting ? 'Saving...' : editingId ? 'Save Changes' : 'Add Contact'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deactivateTargetId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Deactivate this contact?</h2>
+            <p className="text-sm text-gray-600">
+              This is a soft delete — the contact will be marked inactive and hidden from active lists, but
+              historical references (e.g. past assignments) remain intact. This is not a permanent erasure.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeactivateTargetId(null)}
+                className="px-4 py-2 rounded text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deactivateContact}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium"
+              >
+                Deactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

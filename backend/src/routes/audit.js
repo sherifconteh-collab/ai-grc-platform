@@ -7,12 +7,22 @@ const { decrypt } = require('../utils/encrypt');
 const splunk = require('../services/splunkService');
 const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { decodeCursor, nextCursorFrom } = require('../utils/keysetPagination');
+const rateLimit = require('express-rate-limit');
 
 const auditWriteLimiter = createRateLimiter({
   label: 'audit-log-write',
   windowMs: 60 * 1000,
   max: 60
 });
+
+// express-rate-limit applied router-wide, ahead of authenticate, so a cheap
+// IP-based bound is in place before authenticate's own DB/JWT work runs, and
+// so static analysis (CodeQL) can trace a recognized rate-limiting
+// middleware covering every route below — the Redis-backed auditWriteLimiter
+// above remains the real per-org production control on the write route.
+// Matches the pattern already established in trustCenter.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 router.use(authenticate);
 
@@ -31,10 +41,17 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       vulnerabilityId,
       source,
       limit,
-      offset
+      offset,
+      cursor
     } = req.query;
     const normalizedLimit = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
     const normalizedOffset = Math.max(0, parseInt(offset, 10) || 0);
+    // Keyset pagination: pass cursor=<next_cursor from a previous response>
+    // for O(1) page turns on deep audit history. OFFSET remains supported.
+    const keyset = cursor ? decodeCursor(cursor) : null;
+    if (cursor && !keyset) {
+      return res.status(400).json({ success: false, error: 'Invalid cursor' });
+    }
 
     let query = `
       SELECT al.id, al.event_type, al.resource_type, al.resource_id, al.details,
@@ -95,12 +112,21 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       idx++;
     }
 
-    query += ' ORDER BY al.created_at DESC';
-    query += ` LIMIT $${idx}`;
-    params.push(normalizedLimit);
-    idx++;
-    query += ` OFFSET $${idx}`;
-    params.push(normalizedOffset);
+    if (keyset) {
+      query += ` AND (al.created_at, al.id) < ($${idx}, $${idx + 1})`;
+      params.push(keyset.createdAt, keyset.id);
+      idx += 2;
+      query += ' ORDER BY al.created_at DESC, al.id DESC';
+      query += ` LIMIT $${idx}`;
+      params.push(normalizedLimit);
+    } else {
+      query += ' ORDER BY al.created_at DESC, al.id DESC';
+      query += ` LIMIT $${idx}`;
+      params.push(normalizedLimit);
+      idx++;
+      query += ` OFFSET $${idx}`;
+      params.push(normalizedOffset);
+    }
 
     const result = await pool.query(query, params);
 
@@ -155,7 +181,9 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       countIdx++;
     }
 
-    const countResult = await pool.query(countQuery, countParams);
+    // Cursor mode skips the full COUNT(*) — that scan is exactly the cost
+    // keyset pagination exists to avoid on deep audit history.
+    const countResult = keyset ? null : await pool.query(countQuery, countParams);
 
     // Get custom field values for the audit logs
     const auditLogIds = result.rows.map(row => row.id);
@@ -174,11 +202,17 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
       success: true,
       data: logsWithCustomFields,
       logs: logsWithCustomFields,
-      pagination: {
-        total: parseInt(countResult.rows[0].count),
-        limit: normalizedLimit,
-        offset: normalizedOffset
-      }
+      pagination: keyset
+        ? {
+            limit: normalizedLimit,
+            next_cursor: nextCursorFrom(result.rows, normalizedLimit)
+          }
+        : {
+            total: parseInt(countResult.rows[0].count),
+            limit: normalizedLimit,
+            offset: normalizedOffset,
+            next_cursor: nextCursorFrom(result.rows, normalizedLimit)
+          }
     });
   } catch (error) {
     console.error('Audit logs error:', error);

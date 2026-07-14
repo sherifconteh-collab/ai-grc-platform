@@ -243,7 +243,7 @@ export const organizationAPI = {
   removeFramework: (orgId: string, frameworkId: string) =>
     api.delete(`/organizations/${orgId}/frameworks/${frameworkId}`),
 
-  getControls: (orgId: string, params?: { frameworkId?: string; status?: string }) =>
+  getControls: (orgId: string, params?: { frameworkId?: string; status?: string; page?: number; limit?: number }) =>
     api.get(`/organizations/${orgId}/controls`, { params }),
 
   exportControlAnswers: (
@@ -548,7 +548,7 @@ export const sbomAPI = {
 
 // Implementations APIs
 export const implementationsAPI = {
-  getAll: (params?: { frameworkId?: string; status?: string; assignedTo?: string; priority?: string; controlId?: string }) =>
+  getAll: (params?: { frameworkId?: string; status?: string; assignedTo?: string; priority?: string; controlId?: string; page?: number; limit?: number }) =>
     api.get('/implementations', { params }),
 
   ensureForControl: (controlId: string) =>
@@ -1254,6 +1254,25 @@ export const reportsAPI = {
     api.get('/reports/ssp/json', { responseType: 'blob' }),
 };
 
+// Scheduled Reports API
+export interface ScheduledReportInput {
+  name: string;
+  report_type: 'compliance_summary' | 'framework_gap' | 'evidence_status' | 'audit_trail' | 'executive';
+  schedule: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+  format?: 'pdf' | 'csv' | 'json';
+  recipients?: string[];
+  filters?: Record<string, unknown>;
+  is_active?: boolean;
+}
+
+export const scheduledReportsAPI = {
+  getAll: () => api.get('/reports/scheduled'),
+  create: (data: ScheduledReportInput) => api.post('/reports/scheduled', data),
+  update: (id: string, data: Partial<ScheduledReportInput>) => api.patch(`/reports/scheduled/${id}`, data),
+  remove: (id: string) => api.delete(`/reports/scheduled/${id}`),
+  runNow: (id: string) => api.post(`/reports/scheduled/${id}/run`),
+};
+
 // Issue Reporting APIs
 export const issueReportAPI = {
   submit: (data: {
@@ -1607,7 +1626,8 @@ export const exceptionsAPI = {
   create: (data: Record<string, unknown>) => api.post('/exceptions', data),
   update: (id: string, data: Record<string, unknown>) => api.patch(`/exceptions/${id}`, data),
   approve: (id: string, data?: { notes?: string }) => api.post(`/exceptions/${id}/approve`, data || {}),
-  revoke: (id: string, data?: { notes?: string }) => api.post(`/exceptions/${id}/revoke`, data || {}),
+  // Note: backend reads `note` (singular) from the request body, not `notes`.
+  revoke: (id: string, data?: { note?: string }) => api.post(`/exceptions/${id}/revoke`, data || {}),
 };
 
 // Data Sovereignty API
@@ -1782,7 +1802,13 @@ export const trustCenterAPI = {
   }) => api.put('/trust-center/config', data),
   regenerateToken: () => api.post('/trust-center/config/regenerate-token'),
   getPublicPage: (token: string) =>
-    fetch(`${API_BASE_URL}/trust-center/public/${token}`).then(res => res.json()),
+    fetch(`${API_BASE_URL}/trust-center/public/${encodeURIComponent(token)}`).then(res => res.json()),
+};
+
+// Auditor Workspace — public read-only share links (routes/auditorWorkspace.js)
+export const auditorWorkspacePublicAPI = {
+  getPublicWorkspace: (token: string) =>
+    fetch(`${API_BASE_URL}/auditor-workspace/public/${encodeURIComponent(token)}`).then((res) => res.json()),
 };
 
 // Classroom mode — guided training scenarios (routes/training.js)
@@ -1863,6 +1889,15 @@ export const stateAiLawsAPI = {
     api.get('/state-ai-laws/controls', { params }),
   getControl: (controlId: string) => api.get(`/state-ai-laws/controls/${controlId}`),
   getSummary: () => api.get('/state-ai-laws/summary'),
+};
+
+// International AI Laws API — EU AI Act, UK, Canada, Brazil, Singapore, Japan, South Korea, China, Australia, India
+export const internationalAiLawsAPI = {
+  getJurisdictions: () => api.get('/international-ai-laws/jurisdictions'),
+  getControls: (params?: { jurisdiction?: string; region?: string; control_type?: string; priority?: string; search?: string }) =>
+    api.get('/international-ai-laws/controls', { params }),
+  getControl: (controlId: string) => api.get(`/international-ai-laws/controls/${controlId}`),
+  getSummary: () => api.get('/international-ai-laws/summary'),
 };
 
 // Push Tokens API — device push token registration for mobile apps (iOS APNs / Android FCM)

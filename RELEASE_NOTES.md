@@ -4,6 +4,82 @@
 
 ---
 
+## [4.5.1] — 2026-07-14
+
+### Changed
+
+- **Documentation accuracy pass**: `docs/SELF_HOSTED_INSTALL.md` and `STAGING_ENVIRONMENT.md` described a defunct "community mirror vs. commercial Docker image" distribution model with paid license-key feature unlocks, contradicting the actual fully open source, no-tier-gating reality already documented in `.claude/rules/tier-system.md` and this repo's own `CLAUDE.md`. Rewrote both to describe the real single-build, dual-license (AGPL v3 / commercial) model.
+- Mirrors the equivalent cleanup done in the sibling `ControlWeaver-Pro` repo, where the same stale tier/billing language was scattered across dozens of `docs/guides/*.md` files, the GitHub Wiki source tree, and the Settings page itself.
+
+---
+
+## [4.5.0] — 2026-07-14
+
+### Added
+
+- **Claude-triggered PR documentation review** (`claude-doc-review.yml`): runs `anthropics/claude-code-action@v1` on every non-draft PR with a fixed doc-focused prompt, alongside the existing Copilot code-review bot. Requires a one-time manual setup by a repo admin (install the Claude GitHub App, add `ANTHROPIC_API_KEY`) before it can run.
+- **`roles.manage` and `users.manage` now check the caller's own permissions before granting new ones**: `POST/PUT /roles` and `POST /roles/assign` reject any permission (direct or via an assigned role) the requester doesn't already hold; `PATCH /users/:userId` requires the caller to already be an admin before granting the `admin` role, and blocks self role-changes outright. Role/permission changes are now audit-logged (`role.created`, `role.updated`, `role.assigned`, `user.role_changed`).
+- Seeded `ai.read`, `ai.write`, `organizations.write`, and `reports.manage` permissions (migration) — used in route gates since these features shipped but never seeded, so every non-admin user was silently 403'd on all AI-governance/monitoring endpoints and most of the Organizations write surface.
+
+### Changed
+
+- **`ROLE_FALLBACK_PERMISSIONS` fallback is now a true fallback**: it only applies when a user has zero rows in `role_permissions` (accounts never migrated onto the roles system). Previously it was unconditionally unioned on top of real custom-role permissions, which meant a custom role could only ever add permissions on top of the legacy `admin`/`auditor`/`user` floor — never restrict below it. This silently defeated the shipped `auditor_observer` role's `assessments.write` restriction; it now actually restricts.
+- **`DELETE /ai/reasoning-memory`** (bulk-wipes org-wide AI memory) now requires `assessments.write` instead of the low-bar router-wide `ai.use` gate, matching every other mutating action in that file.
+- **`performance.js`** now uses `requireAdmin` instead of `requirePermission('admin')` — the latter checked a string that was never a real seeded permission, so it only ever worked by coincidentally matching the `'*'` wildcard.
+
+### Fixed
+
+- **Login timing oracle**: the "no such user" branch of `POST /auth/login` now runs a dummy `bcrypt.compare` against a fixed hash so it costs the same as a real wrong-password check, closing an email-enumeration timing side-channel.
+- **Password complexity was only enforced on invite acceptance**, not on self-registration or password reset (both only checked length). All three paths now require the same complexity policy.
+- **Failed logins and account lockouts were never audit-logged** — only successful logins were. Both now write `user.login_failed` / `user.login_blocked_locked` audit events.
+- **Registration/invite-acceptance email races returned a misleading 500** instead of 409 when two concurrent requests for the same email both passed the initial existence check (the DB unique constraint still prevented the duplicate — only the response code was wrong).
+- `organization_name` is now sanitized the same way `email`/`full_name` already were on registration.
+
+## [4.4.0] — 2026-07-13
+
+### Added
+
+- **UI for ten previously headless backend features**: a platform-wide audit found these routes had working APIs but no way to reach them from the app. All now have full UI:
+  - **Scheduled Reports** — new tab in `dashboard/reports`: create/edit schedules (name, report type, cadence, format, recipients) and trigger a manual run.
+  - **Exceptions** — new `dashboard/exceptions` page: status-filtered list, create/approve/revoke workflow for time-boxed control exceptions.
+  - **Control Health** — new "Health" view in `dashboard/controls`: a deterministic 0–100 score per control (evidence freshness, assessment outcome, open vulnerabilities/POA&M items, active exceptions) with a KPI summary row and a per-control factor breakdown.
+  - **Contacts** — new tab in `dashboard/organization`: a simple directory (name, email, title, team, notes) for people referenced elsewhere in the platform but never manageable directly.
+  - **Vendor Security Ratings** — new tab in `dashboard/tprm`: manual risk scoring (always available) plus optional SecurityScorecard/BitSight refresh for orgs that supply their own API key.
+  - **Data Sovereignty** — new `dashboard/data-sovereignty` page with Config / Jurisdictions / Regulatory Changes / Gap Analysis tabs.
+  - **AI Insights (Phase 6)** — new tabs in `dashboard/ai-insights`: a deterministic Predictive Risk Score (no AI provider required), plus AI-generated Regulatory Impact analysis and Smart Remediation Plans (gracefully prompt for a BYOK provider when none is configured).
+  - **AI Laws** — new `dashboard/ai-laws` page with US State and International tabs, surfacing the jurisdiction frameworks that previously had no dedicated view.
+  - **Dashboard Views** — new `dashboard/views` page: saved-view CRUD with per-view widgets (MVP — form-based add/edit, no drag-and-drop grid yet).
+- **Framework coverage honesty labeling**: every framework now carries a `coverage_status` (`comprehensive` / `core_controls` / `representative`) surfaced as a badge on framework cards, so a partially-seeded catalog (e.g. NIST 800-53's base-only control set) is never presented as if it were complete.
+- **CI guard against a repeat of the broken `.exe` release** (see Fixed below): `build-release.yml` now runs a `lockfile-integrity` job before any platform build starts, failing fast with a clear message if `frontend/package-lock.json` is ever missing a required cross-platform native-binding entry again.
+
+### Changed
+
+- **`implementations.js`/`organizations.js` priority filtering**: `?priority=high` now matches NIST's numeric priority values (`1`/`P1`) as well as the UI's word-based ones, via an equivalence-set lookup instead of an exact string match.
+- **Pagination added** to `GET /implementations` and `GET /organizations/:orgId/controls` (opt-in `page`/`limit`, `LIMIT 2000` safety cap when omitted) — previously unbounded.
+- **`GET /organizations/:orgId/controls`** now returns a real `mapping_count` (source + target crosswalk counts) instead of always `0`.
+- **`seed-missing-controls.js` is now wired in**: chained into the `seed:frameworks` npm script and run automatically at startup (`ensureFrameworkCatalogCompleteness()`) if the NIST 800-53 catalog is missing its MA/MP/PE/PS/PT/SA/SR families — previously it existed but was never invoked by anything.
+- **`/bump-version` playbook**: the frontend lockfile regeneration step now uses a full `npm install` instead of `--package-lock-only`, which is what silently produced the broken v4.3.0 release lockfile in the first place.
+
+### Fixed
+
+- **The v4.3.0 GitHub Release shipped with zero installer assets.** `frontend/package-lock.json` had been pruned down to only its generating platform's entries for every native multi-platform dependency (`lightningcss`, `@tailwindcss/oxide`, `sharp`, `unrs-resolver`), so the Windows job crashed at `next build` with `Cannot find module '../lightningcss.win32-x64-msvc.node'` and the macOS/Linux jobs never ran (gated on the same matrix). Regenerated the lockfile with a full `npm install`, which restores every platform variant; verified against a real test build via `workflow_dispatch`.
+- **Encrypted assignee email returned as ciphertext**: `GET /implementations`, `GET /implementations/:id`, and the org-controls export all now decrypt `assigned_to_email` before returning it (migration-098 field encryption had never been applied to these three read paths).
+- **Control-answer CSV import silently dropped every assignee**: the import's email→user lookup map was built from the still-encrypted `email` column, which could never match the plaintext email in the uploaded file; now decrypts per row before building the map.
+- **`due_date` was aliased to `implementation_date`**, so marking a control implemented silently wiped the due date set at assignment time. Added a dedicated `due_date` column (migration) and updated every read/write path (`implementations.js`, `controls.js`, org-controls export/import) to use it.
+- **Audit-log `resource_id` inconsistency broke control history and the activity feed**: `PATCH /implementations/:id/status` logged the *implementation* id while every other control-audit write logged the *framework_control* id, so `GET /controls/:id/history` silently missed all UI-driven status changes and the activity feed showed blank control names for them. Unified on framework_control id going forward, with legacy-id fallback joins so older rows still resolve (no audit-log rows were rewritten — AU-2 immutability).
+- **"Control Verified" notification linked to a 404**: the deep-link builder referenced a column (`ctrl.rows[0]?.id`) that was never selected by the query, so it always fell back to a broken URL. Now selects and links to the real framework_control id.
+- **`controlHealth.js` inflated open-item counts**: a flat 5-table `LEFT JOIN` + `GROUP BY` cross-multiplied rows whenever a control had more than one row in more than one joined table, artificially depressing health scores. Rewritten with a `LEFT JOIN LATERAL` per related table so each aggregate is computed independently.
+- **Auditor Workspace public share link was unreachable**: the "copy link" button generated a URL for a frontend page (`/auditor-workspace/shared/[token]`) that didn't exist. Built it — a public, unauthenticated page rendering the workspace summary, engagement, findings, PBC requests, and recent evidence.
+- **`PATCH /implementations/:id/status` update was not org-scoped** at the UPDATE statement itself (only guarded by a prior SELECT) — added `AND organization_id = $n` for defense in depth.
+
+### Security
+
+- **Auditor share-link management required only `audit.read`**, letting a read-only auditor mint or deactivate public tokens exposing org compliance data. `POST /links` and `PATCH /links/:id` now require `audit.write` (newly seeded permission, granted to `admin` and `auditor` roles).
+- **Auditor Workspace public share page passed an unencoded URL token directly into a `fetch()` request URL** (`fetch(\`.../public/${token}\`)`), letting a crafted share-link token manipulate the resulting request path/query instead of being treated as an opaque segment. Fixed with `encodeURIComponent(token)`.
+- **`compliance.read`/`compliance.manage` permissions were referenced by `phase6.js` but never seeded anywhere**, so every non-admin user was silently 403'd on all AI risk-scoring, regulatory-impact, and remediation-plan endpoints. Seeded and granted to `admin`/`user` roles.
+
+---
+
 ## [4.3.0] — 2026-07-08
 
 ### Added

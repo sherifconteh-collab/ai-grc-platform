@@ -144,6 +144,31 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────────────────────
+  # Guard: frontend/package-lock.json must carry every OS/CPU native-binding
+  # variant the release matrix below needs (Windows, macOS x64+arm64, Linux).
+  # `npm install --package-lock-only` silently prunes these to just the
+  # generating platform — this fails in seconds with a clear message instead
+  # of ~40 minutes into a Windows build with a cryptic module-not-found error.
+  # ────────────────────────────────────────────────────────────────────────────
+  lockfile-integrity:
+    name: Frontend lockfile has cross-platform native bindings
+    runs-on: ubuntu-latest
+    needs: [check-release, create-release]
+    if: always() && needs.create-release.result == 'success'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check frontend/package-lock.json for missing platform variants
+        run: node scripts/check-lockfile-platforms.js
+        working-directory: frontend
+
+  # ────────────────────────────────────────────────────────────────────────────
   # Build Windows installer (.exe)
   # Runs on every release (push-to-main version bump, tag, dispatch).
   # ────────────────────────────────────────────────────────────────────────────
@@ -151,8 +176,8 @@ jobs:
     name: Windows Installer (.exe)
     runs-on: windows-latest
     timeout-minutes: 45
-    needs: [check-release, create-release]
-    if: always() && needs.create-release.result == 'success'
+    needs: [check-release, create-release, lockfile-integrity]
+    if: always() && needs.create-release.result == 'success' && needs.lockfile-integrity.result == 'success'
 
     permissions:
       contents: write   # needed to upload release assets
@@ -332,9 +357,9 @@ jobs:
     name: macOS Installer (.dmg — arm64)
     runs-on: macos-latest
     timeout-minutes: 60
-    needs: [check-release, create-release]
+    needs: [check-release, create-release, lockfile-integrity]
     if: |
-      always() && needs.create-release.result == 'success' && (
+      always() && needs.create-release.result == 'success' && needs.lockfile-integrity.result == 'success' && (
         startsWith(github.ref, 'refs/tags/v') ||
         github.event_name == 'release' ||
         github.event_name == 'workflow_dispatch'
@@ -446,9 +471,9 @@ jobs:
     name: macOS Installer (.dmg — x64)
     runs-on: macos-13
     timeout-minutes: 60
-    needs: [check-release, create-release]
+    needs: [check-release, create-release, lockfile-integrity]
     if: |
-      always() && needs.create-release.result == 'success' && (
+      always() && needs.create-release.result == 'success' && needs.lockfile-integrity.result == 'success' && (
         startsWith(github.ref, 'refs/tags/v') ||
         github.event_name == 'release' ||
         github.event_name == 'workflow_dispatch'
@@ -556,9 +581,9 @@ jobs:
     name: Linux AppImage
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [check-release, create-release]
+    needs: [check-release, create-release, lockfile-integrity]
     if: |
-      always() && needs.create-release.result == 'success' && (
+      always() && needs.create-release.result == 'success' && needs.lockfile-integrity.result == 'success' && (
         startsWith(github.ref, 'refs/tags/v') ||
         github.event_name == 'release' ||
         github.event_name == 'workflow_dispatch'

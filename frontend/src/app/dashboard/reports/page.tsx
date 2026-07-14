@@ -4,9 +4,408 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
-import { reportsAPI, benchmarksAPI } from '@/lib/api';
+import { reportsAPI, benchmarksAPI, scheduledReportsAPI, ScheduledReportInput } from '@/lib/api';
 
 type ReportType = 'compliance-pdf' | 'compliance-excel' | 'ssp-pdf' | 'ssp-json';
+type ReportsTab = 'ondemand' | 'scheduled';
+
+interface ScheduledReport {
+  id: string;
+  name: string;
+  report_type: ScheduledReportInput['report_type'];
+  schedule: ScheduledReportInput['schedule'];
+  format: ScheduledReportInput['format'];
+  recipients: string[];
+  filters?: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+const REPORT_TYPE_OPTIONS: { value: ScheduledReportInput['report_type']; label: string }[] = [
+  { value: 'compliance_summary', label: 'Compliance Summary' },
+  { value: 'framework_gap', label: 'Framework Gap' },
+  { value: 'evidence_status', label: 'Evidence Status' },
+  { value: 'audit_trail', label: 'Audit Trail' },
+  { value: 'executive', label: 'Executive' },
+];
+
+const SCHEDULE_OPTIONS: { value: ScheduledReportInput['schedule']; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+];
+
+const FORMAT_OPTIONS: { value: NonNullable<ScheduledReportInput['format']>; label: string }[] = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'csv', label: 'CSV' },
+  { value: 'json', label: 'JSON' },
+];
+
+interface ScheduleFormState {
+  name: string;
+  report_type: ScheduledReportInput['report_type'];
+  schedule: ScheduledReportInput['schedule'];
+  format: NonNullable<ScheduledReportInput['format']>;
+  recipients: string;
+}
+
+const EMPTY_SCHEDULE_FORM: ScheduleFormState = {
+  name: '',
+  report_type: 'compliance_summary',
+  schedule: 'weekly',
+  format: 'pdf',
+  recipients: '',
+};
+
+function ScheduledReportsPanel() {
+  const [schedules, setSchedules] = useState<ScheduledReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<ScheduleFormState>(EMPTY_SCHEDULE_FORM);
+  const [formError, setFormError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [runningId, setRunningId] = useState<string | null>(null);
+
+  const loadSchedules = async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const response = await scheduledReportsAPI.getAll();
+      const data = Array.isArray(response.data?.data) ? response.data.data : [];
+      setSchedules(data);
+    } catch {
+      setLoadError('Failed to load scheduled reports.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await loadSchedules();
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setForm(EMPTY_SCHEDULE_FORM);
+    setFormError('');
+    setShowForm(true);
+  };
+
+  const openEditForm = (schedule: ScheduledReport) => {
+    setEditingId(schedule.id);
+    setForm({
+      name: schedule.name,
+      report_type: schedule.report_type,
+      schedule: schedule.schedule,
+      format: schedule.format || 'pdf',
+      recipients: Array.isArray(schedule.recipients) ? schedule.recipients.join(', ') : '',
+    });
+    setFormError('');
+    setShowForm(true);
+  };
+
+  const submitForm = async () => {
+    if (!form.name.trim()) {
+      setFormError('Name is required.');
+      return;
+    }
+    const recipients = form.recipients
+      .split(',')
+      .map((email) => email.trim())
+      .filter(Boolean);
+
+    setSubmitting(true);
+    setFormError('');
+    try {
+      const payload: ScheduledReportInput = {
+        name: form.name.trim(),
+        report_type: form.report_type,
+        schedule: form.schedule,
+        format: form.format,
+        recipients,
+      };
+      if (editingId) {
+        await scheduledReportsAPI.update(editingId, payload);
+      } else {
+        await scheduledReportsAPI.create(payload);
+      }
+      setShowForm(false);
+      await loadSchedules();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setFormError(error.response?.data?.error || 'Failed to save scheduled report.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deleteSchedule = async (id: string) => {
+    try {
+      await scheduledReportsAPI.remove(id);
+      await loadSchedules();
+    } catch {
+      setNotice('Failed to delete scheduled report.');
+    }
+  };
+
+  const runNow = async (id: string) => {
+    setRunningId(id);
+    setNotice('');
+    try {
+      await scheduledReportsAPI.runNow(id);
+      setNotice('Report queued — delivery depends on the background job worker.');
+    } catch {
+      setNotice('Failed to queue the report run.');
+    } finally {
+      setRunningId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-sm text-gray-600">
+          Schedule recurring report delivery to stakeholders. Actual delivery depends on the background
+          job worker being enabled for this deployment.
+        </p>
+        <button
+          onClick={openCreateForm}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          New Schedule
+        </button>
+      </div>
+
+      {notice && (
+        <div className="bg-purple-50 border border-purple-200 text-purple-700 px-4 py-3 rounded text-sm">
+          {notice}
+        </div>
+      )}
+
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">{loadError}</div>
+      )}
+
+      {loading ? (
+        <div className="animate-pulse h-32 rounded-lg bg-gray-100" />
+      ) : schedules.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-md p-6 text-sm text-gray-500">
+          No scheduled reports yet. Create one to automate recurring delivery.
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Cadence</th>
+                <th className="px-4 py-3">Format</th>
+                <th className="px-4 py-3">Recipients</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schedules.map((schedule) => (
+                <tr key={schedule.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-4 py-3 font-medium text-gray-900">{schedule.name}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {REPORT_TYPE_OPTIONS.find((o) => o.value === schedule.report_type)?.label ||
+                      schedule.report_type}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 capitalize">{schedule.schedule}</td>
+                  <td className="px-4 py-3 text-gray-600 uppercase">{schedule.format}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {Array.isArray(schedule.recipients) ? schedule.recipients.length : 0}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        schedule.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
+                      }`}
+                      aria-label={`Schedule status: ${schedule.is_active ? 'active' : 'inactive'}`}
+                    >
+                      {schedule.is_active ? 'active' : 'inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => runNow(schedule.id)}
+                        disabled={runningId === schedule.id}
+                        className="text-purple-600 hover:text-purple-800 text-xs font-medium disabled:opacity-50"
+                      >
+                        {runningId === schedule.id ? 'Queuing...' : 'Run Now'}
+                      </button>
+                      <button
+                        onClick={() => openEditForm(schedule)}
+                        className="text-gray-600 hover:text-gray-900 text-xs font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteSchedule(schedule.id)}
+                        className="text-red-600 hover:text-red-800 text-xs font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">
+                {editingId ? 'Edit Schedule' : 'New Schedule'}
+              </h2>
+              <button
+                onClick={() => setShowForm(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+
+            {formError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="schedule-name" className="block text-sm font-medium text-gray-700 mb-1">
+                Name
+              </label>
+              <input
+                id="schedule-name"
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="schedule-report-type" className="block text-sm font-medium text-gray-700 mb-1">
+                Report Type
+              </label>
+              <select
+                id="schedule-report-type"
+                value={form.report_type}
+                onChange={(e) =>
+                  setForm({ ...form, report_type: e.target.value as ScheduledReportInput['report_type'] })
+                }
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              >
+                {REPORT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="schedule-cadence" className="block text-sm font-medium text-gray-700 mb-1">
+                Schedule
+              </label>
+              <select
+                id="schedule-cadence"
+                value={form.schedule}
+                onChange={(e) =>
+                  setForm({ ...form, schedule: e.target.value as ScheduledReportInput['schedule'] })
+                }
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              >
+                {SCHEDULE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="schedule-format" className="block text-sm font-medium text-gray-700 mb-1">
+                Format
+              </label>
+              <select
+                id="schedule-format"
+                value={form.format}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    format: e.target.value as NonNullable<ScheduledReportInput['format']>,
+                  })
+                }
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              >
+                {FORMAT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="schedule-recipients" className="block text-sm font-medium text-gray-700 mb-1">
+                Recipients (comma-separated emails)
+              </label>
+              <input
+                id="schedule-recipients"
+                type="text"
+                value={form.recipients}
+                onChange={(e) => setForm({ ...form, recipients: e.target.value })}
+                placeholder="alice@example.com, bob@example.com"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 rounded text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitForm}
+                disabled={submitting}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
+              >
+                {submitting ? 'Saving...' : editingId ? 'Save Changes' : 'Create Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface FrameworkBenchmarkInsufficient {
   framework_id: string;
@@ -117,6 +516,7 @@ function IndustryBenchmarkPanel() {
 export default function ReportsPage() {
   const [generating, setGenerating] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<ReportsTab>('ondemand');
 
   const downloadReport = async (reportType: ReportType) => {
     setGenerating(reportType);
@@ -205,6 +605,36 @@ export default function ReportsPage() {
             {error}
           </div>
         )}
+
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-6">
+            <button
+              onClick={() => setActiveTab('ondemand')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'ondemand'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              On-Demand Reports
+            </button>
+            <button
+              onClick={() => setActiveTab('scheduled')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'scheduled'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Scheduled Reports
+            </button>
+          </nav>
+        </div>
+
+        {activeTab === 'scheduled' && <ScheduledReportsPanel />}
+
+        {activeTab === 'ondemand' && (
+        <>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* PDF Report Card */}
@@ -357,6 +787,8 @@ export default function ReportsPage() {
             Keep SSP content current by updating organization and system details at <code>/dashboard/organization</code>, then regenerate.
           </p>
         </div>
+        </>
+        )}
       </div>
     </DashboardLayout>
   );

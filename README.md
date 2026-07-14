@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v4.3.0-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v4.5.1-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -67,9 +67,21 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (21 tools)
 - **Enterprise-Grade**: PostgreSQL RLS, Redis caching, automated backups, SSO, Sentry
 
-## ✅ Current Status — v4.3.0 (All Features Shipped)
+## ✅ Current Status — v4.4.0 (All Features Shipped)
 
-The platform is **fully functional** with the complete v4.3.0 feature set. Every capability is available — no tier gating, no feature flags.
+The platform is **fully functional** with the complete v4.4.0 feature set. Every capability is available — no tier gating, no feature flags.
+
+### New in v4.4.0
+- 🩺 **Control Health scoring** — a deterministic 0–100 score per control (evidence freshness, latest assessment outcome, open vulnerabilities/POA&M items, active exceptions) with a fleet-wide KPI summary
+- 🚫 **Control Exceptions** — time-boxed, approvable exceptions with a status-filtered workspace
+- 🕒 **Scheduled Reports** — recurring report generation (cadence, format, recipients) with manual run-now
+- 👥 **Contacts directory** — org-level contact management (name, email, title, team)
+- 🛡️ **Vendor Security Ratings** — manual TPRM risk scoring plus optional SecurityScorecard/BitSight refresh (BYO API key)
+- 🌍 **Data Sovereignty** — jurisdiction configuration, regulatory-change tracking, and gap analysis
+- 🔮 **AI Insights (Phase 6)** — deterministic Predictive Risk Score, plus AI-generated Regulatory Impact analysis and Smart Remediation Plans
+- ⚖️ **AI Laws browser** — US State and International AI-governance jurisdiction views in one place
+- 📐 **Dashboard Views** — saved, shareable dashboard layouts with configurable widgets
+- 🏷️ **Framework coverage badges** — every framework card now honestly labels whether its control set is comprehensive, core-only, or representative, instead of implying full catalog coverage everywhere
 
 ### RMF & GRC Differentiators (v4.3.0)
 - 🔗 **RMF Leveraged Authorizations** — RMF packages inherit controls and authorization posture from COTS/SaaS products (FedRAMP-style leveraged authorization), with at-risk flagging when a provider product is deprecated or its authorization has lapsed

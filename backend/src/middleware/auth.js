@@ -37,11 +37,15 @@ const ROLE_FALLBACK_PERMISSIONS = new Map([
     'environments.read',
     'service_accounts.read',
     'audit.read',
+    'audit.write',
     'reports.read',
     'assessments.read',
     'assessments.write',
     'notifications.read',
-    'ai.use'
+    'ai.use',
+    'ai.read',
+    'compliance.read',
+    'compliance.manage'
   ]],
   ['user', [
     'dashboard.read',
@@ -64,7 +68,12 @@ const ROLE_FALLBACK_PERMISSIONS = new Map([
     'notifications.read',
     'notifications.write',
     'ai.use',
-    'reports.read'
+    'ai.read',
+    'ai.write',
+    'reports.read',
+    'reports.manage',
+    'compliance.read',
+    'compliance.manage'
   ]]
 ]);
 
@@ -220,11 +229,17 @@ const authenticate = async (req, res, next) => {
           WHERE ur.user_id = $1
         `, [req.user.id]);
 
-        const fallbackPermissions = getRoleFallbackPermissions(req.user.role);
-        const resolvedPermissions = new Set([
-          ...permissionResult.rows.map((row) => row.name),
-          ...fallbackPermissions
-        ]);
+        // The legacy-role fallback is a true fallback: it only applies when the
+        // user has zero rows in role_permissions (accounts never migrated onto
+        // the roles/user_roles system). When real role_permissions rows exist,
+        // they are used exclusively — unconditionally unioning the fallback on
+        // top defeats any custom role that intentionally restricts below the
+        // legacy-role floor (e.g. an auditor_observer role that strips
+        // assessments.write would silently get it back via the 'auditor'
+        // fallback if this stayed unconditional).
+        const resolvedPermissions = permissionResult.rows.length > 0
+          ? new Set(permissionResult.rows.map((row) => row.name))
+          : new Set(getRoleFallbackPermissions(req.user.role));
 
         if (req.user.role === 'admin') {
           resolvedPermissions.add('*');

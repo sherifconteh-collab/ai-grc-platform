@@ -32,6 +32,10 @@ const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 const DEMO_SESSION_EXPIRY = process.env.JWT_DEMO_SESSION_EXPIRY || '8h';
 const BCRYPT_ROUNDS = 14;
+// Fixed-cost dummy hash so the "no such user" login branch spends the same
+// time as a real bcrypt.compare — otherwise the two branches are
+// distinguishable by timing (email-enumeration oracle).
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-safety-dummy-password', BCRYPT_ROUNDS);
 const ALLOWED_INITIAL_ROLES = new Set(['admin', 'auditor', 'user']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_REGISTER_FRAMEWORK_CODES = 20;
@@ -466,6 +470,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
     const selectedRole = sanitizeInput(String(initial_role || initialRole || 'admin').toLowerCase());
     const normalizedEmail = sanitizeInput(String(email || '').trim().toLowerCase());
     const normalizedFullName = sanitizeInput(String(full_name || '').trim());
+    const normalizedOrganizationName = sanitizeInput(String(organization_name || '').trim());
     const selectedFrameworkCodes = normalizeFrameworkCodes(framework_codes || frameworkCodes);
     const selectedInformationTypes = normalizeInformationTypes(information_types || informationTypes);
 
@@ -496,6 +501,10 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
       });
     }
 
+    if (!hasRequiredPasswordComplexity(password)) {
+      return res.status(400).json({ success: false, error: PASSWORD_COMPLEXITY_ERROR_MESSAGE });
+    }
+
     if (selectedFrameworkCodes.includes(NIST_800_53_FRAMEWORK_CODE) && selectedInformationTypes.length === 0) {
       return res.status(400).json({
         success: false,
@@ -523,7 +532,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || '';
     const resolvedOrganizationName = deriveOrganizationName({
-      organizationName: organization_name,
+      organizationName: normalizedOrganizationName,
       fullName: normalizedFullName,
       email: normalizedEmail,
       role: selectedRole
@@ -718,6 +727,11 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
     }
   } catch (error) {
     log('error', 'register_error', { error: error?.message || String(error) });
+    if (error.code === '23505') {
+      // Concurrent registration race lost to the DB unique constraint after
+      // passing the earlier existence check — not a server error.
+      return res.status(409).json({ success: false, error: 'Email already registered' });
+    }
     const statusCode = Number(error.statusCode) || 500;
     const message = statusCode === 500 ? 'Registration failed' : String(error.message || 'Registration failed');
     res.status(statusCode).json({ success: false, error: message });
@@ -736,6 +750,10 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
 
     let user = await getUserByEmail(normalizedEmail);
     if (!user) {
+      // Run a dummy compare so this branch costs the same as a real
+      // wrong-password check — otherwise response timing leaks whether the
+      // email exists.
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
@@ -752,6 +770,18 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
     if (!lockoutExempt && user.locked_until && new Date(user.locked_until) > new Date()) {
       const retryAfterSeconds = Math.ceil((new Date(user.locked_until) - Date.now()) / 1000);
       res.setHeader('Retry-After', String(retryAfterSeconds));
+      createAuditLog({
+        organizationId: user.organization_id,
+        userId: user.id,
+        eventType: 'user.login_blocked_locked',
+        resourceType: 'user',
+        resourceId: user.id,
+        details: { email: user.email },
+        ipAddress: extractIpFromRequest(req),
+        userAgent: req.headers['user-agent'],
+        success: false,
+        authenticationMethod: 'password'
+      }).catch(err => log('error', 'audit_log_error', { error: err?.message || String(err) }));
       return res.status(423).json({
         success: false,
         error: 'Account temporarily locked due to too many failed login attempts',
@@ -772,6 +802,18 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
           [newAttempts, shouldLock, lockoutDurationMs, user.id]
         );
       }
+      createAuditLog({
+        organizationId: user.organization_id,
+        userId: user.id,
+        eventType: 'user.login_failed',
+        resourceType: 'user',
+        resourceId: user.id,
+        details: { email: user.email },
+        ipAddress: extractIpFromRequest(req),
+        userAgent: req.headers['user-agent'],
+        success: false,
+        authenticationMethod: 'password'
+      }).catch(err => log('error', 'audit_log_error', { error: err?.message || String(err) }));
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
@@ -1028,6 +1070,9 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
       return res.status(400).json({ success: false, error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+    }
+    if (!hasRequiredPasswordComplexity(password)) {
+      return res.status(400).json({ success: false, error: PASSWORD_COMPLEXITY_ERROR_MESSAGE });
     }
 
     const tokenResult = await pool.query(
@@ -1459,6 +1504,9 @@ router.post('/accept-invite', validateBody((body) => {
     }
   } catch (error) {
     log('error', 'accept_invite_error', { error: error?.message || String(error) });
+    if (error.code === '23505') {
+      return res.status(409).json({ success: false, error: 'Email already registered' });
+    }
     const statusCode = Number(error.statusCode) || 500;
     const message = statusCode === 500 ? 'Failed to accept invite' : String(error.message || 'Failed to accept invite');
     res.status(statusCode).json({ success: false, error: message });

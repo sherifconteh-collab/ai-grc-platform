@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { organizationAPI, controlsAPI, implementationsAPI } from '@/lib/api';
+import { organizationAPI, controlsAPI, implementationsAPI, controlHealthAPI } from '@/lib/api';
 import { groupByControlFamily } from '@/lib/controlFamilies';
 import { hasPermission } from '@/lib/access';
 
@@ -37,6 +37,195 @@ interface Control {
   mappingCount?: number;
 }
 
+type ControlHealthRating = 'strong' | 'good' | 'watch' | 'weak';
+
+interface ControlHealthFactor {
+  key: string;
+  impact: number;
+  detail: string;
+}
+
+interface ControlHealthRow {
+  id: string;
+  control_id: string;
+  title: string;
+  framework_code: string;
+  implementation_status: string;
+  health: {
+    score: number;
+    rating: ControlHealthRating;
+    factors: ControlHealthFactor[];
+  };
+}
+
+interface ControlHealthSummary {
+  total: number;
+  strong: number;
+  good: number;
+  watch: number;
+  weak: number;
+  avg_score: number;
+}
+
+const HEALTH_RATING_STYLES: Record<ControlHealthRating, string> = {
+  strong: 'bg-green-100 text-green-800',
+  good: 'bg-blue-100 text-blue-800',
+  watch: 'bg-yellow-100 text-yellow-800',
+  weak: 'bg-red-100 text-red-800',
+};
+
+const HEALTH_TILE_STYLES: Record<'total' | ControlHealthRating | 'avg_score', string> = {
+  total: 'border-gray-400',
+  strong: 'border-green-500',
+  good: 'border-blue-500',
+  watch: 'border-yellow-500',
+  weak: 'border-red-500',
+  avg_score: 'border-purple-500',
+};
+
+function ControlHealthPanel() {
+  const [summary, setSummary] = useState<ControlHealthSummary | null>(null);
+  const [rows, setRows] = useState<ControlHealthRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const response = await controlHealthAPI.getAll();
+        const payload = response.data?.data;
+        if (!cancelled) {
+          setSummary(payload?.summary || null);
+          setRows(Array.isArray(payload?.controls) ? payload.controls : []);
+        }
+      } catch {
+        if (!cancelled) setError('Failed to load control health data.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="animate-pulse h-20 rounded-lg bg-gray-100" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${HEALTH_TILE_STYLES.total}`}>
+            <div className="text-xs text-gray-500 uppercase">Total</div>
+            <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
+          </div>
+          <div className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${HEALTH_TILE_STYLES.strong}`}>
+            <div className="text-xs text-gray-500 uppercase">Strong</div>
+            <div className="text-2xl font-bold text-green-700">{summary.strong}</div>
+          </div>
+          <div className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${HEALTH_TILE_STYLES.good}`}>
+            <div className="text-xs text-gray-500 uppercase">Good</div>
+            <div className="text-2xl font-bold text-blue-700">{summary.good}</div>
+          </div>
+          <div className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${HEALTH_TILE_STYLES.watch}`}>
+            <div className="text-xs text-gray-500 uppercase">Watch</div>
+            <div className="text-2xl font-bold text-yellow-700">{summary.watch}</div>
+          </div>
+          <div className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${HEALTH_TILE_STYLES.weak}`}>
+            <div className="text-xs text-gray-500 uppercase">Weak</div>
+            <div className="text-2xl font-bold text-red-700">{summary.weak}</div>
+          </div>
+          <div className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${HEALTH_TILE_STYLES.avg_score}`}>
+            <div className="text-xs text-gray-500 uppercase">Avg Score</div>
+            <div className="text-2xl font-bold text-purple-700">{summary.avg_score}</div>
+          </div>
+        </div>
+      )}
+
+      {rows.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-md p-12 text-center text-gray-500">
+          No control health data available yet.
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-gray-500 border-b border-gray-200">
+                <th className="px-4 py-3">Control</th>
+                <th className="px-4 py-3">Framework</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Health</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const isExpanded = expandedId === row.id;
+                return (
+                  <React.Fragment key={row.id}>
+                    <tr
+                      onClick={() => setExpandedId(isExpanded ? null : row.id)}
+                      className="border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900">{row.control_id}</div>
+                        <div className="text-xs text-gray-500">{row.title}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{row.framework_code}</td>
+                      <td className="px-4 py-3 text-gray-600">{row.implementation_status}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`text-xs font-medium px-2 py-1 rounded-full ${HEALTH_RATING_STYLES[row.health.rating]}`}
+                          aria-label={`Health rating: ${row.health.rating}, score ${row.health.score}`}
+                        >
+                          {row.health.rating} ({row.health.score})
+                        </span>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <td colSpan={4} className="px-4 py-3">
+                          {row.health.factors.length > 0 ? (
+                            <ul role="list" className="space-y-1 text-xs text-gray-600">
+                              {row.health.factors.map((factor) => (
+                                <li role="listitem" key={factor.key}>
+                                  <span className="font-medium">{factor.key}:</span> {factor.detail}
+                                  {factor.impact !== 0 ? ` (${factor.impact > 0 ? '+' : ''}${factor.impact})` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-gray-500">No scoring factors recorded.</p>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ControlsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -45,6 +234,7 @@ export default function ControlsPage() {
   const canUseAI = hasPermission(user, 'ai.use');
   const [controls, setControls] = useState<Control[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'health'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFramework, setSelectedFramework] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -604,6 +794,36 @@ export default function ControlsPage() {
           </div>
         )}
 
+        {/* View mode toggle */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-6">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                viewMode === 'list'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Controls List
+            </button>
+            <button
+              onClick={() => setViewMode('health')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                viewMode === 'health'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Health
+            </button>
+          </nav>
+        </div>
+
+        {viewMode === 'health' && <ControlHealthPanel />}
+
+        {viewMode === 'list' && (
+        <>
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -962,6 +1182,8 @@ export default function ControlsPage() {
           <div className="text-sm text-gray-600 text-center">
             Showing {filteredControls.length} of {controls.length} controls
           </div>
+        )}
+        </>
         )}
       </div>
     </DashboardLayout>

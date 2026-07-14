@@ -1,0 +1,67 @@
+# Automatic Copilot PR Review Workflow
+# This workflow automatically triggers GitHub Copilot to review all pull requests
+# For more information: https://docs.github.com/en/copilot/using-github-copilot/code-review/using-copilot-code-review
+
+name: Copilot PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  copilot-review:
+    name: Automatic Copilot Review
+    runs-on: ubuntu-latest
+
+    # Skip if the PR is in draft mode or from dependabot
+    if: |
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A plain-text "@copilot review this pull request" PR comment does not
+      # actually invoke GitHub Copilot's code-review feature — that only
+      # responds to @-mentions in chat/Workspace contexts, not PR comments.
+      # Requesting a Copilot review requires adding it as a reviewer via the
+      # requested_reviewers API (same mechanism `gh pr edit --add-reviewer
+      # Copilot` uses under the hood).
+      - name: Request Copilot Review
+        id: request_review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          echo "Requesting a real Copilot code review for PR #${PR_NUMBER}"
+
+          if gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/requested_reviewers" \
+               -X POST -f "reviewers[]=copilot-pull-request-reviewer[bot]" > /dev/null 2>request_error.log; then
+            echo "requested=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Copilot review genuinely requested for PR #${PR_NUMBER}"
+          else
+            echo "requested=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Could not request a Copilot review — Copilot code review may not be enabled for this repo/org."
+            cat request_error.log || true
+          fi
+
+      - name: Add label reflecting the real outcome
+        if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'reopened')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ "${{ steps.request_review.outputs.requested }}" == "true" ]; then
+            gh pr edit ${PR_NUMBER} --add-label "copilot-review-requested" || true
+          else
+            gh pr edit ${PR_NUMBER} --add-label "copilot-review-unavailable" || true
+          fi

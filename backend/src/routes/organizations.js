@@ -12,6 +12,7 @@ const { getFrameworkLimit, normalizeTier, shouldEnforceAiLimitForByok } = requir
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { log } = require('../utils/logger');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { decrypt } = require('../utils/encrypt');
 
 
 router.use(authenticate);
@@ -1413,7 +1414,7 @@ router.get('/:orgId/controls', requirePermission('organizations.read'), async (r
   try {
     const orgId = verifyOrgAccess(req, res);
     if (!orgId) return;
-    const { frameworkId, status } = req.query;
+    const { frameworkId, status, page, limit } = req.query;
 
     let query = `
       SELECT fc.id, fc.control_id,
@@ -1423,7 +1424,12 @@ router.get('/:orgId/controls', requirePermission('organizations.read'), async (r
              f.name as framework_name, f.code as framework_code,
              COALESCE(ci.status, 'not_started') as status,
              ci.assigned_to, ci.notes,
-             u.first_name || ' ' || u.last_name as assigned_to_name
+             u.first_name || ' ' || u.last_name as assigned_to_name,
+             (
+               (SELECT COUNT(*)::int FROM control_mappings cms WHERE cms.source_control_id = fc.id AND cms.target_control_id <> fc.id)
+               +
+               (SELECT COUNT(*)::int FROM control_mappings cmt WHERE cmt.target_control_id = fc.id AND cmt.source_control_id <> fc.id)
+             ) AS mapping_count
       FROM organization_frameworks of2
       JOIN framework_controls fc ON fc.framework_id = of2.framework_id
       JOIN frameworks f ON f.id = fc.framework_id
@@ -1453,10 +1459,27 @@ router.get('/:orgId/controls', requirePermission('organizations.read'), async (r
       }
     }
 
-    query += ' ORDER BY f.name, fc.control_id';
+    query += ' ORDER BY f.name, fc.control_id, fc.id';
+
+    const usePagination = page !== undefined || limit !== undefined;
+    let pagination = null;
+    if (usePagination) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+      const offset = (pageNum - 1) * limitNum;
+      query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(limitNum, offset);
+      pagination = { page: pageNum, limit: limitNum };
+    } else {
+      query += ' LIMIT 2000';
+    }
 
     const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows, controls: result.rows });
+    const payload = { success: true, data: result.rows, controls: result.rows };
+    if (pagination) {
+      payload.pagination = pagination;
+    }
+    res.json(payload);
   } catch (error) {
     log('error', 'organizations.controls.failed', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to load controls' });
@@ -1920,7 +1943,7 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
         ci.implementation_notes,
         ci.evidence_location,
         ci.notes,
-        ci.implementation_date as due_date,
+        ci.due_date,
         u.email as assigned_to_email,
         NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') as assigned_to_name
       FROM organization_frameworks of2
@@ -1958,7 +1981,15 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
     query += ' ORDER BY f.name, fc.control_id';
 
     const result = await pool.query(query, params);
-    const rows = result.rows || [];
+    const rows = (result.rows || []).map((row) => {
+      let assignedToEmail = null;
+      try {
+        assignedToEmail = decrypt(row.assigned_to_email);
+      } catch (error) {
+        assignedToEmail = null;
+      }
+      return { ...row, assigned_to_email: assignedToEmail };
+    });
 
     const exportColumns = [
       'framework_control_id',
@@ -2233,12 +2264,26 @@ router.post(
       const hasExistingImplementation = new Set(existingResult.rows.map((row) => String(row.control_id)));
 
       const userResult = await pool.query(
-        `SELECT id, LOWER(email) as email
+        `SELECT id, email
          FROM users
          WHERE organization_id = $1 AND is_active = true`,
         [orgId]
       );
-      const userIdByEmail = new Map(userResult.rows.map((row) => [String(row.email || ''), String(row.id)]));
+      // email is stored encrypted — decrypt in JS before building the lookup
+      // map. decrypt() returns legacy plaintext values unchanged, so this is
+      // safe for rows that predate encryption as well.
+      const userIdByEmail = new Map();
+      userResult.rows.forEach((row) => {
+        let decryptedEmail = null;
+        try {
+          decryptedEmail = decrypt(row.email);
+        } catch (error) {
+          decryptedEmail = null;
+        }
+        if (decryptedEmail) {
+          userIdByEmail.set(String(decryptedEmail).trim().toLowerCase(), String(row.id));
+        }
+      });
       const userIds = new Set(userResult.rows.map((row) => String(row.id)));
 
       const summary = {
@@ -2260,7 +2305,7 @@ router.post(
 
       const upsertSql = `
         INSERT INTO control_implementations
-          (control_id, organization_id, status, implementation_notes, evidence_location, assigned_to, notes, implementation_date)
+          (control_id, organization_id, status, implementation_notes, evidence_location, assigned_to, notes, due_date)
         VALUES
           ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (control_id, organization_id) DO UPDATE SET
@@ -2269,7 +2314,7 @@ router.post(
           evidence_location = CASE WHEN $11 THEN EXCLUDED.evidence_location ELSE control_implementations.evidence_location END,
           assigned_to = CASE WHEN $12 THEN EXCLUDED.assigned_to ELSE control_implementations.assigned_to END,
           notes = CASE WHEN $13 THEN EXCLUDED.notes ELSE control_implementations.notes END,
-          implementation_date = CASE WHEN $14 THEN EXCLUDED.implementation_date ELSE control_implementations.implementation_date END
+          due_date = CASE WHEN $14 THEN EXCLUDED.due_date ELSE control_implementations.due_date END
         RETURNING (xmax = 0) AS inserted
       `;
 

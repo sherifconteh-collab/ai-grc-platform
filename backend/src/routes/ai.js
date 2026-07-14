@@ -1,6 +1,7 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const llm = require('../services/llmService');
@@ -27,6 +28,12 @@ const aiDecisionWriteLimiter = createOrgRateLimiter({
 });
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
+
+// Every route below is already covered by the Redis-backed aiOrgRateLimiter
+// applied further down (org-scoped, the real production control). This adds
+// a second, cheap IP-based layer ahead of authenticate, so an unauthenticated
+// flood is bounded before any DB/JWT work runs.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 // All AI routes require authentication
 router.use(authenticate);
@@ -987,7 +994,8 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
     model: params.model,
     organizationId: orgId,
     systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }]
+    messages: [{ role: 'user', content: userPrompt }],
+    feature: 'security_posture'
   });
 
   // Parse JSON from LLM response
@@ -1144,7 +1152,10 @@ router.get('/reasoning-memory/entries', requireTier('enterprise'), async (req, r
 });
 
 // DELETE /ai/reasoning-memory — clear all reasoning memory for this org
-router.delete('/reasoning-memory', requireTier('enterprise'), async (req, res) => {
+// Bulk-wipes org-wide state, so it needs the stronger write-tier permission
+// every other mutating action in this file uses, not just the router-wide
+// ai.use gate that everyone with AI access already holds.
+router.delete('/reasoning-memory', requireTier('enterprise'), requirePermission('assessments.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(

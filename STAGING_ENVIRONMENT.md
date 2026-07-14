@@ -1,6 +1,6 @@
 # Staging Environment Guide
 
-This guide documents a lightweight staging environment for ControlWeave Community Edition so changes can be validated before production deployment.
+This guide documents a lightweight staging environment for ControlWeave so changes can be validated before production deployment.
 
 ## Overview
 
@@ -109,4 +109,3 @@ npm start
 
 - Use a dedicated staging database and secrets.
 - Keep staging telemetry, SMTP, and webhooks isolated from production systems.
-- If paid-tier modules are absent in the community mirror, expect those routes to remain unavailable in staging as well.

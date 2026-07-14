@@ -82,11 +82,12 @@ function getTestResultInfo(status: string) {
 }
 
 function getPriorityLabel(priority: string | number) {
-  const p = Number(priority);
-  if (p >= 3) return { label: 'Critical', color: 'bg-red-100 text-red-800' };
-  if (p === 2) return { label: 'High', color: 'bg-orange-100 text-orange-800' };
-  if (p === 1) return { label: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
-  return { label: 'Low', color: 'bg-blue-100 text-blue-800' };
+  const raw = String(priority ?? '').toLowerCase().replace(/^p/, '');
+  if (raw === 'critical') return { label: 'Critical', color: 'bg-red-100 text-red-800' };
+  if (raw === 'high' || raw === '1') return { label: 'High', color: 'bg-orange-100 text-orange-800' };
+  if (raw === 'medium' || raw === '2') return { label: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
+  if (raw === 'low' || raw === '3') return { label: 'Low', color: 'bg-blue-100 text-blue-800' };
+  return { label: 'Unspecified', color: 'bg-gray-100 text-gray-600' };
 }
 
 function formatDate(dateStr: string | null) {
@@ -548,7 +549,7 @@ export default function ControlDetailPage() {
   }
 
   const statusInfo = implementation ? getStatusInfo(implementation.status) : getStatusInfo('not_started');
-  const priorityInfo = controlData ? getPriorityLabel(controlData.priority) : getPriorityLabel(0);
+  const priorityInfo = controlData ? getPriorityLabel(controlData.priority) : getPriorityLabel('');
   const linkedEvidenceIds = new Set((implementation?.evidence || []).map((ev) => ev.id));
 
   return (
