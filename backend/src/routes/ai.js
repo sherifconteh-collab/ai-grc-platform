@@ -1,6 +1,7 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const llm = require('../services/llmService');
@@ -27,6 +28,12 @@ const aiDecisionWriteLimiter = createOrgRateLimiter({
 });
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
+
+// Every route below is already covered by the Redis-backed aiOrgRateLimiter
+// applied further down (org-scoped, the real production control). This adds
+// a second, cheap IP-based layer ahead of authenticate, so an unauthenticated
+// flood is bounded before any DB/JWT work runs.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 // All AI routes require authentication
 router.use(authenticate);

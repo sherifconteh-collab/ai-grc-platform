@@ -1,12 +1,18 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission, requireAnyPermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
 const auditService = require('../services/auditService');
 
+// This router had no router-level rate limit of its own — only the app-wide
+// limiter mounted in server.js. Role/permission assignment is sensitive
+// enough (privilege-escalation surface) to warrant its own explicit limit;
+// runs before authenticate to bound request volume before DB/JWT work.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 router.use(authenticate);
 
 // A caller can never grant a permission (directly, or via a role they assign)

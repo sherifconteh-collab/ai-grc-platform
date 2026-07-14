@@ -10,9 +10,15 @@
 
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { requireAdmin } = require('../middleware/auth');
 const { getPerformanceStats, getRecentRequests } = require('../middleware/performanceMonitoring');
+
+// This router had no router-level rate limit of its own — only the app-wide
+// limiter mounted in server.js. Add an explicit, router-scoped limit as a
+// second layer of defense on these DB-querying admin endpoints.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 /**
  * GET /api/v1/performance/stats
