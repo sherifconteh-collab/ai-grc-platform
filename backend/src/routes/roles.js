@@ -5,8 +5,18 @@ const pool = require('../config/database');
 const { authenticate, requirePermission, requireAnyPermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { ensureAuditorSubroles } = require('../services/auditorRoleTemplates');
+const auditService = require('../services/auditService');
 
 router.use(authenticate);
+
+// A caller can never grant a permission (directly, or via a role they assign)
+// that they don't already hold themselves — otherwise roles.manage alone lets
+// a non-admin mint or assign an over-privileged role and self-escalate.
+function findDisallowedPermissions(req, permissionNames) {
+  const callerPermissions = req.user.permissions || [];
+  if (callerPermissions.includes('*')) return [];
+  return permissionNames.filter((name) => !callerPermissions.includes(name));
+}
 
 // GET /roles
 router.get('/', requirePermission('roles.manage'), async (req, res) => {
@@ -46,6 +56,17 @@ router.post('/', requirePermission('roles.manage'), validateBody((body) => {
   try {
     const { name, description, permissions } = req.body;
 
+    if (permissions && permissions.length > 0) {
+      const disallowed = findDisallowedPermissions(req, permissions);
+      if (disallowed.length > 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'Cannot grant permissions you do not hold',
+          disallowedPermissions: disallowed
+        });
+      }
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -69,6 +90,15 @@ router.post('/', requirePermission('roles.manage'), validateBody((body) => {
       }
 
       await client.query('COMMIT');
+
+      auditService.logFromRequest(req, {
+        eventType: 'role.created',
+        resourceType: 'role',
+        resourceId: role.id,
+        details: { name: role.name, permissions: permissions || [] },
+        success: true
+      }).catch(() => {});
+
       res.status(201).json({ success: true, data: role });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -92,6 +122,17 @@ router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) =>
 }), async (req, res) => {
   try {
     const { name, description, permissions } = req.body;
+
+    if (permissions) {
+      const disallowed = findDisallowedPermissions(req, permissions);
+      if (disallowed.length > 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'Cannot grant permissions you do not hold',
+          disallowedPermissions: disallowed
+        });
+      }
+    }
 
     const client = await pool.connect();
     try {
@@ -121,6 +162,15 @@ router.put('/:roleId', requirePermission('roles.manage'), validateBody((body) =>
       }
 
       await client.query('COMMIT');
+
+      auditService.logFromRequest(req, {
+        eventType: 'role.updated',
+        resourceType: 'role',
+        resourceId: result.rows[0].id,
+        details: { name: result.rows[0].name, permissions: permissions || undefined },
+        success: true
+      }).catch(() => {});
+
       res.json({ success: true, data: result.rows[0] });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -277,6 +327,26 @@ router.post('/assign', requirePermission('roles.manage'), validateBody((body) =>
       return res.status(400).json({ success: false, error: 'One or more roles are invalid for this organization' });
     }
 
+    // A roles.manage holder cannot assign a role (including an existing
+    // system role like admin) that grants permissions they don't already
+    // hold themselves — otherwise assigning the admin role to yourself is a
+    // one-call privilege escalation.
+    const targetPermissionsResult = await pool.query(
+      `SELECT DISTINCT p.name
+       FROM role_permissions rp
+       JOIN permissions p ON p.id = rp.permission_id
+       WHERE rp.role_id = ANY($1::uuid[])`,
+      [uniqueRoleIds]
+    );
+    const disallowed = findDisallowedPermissions(req, targetPermissionsResult.rows.map((row) => row.name));
+    if (disallowed.length > 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'Cannot assign a role that grants permissions you do not hold',
+        disallowedPermissions: disallowed
+      });
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -296,6 +366,14 @@ router.post('/assign', requirePermission('roles.manage'), validateBody((body) =>
     } finally {
       client.release();
     }
+
+    auditService.logFromRequest(req, {
+      eventType: 'role.assigned',
+      resourceType: 'user',
+      resourceId: userId,
+      details: { roleIds: uniqueRoleIds },
+      success: true
+    }).catch(() => {});
 
     res.json({ success: true, message: 'Roles assigned' });
   } catch (error) {

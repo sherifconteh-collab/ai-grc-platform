@@ -1144,7 +1144,10 @@ router.get('/reasoning-memory/entries', requireTier('enterprise'), async (req, r
 });
 
 // DELETE /ai/reasoning-memory — clear all reasoning memory for this org
-router.delete('/reasoning-memory', requireTier('enterprise'), async (req, res) => {
+// Bulk-wipes org-wide state, so it needs the stronger write-tier permission
+// every other mutating action in this file uses, not just the router-wide
+// ai.use gate that everyone with AI access already holds.
+router.delete('/reasoning-memory', requireTier('enterprise'), requirePermission('assessments.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(

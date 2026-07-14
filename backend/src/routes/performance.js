@@ -11,7 +11,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { requirePermission } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/auth');
 const { getPerformanceStats, getRecentRequests } = require('../middleware/performanceMonitoring');
 
 /**
@@ -19,7 +19,7 @@ const { getPerformanceStats, getRecentRequests } = require('../middleware/perfor
  * Get current performance statistics
  * Requires admin permission
  */
-router.get('/stats', requirePermission('admin'), async (req, res) => {
+router.get('/stats', requireAdmin, async (req, res) => {
   try {
     const stats = getPerformanceStats();
     
@@ -63,7 +63,7 @@ router.get('/stats', requirePermission('admin'), async (req, res) => {
  * Get recent request history
  * Requires admin permission
  */
-router.get('/requests', requirePermission('admin'), async (req, res) => {
+router.get('/requests', requireAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const requests = getRecentRequests(Math.min(limit, 500));
@@ -89,7 +89,7 @@ router.get('/requests', requirePermission('admin'), async (req, res) => {
  * Get database performance metrics
  * Requires admin permission
  */
-router.get('/database', requirePermission('admin'), async (req, res) => {
+router.get('/database', requireAdmin, async (req, res) => {
   try {
     const metrics = {};
 
@@ -190,7 +190,7 @@ router.get('/database', requirePermission('admin'), async (req, res) => {
  * Get system resource metrics
  * Requires admin permission
  */
-router.get('/system', requirePermission('admin'), (req, res) => {
+router.get('/system', requireAdmin, (req, res) => {
   try {
     const memory = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
