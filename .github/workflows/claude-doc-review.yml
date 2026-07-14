@@ -1,0 +1,41 @@
+# Claude-triggered documentation review, run automatically on every PR.
+# Requires one-time manual setup by a repo admin (cannot be done from CI):
+#   1. Install the Claude GitHub App: https://github.com/apps/claude
+#   2. Add the ANTHROPIC_API_KEY repository secret
+# Until both are done, this workflow will fail at the anthropics/claude-code-action step.
+name: Claude Doc Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  claude-review:
+    name: Claude Documentation Review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: >
+            Review the documentation impact of this pull request only — do not
+            review code quality or correctness, another workflow handles that.
+            Look at README.md, RELEASE_NOTES.md, .claude/rules/*.md, and any
+            docs/ files. Post a single PR comment covering: (1) which
+            documentation files this PR already updated, (2) which
+            documentation files look like they should have been updated given
+            the code changes but were not, (3) any broken internal links or
+            stale version numbers you notice in the docs this PR touches. If
+            nothing needs attention, say so plainly instead of padding the
+            comment with boilerplate.
+          claude_args: '--max-turns 6'
