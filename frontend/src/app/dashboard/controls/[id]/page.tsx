@@ -24,12 +24,15 @@ interface Implementation {
 
 interface StatusHistoryEntry {
   id: string;
+  event_type: string;
   old_status: string;
   new_status: string;
   notes: string | null;
   changed_at: string;
   changed_by_name: string;
 }
+
+const TEST_RESULT_EVENT_TYPES = ['test_result_changed', 'assessment_result_updated', 'assessment_result_recorded'];
 
 interface EvidenceItem {
   id: string;
@@ -266,6 +269,14 @@ export default function ControlDetailPage() {
     if (testResultCounts.satisfied > 0) return { status: 'satisfied', incomplete: testResultCounts.not_assessed > 0 };
     return { status: 'not_assessed', incomplete: false };
   }, [assessmentProcedures.length, testResultCounts]);
+
+  const { workflowHistory, testResultHistory } = useMemo(() => {
+    const entries = implementation?.status_history || [];
+    return {
+      workflowHistory: entries.filter((entry) => !TEST_RESULT_EVENT_TYPES.includes(entry.event_type)),
+      testResultHistory: entries.filter((entry) => TEST_RESULT_EVENT_TYPES.includes(entry.event_type)),
+    };
+  }, [implementation?.status_history]);
 
   const quickSetProcedureStatus = async (
     procId: string,
@@ -699,6 +710,43 @@ export default function ControlDetailPage() {
                 {testSaving ? 'Saving...' : 'Save Test Result'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Test Result History — every recorded control-level and procedure-level verdict change */}
+        {implementation && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Test Result History</h3>
+            {testResultHistory.length > 0 ? (
+              <div className="relative">
+                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                <div className="space-y-4">
+                  {testResultHistory.map((entry) => (
+                    <div key={entry.id} className="relative flex items-start gap-4 pl-10">
+                      <div className="absolute left-2.5 top-2 w-3 h-3 rounded-full bg-purple-600 border-2 border-white shadow"></div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getTestResultInfo(entry.old_status).color}`}>
+                            {getTestResultInfo(entry.old_status).label}
+                          </span>
+                          <span className="text-gray-400 text-xs">→</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getTestResultInfo(entry.new_status).color}`}>
+                            {getTestResultInfo(entry.new_status).label}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-auto">{formatDatetime(entry.changed_at)}</span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          by {entry.changed_by_name || 'Unknown'}
+                          {entry.notes && <span className="ml-2 italic">— {entry.notes}</span>}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No test results recorded yet.</p>
+            )}
           </div>
         )}
 
@@ -1291,11 +1339,11 @@ export default function ControlDetailPage() {
         {/* Status History Timeline */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Status History</h3>
-          {implementation?.status_history && implementation.status_history.length > 0 ? (
+          {workflowHistory.length > 0 ? (
             <div className="relative">
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
               <div className="space-y-4">
-                {implementation.status_history.map((entry) => (
+                {workflowHistory.map((entry) => (
                   <div key={entry.id} className="relative flex items-start gap-4 pl-10">
                     <div className="absolute left-2.5 top-2 w-3 h-3 rounded-full bg-purple-600 border-2 border-white shadow"></div>
                     <div className="flex-1">
