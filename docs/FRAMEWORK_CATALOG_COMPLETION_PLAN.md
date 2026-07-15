@@ -119,10 +119,17 @@ The largest single gap, and three frameworks fall out of it nearly for free.
    800-53 module through the baseline's ID list — never a hand-authored
    parallel catalog. Replaces today's hand-picked 25-control `fedramp_high`
    and adds `fedramp_moderate`/`fedramp_low`.
-3. **800-171 Rev 3 to 97 requirements, CMMC 2.0 derived from it.** 800-171 r3
-   is also published as OSCAL. CMMC 2.0 L1 (15) and L2 (110, per the DoD
-   800-171 mapping) become derived selections the same way FedRAMP baselines
-   are.
+3. **800-171 Rev 3 to 97 requirements; CMMC 2.0 stays pinned to Rev 2 as its
+   derivation source.** 800-171 r3 is also published as OSCAL and becomes the
+   `comprehensive` `nist_800_171` framework in this wave. CMMC 2.0 L2's 110
+   practices, however, map 1:1 to 800-171 **Rev 2**'s 110 requirements (the
+   official CMMC 2.0 Level 2 Assessment Guide is written against Rev 2, and
+   Rev 3 consolidated down to 97 requirements — there is no 110-item subset of
+   Rev 3 to derive L2 from). So `cmmc_2.0` is generated from a pinned Rev 2
+   800-171 OSCAL catalog kept alongside the Rev 3 module specifically for this
+   derivation, not from the `nist_800_171` framework seeded above. L1 (15)
+   derives the same way, also from Rev 2. Re-derive CMMC 2.0 from Rev 3 only
+   if/when DoD publishes an updated mapping.
 4. **CSF 2.0 top-up to 106 subcategories** (30 missing) — small, hand-authored
    from the public CSF 2.0 core, rides along in this wave.
 
@@ -144,7 +151,7 @@ module header.
 - `iso_27002` 15 → 93 (same control set as 27001 Annex A, guidance-level
   descriptions; consider generating from the 27001 module with adjusted
   descriptions to avoid double authoring).
-- `iso_27017` → full cloud control set (31 base + 7 cloud-only extensions).
+- `iso_27017` → full cloud control set (30 base + 7 cloud-only extensions).
 - `iso_27018` → full PII-protection extension set.
 - `iso_27701` → 49 PIMS controls (Annex A controller + Annex B processor).
 - `iso_42001` 16 → 38 Annex A AI-management controls.
