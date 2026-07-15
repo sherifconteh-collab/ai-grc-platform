@@ -469,7 +469,7 @@ router.patch('/:id/test-result', requirePermission('assessments.write'), validat
       `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
        VALUES ($1, $2, 'test_result_changed', 'control', $3, $4)`,
       [req.user.organization_id, req.user.id, existing.rows[0].control_id,
-       JSON.stringify({ old_status: oldTestResult, status: test_result, notes: result.rows[0].test_notes })]
+       JSON.stringify({ old_status: oldTestResult, status: test_result, notes: result.rows[0]?.test_notes })]
     );
 
     res.json({ success: true, data: result.rows[0] });
