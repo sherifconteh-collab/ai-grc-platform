@@ -18,7 +18,6 @@ const { encrypt, hashForLookup } = require('../src/utils/encrypt');
 const {
   DEMO_ADMIN_ACCOUNTS,
   DEFAULT_DEMO_PASSWORD,
-  MIN_DEMO_PASSWORD_LENGTH,
   resolveDemoAccountPassword
 } = require('./lib/demo-account-config');
 
@@ -135,10 +134,11 @@ async function run() {
     }
 
     if (HAS_EXPLICIT_PASSWORD_OVERRIDE) {
-      console.log(`\n  Password for all accounts (reset): ${PASSWORD}`);
+      // Do not echo the credential: the operator supplied it and it is a secret at rest.
+      console.log('\n  Account passwords reset to the value supplied via the DEMO_ACCOUNT_PASSWORD environment variable.');
     } else {
-      console.log(`\n  New accounts password: ${PASSWORD}`);
-      console.log(`  Existing account passwords were preserved (set DEMO_ACCOUNT_PASSWORD env var to rotate; minimum ${MIN_DEMO_PASSWORD_LENGTH} characters).`);
+      console.log('\n  New accounts use the default demo password documented in this script\'s header comment.');
+      console.log('  Existing account passwords were preserved (set DEMO_ACCOUNT_PASSWORD to rotate them).');
     }
     console.log('  Account lockouts cleared and is_active=true ensured for all accounts.');
     console.log('\n✅ Demo accounts ready.\n');

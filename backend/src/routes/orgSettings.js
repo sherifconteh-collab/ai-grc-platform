@@ -1768,7 +1768,7 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
        WHERE a.organization_id = $1
        ORDER BY a.name`, [orgId]
     );
-    assetsResult.rows = assetsResult.rows.map((a) => ({ ...a, owner_email: decrypt(a.owner_email) }));
+    assetsResult.rows = assetsResult.rows.map((a) => ({ ...a, owner_email: a.owner_email ? decrypt(a.owner_email) : null }));
 
     // 5. Users (name and email only — no passwords)
     const usersResult = await pool.query(
@@ -1776,7 +1776,7 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
        FROM users u WHERE u.organization_id = $1
        ORDER BY u.created_at`, [orgId]
     );
-    usersResult.rows = usersResult.rows.map((u) => ({ ...u, email: decrypt(u.email) }));
+    usersResult.rows = usersResult.rows.map((u) => ({ ...u, email: u.email ? decrypt(u.email) : null }));
 
     // 6. Audit logs (last 1000)
     const auditResult = await pool.query(
