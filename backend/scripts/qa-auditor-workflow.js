@@ -67,7 +67,8 @@ function request(method, urlPath, body, token, attempt = 0) {
       method,
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 30000
     };
 
     if (token) {
@@ -105,6 +106,7 @@ function request(method, urlPath, body, token, attempt = 0) {
       });
     });
 
+    req.on('timeout', () => req.destroy(new Error('Request timed out')));
     req.on('error', (error) => resolve({ status: 0, body: error.message }));
     if (payload) req.write(payload);
     req.end();

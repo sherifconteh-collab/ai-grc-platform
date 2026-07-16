@@ -14,6 +14,7 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const pool = require('../src/config/database');
+const { encrypt, hashForLookup } = require('../src/utils/encrypt');
 const {
   DEMO_ADMIN_ACCOUNTS,
   DEFAULT_DEMO_PASSWORD,
@@ -65,15 +66,21 @@ async function run() {
       try {
         const orgId = await upsertOrg(client, acct);
 
-        // Upsert user (email is unique)
+        // users.email is field-level encrypted at rest (migrations/101_user_pii_encryption.sql);
+        // email_hash is the deterministic HMAC-SHA-384 lookup/uniqueness key since encrypt()
+        // uses a random IV and never produces the same ciphertext twice.
+        const emailHash = hashForLookup(acct.email);
+
+        // Upsert user (email_hash is the stable unique key across re-runs).
         // Always reset lockout state and ensure account is active.
         // Only update password_hash when DEMO_ACCOUNT_PASSWORD is explicitly provided.
         if (HAS_EXPLICIT_PASSWORD_OVERRIDE) {
           await client.query(
-            `INSERT INTO users (organization_id, email, password_hash, first_name, last_name, role, is_active, failed_login_attempts, locked_until)
-             VALUES ($1, $2, $3, $4, $5, 'admin', true, 0, NULL)
-             ON CONFLICT (email) DO UPDATE
+            `INSERT INTO users (organization_id, email, email_hash, password_hash, first_name, last_name, role, is_active, failed_login_attempts, locked_until)
+             VALUES ($1, $2, $3, $4, $5, $6, 'admin', true, 0, NULL)
+             ON CONFLICT (email_hash) DO UPDATE
                SET organization_id        = EXCLUDED.organization_id,
+                   email                  = EXCLUDED.email,
                    password_hash          = EXCLUDED.password_hash,
                    first_name             = EXCLUDED.first_name,
                    last_name              = EXCLUDED.last_name,
@@ -81,28 +88,29 @@ async function run() {
                    is_active              = true,
                    failed_login_attempts  = 0,
                    locked_until           = NULL`,
-            [orgId, acct.email, passwordHash, acct.firstName, acct.lastName]
+            [orgId, encrypt(acct.email), emailHash, passwordHash, acct.firstName, acct.lastName]
           );
         } else {
           await client.query(
-            `INSERT INTO users (organization_id, email, password_hash, first_name, last_name, role, is_active, failed_login_attempts, locked_until)
-             VALUES ($1, $2, $3, $4, $5, 'admin', true, 0, NULL)
-             ON CONFLICT (email) DO UPDATE
+            `INSERT INTO users (organization_id, email, email_hash, password_hash, first_name, last_name, role, is_active, failed_login_attempts, locked_until)
+             VALUES ($1, $2, $3, $4, $5, $6, 'admin', true, 0, NULL)
+             ON CONFLICT (email_hash) DO UPDATE
                SET organization_id        = EXCLUDED.organization_id,
+                   email                  = EXCLUDED.email,
                    first_name             = EXCLUDED.first_name,
                    last_name              = EXCLUDED.last_name,
                    role                   = 'admin',
                    is_active              = true,
                    failed_login_attempts  = 0,
                    locked_until           = NULL`,
-            [orgId, acct.email, passwordHash, acct.firstName, acct.lastName]
+            [orgId, encrypt(acct.email), emailHash, passwordHash, acct.firstName, acct.lastName]
           );
         }
 
         // Get user id for profile
         const userRes = await client.query(
-          'SELECT id FROM users WHERE email = $1',
-          [acct.email]
+          'SELECT id FROM users WHERE email_hash = $1',
+          [emailHash]
         );
         const userId = userRes.rows[0].id;
 

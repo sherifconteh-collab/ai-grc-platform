@@ -58,7 +58,8 @@ function req(method, urlPath, body, token, raw = false, attempt = 0) {
       port: url.port || (url.protocol === 'https:' ? 443 : 80),
       path: url.pathname + url.search,
       method,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000
     };
     if (token) opts.headers.Authorization = 'Bearer ' + token;
 
@@ -96,6 +97,7 @@ function req(method, urlPath, body, token, raw = false, attempt = 0) {
         resolve({ s: res.statusCode, b: parsedBody });
       });
     });
+    r.on('timeout', () => r.destroy(new Error('Request timed out')));
     r.on('error', e => resolve({ s: 0, b: e.message }));
     if (body) r.write(JSON.stringify(body));
     r.end();
