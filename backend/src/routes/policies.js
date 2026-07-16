@@ -57,18 +57,18 @@ router.get('/', requirePermission('controls.read'), async (req, res) => {
     const orgId = req.user.organization_id;
     const { status, policy_type, limit = 100, offset = 0 } = req.query;
 
-    const where = ['organization_id = $1'];
+    const where = ['p.organization_id = $1'];
     const params = [orgId];
     let idx = 2;
 
     if (status && ALLOWED_POLICY_STATUSES.includes(String(status))) {
-      where.push(`status = $${idx}`);
+      where.push(`p.status = $${idx}`);
       params.push(status);
       idx++;
     }
 
     if (policy_type) {
-      where.push(`policy_type = $${idx}`);
+      where.push(`p.policy_type = $${idx}`);
       params.push(String(policy_type));
       idx++;
     }
@@ -95,7 +95,7 @@ router.get('/', requirePermission('controls.read'), async (req, res) => {
     );
 
     const countResult = await pool.query(
-      `SELECT COUNT(*)::int AS total FROM organization_policies WHERE ${where.join(' AND ')}`,
+      `SELECT COUNT(*)::int AS total FROM organization_policies p WHERE ${where.join(' AND ')}`,
       params
     );
 

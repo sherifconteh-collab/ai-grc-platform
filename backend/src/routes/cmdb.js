@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requireTier } = require('../middleware/auth');
 const { requireProEdition } = require('../middleware/edition');
+const { validateBody, requireFields } = require('../middleware/validate');
 
 router.use(authenticate);
 router.use(requireProEdition('cmdb')); // Edition check BEFORE tier check
@@ -59,7 +60,7 @@ router.get('/environments/:id', async (req, res) => {
   } catch (error) { console.error('CMDB error:', error); res.status(500).json({ success: false, error: 'Internal server error' }); }
 });
 
-router.post('/environments', async (req, res) => {
+router.post('/environments', validateBody((body) => requireFields(body, ['name', 'code'])), async (req, res) => {
   try {
     const { name, code, environment_type, description, contains_pii, contains_phi, contains_pci,
             data_classification, network_zone, security_level, criticality } = req.body;
@@ -207,7 +208,7 @@ router.get('/service-accounts/:id', async (req, res) => {
   } catch (error) { console.error('CMDB error:', error); res.status(500).json({ success: false, error: 'Internal server error' }); }
 });
 
-router.post('/service-accounts', async (req, res) => {
+router.post('/service-accounts', validateBody((body) => requireFields(body, ['account_name'])), async (req, res) => {
   try {
     const { account_name, account_type, description, owner_id, vault_id, credential_type,
             rotation_frequency_days, privilege_level, scope } = req.body;
