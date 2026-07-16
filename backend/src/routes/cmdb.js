@@ -5,10 +5,22 @@ const pool = require('../config/database');
 const { authenticate, requireTier } = require('../middleware/auth');
 const { requireProEdition } = require('../middleware/edition');
 const { validateBody, requireFields } = require('../middleware/validate');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
 router.use(requireProEdition('cmdb')); // Edition check BEFORE tier check
 router.use(requireTier('pro'));
+
+// Rate limiter: 120 requests per 15 minutes per org. Defense-in-depth alongside
+// the global /api/v1 limiter, and consistent with tprm/evidence/etc. route modules.
+const cmdbRateLimiter = createRateLimiter({
+  label: 'cmdb',
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
+});
+router.use(cmdbRateLimiter);
+
 router.use((req, res, next) => {
   const permissions = req.user?.permissions || [];
   const has = (name) => permissions.includes('*') || permissions.includes(name);
