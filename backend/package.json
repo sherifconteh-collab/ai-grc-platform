@@ -124,6 +124,7 @@
     "glob": "^11.0.1",
     "hono": "^4.12.28",
     "socket.io-parser": "4.2.6",
+    "websocket-driver": ">=0.7.5",
     "yauzl": ">=3.2.1",
     "@xmldom/xmldom": ">=0.8.12",
     "node-forge": ">=1.4.0",
