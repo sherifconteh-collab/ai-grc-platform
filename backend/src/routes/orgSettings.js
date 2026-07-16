@@ -1722,13 +1722,13 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
     // 1. Organization profile
     const orgResult = await pool.query(
       `SELECT o.id, o.name, o.tier, o.created_at, o.updated_at,
-              op.company_legal_name, op.industry, op.website, op.hq_location,
+              op.company_legal_name, op.industry, op.website, op.headquarters_location,
               op.employee_count_range, op.company_description, op.system_name,
               op.system_description, op.authorization_boundary, op.operating_environment_summary,
               op.confidentiality_impact, op.integrity_impact, op.availability_impact,
               op.impact_rationale, op.environment_types, op.deployment_model,
               op.cloud_providers, op.data_sensitivity_types, op.rmf_stage,
-              op.information_types, op.compliance_profile
+              op.compliance_profile
        FROM organizations o
        LEFT JOIN organization_profiles op ON op.organization_id = o.id
        WHERE o.id = $1`, [orgId]
@@ -1759,14 +1759,16 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
 
     // 4. Assets
     const assetsResult = await pool.query(
-      `SELECT a.name, a.asset_type, a.description, a.criticality, a.status,
-              a.owner, a.location, a.ip_address, a.mac_address,
+      `SELECT a.name, a.criticality, a.status,
+              owner.email AS owner_email, a.location, a.ip_address, a.mac_address,
               ac.name AS category_name, ac.code AS category_code
        FROM assets a
        LEFT JOIN asset_categories ac ON ac.id = a.category_id
+       LEFT JOIN users owner ON owner.id = a.owner_id
        WHERE a.organization_id = $1
        ORDER BY a.name`, [orgId]
     );
+    assetsResult.rows = assetsResult.rows.map((a) => ({ ...a, owner_email: a.owner_email ? decrypt(a.owner_email) : null }));
 
     // 5. Users (name and email only — no passwords)
     const usersResult = await pool.query(
@@ -1774,6 +1776,7 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
        FROM users u WHERE u.organization_id = $1
        ORDER BY u.created_at`, [orgId]
     );
+    usersResult.rows = usersResult.rows.map((u) => ({ ...u, email: u.email ? decrypt(u.email) : null }));
 
     // 6. Audit logs (last 1000)
     const auditResult = await pool.query(

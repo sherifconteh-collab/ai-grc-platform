@@ -191,7 +191,7 @@ function buildWhereClause(orgId, queryParams) {
 
   if (queryParams.search) {
     where.push(`(
-      vf.vulnerability_id ILIKE $${idx}
+      vf.vulnerability_id::text ILIKE $${idx}
       OR vf.title ILIKE $${idx}
       OR vf.finding_key ILIKE $${idx}
       OR COALESCE(vf.package_name, '') ILIKE $${idx}

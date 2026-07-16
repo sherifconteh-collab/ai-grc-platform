@@ -9,6 +9,7 @@
  * We seed the most critical controls from each family.
  */
 
+require('dotenv').config();
 const { Pool } = require('pg');
 
 const pool = process.env.DATABASE_URL
