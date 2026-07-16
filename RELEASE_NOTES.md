@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix(qa): port CW-Pro's QA scripts and fix bugs they surfaced ([#220](https://github.com/sherifconteh-collab/ai-grc-platform/pull/220)) — @sherifconteh-collab
 - fix(compliance): platform-wide feature audit — linkage, controls, catalog, UI build-out ([#209](https://github.com/sherifconteh-collab/ai-grc-platform/pull/209)) — @sherifconteh-collab
 - chore(frontend)(deps): bump date-fns from 4.1.0 to 4.4.0 in /frontend ([#215](https://github.com/sherifconteh-collab/ai-grc-platform/pull/215)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump eslint from 10.3.0 to 10.7.0 in /frontend ([#211](https://github.com/sherifconteh-collab/ai-grc-platform/pull/211)) — @dependabot[bot]
