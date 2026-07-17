@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- docs: add framework catalog completion plan (waves 0-4) ([#216](https://github.com/sherifconteh-collab/ai-grc-platform/pull/216)) — @sherifconteh-collab
 - fix(qa): port CW-Pro's QA scripts and fix bugs they surfaced ([#220](https://github.com/sherifconteh-collab/ai-grc-platform/pull/220)) — @sherifconteh-collab
 - fix(compliance): platform-wide feature audit — linkage, controls, catalog, UI build-out ([#209](https://github.com/sherifconteh-collab/ai-grc-platform/pull/209)) — @sherifconteh-collab
 - chore(frontend)(deps): bump date-fns from 4.1.0 to 4.4.0 in /frontend ([#215](https://github.com/sherifconteh-collab/ai-grc-platform/pull/215)) — @dependabot[bot]

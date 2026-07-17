@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-16 | PR #220: fix(qa): port CW-Pro's QA scripts and fix bugs they surfaced -->
+<!-- LAST_UPDATED: 2026-07-17 | PR #216: docs: add framework catalog completion plan (waves 0-4) -->
 
 ## 🎯 What is This?
 
