@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-17 | PR #216: docs: add framework catalog completion plan (waves 0-4) -->
+<!-- LAST_UPDATED: 2026-07-17 | PR #219: fix: record and display control test-result history -->
 
 ## 🎯 What is This?
 
