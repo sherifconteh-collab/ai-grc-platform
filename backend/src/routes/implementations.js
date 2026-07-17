@@ -249,6 +249,7 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
 
     const statusHistoryResult = await pool.query(`
       SELECT al.id,
+             al.event_type,
              COALESCE(al.details->>'old_status', 'not_started') as old_status,
              COALESCE(al.details->>'status', al.details->>'new_status', 'not_started') as new_status,
              al.details->>'notes' as notes,
@@ -438,16 +439,39 @@ router.patch('/:id/test-result', requirePermission('assessments.write'), validat
 }), async (req, res) => {
   try {
     const { test_result, test_notes } = req.body;
-    const result = await pool.query(
-      `UPDATE control_implementations
-       SET test_result = $1, test_notes = $2, updated_at = NOW()
-       WHERE id = $3 AND organization_id = $4
-       RETURNING id, test_result, test_notes, updated_at`,
-      [test_result, test_notes || null, req.params.id, req.user.organization_id]
+
+    const existing = await pool.query(
+      'SELECT id, test_result, control_id FROM control_implementations WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
     );
-    if (result.rows.length === 0) {
+
+    if (existing.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Implementation not found' });
     }
+
+    const oldTestResult = existing.rows[0].test_result;
+    const hasTestNotes = Object.prototype.hasOwnProperty.call(req.body || {}, 'test_notes');
+
+    const result = await pool.query(
+      `UPDATE control_implementations
+       SET test_result = $1,
+           test_notes = CASE WHEN $2 THEN $3 ELSE test_notes END,
+           updated_at = NOW()
+       WHERE id = $4 AND organization_id = $5
+       RETURNING id, test_result, test_notes, updated_at`,
+      [test_result, hasTestNotes, test_notes || null, req.params.id, req.user.organization_id]
+    );
+
+    // Log audit — resource_id uses the framework_control id (not the
+    // control_implementations id) to stay consistent with the /status route
+    // and assessments/procedures.js, so all three feed the same history feed.
+    await pool.query(
+      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
+       VALUES ($1, $2, 'test_result_changed', 'control', $3, $4)`,
+      [req.user.organization_id, req.user.id, existing.rows[0].control_id,
+       JSON.stringify({ old_status: oldTestResult, status: test_result, notes: result.rows[0]?.test_notes })]
+    );
+
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     log('error', 'test_result_update_error', { error: error?.message || String(error) });
