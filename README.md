@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-14 | PR #209: fix(compliance): platform-wide feature audit — linkage, controls, catalog, UI build-out -->
+<!-- LAST_UPDATED: 2026-07-17 | PR #216: docs: add framework catalog completion plan (waves 0-4) -->
 
 ## 🎯 What is This?
 

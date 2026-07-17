@@ -1,5 +1,12 @@
 # ControlWeave - Framework Coverage
 
+> **Note:** the counts in this document date from the original 7-framework
+> release and are historical. The platform now seeds 33+ frameworks with
+> 700+ controls of varying completeness (labeled per-framework via
+> `frameworks.coverage_status`). For the live inventory and the roadmap to
+> full per-framework catalogs, see
+> [FRAMEWORK_CATALOG_COMPLETION_PLAN.md](FRAMEWORK_CATALOG_COMPLETION_PLAN.md).
+
 ## Overview
 
 This platform provides **comprehensive coverage of 7 major compliance and governance frameworks**, totaling over **429+ controls** across cybersecurity, AI governance, privacy, and industry-specific regulations.
