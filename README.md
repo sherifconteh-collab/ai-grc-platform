@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-17 | PR #219: fix: record and display control test-result history -->
+<!-- LAST_UPDATED: 2026-07-18 | PR #221: fix: wire real scheduled report generation and email delivery -->
 
 ## 🎯 What is This?
 
@@ -930,7 +930,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Tables**: 170+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 115 sequential, idempotent migrations
 - **API Routes**: 70+ route modules
-- **Services**: 50 service modules
+- **Services**: 52 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
