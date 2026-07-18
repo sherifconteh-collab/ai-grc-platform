@@ -9,17 +9,37 @@ const { log } = require('../utils/logger');
 const { runScheduledReport } = require('./jobService');
 
 let schedulerHandle = null;
+let isSweeping = false;
 
 async function runDueReportsSweep() {
+  // Same-instance overlap guard: a slow SMTP send or PDF generation can
+  // make one sweep outlast the interval; without this a second setInterval
+  // tick would start processing the same rows again before the first
+  // sweep's claim below has bumped their next_run_at.
+  if (isSweeping) return;
+  isSweeping = true;
   try {
-    const due = await pool.query(
-      `SELECT id, organization_id
-         FROM scheduled_reports
-        WHERE is_active = true
-          AND (next_run_at IS NULL OR next_run_at <= NOW())`
+    // Atomically claim due rows with FOR UPDATE SKIP LOCKED (same pattern
+    // as jobService.js's evidence_collection_rules claim) so that a second
+    // process instance running this same sweep concurrently skips rows
+    // already locked here, instead of both sending the same report email.
+    // The claim bumps next_run_at forward as a placeholder; runScheduledReport
+    // overwrites it with the real schedule-derived value once it completes.
+    const claimed = await pool.query(
+      `WITH due AS (
+         SELECT id FROM scheduled_reports
+         WHERE is_active = true
+           AND (next_run_at IS NULL OR next_run_at <= NOW())
+         FOR UPDATE SKIP LOCKED
+       )
+       UPDATE scheduled_reports
+       SET next_run_at = NOW() + INTERVAL '1 hour'
+       FROM due
+       WHERE scheduled_reports.id = due.id
+       RETURNING scheduled_reports.id, scheduled_reports.organization_id`
     );
 
-    for (const row of due.rows) {
+    for (const row of claimed.rows) {
       try {
         const result = await runScheduledReport({
           scheduledReportId: row.id,
@@ -37,11 +57,13 @@ async function runDueReportsSweep() {
       }
     }
 
-    if (due.rows.length > 0) {
-      log('info', 'scheduled_reports.sweep.completed', { count: due.rows.length });
+    if (claimed.rows.length > 0) {
+      log('info', 'scheduled_reports.sweep.completed', { count: claimed.rows.length });
     }
   } catch (error) {
     log('error', 'scheduled_reports.sweep.failed', { error: error.message });
+  } finally {
+    isSweeping = false;
   }
 }
 

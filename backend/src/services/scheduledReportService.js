@@ -16,7 +16,7 @@ async function fetchFrameworkGapRows(orgId) {
        LEFT JOIN control_implementations ci
          ON ci.control_id = fc.id AND ci.organization_id = of2.organization_id
       WHERE of2.organization_id = $1
-        AND COALESCE(ci.status, 'not_started') NOT IN ('implemented', 'satisfied_via_crosswalk')
+        AND COALESCE(ci.status, 'not_started') NOT IN ('implemented', 'satisfied_via_crosswalk', 'verified', 'not_applicable')
       ORDER BY f.name, fc.control_id`,
     [orgId]
   );
