@@ -833,3 +833,6 @@ router.post('/scheduled/:id/run', requirePermission('reports.manage'), async (re
 });
 
 module.exports = router;
+// Exposed for reuse by services/scheduledReportService.js (attaching to the
+// router function itself keeps `app.use(reportsRoutes)` unchanged).
+module.exports.getComplianceData = getComplianceData;
