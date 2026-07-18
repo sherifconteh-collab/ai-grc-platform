@@ -293,7 +293,10 @@ async function sendReportEmail({ orgId, recipients, subject, reportName, attachm
   if (!transport) return false // SMTP not configured — silent no-op, caller logs the skip
 
   const toList = (Array.isArray(recipients) ? recipients : [recipients])
-    .map((r) => (typeof r === 'string' ? r : r?.email))
+    .map((r) => {
+      const email = typeof r === 'string' ? r : r?.email
+      return typeof email === 'string' ? email.trim() : null
+    })
     .filter(Boolean)
   if (toList.length === 0) return false
 
