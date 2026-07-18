@@ -4,6 +4,16 @@ const path = require('path');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
 const { processPendingWebhookDeliveries } = require('./webhookService');
+const { generateReportFile } = require('./scheduledReportService');
+const { sendReportEmail } = require('./emailService');
+const { log } = require('../utils/logger');
+
+const SCHEDULE_INTERVAL_MS = Object.freeze({
+  daily: 24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000,
+  monthly: 30 * 24 * 60 * 60 * 1000,
+  quarterly: 91 * 24 * 60 * 60 * 1000
+});
 
 async function enqueueJob({ organizationId = null, jobType, payload = {}, createdBy = null, runAfter = null }) {
   const result = await pool.query(
@@ -159,18 +169,53 @@ async function runScheduledReport({ scheduledReportId, organizationId }) {
   if (!scheduledReportId || !organizationId) {
     return { noop: true, reason: 'scheduledReportId and organizationId required' };
   }
-  const report = await pool.query(
-    'SELECT * FROM scheduled_reports WHERE id = $1 AND organization_id = $2',
+  const reportResult = await pool.query(
+    `SELECT sr.*, o.name AS organization_name
+       FROM scheduled_reports sr
+       JOIN organizations o ON o.id = sr.organization_id
+      WHERE sr.id = $1 AND sr.organization_id = $2`,
     [scheduledReportId, organizationId]
   );
-  if (report.rows.length === 0) {
+  if (reportResult.rows.length === 0) {
     return { noop: true, reason: 'Scheduled report not found' };
   }
+  const report = reportResult.rows[0];
+  const nextRunAt = new Date(Date.now() + (SCHEDULE_INTERVAL_MS[report.schedule] || SCHEDULE_INTERVAL_MS.monthly));
+
+  let delivered = false;
+  let deliveryError = null;
+  try {
+    const file = await generateReportFile({
+      organizationId,
+      orgName: report.organization_name,
+      reportType: report.report_type,
+      format: report.format
+    });
+    delivered = await sendReportEmail({
+      orgId: organizationId,
+      recipients: report.recipients,
+      subject: `ControlWeave scheduled report: ${report.name}`,
+      reportName: report.name,
+      attachment: file
+    });
+  } catch (error) {
+    deliveryError = error.message;
+    log('error', 'scheduled_report.run_failed', { scheduledReportId, error: error.message });
+  }
+
   await pool.query(
-    'UPDATE scheduled_reports SET last_run_at = NOW() WHERE id = $1',
-    [scheduledReportId]
+    'UPDATE scheduled_reports SET last_run_at = NOW(), next_run_at = $2 WHERE id = $1',
+    [scheduledReportId, nextRunAt]
   );
-  return { executed: true, report_id: scheduledReportId, report_type: report.rows[0].report_type };
+
+  return {
+    executed: true,
+    report_id: scheduledReportId,
+    report_type: report.report_type,
+    delivered,
+    delivery_error: deliveryError,
+    next_run_at: nextRunAt.toISOString()
+  };
 }
 
 async function runScheduledEvidenceCollection({ organizationId }) {
@@ -409,5 +454,6 @@ async function processPendingJobs({ organizationId = null, limit = 20 } = {}) {
 module.exports = {
   enqueueJob,
   processPendingJobs,
-  runRetentionCleanup
+  runRetentionCleanup,
+  runScheduledReport
 };

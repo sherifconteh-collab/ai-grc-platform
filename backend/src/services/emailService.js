@@ -288,6 +288,44 @@ async function sendPasswordResetEmail({ email, fullName, resetLink, orgId = null
   });
 }
 
+async function sendReportEmail({ orgId, recipients, subject, reportName, attachment }) {
+  const transport = await _getTransporterForOrg(orgId)
+  if (!transport) return false // SMTP not configured — silent no-op, caller logs the skip
+
+  const toList = (Array.isArray(recipients) ? recipients : [recipients]).filter(Boolean)
+  if (toList.length === 0) return false
+
+  const fromEmail = await _getFromEmailForOrg(orgId)
+  const safeReportName = escapeHtml(reportName)
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px">
+      <h2 style="color:#7c3aed;margin-bottom:4px">ControlWeave</h2>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin-bottom:24px"/>
+      <p>Your scheduled report <strong>${safeReportName}</strong> is attached.</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin-top:24px"/>
+      <p style="color:#9ca3af;font-size:12px">You're receiving this because this address is configured as a recipient for this scheduled report.
+        Manage scheduled reports in <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/reports">Reports</a>.</p>
+    </div>`
+
+  await transport.sendMail({
+    from: fromEmail,
+    to: toList.join(','),
+    subject,
+    text: `Your scheduled report "${reportName}" is attached.`,
+    html,
+    attachments: [
+      {
+        filename: attachment.filename,
+        content: attachment.buffer,
+        contentType: attachment.mimeType
+      }
+    ]
+  })
+
+  return true
+}
+
 function buildDemoAccountDeliveryTemplate({
   prospectName,
   accountEmail,
@@ -459,6 +497,7 @@ module.exports = {
   sendPasswordResetEmail,
   sendDemoAccountDeliveryEmail,
   sendSalesFollowUpEmail,
+  sendReportEmail,
   buildDemoAccountDeliveryTemplate,
   buildSalesFollowUpTemplate,
   invalidateSmtpCache,
