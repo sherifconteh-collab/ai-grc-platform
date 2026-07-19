@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-18 | PR #221: fix: wire real scheduled report generation and email delivery -->
+<!-- LAST_UPDATED: 2026-07-19 | PR #222: feat(controls): connector-to-control AI auto-assessment with approval workflow -->
 
 ## 🎯 What is This?
 

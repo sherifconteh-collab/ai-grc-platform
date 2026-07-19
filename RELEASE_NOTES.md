@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- feat(controls): connector-to-control AI auto-assessment with approval workflow ([#222](https://github.com/sherifconteh-collab/ai-grc-platform/pull/222)) — @sherifconteh-collab
 - fix: wire real scheduled report generation and email delivery ([#221](https://github.com/sherifconteh-collab/ai-grc-platform/pull/221)) — @sherifconteh-collab
 - fix: record and display control test-result history ([#219](https://github.com/sherifconteh-collab/ai-grc-platform/pull/219)) — @sherifconteh-collab
 - docs: add framework catalog completion plan (waves 0-4) ([#216](https://github.com/sherifconteh-collab/ai-grc-platform/pull/216)) — @sherifconteh-collab
