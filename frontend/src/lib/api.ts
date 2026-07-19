@@ -1237,6 +1237,22 @@ export const pendingEvidenceAPI = {
     api.post(`/pending-evidence/${id}/reject`, { notes }),
 };
 
+// Pending Control Assessments APIs (AI-suggested control status changes with approval workflow)
+export const pendingControlAssessmentsAPI = {
+  scan: () => api.post('/pending-control-assessments/scan'),
+
+  getAll: (status?: 'pending' | 'approved' | 'rejected' | 'all') =>
+    api.get('/pending-control-assessments', { params: { status: status || 'pending' } }),
+
+  getStats: () => api.get('/pending-control-assessments/stats'),
+
+  approve: (id: string, notes?: string) =>
+    api.post(`/pending-control-assessments/${id}/approve`, { notes }),
+
+  reject: (id: string, notes?: string) =>
+    api.post(`/pending-control-assessments/${id}/reject`, { notes }),
+};
+
 // Reports APIs
 export const reportsAPI = {
   getTypes: () => api.get('/reports/types'),

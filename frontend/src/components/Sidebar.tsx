@@ -32,6 +32,7 @@ const navigationSections: NavigationSection[] = [
     label: 'Compliance',
     items: [
       { name: 'Controls', href: '/dashboard/controls', icon: '✅', requiredPermissions: ['organizations.read'] },
+      { name: 'AI Control Assessments', href: '/dashboard/controls/pending-assessments', icon: '🤖', requiredPermissions: ['implementations.read'] },
       { name: 'Exceptions', href: '/dashboard/exceptions', icon: '⚠️', requiredPermissions: ['controls.read'] },
       { name: 'Frameworks', href: '/dashboard/frameworks', icon: '📐', requiredPermissions: ['organizations.read'] },
       { name: 'Evidence', href: '/dashboard/evidence', icon: '📄', requiredPermissions: ['evidence.read'] },
