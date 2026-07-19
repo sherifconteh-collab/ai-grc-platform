@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix(crosswalks): close every framework with zero crosswalk mappings ([#224](https://github.com/sherifconteh-collab/ai-grc-platform/pull/224)) — @sherifconteh-collab
 - feat(controls): connector-to-control AI auto-assessment with approval workflow ([#222](https://github.com/sherifconteh-collab/ai-grc-platform/pull/222)) — @sherifconteh-collab
 - fix: wire real scheduled report generation and email delivery ([#221](https://github.com/sherifconteh-collab/ai-grc-platform/pull/221)) — @sherifconteh-collab
 - fix: record and display control test-result history ([#219](https://github.com/sherifconteh-collab/ai-grc-platform/pull/219)) — @sherifconteh-collab

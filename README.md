@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-19 | PR #222: feat(controls): connector-to-control AI auto-assessment with approval workflow -->
+<!-- LAST_UPDATED: 2026-07-19 | PR #224: fix(crosswalks): close every framework with zero crosswalk mappings -->
 
 ## 🎯 What is This?
 
