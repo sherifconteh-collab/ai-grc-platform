@@ -29,6 +29,7 @@ router.use(requireTier('pro'));
 const MAX_EVIDENCE_PER_CONTROL = 5;
 const MAX_AI_EVIDENCE_SAMPLE_LENGTH = 2000;
 const MAX_RULES_PER_SCAN = 10;
+const SCAN_CONCURRENCY = 3;
 const AI_ASSESSMENT_SYSTEM_PROMPT =
   'You assess whether new evidence changes a compliance control\'s implementation status. Respond ONLY with valid JSON, no markdown.';
 
@@ -87,6 +88,7 @@ or if no change is warranted:
       throw new Error(`Failed to parse LLM response JSON. Raw response snippet: "${text.slice(0, 200)}". Error: ${parseErr.message}`);
     }
 
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
     if (!parsed.should_change) return null;
 
     const suggestedStatus = sanitizeStatus(parsed.suggested_status);
@@ -146,58 +148,70 @@ router.post(
         }
       }
 
-      for (const control of controlsResult.rows) {
-        try {
-          const evidenceResult = await pool.query(
-            `SELECT e.id, e.file_name AS title, e.description, e.created_at
-               FROM evidence e
-               JOIN evidence_control_links ecl ON ecl.evidence_id = e.id
-              WHERE e.organization_id = $1 AND ecl.control_id = $2
-              ORDER BY e.created_at DESC
-              LIMIT $3`,
-            [orgId, control.id, MAX_EVIDENCE_PER_CONTROL]
-          );
-          if (evidenceResult.rows.length === 0) continue;
+      // Each control's evidence lookup + LLM call is independent, so controls are
+      // assessed in small concurrent batches rather than one at a time -- LLM
+      // calls are slow/network-bound, and running MAX_RULES_PER_SCAN of them
+      // sequentially risked gateway/client timeouts on a full scan.
+      async function assessOneControl(control) {
+        const evidenceResult = await pool.query(
+          `SELECT e.id, e.file_name AS title, e.description, e.created_at
+             FROM evidence e
+             JOIN evidence_control_links ecl ON ecl.evidence_id = e.id
+            WHERE e.organization_id = $1 AND ecl.control_id = $2
+            ORDER BY e.created_at DESC
+            LIMIT $3`,
+          [orgId, control.id, MAX_EVIDENCE_PER_CONTROL]
+        );
+        if (evidenceResult.rows.length === 0) return null;
 
-          const rule = ruleByControl.get(control.id);
-          const assessment = await aiAssessControlStatus(
+        const rule = ruleByControl.get(control.id);
+        const assessment = await aiAssessControlStatus(
+          orgId,
+          control,
+          control.current_status,
+          evidenceResult.rows.map((e) => ({ title: e.title, description: e.description, collected_at: e.created_at }))
+        );
+        if (!assessment) return null;
+
+        const ins = await pool.query(
+          `INSERT INTO pending_control_assessments (
+             organization_id, control_id, rule_id, source_type, source_summary,
+             current_status, ai_suggested_status, ai_confidence, ai_reasoning, evidence_ids
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::uuid[])
+           ON CONFLICT (organization_id, control_id) WHERE status = 'pending'
+           DO UPDATE SET
+             rule_id = EXCLUDED.rule_id, source_type = EXCLUDED.source_type,
+             source_summary = EXCLUDED.source_summary, ai_suggested_status = EXCLUDED.ai_suggested_status,
+             ai_confidence = EXCLUDED.ai_confidence, ai_reasoning = EXCLUDED.ai_reasoning,
+             evidence_ids = EXCLUDED.evidence_ids, updated_at = NOW()
+           RETURNING id, ai_suggested_status, ai_confidence, status`,
+          [
             orgId,
-            control,
+            control.id,
+            rule ? rule.id : null,
+            rule ? rule.source_type : 'connector',
+            `${evidenceResult.rows.length} evidence item${evidenceResult.rows.length === 1 ? '' : 's'} linked to ${control.control_code}`,
             control.current_status,
-            evidenceResult.rows.map((e) => ({ title: e.title, description: e.description, collected_at: e.created_at }))
-          );
-          if (!assessment) continue;
+            assessment.suggested_status,
+            assessment.confidence,
+            assessment.reasoning,
+            evidenceResult.rows.map((e) => e.id)
+          ]
+        );
+        return ins.rows[0];
+      }
 
-          const ins = await pool.query(
-            `INSERT INTO pending_control_assessments (
-               organization_id, control_id, rule_id, source_type, source_summary,
-               current_status, ai_suggested_status, ai_confidence, ai_reasoning, evidence_ids
-             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::uuid[])
-             ON CONFLICT (organization_id, control_id) WHERE status = 'pending'
-             DO UPDATE SET
-               rule_id = EXCLUDED.rule_id, source_type = EXCLUDED.source_type,
-               source_summary = EXCLUDED.source_summary, ai_suggested_status = EXCLUDED.ai_suggested_status,
-               ai_confidence = EXCLUDED.ai_confidence, ai_reasoning = EXCLUDED.ai_reasoning,
-               evidence_ids = EXCLUDED.evidence_ids, updated_at = NOW()
-             RETURNING id, ai_suggested_status, ai_confidence, status`,
-            [
-              orgId,
-              control.id,
-              rule ? rule.id : null,
-              rule ? rule.source_type : 'connector',
-              `${evidenceResult.rows.length} evidence item${evidenceResult.rows.length === 1 ? '' : 's'} linked to ${control.control_code}`,
-              control.current_status,
-              assessment.suggested_status,
-              assessment.confidence,
-              assessment.reasoning,
-              evidenceResult.rows.map((e) => e.id)
-            ]
-          );
-          created.push(ins.rows[0]);
-        } catch (controlErr) {
-          console.error(`Control assessment failed for ${control.control_code}:`, controlErr.message);
-        }
+      for (let i = 0; i < controlsResult.rows.length; i += SCAN_CONCURRENCY) {
+        const batch = controlsResult.rows.slice(i, i + SCAN_CONCURRENCY);
+        const results = await Promise.allSettled(batch.map(assessOneControl));
+        results.forEach((result, idx) => {
+          if (result.status === 'fulfilled') {
+            if (result.value) created.push(result.value);
+          } else {
+            console.error(`Control assessment failed for ${batch[idx].control_code}:`, result.reason?.message);
+          }
+        });
       }
 
       await pool.query(

@@ -237,14 +237,14 @@ export default function PendingControlAssessmentsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleApprove(item.id)}
-                          disabled={actionLoading === item.id}
+                          disabled={actionLoading !== null}
                           className="flex-1 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
                         >
                           {actionLoading === item.id ? '…' : 'Approve'}
                         </button>
                         <button
                           onClick={() => handleReject(item.id)}
-                          disabled={actionLoading === `reject-${item.id}`}
+                          disabled={actionLoading !== null}
                           className="flex-1 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded border border-red-200 hover:bg-red-100 disabled:opacity-50 transition-colors"
                         >
                           {actionLoading === `reject-${item.id}` ? '…' : 'Reject'}
