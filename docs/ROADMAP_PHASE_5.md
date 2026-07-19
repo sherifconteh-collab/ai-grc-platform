@@ -30,7 +30,7 @@ The GitHub connector port (once complete, mirroring ControlWeaver-Pro
 there: the `evidence_collection_rules.source_type` CHECK constraint here
 likely has the identical `('splunk', 'connector')`-only gap (verify
 against this repo's migration history before assuming), the Auto-Evidence
-rule creation form may have the same "always submits `source_config: {}}`"
+rule creation form may have the same "always submits `source_config: {}`"
 bug, and any Splunk/GitHub token storage should go through this repo's
 `utils/encrypt.js` equivalent rather than storing plaintext with
 `is_encrypted: true` set incorrectly — check `services/splunkService.js`
