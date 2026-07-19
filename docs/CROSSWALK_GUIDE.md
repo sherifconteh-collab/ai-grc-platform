@@ -2,7 +2,7 @@
 
 ## Overview
 
-The ControlWeave includes comprehensive **cross-framework control mappings** (also called "crosswalks") that show relationships between controls across all 6 major frameworks. This is one of the platform's most powerful features.
+The ControlWeave includes comprehensive **cross-framework control mappings** (also called "crosswalks") that show relationships between controls across every framework in the catalog — every framework has at least one crosswalk mapping to another framework; none are isolated. This is one of the platform's most powerful features.
 
 ## What Are Crosswalks?
 
@@ -15,15 +15,13 @@ These three controls from different frameworks all require multi-factor authenti
 
 ## Supported Framework Combinations
 
-The platform includes mappings between:
+Every framework in the catalog has at least one crosswalk mapping to another framework — none are isolated. Coverage clusters around a few hub frameworks:
 
-1. **NIST CSF 2.0 ↔ NIST SP 800-171**
-2. **NIST SP 800-171 ↔ NIST SP 800-53**
-3. **NIST CSF 2.0 ↔ ISO 27001:2022**
-4. **SOC 2 ↔ NIST CSF 2.0**
-5. **ISO 27001:2022 ↔ SOC 2**
-6. **NIST AI RMF ↔ NIST CSF 2.0**
-7. **NIST AI RMF ↔ ISO 27001:2022**
+- **Security/general-controls hub** (NIST SP 800-53, ISO/IEC 27001:2022, NIST CSF 2.0): the densest cluster, with NIST 800-53 and ISO 27001 each individually cross-mapped to a dozen-plus other frameworks (SOC 2, GDPR, HIPAA, HITECH, CIS Controls v8, FedRAMP High, NERC CIP, FISCAM, FFIEC, NIST 800-171, NIST 800-207, the ISO risk/cloud/privacy family — 27002, 27005, 27017, 27018, 31000 — and more).
+- **AI-governance hub** (NIST AI RMF, EU AI Act): cross-mapped to ISO/IEC 42001:2023, ISO/IEC 42005:2025, AIUC-1, and the financial-sector AI frameworks (SR 11-7, SEC AI Risk Management, FINRA Supervisory Controls for AI), plus the International and US State AI Governance Law catalogs — including a direct mapping from each law framework's own EU-AI-Act-derived subset back to the canonical `eu_ai_act` framework, and a cross-link between the International and State AI Governance "core" program-management controls.
+- **Privacy hub** (GDPR, NIST Privacy Framework, ISO/IEC 27701:2019): cross-mapped to CCPA/CPRA, ISO/IEC 27018:2019, and the AI-governance law frameworks' data-protection provisions.
+
+Not every control in every framework has a mapping — coverage breadth (touching every framework) was prioritized over exhaustive per-control depth. See `backend/scripts/seed-iso27001-2022-crosswalks.js`, `seed-hipaa-crosswalks.js`, and `seed-crosswalk-completion.js` for the full, current set of seeded mappings.
 
 ## Mapping Types
 
