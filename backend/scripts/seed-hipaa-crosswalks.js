@@ -272,7 +272,8 @@ async function insertCrosswalk(client, mapping, sourceFwCode, targetFwCode) {
 
   const existing = await client.query(
     `SELECT id FROM control_mappings
-     WHERE source_control_id = $1 AND target_control_id = $2
+     WHERE (source_control_id = $1 AND target_control_id = $2)
+        OR (source_control_id = $2 AND target_control_id = $1)
      LIMIT 1`,
     [srcCtrl.rows[0].id, tgtCtrl.rows[0].id]
   );
