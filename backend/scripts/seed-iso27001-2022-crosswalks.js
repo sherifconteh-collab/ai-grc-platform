@@ -139,24 +139,29 @@ const ISO_27001_TO_NIST_CSF = [
 // ISO 27001:2022 → GDPR Additional Mappings
 // ============================================================
 const ISO_27001_TO_GDPR = [
-  { source: 'A.5.34', source_fw: 'iso_27001', target: 'Art-5',   target_fw: 'gdpr', score: 95, type: 'equivalent' },
-  { source: 'A.5.12', source_fw: 'iso_27001', target: 'Art-5',   target_fw: 'gdpr', score: 85, type: 'related' },
-  { source: 'A.8.10', source_fw: 'iso_27001', target: 'Art-17',  target_fw: 'gdpr', score: 90, type: 'equivalent' },
-  { source: 'A.8.12', source_fw: 'iso_27001', target: 'Art-32',  target_fw: 'gdpr', score: 90, type: 'equivalent' },
-  { source: 'A.5.31', source_fw: 'iso_27001', target: 'Art-5',   target_fw: 'gdpr', score: 90, type: 'equivalent' },
-  { source: 'A.5.33', source_fw: 'iso_27001', target: 'Art-5',   target_fw: 'gdpr', score: 85, type: 'related' },
-  { source: 'A.6.5',  source_fw: 'iso_27001', target: 'Art-32',  target_fw: 'gdpr', score: 80, type: 'related' },
+  { source: 'A.5.34', source_fw: 'iso_27001', target: 'GDPR-5',   target_fw: 'gdpr', score: 95, type: 'equivalent' },
+  { source: 'A.5.12', source_fw: 'iso_27001', target: 'GDPR-5',   target_fw: 'gdpr', score: 85, type: 'related' },
+  { source: 'A.8.10', source_fw: 'iso_27001', target: 'GDPR-17',  target_fw: 'gdpr', score: 90, type: 'equivalent' },
+  { source: 'A.8.12', source_fw: 'iso_27001', target: 'GDPR-32',  target_fw: 'gdpr', score: 90, type: 'equivalent' },
+  { source: 'A.5.31', source_fw: 'iso_27001', target: 'GDPR-5',   target_fw: 'gdpr', score: 90, type: 'equivalent' },
+  { source: 'A.5.33', source_fw: 'iso_27001', target: 'GDPR-5',   target_fw: 'gdpr', score: 85, type: 'related' },
+  { source: 'A.6.5',  source_fw: 'iso_27001', target: 'GDPR-32',  target_fw: 'gdpr', score: 80, type: 'related' },
 ];
 
+// NOTE: HIPAA control IDs in the DB are prefixed with 'HIPAA-' per
+// seed-frameworks.js. See scripts/seed-hipaa-crosswalks.js for the
+// comprehensive HIPAA ↔ NIST 800-53 / ISO 27001:2022 mapping set. The
+// entries below are a minimal subset kept here for backwards compatibility
+// with operators that ran this script previously.
 // ============================================================
 // ISO 27001:2022 → HIPAA Additional Mappings
 // ============================================================
 const ISO_27001_TO_HIPAA = [
-  { source: 'A.8.3',  source_fw: 'iso_27001', target: '164.312(a)', target_fw: 'hipaa', score: 90, type: 'equivalent' },
-  { source: 'A.8.5',  source_fw: 'iso_27001', target: '164.312(d)', target_fw: 'hipaa', score: 90, type: 'equivalent' },
-  { source: 'A.8.15', source_fw: 'iso_27001', target: '164.312(b)', target_fw: 'hipaa', score: 90, type: 'equivalent' },
-  { source: 'A.8.13', source_fw: 'iso_27001', target: '164.308(a)', target_fw: 'hipaa', score: 85, type: 'related' },
-  { source: 'A.5.26', source_fw: 'iso_27001', target: '164.308(a)', target_fw: 'hipaa', score: 85, type: 'related' },
+  { source: 'A.8.3',  source_fw: 'iso_27001', target: 'HIPAA-164.312(a)(1)', target_fw: 'hipaa', score: 90, type: 'equivalent' }, // ip-hygiene:ignore
+  { source: 'A.8.5',  source_fw: 'iso_27001', target: 'HIPAA-164.312(d)',    target_fw: 'hipaa', score: 90, type: 'equivalent' }, // ip-hygiene:ignore
+  { source: 'A.8.15', source_fw: 'iso_27001', target: 'HIPAA-164.312(b)',    target_fw: 'hipaa', score: 90, type: 'equivalent' }, // ip-hygiene:ignore
+  { source: 'A.8.13', source_fw: 'iso_27001', target: 'HIPAA-164.308(a)(7)', target_fw: 'hipaa', score: 85, type: 'related' },    // ip-hygiene:ignore
+  { source: 'A.5.26', source_fw: 'iso_27001', target: 'HIPAA-164.308(a)(6)', target_fw: 'hipaa', score: 85, type: 'related' },    // ip-hygiene:ignore
 ];
 
 // ============================================================
