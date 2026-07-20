@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-20 | PR #223: docs: add Phase 5 roadmap -->
+<!-- LAST_UPDATED: 2026-07-20 | PR #232: revert(frontend): downgrade typescript 7.0.2 back to 6.0.3 — breaks production build -->
 
 ## 🎯 What is This?
 

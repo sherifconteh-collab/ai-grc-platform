@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- revert(frontend): downgrade typescript 7.0.2 back to 6.0.3 — breaks production build ([#232](https://github.com/sherifconteh-collab/ai-grc-platform/pull/232)) — @sherifconteh-collab
 - docs: add Phase 5 roadmap ([#223](https://github.com/sherifconteh-collab/ai-grc-platform/pull/223)) — @sherifconteh-collab
 - chore(frontend)(deps): bump next from 16.2.7 to 16.2.10 in /frontend ([#228](https://github.com/sherifconteh-collab/ai-grc-platform/pull/228)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @types/node from 25.9.5 to 26.1.1 in /frontend ([#227](https://github.com/sherifconteh-collab/ai-grc-platform/pull/227)) — @dependabot[bot]
