@@ -11,7 +11,9 @@ import type { PieLabelRenderProps, PieSectorDataItem } from 'recharts';
 
 function formatDateLabel(label: ReactNode): string {
   if (label === undefined || label === null) return '';
-  return new Date(String(label)).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const date = new Date(String(label));
+  if (isNaN(date.getTime())) return String(label);
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 const CHART_COLORS = ['#7c3aed', '#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];

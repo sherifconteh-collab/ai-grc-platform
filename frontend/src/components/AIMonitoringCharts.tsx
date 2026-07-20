@@ -8,7 +8,9 @@ import {
 
 function formatDateLabel(label: ReactNode): string {
   if (label === undefined || label === null) return '';
-  return new Date(String(label)).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const date = new Date(String(label));
+  if (isNaN(date.getTime())) return String(label);
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 interface UsageDataItem {
