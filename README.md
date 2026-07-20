@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-19 | PR #224: fix(crosswalks): close every framework with zero crosswalk mappings -->
+<!-- LAST_UPDATED: 2026-07-20 | PR #228: chore(frontend)(deps): bump next from 16.2.7 to 16.2.10 in /frontend -->
 
 ## 🎯 What is This?
 
