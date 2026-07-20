@@ -8,6 +8,10 @@
 const expected = require('./expected-counts');
 
 function verifyExpectedCounts(frameworks) {
+  if (!Array.isArray(frameworks)) {
+    throw new Error('verifyExpectedCounts: frameworks must be an array');
+  }
+
   const errors = [];
 
   if (frameworks.length !== expected.totalFrameworks) {
@@ -16,12 +20,14 @@ function verifyExpectedCounts(frameworks) {
 
   const seenCodes = new Set();
   for (const fw of frameworks) {
+    if (!fw) continue;
     seenCodes.add(fw.code);
+    const controlCount = fw.controls?.length ?? 0;
     const expectedCount = expected.perFramework[fw.code];
     if (expectedCount === undefined) {
       errors.push(`Framework "${fw.code}" is not in the expected-counts manifest (lib/frameworks/expected-counts.js). Regenerate it.`);
-    } else if (fw.controls.length !== expectedCount) {
-      errors.push(`Framework "${fw.code}": expected ${expectedCount} controls, found ${fw.controls.length}.`);
+    } else if (controlCount !== expectedCount) {
+      errors.push(`Framework "${fw.code}": expected ${expectedCount} controls, found ${controlCount}.`);
     }
   }
 
@@ -31,7 +37,7 @@ function verifyExpectedCounts(frameworks) {
     }
   }
 
-  const totalControls = frameworks.reduce((sum, f) => sum + f.controls.length, 0);
+  const totalControls = frameworks.reduce((sum, f) => sum + (f?.controls?.length ?? 0), 0);
   if (totalControls !== expected.totalControls) {
     errors.push(`Expected ${expected.totalControls} total controls, found ${totalControls}.`);
   }
