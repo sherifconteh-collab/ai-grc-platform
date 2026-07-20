@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(ci): bump actions/setup-node from 4 to 7 ([#226](https://github.com/sherifconteh-collab/ai-grc-platform/pull/226)) — @dependabot[bot]
 - chore(ci): bump actions/checkout from 4 to 7 ([#225](https://github.com/sherifconteh-collab/ai-grc-platform/pull/225)) — @dependabot[bot]
 - fix(crosswalks): close every framework with zero crosswalk mappings ([#224](https://github.com/sherifconteh-collab/ai-grc-platform/pull/224)) — @sherifconteh-collab
 - feat(controls): connector-to-control AI auto-assessment with approval workflow ([#222](https://github.com/sherifconteh-collab/ai-grc-platform/pull/222)) — @sherifconteh-collab
