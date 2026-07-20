@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-20 | PR #233: chore(frontend)(deps): bump recharts from 2.15.4 to 3.9.2 in /frontend -->
+<!-- LAST_UPDATED: 2026-07-20 | PR #234: refactor(backend): split seed-frameworks.js into per-framework modules -->
 
 ## 🎯 What is This?
 
