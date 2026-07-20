@@ -53,11 +53,11 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-20 | PR #231: chore(frontend)(deps-dev): bump @tailwindcss/postcss from 4.3.2 to 4.3.3 in /frontend -->
+<!-- LAST_UPDATED: 2026-07-20 | PR #233: chore(frontend)(deps): bump recharts from 2.15.4 to 3.9.2 in /frontend -->
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 30+ frameworks with 1,000+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 15+ frameworks with 1,000+ controls. Built to be:
 
 - **Multi-Framework**: 30+ major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
@@ -96,7 +96,7 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
 - 📊 Compliance dashboard with real-time metrics and custom dashboard builder
-- 🎯 Framework selection (30+ frameworks, 1,000+ controls)
+- 🎯 Framework selection (15+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks)
 - 📜 AU-2 compliant immutable audit logging
@@ -331,7 +331,7 @@ Full RMF lifecycle management without leaving the platform:
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
-- Track compliance across 30+ frameworks simultaneously
+- Track compliance across 15+ frameworks simultaneously
 - **Cross-framework control mapping (Crosswalks)** — 80+ mappings showing control overlaps
 - Unified risk register
 - Gap analysis across standards
@@ -671,7 +671,7 @@ controlweave/
 ### Core Tables
 - `organizations` — Multi-tenant support
 - `users` — Authentication and profiles with AES-256-GCM PII encryption and HMAC-SHA-384 email hashing
-- `frameworks` — Framework catalog (30+ frameworks)
+- `frameworks` — Framework catalog (15+ frameworks)
 - `framework_controls` — Individual controls/requirements
 - `control_implementations` — Org-specific implementation status
 
@@ -721,7 +721,7 @@ controlweave/
 ## 🎯 Use Cases
 
 ### For Compliance Officers
-- Track compliance across 30+ frameworks simultaneously
+- Track compliance across 15+ frameworks simultaneously
 - Leverage auto-crosswalk to reduce compliance burden by 40-60%
 - Use AI Copilot with RAG for grounded gap analysis and compliance forecasting
 - Generate audit-ready reports and documentation
@@ -798,7 +798,7 @@ controlweave/
 
 ### Phase 1: Foundation ✅
 - ✅ Complete PostgreSQL schema (140+ tables)
-- ✅ 30+ framework seed data (1,000+ controls)
+- ✅ 15+ framework seed data (1,000+ controls)
 - ✅ Cross-framework crosswalk mappings (80+)
 - ✅ REST API with full CRUD operations
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA

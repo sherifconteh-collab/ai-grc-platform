@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(frontend)(deps): bump recharts from 2.15.4 to 3.9.2 in /frontend ([#233](https://github.com/sherifconteh-collab/ai-grc-platform/pull/233)) — @sherifconteh-collab
 - chore(frontend)(deps-dev): bump @tailwindcss/postcss from 4.3.2 to 4.3.3 in /frontend ([#231](https://github.com/sherifconteh-collab/ai-grc-platform/pull/231)) — @sherifconteh-collab
 - revert(frontend): downgrade typescript 7.0.2 back to 6.0.3 — breaks production build ([#232](https://github.com/sherifconteh-collab/ai-grc-platform/pull/232)) — @sherifconteh-collab
 - docs: add Phase 5 roadmap ([#223](https://github.com/sherifconteh-collab/ai-grc-platform/pull/223)) — @sherifconteh-collab
