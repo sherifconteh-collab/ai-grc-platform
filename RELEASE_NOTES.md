@@ -4,6 +4,28 @@
 
 ---
 
+## [Unreleased]
+
+> Changes staged but not yet released to production.
+
+## [4.6.0] — 2026-07-20
+
+### Added
+
+- **Connector-to-control AI auto-assessment with approval workflow** ([#222](https://github.com/sherifconteh-collab/ai-grc-platform/pull/222)): when a connector rule produces new evidence linked to a control, an AI assessment pass can suggest a status change (forward progress or regression), staged as a pending assessment for human approval before `control_implementations` is ever touched — mirroring the established "AI proposes, human approves" pattern from pending evidence. Ships migration `130` (`pending_control_assessments`).
+- **Framework catalog completion plan (waves 0–4)** ([#216](https://github.com/sherifconteh-collab/ai-grc-platform/pull/216)): the per-framework roadmap referenced by migration `123_framework_coverage_status.sql` — NIST 800-53 base controls, FedRAMP/CMMC baseline derivation, ISO family, PCI DSS v4, CIS v8, DISA STIG + CCI.
+- **Working QA/test script suite** ([#220](https://github.com/sherifconteh-collab/ai-grc-platform/pull/220)): ported ControlWeaver-Pro's QA scripts (`qa-dynamic.js`, `qa-auditor-workflow.js`, mega-QA, demo-account helpers, and more) — the 11+ `qa:*`/`test:*` npm scripts that previously failed with "Cannot find module" now run, and the bugs they surfaced were fixed in the same PR.
+
+### Fixed
+
+- **Scheduled reports now actually generate and deliver** ([#221](https://github.com/sherifconteh-collab/ai-grc-platform/pull/221)): `scheduled_reports` had CRUD and a job-runner that only ever touched `last_run_at`. New `scheduledReportService` generates a real PDF/CSV/JSON file from live data per report type, `emailService.sendReportEmail()` delivers it over the org's existing SMTP transport, and the runner is invoked on schedule.
+- **Control test-result history is recorded and displayed** ([#219](https://github.com/sherifconteh-collab/ai-grc-platform/pull/219)): the Control Testing card's Save button silently overwrote prior verdicts with no audit trail, and the Status History timeline rendered assessment-outcome entries as "Not Started → Not Started". Test-result changes now write a `test_result_changed` audit event and render in a dedicated Test Result History timeline (history is only guaranteed going forward — pre-fix changes were never recorded).
+- **Every framework now has crosswalk mappings** ([#224](https://github.com/sherifconteh-collab/ai-grc-platform/pull/224)): a live audit found 14 of 33 frameworks had zero crosswalk mappings (HITECH, five ISO 27000-family standards, ISO 42005, FISCAM, FFIEC, SR 11-7, SEC/FINRA AI catalogs, both AI Governance Law catalogs). The ISO 27001:2022 seed script existed but was never wired into any npm script; it and the other gaps are now seeded and verified.
+
+### Changed
+
+- Release hygiene: the `[Unreleased]` section had accumulated every merged-PR bullet since v3.5.0 without ever being cleared when releases were cut, and sat buried mid-file. It now lives at the top and is emptied at each release; entries above are the post-4.5.1 changes it contained.
+
 ## [4.5.1] — 2026-07-14
 
 ### Changed
@@ -315,47 +337,6 @@
 ### Licensing
 
 - Relicensed to the ControlWeave dual license (AGPL-3.0 + commercial).
-
-## [Unreleased]
-
-> Changes staged but not yet released to production.
-
-### Changed
-- fix(crosswalks): close every framework with zero crosswalk mappings ([#224](https://github.com/sherifconteh-collab/ai-grc-platform/pull/224)) — @sherifconteh-collab
-- feat(controls): connector-to-control AI auto-assessment with approval workflow ([#222](https://github.com/sherifconteh-collab/ai-grc-platform/pull/222)) — @sherifconteh-collab
-- fix: wire real scheduled report generation and email delivery ([#221](https://github.com/sherifconteh-collab/ai-grc-platform/pull/221)) — @sherifconteh-collab
-- fix: record and display control test-result history ([#219](https://github.com/sherifconteh-collab/ai-grc-platform/pull/219)) — @sherifconteh-collab
-- docs: add framework catalog completion plan (waves 0-4) ([#216](https://github.com/sherifconteh-collab/ai-grc-platform/pull/216)) — @sherifconteh-collab
-- fix(qa): port CW-Pro's QA scripts and fix bugs they surfaced ([#220](https://github.com/sherifconteh-collab/ai-grc-platform/pull/220)) — @sherifconteh-collab
-- fix(compliance): platform-wide feature audit — linkage, controls, catalog, UI build-out ([#209](https://github.com/sherifconteh-collab/ai-grc-platform/pull/209)) — @sherifconteh-collab
-- chore(frontend)(deps): bump date-fns from 4.1.0 to 4.4.0 in /frontend ([#215](https://github.com/sherifconteh-collab/ai-grc-platform/pull/215)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump eslint from 10.3.0 to 10.7.0 in /frontend ([#211](https://github.com/sherifconteh-collab/ai-grc-platform/pull/211)) — @dependabot[bot]
-- feat(rmf): package inheritance from COTS products + flagship GRC differentiators ([#207](https://github.com/sherifconteh-collab/ai-grc-platform/pull/207)) — @sherifconteh-collab
-- chore(backend)(deps): bump redis from 5.12.1 to 6.0.0 in /backend ([#200](https://github.com/sherifconteh-collab/ai-grc-platform/pull/200)) — @dependabot[bot]
-- chore(ci): bump actions/checkout from 4 to 7 ([#205](https://github.com/sherifconteh-collab/ai-grc-platform/pull/205)) — @dependabot[bot]
-- chore(deps-dev): bump form-data from 4.0.5 to 4.0.6 in /electron in the npm_and_yarn group across 1 directory ([#203](https://github.com/sherifconteh-collab/ai-grc-platform/pull/203)) — @dependabot[bot]
-- chore(frontend)(deps): bump react and @types/react in /frontend ([#198](https://github.com/sherifconteh-collab/ai-grc-platform/pull/198)) — @dependabot[bot]
-- chore(backend)(deps): bump ioredis from 5.10.1 to 5.11.0 in /backend ([#194](https://github.com/sherifconteh-collab/ai-grc-platform/pull/194)) — @dependabot[bot]
-- chore(frontend)(deps): bump react-dom from 19.2.6 to 19.2.7 in /frontend ([#199](https://github.com/sherifconteh-collab/ai-grc-platform/pull/199)) — @dependabot[bot]
-- chore(backend)(deps): bump firebase-admin from 13.8.0 to 13.10.0 in /backend ([#196](https://github.com/sherifconteh-collab/ai-grc-platform/pull/196)) — @dependabot[bot]
-- chore(frontend)(deps): bump axios from 1.16.0 to 1.16.1 in /frontend ([#193](https://github.com/sherifconteh-collab/ai-grc-platform/pull/193)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump @types/node from 25.9.0 to 25.9.1 in /frontend ([#195](https://github.com/sherifconteh-collab/ai-grc-platform/pull/195)) — @dependabot[bot]
-- chore(backend)(deps): bump stripe from 22.1.1 to 22.2.0 in /backend ([#192](https://github.com/sherifconteh-collab/ai-grc-platform/pull/192)) — @dependabot[bot]
-- chore(ci): bump gitleaks/gitleaks-action from 2 to 3 ([#191](https://github.com/sherifconteh-collab/ai-grc-platform/pull/191)) — @dependabot[bot]
-- chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory ([#189](https://github.com/sherifconteh-collab/ai-grc-platform/pull/189)) — @dependabot[bot]
-- chore: v4.2.2 — fix 23-hour build times (npm cache + scoped macOS/Linux triggers) ([#190](https://github.com/sherifconteh-collab/ai-grc-platform/pull/190)) — @sherifconteh-collab
-- chore: release v4.2.1 — CI improvements + release changelog publishing ([#188](https://github.com/sherifconteh-collab/ai-grc-platform/pull/188)) — @sherifconteh-collab
-- feat(v4.2.0): port ControlWeaver-Pro v4.2.0 features + dependency updates ([#187](https://github.com/sherifconteh-collab/ai-grc-platform/pull/187)) — @sherifconteh-collab
-- chore(frontend)(deps): bump lucide-react from 1.14.0 to 1.16.0 in /frontend ([#185](https://github.com/sherifconteh-collab/ai-grc-platform/pull/185)) — @dependabot[bot]
-- chore(backend)(deps-dev): bump globals from 17.5.0 to 17.6.0 in /backend ([#186](https://github.com/sherifconteh-collab/ai-grc-platform/pull/186)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump @playwright/test from 1.59.1 to 1.60.0 in /frontend ([#183](https://github.com/sherifconteh-collab/ai-grc-platform/pull/183)) — @dependabot[bot]
-- chore(backend)(deps): bump @anthropic-ai/sdk from 0.97.0 to 0.98.0 in /backend ([#182](https://github.com/sherifconteh-collab/ai-grc-platform/pull/182)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump tailwindcss from 4.2.4 to 4.3.0 in /frontend ([#179](https://github.com/sherifconteh-collab/ai-grc-platform/pull/179)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump @types/react from 19.2.14 to 19.2.15 in /frontend ([#177](https://github.com/sherifconteh-collab/ai-grc-platform/pull/177)) — @dependabot[bot]
-- fix(ci): split macOS build into native arm64 + x64 jobs; fix framework tiers ([#176](https://github.com/sherifconteh-collab/ai-grc-platform/pull/176)) — @sherifconteh-collab
-- feat: ControlWeave 4.0.0 — full open-source parity (de-tier + all features) ([#174](https://github.com/sherifconteh-collab/ai-grc-platform/pull/174)) — @sherifconteh-collab
-
-- feat: sync ControlWeave v3.4.0 + v3.5.0 functionality ([#173](https://github.com/sherifconteh-collab/ai-grc-platform/pull/173)) — @sherifconteh-collab
 
 ## [3.5.0] — 2026-05-18
 
