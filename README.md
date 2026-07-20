@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-20 | PR #232: revert(frontend): downgrade typescript 7.0.2 back to 6.0.3 — breaks production build -->
+<!-- LAST_UPDATED: 2026-07-20 | PR #231: chore(frontend)(deps-dev): bump @tailwindcss/postcss from 4.3.2 to 4.3.3 in /frontend -->
 
 ## 🎯 What is This?
 
