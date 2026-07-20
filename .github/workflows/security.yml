@@ -126,6 +126,12 @@ jobs:
           DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
         run: node scripts/migrate-all.js
 
+      - name: Seed frameworks and verify against expected-counts manifest
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
+        run: npm run seed:frameworks
+
   secret-scanning:
     name: Scan for Hardcoded Secrets
     runs-on: ubuntu-latest
