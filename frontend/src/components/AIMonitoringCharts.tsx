@@ -1,9 +1,17 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line,
 } from 'recharts';
+
+function formatDateLabel(label: ReactNode): string {
+  if (label === undefined || label === null) return '';
+  const date = new Date(String(label));
+  if (isNaN(date.getTime())) return String(label);
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
 
 interface UsageDataItem {
   date: string;
@@ -31,7 +39,7 @@ export function AIUsageChart({ data }: { data: UsageDataItem[] }) {
           />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip
-            labelFormatter={(v: string) => new Date(v).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            labelFormatter={formatDateLabel}
           />
           <Area 
             type="monotone" 
@@ -69,7 +77,7 @@ export function AIDecisionTimeline({ data }: { data: any[] }) {
           />
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip
-            labelFormatter={(v: string) => new Date(v).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            labelFormatter={formatDateLabel}
           />
           <Line type="monotone" dataKey="high_risk" stroke="#ef4444" strokeWidth={2} name="High Risk" />
           <Line type="monotone" dataKey="medium_risk" stroke="#f59e0b" strokeWidth={2} name="Medium Risk" />
