@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(frontend)(deps-dev): bump @types/node from 25.9.5 to 26.1.1 in /frontend ([#227](https://github.com/sherifconteh-collab/ai-grc-platform/pull/227)) — @dependabot[bot]
 - chore(ci): bump actions/setup-node from 4 to 7 ([#226](https://github.com/sherifconteh-collab/ai-grc-platform/pull/226)) — @dependabot[bot]
 - chore(ci): bump actions/checkout from 4 to 7 ([#225](https://github.com/sherifconteh-collab/ai-grc-platform/pull/225)) — @dependabot[bot]
 - fix(crosswalks): close every framework with zero crosswalk mappings ([#224](https://github.com/sherifconteh-collab/ai-grc-platform/pull/224)) — @sherifconteh-collab
