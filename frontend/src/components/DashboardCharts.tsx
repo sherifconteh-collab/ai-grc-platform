@@ -1,11 +1,18 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
   AreaChart, Area,
 } from 'recharts';
+import type { PieLabelRenderProps, PieSectorDataItem } from 'recharts';
+
+function formatDateLabel(label: ReactNode): string {
+  if (label === undefined || label === null) return '';
+  return new Date(String(label)).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
 
 const CHART_COLORS = ['#7c3aed', '#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
@@ -51,9 +58,9 @@ export function StatusPieChart({ data, onSliceClick }: { data: StatusDataItem[];
             outerRadius={80}
             paddingAngle={3}
             dataKey="value"
-            label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
+            label={({ name, value }: PieLabelRenderProps) => `${name}: ${value}`}
             style={onSliceClick ? { cursor: 'pointer' } : undefined}
-            onClick={onSliceClick ? (entry: StatusDataItem) => onSliceClick(entry.name) : undefined}
+            onClick={onSliceClick ? (entry: PieSectorDataItem) => entry.name && onSliceClick(String(entry.name)) : undefined}
           >
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -84,8 +91,9 @@ export function FrameworkBarChart({ data }: { data: FrameworkChartItem[] }) {
           data={data}
           margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
           onClick={(state) => {
-            if (state?.activePayload?.[0]?.payload?.code) {
-              router.push(`/dashboard/controls?framework=${encodeURIComponent(state.activePayload[0].payload.code)}`);
+            const item = data.find(d => d.name === state?.activeLabel);
+            if (item?.code) {
+              router.push(`/dashboard/controls?framework=${encodeURIComponent(item.code)}`);
             }
           }}
           style={{ cursor: 'pointer' }}
@@ -94,13 +102,13 @@ export function FrameworkBarChart({ data }: { data: FrameworkChartItem[] }) {
           <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-25} textAnchor="end" height={60} />
           <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} unit="%" />
           <Tooltip
-            formatter={(value: number, name: string) => {
+            formatter={(value, name) => {
               if (name === 'compliance') return [`${value}%`, 'Compliance'];
               return [value, name];
             }}
-            labelFormatter={(label: string) => {
+            labelFormatter={(label: ReactNode) => {
               const item = data.find(d => d.name === label);
-              return `${item?.fullName || label} — Click to view controls`;
+              return `${item?.fullName ?? String(label ?? '')} — Click to view controls`;
             }}
           />
           <Bar dataKey="compliance" radius={[4, 4, 0, 0]}>
@@ -126,9 +134,7 @@ export function ComplianceTrendChart({ data }: { data: TrendDataItem[] }) {
             tickFormatter={(v: string) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           />
           <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip
-            labelFormatter={(v: string) => new Date(v).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-          />
+          <Tooltip labelFormatter={formatDateLabel} />
           <Area type="monotone" dataKey="implemented" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.15} strokeWidth={2} name="Implemented" />
           <Area type="monotone" dataKey="total_changes" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.08} strokeWidth={2} name="Total Changes" />
         </AreaChart>
