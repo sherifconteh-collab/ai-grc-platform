@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-20 | PR #228: chore(frontend)(deps): bump next from 16.2.7 to 16.2.10 in /frontend -->
+<!-- LAST_UPDATED: 2026-07-20 | PR #223: docs: add Phase 5 roadmap -->
 
 ## 🎯 What is This?
 

@@ -321,6 +321,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- docs: add Phase 5 roadmap ([#223](https://github.com/sherifconteh-collab/ai-grc-platform/pull/223)) — @sherifconteh-collab
 - chore(frontend)(deps): bump next from 16.2.7 to 16.2.10 in /frontend ([#228](https://github.com/sherifconteh-collab/ai-grc-platform/pull/228)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @types/node from 25.9.5 to 26.1.1 in /frontend ([#227](https://github.com/sherifconteh-collab/ai-grc-platform/pull/227)) — @dependabot[bot]
 - chore(ci): bump actions/setup-node from 4 to 7 ([#226](https://github.com/sherifconteh-collab/ai-grc-platform/pull/226)) — @dependabot[bot]
