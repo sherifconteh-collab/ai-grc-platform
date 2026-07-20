@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-19 | PR #224: fix(crosswalks): close every framework with zero crosswalk mappings -->
+<!-- LAST_UPDATED: 2026-07-20 | PR #225: chore(ci): bump actions/checkout from 4 to 7 -->
 
 ## 🎯 What is This?
 
