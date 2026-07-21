@@ -11,6 +11,7 @@
 
 require('dotenv').config();
 const { Pool } = require('pg');
+const { addControlIfMissing } = require('./lib/frameworkControlUpsert');
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL })
@@ -283,22 +284,7 @@ async function seedControls() {
       let added = 0;
 
       for (const ctrl of controls) {
-        // Check if control already exists
-        const exists = await client.query(
-          'SELECT id FROM framework_controls WHERE framework_id = $1 AND control_id = $2',
-          [frameworkId, ctrl.control_id]
-        );
-
-        if (exists.rows.length > 0) {
-          continue; // Skip existing
-        }
-
-        await client.query(
-          `INSERT INTO framework_controls (framework_id, control_id, title, description, control_type, priority)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [frameworkId, ctrl.control_id, ctrl.title, ctrl.description, ctrl.control_type, ctrl.priority]
-        );
-        added++;
+        if (await addControlIfMissing(client, frameworkId, ctrl)) added++;
       }
 
       console.log(`  [OK] ${label}: ${added} new controls added (${controls.length - added} already existed)`);

@@ -1,6 +1,6 @@
 {
   "name": "controlweave-frontend",
-  "version": "4.6.0",
+  "version": "4.6.1",
   "license": "AGPL-3.0",
   "private": true,
   "scripts": {
@@ -19,23 +19,23 @@
     "axios": "^1.16.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.16.0",
-    "next": "16.2.7",
+    "next": "16.2.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "recharts": "^2.15.4",
+    "recharts": "^3.9.2",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
-    "@tailwindcss/postcss": "^4.3.0",
-    "@types/node": "^25.9.1",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.1.1",
     "@types/react": "^19.2.16",
     "@types/react-dom": "^19.0.0",
     "eslint": "^10.7.0",
     "eslint-config-next": "^16.2.6",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.3.0",
-    "typescript": "6.0.3"
+    "typescript": "~6.0.3"
   },
   "overrides": {
     "minimatch": "^10.2.3",

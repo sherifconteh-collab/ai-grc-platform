@@ -1,0 +1,25 @@
+module.exports = {
+    code: 'nist_800_207', name: 'NIST SP 800-207 Zero Trust Architecture (Reference Model)', version: '2020',
+    category: 'Reference Model', tier_required: 'enterprise',
+    description: 'Zero Trust Architecture reference model and design principles. Not a certifiable compliance framework.',
+    controls: [
+      { control_id: 'ZTA-1', title: 'Resource Identification and Classification', description: 'Identify and classify all enterprise resources including data, services, and devices.', priority: '1', control_type: 'strategic' },
+      { control_id: 'ZTA-2', title: 'Subject/Identity Verification', description: 'Verify the identity of all subjects before granting access to any resource.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-3', title: 'Least Privilege Access Per-Request', description: 'Grant minimum necessary access on a per-request basis regardless of network location.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-4', title: 'Policy Decision Point (PDP) Implementation', description: 'Implement a Policy Decision Point that evaluates access requests against dynamic policies.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-5', title: 'Policy Enforcement Point (PEP) Implementation', description: 'Implement a Policy Enforcement Point that enables and terminates connections based on PDP decisions.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-6', title: 'Continuous Diagnostics and Monitoring', description: 'Continuously monitor and diagnose the security state of all enterprise assets.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-7', title: 'Dynamic and Risk-Based Policy', description: 'Dynamically adjust access policies based on real-time risk signals and contextual data.', priority: '1', control_type: 'strategic' },
+      { control_id: 'ZTA-8', title: 'Micro-Segmentation', description: 'Segment the network into micro-perimeters to contain lateral movement and limit blast radius.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-9', title: 'Encrypted Communications (All Traffic)', description: 'Encrypt all communications regardless of network location to prevent interception.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-10', title: 'Device Health Verification', description: 'Assess device health and posture before granting access to enterprise resources.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-11', title: 'Multi-Factor Authentication (All Access)', description: 'Require multi-factor authentication for all access requests to enterprise resources.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-12', title: 'Just-In-Time / Just-Enough Access', description: 'Provision just-in-time and just-enough access to minimize standing privileges.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-13', title: 'Session-Based Trust Evaluation', description: 'Evaluate trust continuously throughout each session rather than only at initial authentication.', priority: '2', control_type: 'technical' },
+      { control_id: 'ZTA-14', title: 'Behavioral Analytics and Anomaly Detection', description: 'Use behavioral analytics and anomaly detection to identify suspicious access patterns.', priority: '2', control_type: 'technical' },
+      { control_id: 'ZTA-15', title: 'Data Loss Prevention in Zero Trust', description: 'Implement data loss prevention controls within the zero trust architecture.', priority: '2', control_type: 'technical' },
+      { control_id: 'ZTA-16', title: 'Network Visibility and Analytics', description: 'Maintain comprehensive network visibility and analytics across all traffic flows.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-17', title: 'API Security Gateway', description: 'Secure API gateways to authenticate, authorize, and monitor all API communications.', priority: '1', control_type: 'technical' },
+      { control_id: 'ZTA-18', title: 'Supply Chain Trust Verification', description: 'Verify the trustworthiness of supply chain components before integration.', priority: '2', control_type: 'strategic' },
+    ]
+  };

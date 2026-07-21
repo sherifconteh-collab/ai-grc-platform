@@ -1,0 +1,25 @@
+module.exports = {
+    code: 'nist_ai_rmf', name: 'NIST AI Risk Management Framework', version: '1.0',
+    category: 'AI Governance', tier_required: 'community',
+    description: 'AI risk management aligned with NIST 800-160 trustworthiness properties.',
+    controls: [
+      { control_id: 'GOVERN-1', title: 'AI Risk Management Policies', description: 'Policies reflecting risk management are defined, understood, and enforced for AI systems.', priority: '1', control_type: 'policy' },
+      { control_id: 'GOVERN-2', title: 'AI Accountability Structure', description: 'Accountability structures for AI risk management are established and maintained.', priority: '1', control_type: 'organizational' },
+      { control_id: 'GOVERN-3', title: 'AI Workforce Diversity', description: 'Workforce diversity and domain expertise are prioritized in AI design and deployment teams.', priority: '3', control_type: 'organizational' },
+      { control_id: 'GOVERN-4', title: 'Organizational AI Risk Culture', description: 'A culture of risk management is cultivated throughout the organization for AI systems.', priority: '2', control_type: 'organizational' },
+      { control_id: 'GOVERN-5', title: 'Third-Party AI Risk', description: 'Processes are in place to manage risks from third-party AI entities and supply chains.', priority: '2', control_type: 'strategic' },
+      { control_id: 'GOVERN-6', title: 'AI Risk Reporting', description: 'AI risk reporting mechanisms provide timely and accurate information to decision-makers.', priority: '1', control_type: 'organizational' },
+      { control_id: 'MAP-1', title: 'AI System Context Established', description: 'Context is established and understood for AI system design, development, and deployment.', priority: '1', control_type: 'strategic' },
+      { control_id: 'MAP-2', title: 'AI Categorization and Classification', description: 'AI systems are categorized and classified based on their intended purpose and risk.', priority: '1', control_type: 'strategic' },
+      { control_id: 'MAP-3', title: 'AI Benefits and Costs Analyzed', description: 'AI system benefits and costs including societal impacts are analyzed and documented.', priority: '2', control_type: 'strategic' },
+      { control_id: 'MAP-5', title: 'AI Impacts Assessed', description: 'Impacts to individuals, groups, communities, and the environment are assessed.', priority: '1', control_type: 'strategic' },
+      { control_id: 'MEASURE-1', title: 'AI Risk Metrics Established', description: 'Appropriate methods and metrics are identified and applied to measure AI risks.', priority: '1', control_type: 'technical' },
+      { control_id: 'MEASURE-2', title: 'AI System Evaluated', description: 'AI systems are evaluated for trustworthy characteristics using established metrics.', priority: '1', control_type: 'technical' },
+      { control_id: 'MEASURE-3', title: 'AI System Monitored', description: 'AI systems are monitored for risks and performance throughout the lifecycle.', priority: '1', control_type: 'technical' },
+      { control_id: 'MEASURE-4', title: 'AI Feedback Incorporated', description: 'Feedback about AI system efficacy and impact is gathered and integrated into operations.', priority: '2', control_type: 'technical' },
+      { control_id: 'MANAGE-1', title: 'AI Risk Treatment', description: 'AI risks based on assessments and other analytical output are treated and managed.', priority: '1', control_type: 'strategic' },
+      { control_id: 'MANAGE-2', title: 'AI Risk Prioritization', description: 'Strategies to maximize AI benefits and minimize negative impacts are prioritized.', priority: '1', control_type: 'strategic' },
+      { control_id: 'MANAGE-3', title: 'AI Risk Response', description: 'AI risk responses are developed and documented with clear assignment of responsibilities.', priority: '1', control_type: 'organizational' },
+      { control_id: 'MANAGE-4', title: 'AI Risk Communication', description: 'Risk treatments including risk acceptance are communicated to relevant stakeholders.', priority: '2', control_type: 'organizational' },
+    ]
+  };

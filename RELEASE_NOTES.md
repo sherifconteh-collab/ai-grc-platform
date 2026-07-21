@@ -8,6 +8,17 @@
 
 > Changes staged but not yet released to production.
 
+## [4.6.1] — 2026-07-21
+
+### Changed
+
+- **`seed-frameworks.js` refactor** ([#234](https://github.com/sherifconteh-collab/ai-grc-platform/pull/234)): split the ~1,400-line single array literal into one data module per framework under `backend/scripts/lib/frameworks/`, with an `expected-counts.js` manifest the seed run verifies against.
+- Dependency bumps: `actions/checkout` and `actions/setup-node` to v7 in CI ([#225](https://github.com/sherifconteh-collab/ai-grc-platform/pull/225), [#226](https://github.com/sherifconteh-collab/ai-grc-platform/pull/226)), `next` 16.2.7→16.2.10 ([#228](https://github.com/sherifconteh-collab/ai-grc-platform/pull/228)), `@types/node` 25.9.5→26.1.1 ([#227](https://github.com/sherifconteh-collab/ai-grc-platform/pull/227)), `@tailwindcss/postcss` 4.3.2→4.3.3 ([#231](https://github.com/sherifconteh-collab/ai-grc-platform/pull/231)), `recharts` 2.15.4→3.9.2 ([#233](https://github.com/sherifconteh-collab/ai-grc-platform/pull/233)).
+
+### Fixed
+
+- **Reverted TypeScript 7.0.2** back to 6.0.3 ([#232](https://github.com/sherifconteh-collab/ai-grc-platform/pull/232)): the bump had passed `tsc --noEmit` CI but broke `npm run build` and `npm run lint` in practice (`typescript-estree` incompatibility) — CI's typecheck-only gate didn't exercise either.
+
 ## [4.6.0] — 2026-07-20
 
 ### Added
