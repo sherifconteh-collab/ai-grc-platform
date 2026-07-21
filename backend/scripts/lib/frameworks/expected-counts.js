@@ -3,16 +3,16 @@
 // seeding and fails loudly if a wave PR silently under- or over-seeds a framework
 // (see issue #218).
 //
-// Regenerate by re-running the generator that produced this file whenever a
-// framework module is added, removed, or has controls added/removed:
-//   node -e "const fs=require('fs'); const fw=require('./index.js'); const c={}; for (const f of fw) c[f.code]=f.controls.length; fs.writeFileSync('expected-counts.js', 'module.exports = ' + JSON.stringify({totalFrameworks: fw.length, totalControls: fw.reduce((s,x)=>s+x.controls.length,0), perFramework: c}, null, 2) + ';\n');"
+// Regenerate whenever a framework module is added, removed, or has controls
+// added/removed:
+//   node -e "const fs=require('fs'); const fw=require('./index.js'); const c={}; for (const f of fw) c[f.code]=f.controls.length; fs.writeFileSync('expected-counts.js', '// Manifest of expected framework/control counts.\\nmodule.exports = ' + JSON.stringify({totalFrameworks: fw.length, totalControls: fw.reduce((s,x)=>s+x.controls.length,0), perFramework: c}, null, 2) + ';\\n');"
 
 module.exports = {
   "totalFrameworks": 33,
-  "totalControls": 733,
+  "totalControls": 977,
   "perFramework": {
     "nist_csf_2.0": 57,
-    "nist_800_53": 56,
+    "nist_800_53": 300,
     "iso_27001": 39,
     "soc2": 27,
     "nist_800_171": 24,

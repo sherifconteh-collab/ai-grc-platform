@@ -2,11 +2,11 @@
 /**
  * Seed Missing Controls
  *
- * Adds the missing 10 NIST 800-53 control families (CA, MA, MP, PE, PL, PM, PS, PT, SA, SR)
- * and expands other frameworks to full coverage.
+ * Expands frameworks to full coverage beyond their initial seed.
  *
- * NIST 800-53 Rev 5 has 20 control families with 1,189 controls total.
- * We seed the most critical controls from each family.
+ * NIST 800-53 Rev 5's full 20-family base-control set now lives entirely in
+ * lib/frameworks/nist_800_53.js (issue #217 Wave 1) -- this script no longer
+ * carries its own copy.
  */
 
 require('dotenv').config();
@@ -22,129 +22,6 @@ const pool = process.env.DATABASE_URL
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
     });
-
-// ============================================================
-// Missing NIST 800-53 Control Families
-// ============================================================
-
-const NIST_800_53_MISSING_CONTROLS = [
-  // CA - Assessment, Authorization, and Monitoring
-  { control_id: 'CA-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate an assessment, authorization, and monitoring policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'CA-2', title: 'Control Assessments', description: 'Develop a control assessment plan; assess the controls in the system and its environment of operation at a defined frequency.', control_type: 'administrative', priority: '1' },
-  { control_id: 'CA-3', title: 'Information Exchange', description: 'Approve and manage the exchange of information between the system and other systems using interconnection security agreements.', control_type: 'administrative', priority: '2' },
-  { control_id: 'CA-5', title: 'Plan of Action and Milestones', description: 'Develop a plan of action and milestones (POA&M) for the system to document planned remediation actions.', control_type: 'administrative', priority: '1' },
-  { control_id: 'CA-6', title: 'Authorization', description: 'Assign a senior official as the authorizing official; ensure the authorizing official authorizes the system before commencing operations.', control_type: 'administrative', priority: '1' },
-  { control_id: 'CA-7', title: 'Continuous Monitoring', description: 'Develop a system-level continuous monitoring strategy and implement a continuous monitoring program.', control_type: 'administrative', priority: '1' },
-  { control_id: 'CA-8', title: 'Penetration Testing', description: 'Conduct penetration testing at a defined frequency on the system and its environment.', control_type: 'technical', priority: '2' },
-  { control_id: 'CA-9', title: 'Internal System Connections', description: 'Authorize internal connections of system components; document for each internal connection, the interface characteristics, security requirements, and the nature of the information communicated.', control_type: 'administrative', priority: '2' },
-
-  // MA - Maintenance
-  { control_id: 'MA-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a system maintenance policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'MA-2', title: 'Controlled Maintenance', description: 'Schedule, document, and review records of maintenance, repair, and replacement on system components.', control_type: 'operational', priority: '1' },
-  { control_id: 'MA-3', title: 'Maintenance Tools', description: 'Approve, control, and monitor the use of system maintenance tools.', control_type: 'operational', priority: '2' },
-  { control_id: 'MA-4', title: 'Nonlocal Maintenance', description: 'Approve and monitor nonlocal maintenance and diagnostic activities; allow the use of nonlocal maintenance only as consistent with organizational policy.', control_type: 'operational', priority: '2' },
-  { control_id: 'MA-5', title: 'Maintenance Personnel', description: 'Establish a process for maintenance personnel authorization and maintain a list of authorized maintenance organizations or personnel.', control_type: 'operational', priority: '2' },
-  { control_id: 'MA-6', title: 'Timely Maintenance', description: 'Obtain maintenance support and spare parts for system components within a defined time period of failure.', control_type: 'operational', priority: '2' },
-
-  // MP - Media Protection
-  { control_id: 'MP-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a media protection policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'MP-2', title: 'Media Access', description: 'Restrict access to digital and non-digital media to authorized individuals using defined controls.', control_type: 'operational', priority: '1' },
-  { control_id: 'MP-3', title: 'Media Marking', description: 'Mark system media indicating the distribution limitations, handling caveats, and applicable security markings.', control_type: 'operational', priority: '2' },
-  { control_id: 'MP-4', title: 'Media Storage', description: 'Physically control and securely store digital and non-digital media within controlled areas.', control_type: 'operational', priority: '2' },
-  { control_id: 'MP-5', title: 'Media Transport', description: 'Protect and control digital and non-digital media during transport outside of controlled areas.', control_type: 'operational', priority: '2' },
-  { control_id: 'MP-6', title: 'Media Sanitization', description: 'Sanitize system media prior to disposal, release out of organizational control, or release for reuse.', control_type: 'operational', priority: '1' },
-  { control_id: 'MP-7', title: 'Media Use', description: 'Restrict the use of types of digital media on systems or system components using organizational security safeguards.', control_type: 'operational', priority: '2' },
-
-  // PE - Physical and Environmental Protection
-  { control_id: 'PE-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a physical and environmental protection policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PE-2', title: 'Physical Access Authorizations', description: 'Develop, approve, and maintain a list of individuals with authorized access to the facility; issue authorization credentials for facility access.', control_type: 'operational', priority: '1' },
-  { control_id: 'PE-3', title: 'Physical Access Control', description: 'Enforce physical access authorizations at entry/exit points to the facility; maintain physical access audit logs; control access to areas officially designated as publicly accessible.', control_type: 'operational', priority: '1' },
-  { control_id: 'PE-4', title: 'Access Control for Transmission', description: 'Control physical access to system distribution and transmission lines within organizational facilities.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-5', title: 'Access Control for Output Devices', description: 'Control physical access to output from system output devices to prevent unauthorized individuals from obtaining the output.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-6', title: 'Monitoring Physical Access', description: 'Monitor physical access to the facility where the system resides to detect and respond to physical security incidents.', control_type: 'operational', priority: '1' },
-  { control_id: 'PE-8', title: 'Visitor Access Records', description: 'Maintain visitor access records that include name, organization, date/time of access, and escort requirements.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-9', title: 'Power Equipment and Cabling', description: 'Protect power equipment and power cabling for the system from damage and destruction.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-10', title: 'Emergency Shutoff', description: 'Provide the capability of shutting off power to the system or individual system components in emergency situations.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-11', title: 'Emergency Power', description: 'Provide an uninterruptible power supply to facilitate an orderly shutdown of the system in the event of a primary power source loss.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-12', title: 'Emergency Lighting', description: 'Employ and maintain automatic emergency lighting that activates in the event of a power outage or disruption.', control_type: 'operational', priority: '3' },
-  { control_id: 'PE-13', title: 'Fire Protection', description: 'Employ and maintain fire detection and suppression systems that are supported by an independent energy source.', control_type: 'operational', priority: '1' },
-  { control_id: 'PE-14', title: 'Environmental Controls', description: 'Maintain temperature and humidity levels within the facility where the system resides at acceptable levels; monitor environmental conditions at a defined frequency.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-15', title: 'Water Damage Protection', description: 'Protect the system from damage resulting from water leakage by providing master shutoff or isolation valves.', control_type: 'operational', priority: '3' },
-  { control_id: 'PE-16', title: 'Delivery and Removal', description: 'Authorize and control the entry and exit of system components from the facility; maintain records of the items.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-17', title: 'Alternate Work Site', description: 'Determine and document the alternate work sites allowed for use; employ security controls at alternate work sites.', control_type: 'operational', priority: '2' },
-  { control_id: 'PE-18', title: 'Location of System Components', description: 'Position system components within the facility to minimize potential damage from physical and environmental hazards and to minimize the opportunity for unauthorized access.', control_type: 'operational', priority: '2' },
-
-  // PL - Planning
-  { control_id: 'PL-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a planning policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PL-2', title: 'System Security and Privacy Plans', description: 'Develop security and privacy plans that describe the controls in place or planned; distribute plans to authorized personnel; review the plans at a defined frequency.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PL-4', title: 'Rules of Behavior', description: 'Establish and provide to individuals requiring access to the system, the rules that describe their responsibilities and expected behavior.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PL-7', title: 'Concept of Operations', description: 'Develop a concept of operations for the system describing how the organization intends to operate the system from the perspective of information security and privacy.', control_type: 'administrative', priority: '3' },
-  { control_id: 'PL-8', title: 'Security and Privacy Architectures', description: 'Develop security and privacy architectures for the system that describe the philosophy, requirements, and approach to be taken to protect information.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PL-10', title: 'Baseline Selection', description: 'Select a control baseline for the system.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PL-11', title: 'Baseline Tailoring', description: 'Tailor the selected control baseline by applying specified tailoring actions.', control_type: 'administrative', priority: '1' },
-
-  // PM - Program Management
-  { control_id: 'PM-1', title: 'Information Security Program Plan', description: 'Develop and disseminate an organization-wide information security program plan.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PM-2', title: 'Information Security Program Leadership Role', description: 'Appoint a senior information security officer with the mission and resources to coordinate, develop, implement, and maintain an organization-wide information security program.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PM-3', title: 'Information Security and Privacy Resources', description: 'Include the resources needed to implement the information security and privacy programs in capital planning and investment requests.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PM-4', title: 'Plan of Action and Milestones Process', description: 'Implement a process to ensure that plans of action and milestones for the information security, privacy, and supply chain risk management programs are maintained and documented.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PM-5', title: 'System Inventory', description: 'Develop and maintain an inventory of organizational systems.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PM-6', title: 'Measures of Performance', description: 'Develop, monitor, and report on the results of information security and privacy measures of performance.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PM-7', title: 'Enterprise Architecture', description: 'Develop and maintain an enterprise architecture with consideration for information security, privacy, and the resulting risk to organizational operations and assets.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PM-9', title: 'Risk Management Strategy', description: 'Develop a comprehensive strategy to manage risk to organizational operations, assets, individuals, other organizations, and the Nation.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PM-10', title: 'Authorization Process', description: 'Manage the security and privacy state of organizational systems through authorization processes.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PM-11', title: 'Mission and Business Process Definition', description: 'Define organizational mission and business processes with consideration for information security and privacy and the resulting risk to organizational operations.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PM-13', title: 'Security and Privacy Workforce', description: 'Establish a security and privacy workforce development and improvement program.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PM-14', title: 'Testing, Training, and Monitoring', description: 'Implement a process for ensuring that organizational plans for conducting security and privacy testing, training, and monitoring activities are developed and maintained.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PM-15', title: 'Security and Privacy Groups and Associations', description: 'Establish and institutionalize contact with selected groups and associations within the security and privacy communities.', control_type: 'administrative', priority: '3' },
-  { control_id: 'PM-16', title: 'Threat Awareness Program', description: 'Implement a threat awareness program that includes a cross-organization information-sharing capability.', control_type: 'administrative', priority: '1' },
-
-  // PS - Personnel Security
-  { control_id: 'PS-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a personnel security policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PS-2', title: 'Position Risk Designation', description: 'Assign a risk designation to all organizational positions; establish screening criteria for individuals filling those positions; review and update position risk designations at a defined frequency.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PS-3', title: 'Personnel Screening', description: 'Screen individuals prior to authorizing access to the system; rescreen individuals at a defined frequency.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PS-4', title: 'Personnel Termination', description: 'Upon termination of individual employment: disable system access within a defined time period; terminate/revoke any authenticators/credentials; conduct exit interviews; retrieve all organizational information system-related property.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PS-5', title: 'Personnel Transfer', description: 'Review and confirm ongoing operational need for current logical and physical access authorizations when individuals are reassigned or transferred to other positions.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PS-6', title: 'Access Agreements', description: 'Develop and document access agreements for organizational systems; review and update the access agreements at a defined frequency.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PS-7', title: 'External Personnel Security', description: 'Establish personnel security requirements for external providers; require external providers to comply with personnel security policies and procedures.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PS-8', title: 'Personnel Sanctions', description: 'Employ a formal sanctions process for individuals failing to comply with established information security and privacy policies and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PS-9', title: 'Position Descriptions', description: 'Incorporate security and privacy role responsibilities in organizational position descriptions.', control_type: 'administrative', priority: '2' },
-
-  // PT - PII Processing and Transparency
-  { control_id: 'PT-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a personally identifiable information processing and transparency policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PT-2', title: 'Authority to Process Personally Identifiable Information', description: 'Determine and document the legal authority that permits the collection, use, maintenance, and sharing of personally identifiable information.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PT-3', title: 'Personally Identifiable Information Processing Purposes', description: 'Identify and document the purpose(s) for processing personally identifiable information.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PT-4', title: 'Consent', description: 'Implement tools or mechanisms for individuals to consent to the processing of their personally identifiable information prior to collection.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PT-5', title: 'Privacy Notice', description: 'Provide notice to individuals about the processing of personally identifiable information.', control_type: 'administrative', priority: '1' },
-  { control_id: 'PT-6', title: 'System of Records Notice', description: 'For systems that process information in a system of records, publish system of records notices in the Federal Register.', control_type: 'administrative', priority: '2' },
-  { control_id: 'PT-7', title: 'Specific Categories of Personally Identifiable Information', description: 'Apply processing conditions for specific categories of PII (Social Security numbers, etc.).', control_type: 'administrative', priority: '1' },
-  { control_id: 'PT-8', title: 'Computer Matching Requirements', description: 'When a system or organization is involved in a matching program, adhere to applicable computer matching regulations.', control_type: 'administrative', priority: '3' },
-
-  // SA - System and Services Acquisition
-  { control_id: 'SA-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a system and services acquisition policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SA-2', title: 'Allocation of Resources', description: 'Determine the high-level information security and privacy requirements for the system; include the resources needed to protect the system as a discrete line item.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SA-3', title: 'System Development Life Cycle', description: 'Acquire, develop, and manage the system using an SDLC that incorporates information security and privacy considerations.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SA-4', title: 'Acquisition Process', description: 'Include security and privacy functional requirements, strength requirements, assurance requirements, documentation requirements, and acceptance criteria in system acquisition contracts.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SA-5', title: 'System Documentation', description: 'Obtain or develop administrator documentation and user documentation for the system that describes secure configuration, installation, and operation.', control_type: 'administrative', priority: '2' },
-  { control_id: 'SA-8', title: 'Security and Privacy Engineering Principles', description: 'Apply systems security and privacy engineering principles in the specification, design, development, implementation, and modification of the system.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SA-9', title: 'External System Services', description: 'Require that providers of external system services comply with organizational security and privacy requirements; define and document organizational oversight and user roles and responsibilities.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SA-10', title: 'Developer Configuration Management', description: 'Require the developer of the system to perform configuration management during system design, development, implementation, and operation.', control_type: 'administrative', priority: '2' },
-  { control_id: 'SA-11', title: 'Developer Testing and Evaluation', description: 'Require the developer of the system to create a security and privacy assessment plan; perform testing/evaluation at a defined depth and coverage; produce evidence of the execution of the plan.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SA-15', title: 'Development Process, Standards, and Tools', description: 'Require the developer of the system to follow a documented development process that explicitly addresses security and privacy requirements.', control_type: 'administrative', priority: '2' },
-  { control_id: 'SA-17', title: 'Developer Security and Privacy Architecture and Design', description: 'Require the developer of the system to produce a design specification and security and privacy architecture.', control_type: 'administrative', priority: '2' },
-  { control_id: 'SA-22', title: 'Unsupported System Components', description: 'Replace system components when support for the components is no longer available from the developer, vendor, or manufacturer.', control_type: 'operational', priority: '1' },
-
-  // SR - Supply Chain Risk Management
-  { control_id: 'SR-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a supply chain risk management policy and procedures.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SR-2', title: 'Supply Chain Risk Management Plan', description: 'Develop a plan for managing supply chain risks associated with the development, acquisition, maintenance, and disposal of systems.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SR-3', title: 'Supply Chain Controls and Processes', description: 'Establish and apply a process for identifying and addressing weaknesses or deficiencies in the supply chain elements and processes.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SR-5', title: 'Acquisition Strategies, Tools, and Methods', description: 'Employ acquisition strategies, contract tools, and procurement methods to protect against, identify, and mitigate supply chain risks.', control_type: 'administrative', priority: '2' },
-  { control_id: 'SR-6', title: 'Supplier Assessments and Reviews', description: 'Assess and review the supply chain-related risks associated with suppliers or contractors at a defined frequency.', control_type: 'administrative', priority: '1' },
-  { control_id: 'SR-8', title: 'Notification Agreements', description: 'Establish agreements and procedures with entities involved in the supply chain to notify the organization of supply chain compromises.', control_type: 'administrative', priority: '2' },
-  { control_id: 'SR-10', title: 'Inspection of Systems or Components', description: 'Inspect systems or system components at a defined frequency to detect tampering.', control_type: 'operational', priority: '2' },
-  { control_id: 'SR-11', title: 'Component Authenticity', description: 'Develop and implement anti-counterfeit policy and procedures; use anti-counterfeit mechanisms to detect counterfeit system components.', control_type: 'operational', priority: '2' },
-  { control_id: 'SR-12', title: 'Component Disposal', description: 'Dispose of system components using approved disposal techniques and methods.', control_type: 'operational', priority: '2' },
-];
 
 // ============================================================
 // Additional controls for other frameworks that may be thin
@@ -292,9 +169,6 @@ async function seedControls() {
     };
 
     let totalAdded = 0;
-
-    console.log('\nAdding missing NIST 800-53 control families...');
-    totalAdded += await addControls('nist_800_53', NIST_800_53_MISSING_CONTROLS, 'NIST 800-53 (10 new families)');
 
     console.log('\nExpanding NIST CSF 2.0...');
     totalAdded += await addControls('nist_csf_2.0', NIST_CSF_ADDITIONAL, 'NIST CSF 2.0');
