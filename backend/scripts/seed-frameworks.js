@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const frameworks = require('./lib/frameworks/index');
 const { verifyExpectedCounts } = require('./lib/frameworks/verifyCounts');
 const { insertFramework, insertControl } = require('./lib/frameworkControlUpsert');
+const COVERAGE_STATUS = require('./lib/frameworks/coverageStatus');
 
 const pool = process.env.DATABASE_URL
   ? new Pool({ connectionString: process.env.DATABASE_URL })
@@ -41,6 +42,22 @@ async function seed() {
       }
 
       console.log(`  ${fw.code}: ${fw.controls.length} controls (${fw.tier_required} tier)`);
+    }
+
+    // Re-apply the canonical coverage_status classification (see
+    // lib/frameworks/coverageStatus.js) after every insert. This is what
+    // migrations 123/131 intend, but re-doing it here makes the result
+    // correct regardless of whether migrations ran before this framework's
+    // row existed (true for any framework only ever created by this
+    // script -- see the comment in coverageStatus.js for the full list).
+    for (const status of ['comprehensive', 'representative']) {
+      const codes = COVERAGE_STATUS[status];
+      if (codes && codes.length > 0) {
+        await client.query(
+          'UPDATE frameworks SET coverage_status = $1 WHERE code = ANY($2::text[])',
+          [status, codes]
+        );
+      }
     }
 
     // Create some crosswalk mappings between common controls
