@@ -8,6 +8,10 @@
 
 > Changes staged but not yet released to production.
 
+### Changed
+
+- release: v4.6.1 — catch release notes and README up to main ([#230](https://github.com/sherifconteh-collab/ai-grc-platform/pull/230)) — @sherifconteh-collab
+
 ## [4.6.1] — 2026-07-21
 
 ### Changed

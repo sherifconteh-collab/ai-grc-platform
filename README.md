@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-20 | PR #234: refactor(backend): split seed-frameworks.js into per-framework modules -->
+<!-- LAST_UPDATED: 2026-07-22 | PR #230: release: v4.6.1 — catch release notes and README up to main -->
 
 ## 🎯 What is This?
 
