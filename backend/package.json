@@ -1,6 +1,6 @@
 {
   "name": "controlweave-backend",
-  "version": "4.5.1",
+  "version": "4.6.1",
   "license": "AGPL-3.0",
   "engines": {
     "node": ">=20.16.0"
@@ -117,6 +117,7 @@
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
     "hono": "^4.12.28",
+    "@hono/node-server": ">=2.0.5",
     "socket.io-parser": "4.2.6",
     "websocket-driver": ">=0.7.5",
     "yauzl": ">=3.2.1",
