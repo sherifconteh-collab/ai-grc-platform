@@ -9,6 +9,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- Complete NIST SP 800-53 Rev 5 base-control set (issue #217 Wave 1) ([#236](https://github.com/sherifconteh-collab/ai-grc-platform/pull/236)) — @sherifconteh-collab
 
 - release: v4.6.1 — catch release notes and README up to main ([#230](https://github.com/sherifconteh-collab/ai-grc-platform/pull/230)) — @sherifconteh-collab
 

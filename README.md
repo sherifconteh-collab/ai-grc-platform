@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-22 | PR #230: release: v4.6.1 — catch release notes and README up to main -->
+<!-- LAST_UPDATED: 2026-07-22 | PR #236: Complete NIST SP 800-53 Rev 5 base-control set (issue #217 Wave 1) -->
 
 ## 🎯 What is This?
 
