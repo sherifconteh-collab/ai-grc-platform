@@ -13,6 +13,7 @@ const path = require('path');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
 const { getRoleFallbackPermissions } = require('../middleware/auth');
+const { decrypt } = require('../utils/encrypt');
 
 const uploadsDir = path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -34,6 +35,9 @@ function resolveEffectivePermissions(primaryRole, rolePermissions) {
 }
 
 async function getUserEntitlements(orgId) {
+  // users.email is field-level encrypted at rest (see routes/users.js); decrypt
+  // post-query and sort by name rather than the encrypted column, whose
+  // ciphertext order (random IV per row) does not reflect plaintext order.
   const { rows } = await pool.query(`
     SELECT u.id, u.email, u.first_name, u.last_name, u.role AS primary_role, u.is_active,
            COALESCE(ARRAY_AGG(DISTINCT r.name) FILTER (WHERE r.id IS NOT NULL), '{}') AS roles,
@@ -45,12 +49,12 @@ async function getUserEntitlements(orgId) {
     LEFT JOIN permissions p ON p.id = rp.permission_id
     WHERE u.organization_id = $1
     GROUP BY u.id
-    ORDER BY u.email
+    ORDER BY u.first_name, u.last_name
   `, [orgId]);
 
   return rows.map((row) => ({
     id: row.id,
-    email: row.email,
+    email: decrypt(row.email),
     first_name: row.first_name,
     last_name: row.last_name,
     primary_role: row.primary_role,
@@ -263,9 +267,15 @@ async function listCampaignItems(orgId, campaignId) {
     JOIN users su ON su.id = i.subject_user_id
     LEFT JOIN users rv ON rv.id = i.reviewer_id
     WHERE i.campaign_id = $1 AND i.organization_id = $2
-    ORDER BY su.email
+    ORDER BY su.first_name, su.last_name
   `, [campaignId, orgId]);
-  return rows;
+  // subject_email/reviewer_email come from users.email, which is field-level
+  // encrypted at rest (see routes/users.js) — decrypt post-query.
+  return rows.map((row) => ({
+    ...row,
+    subject_email: decrypt(row.subject_email),
+    reviewer_email: row.reviewer_email ? decrypt(row.reviewer_email) : null
+  }));
 }
 
 async function decideItem(orgId, campaignId, itemId, reviewerId, { decision, notes }) {

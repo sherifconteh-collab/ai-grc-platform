@@ -17,6 +17,7 @@ const { validateBody, requireFields, isUuid } = require('../middleware/validate'
 const { requireSod } = require('../middleware/sod');
 const auditService = require('../services/auditService');
 const accessGovernance = require('../services/accessGovernanceService');
+const { decrypt } = require('../utils/encrypt');
 
 // express-rate-limit applied router-wide, ahead of authenticate, so a cheap
 // IP-based bound is in place before authenticate's DB/JWT work runs and so
@@ -484,7 +485,13 @@ router.get('/rbac-documents', requirePermission('access_governance.read'), async
        LIMIT $2 OFFSET $3`,
       [req.user.organization_id, limit, offset]
     );
-    res.json({ success: true, data: result.rows });
+    // uploaded_by_email comes from users.email, which is field-level
+    // encrypted at rest (see routes/users.js) — decrypt post-query.
+    const rows = result.rows.map((row) => ({
+      ...row,
+      uploaded_by_email: row.uploaded_by_email ? decrypt(row.uploaded_by_email) : null
+    }));
+    res.json({ success: true, data: rows });
   } catch (error) {
     console.error('List RBAC documents error:', error);
     res.status(500).json({ success: false, error: 'Failed to load RBAC documents' });
