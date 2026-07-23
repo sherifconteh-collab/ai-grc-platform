@@ -206,12 +206,88 @@ const FINDING_SCHEMA = {
   }
 };
 
+const RBAC_ANALYSIS_SCHEMA = {
+  type: 'object',
+  required: ['summary', 'roles', 'sod_conflicts', 'suggested_sod_rules', 'gaps_and_risks'],
+  properties: {
+    summary: { type: 'string', minLength: 50 },
+    roles: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['name', 'duties', 'mapped_permissions'],
+        properties: {
+          name:               { type: 'string' },
+          description:        { type: 'string' },
+          duties:             { type: 'array', items: { type: 'string' } },
+          // Permission keys from the provided platform catalog only
+          mapped_permissions: { type: 'array', items: { type: 'string' } },
+          notes:              { type: 'string' }
+        }
+      }
+    },
+    sod_conflicts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['title', 'description', 'severity'],
+        properties: {
+          title:              { type: 'string' },
+          description:        { type: 'string' },
+          roles_involved:     { type: 'array', items: { type: 'string' } },
+          conflicting_duties: { type: 'array', items: { type: 'string' } },
+          severity:           { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+          recommendation:     { type: 'string' }
+        }
+      }
+    },
+    suggested_platform_roles: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['name', 'permissions'],
+        properties: {
+          name:        { type: 'string' },
+          description: { type: 'string' },
+          permissions: { type: 'array', items: { type: 'string' } }
+        }
+      }
+    },
+    suggested_sod_rules: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['name', 'conflicting_permissions', 'severity'],
+        properties: {
+          name:                    { type: 'string' },
+          description:             { type: 'string' },
+          conflicting_permissions: { type: 'array', items: { type: 'string' } },
+          severity:                { type: 'string', enum: ['critical', 'high', 'medium', 'low'] }
+        }
+      }
+    },
+    gaps_and_risks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['title', 'detail', 'severity'],
+        properties: {
+          title:    { type: 'string' },
+          detail:   { type: 'string' },
+          severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] }
+        }
+      }
+    }
+  }
+};
+
 // Map feature keys to their output schema. Keys match BOTH the route-level
 // feature identifier used for usage logging AND the profile key, so the
 // schema-validation-and-retry flow in aiHandler() correctly resolves a
 // schema regardless of which key the caller passes.
 const FEATURE_SCHEMAS = {
   gap_analysis:          GAP_ANALYSIS_SCHEMA,
+  rbac_analysis:         RBAC_ANALYSIS_SCHEMA,
   remediation_playbook:  REMEDIATION_PLAYBOOK_SCHEMA,
   test_procedures:       TEST_PROCEDURE_SCHEMA,
   evidence_suggestion:   EVIDENCE_SUGGESTION_SCHEMA,
@@ -287,6 +363,7 @@ module.exports = {
   TEST_PROCEDURE_SCHEMA,
   EVIDENCE_SUGGESTION_SCHEMA,
   FINDING_SCHEMA,
+  RBAC_ANALYSIS_SCHEMA,
   FEATURE_SCHEMAS,
   validate,
   parseJsonOutput,

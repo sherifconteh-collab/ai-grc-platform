@@ -388,5 +388,6 @@ module.exports = {
   requireAnyPermission,
   isFeatureEnabled,
   invalidateFeatureFlagsCache,
+  getRoleFallbackPermissions,
   TIER_LEVELS
 };

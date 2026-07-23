@@ -25,6 +25,7 @@
  *   19. Custom role enforcement
  *   20. Permission escalation prevention
  *   21. Cross-org isolation
+ *   22. Access governance (entitlements, SoD, campaigns, RBAC document import)
  */
 
 const http = require('http');
@@ -792,6 +793,148 @@ function dbQuery(sql, params = []) {
     skip('21.3', 'Cross-org user CANNOT access other org controls', 'cross-org setup failed');
     skip('21.4', 'Cross-org user gets only own org assets', 'cross-org setup failed');
     skip('21.5', 'Cross-org user CANNOT see other org asset', 'cross-org setup failed');
+  }
+
+  // ======================== 22. ACCESS GOVERNANCE ========================
+  console.log('\n── 22. Access Governance ──');
+
+  // Positive: admin ('*') and auditor (access_governance.read) can read
+  const entAdmin = await req('GET', '/api/v1/access-governance/entitlements', null, adminToken);
+  assert('22.1', 'Admin CAN read entitlement report', entAdmin.s === 200 && Array.isArray(entAdmin.b.data?.users));
+
+  const entAuditor = await req('GET', '/api/v1/access-governance/entitlements', null, auditorToken);
+  assert('22.2', 'Auditor CAN read entitlement report', entAuditor.s === 200);
+
+  // Negative: regular user lacks access_governance.read
+  const entUser = await req('GET', '/api/v1/access-governance/entitlements', null, userToken);
+  assert('22.3', 'User CANNOT read entitlement report', entUser.s === 403);
+
+  const sodRulesAdmin = await req('GET', '/api/v1/access-governance/sod/rules', null, adminToken);
+  assert('22.4', 'Admin sees seeded system SoD rules',
+    sodRulesAdmin.s === 200 && Array.isArray(sodRulesAdmin.b.data) && sodRulesAdmin.b.data.length >= 5);
+
+  const sodRulesUser = await req('GET', '/api/v1/access-governance/sod/rules', null, userToken);
+  assert('22.5', 'User CANNOT list SoD rules', sodRulesUser.s === 403);
+
+  // Negative: auditor has read but not manage
+  const sodCreateAuditor = await req('POST', '/api/v1/access-governance/sod/rules', {
+    name: `QA auditor rule ${ts}`, conflictingPermissions: ['controls.read', 'evidence.read']
+  }, auditorToken);
+  assert('22.6', 'Auditor CANNOT create SoD rule', sodCreateAuditor.s === 403);
+
+  const sodCreateAdmin = await req('POST', '/api/v1/access-governance/sod/rules', {
+    name: `QA org rule ${ts}`,
+    description: 'QA-created org rule',
+    conflictingPermissions: ['controls.read', 'evidence.read'],
+    severity: 'low'
+  }, adminToken);
+  assert('22.7', 'Admin CAN create org SoD rule', sodCreateAdmin.s === 201 && sodCreateAdmin.b.data?.id);
+
+  // Simulation: positive/negative matrix + toxic-combination detection
+  const simToxic = await req('POST', '/api/v1/access-governance/simulate', {
+    permissions: ['controls.write', 'assessments.write']
+  }, adminToken);
+  assert('22.8', 'Simulation flags toxic permission combination',
+    simToxic.s === 200 && Array.isArray(simToxic.b.data?.sod_violations) && simToxic.b.data.sod_violations.length >= 1);
+  assert('22.9', 'Simulation returns allowed and denied results',
+    simToxic.s === 200 && simToxic.b.data?.allowed_count >= 2 && simToxic.b.data?.denied_count >= 1);
+
+  const simAuditor = await req('POST', '/api/v1/access-governance/simulate', {
+    permissions: ['controls.read']
+  }, auditorToken);
+  assert('22.10', 'Auditor CAN run simulation (read permission)', simAuditor.s === 200);
+
+  const simUser = await req('POST', '/api/v1/access-governance/simulate', {
+    permissions: ['controls.read']
+  }, userToken);
+  assert('22.11', 'User CANNOT run simulation', simUser.s === 403);
+
+  // Campaign lifecycle: draft -> active -> decisions -> completed (+ evidence)
+  const campCreate = await req('POST', '/api/v1/access-governance/campaigns', {
+    name: `QA access review ${ts}`
+  }, adminToken);
+  assert('22.12', 'Admin CAN create access review campaign',
+    campCreate.s === 201 && campCreate.b.data?.status === 'draft' && campCreate.b.data?.item_count >= 1);
+  const campaignId = campCreate.b.data?.id;
+
+  const campListUser = await req('GET', '/api/v1/access-governance/campaigns', null, userToken);
+  assert('22.13', 'User CANNOT list campaigns', campListUser.s === 403);
+
+  if (campaignId) {
+    const campActivate = await req('POST', `/api/v1/access-governance/campaigns/${campaignId}/activate`, null, adminToken);
+    assert('22.14', 'Admin CAN activate campaign', campActivate.s === 200 && campActivate.b.data?.status === 'active');
+
+    const completeEarly = await req('POST', `/api/v1/access-governance/campaigns/${campaignId}/complete`, null, adminToken);
+    assert('22.15', 'Campaign CANNOT complete with pending items', completeEarly.s === 409);
+
+    const campDetail = await req('GET', `/api/v1/access-governance/campaigns/${campaignId}`, null, adminToken);
+    const items = campDetail.b.data?.items || [];
+    assert('22.16', 'Campaign detail includes entitlement snapshots',
+      campDetail.s === 200 && items.length >= 1 && items.every(i => i.entitlement_snapshot));
+
+    let decideOk = items.length > 0;
+    for (const item of items) {
+      const decide = await req('PATCH', `/api/v1/access-governance/campaigns/${campaignId}/items/${item.id}`, {
+        decision: 'certified', notes: 'QA certification'
+      }, adminToken);
+      if (decide.s !== 200) decideOk = false;
+    }
+    assert('22.17', 'Admin CAN certify all review items (SoD admin override on own item)', decideOk);
+
+    const campComplete = await req('POST', `/api/v1/access-governance/campaigns/${campaignId}/complete`, null, adminToken);
+    assert('22.18', 'Completing campaign generates evidence record',
+      campComplete.s === 200 && campComplete.b.data?.status === 'completed' && campComplete.b.data?.evidence_id);
+
+    // Cross-org isolation: other org's admin cannot see this campaign
+    if (crossOrgToken) {
+      const crossCamp = await req('GET', `/api/v1/access-governance/campaigns/${campaignId}`, null, crossOrgToken);
+      assert('22.19', 'Cross-org user CANNOT access other org campaign', crossCamp.s === 404);
+    } else {
+      skip('22.19', 'Cross-org user CANNOT access other org campaign', 'cross-org setup failed');
+    }
+  } else {
+    ['22.14', '22.15', '22.16', '22.17', '22.18', '22.19'].forEach((id) =>
+      skip(id, 'Campaign lifecycle', 'campaign creation failed'));
+  }
+
+  // RBAC document import: positive (admin manage) / negative (auditor & user
+  // read-only) / cross-org isolation for the uploaded-document surface.
+  const rbacDocPath = path.join(os.tmpdir(), `qa-rbac-doc-${ts}.txt`);
+  fs.writeFileSync(rbacDocPath,
+    'Role, Responsibilities\nOps Lead, Creates user accounts; assigns system roles\n');
+
+  const uploadUser = await uploadFile('/api/v1/access-governance/rbac-documents', rbacDocPath,
+    { document_type: 'roles_responsibilities' }, userToken);
+  assert('22.20', 'User CANNOT upload an RBAC document', uploadUser.s === 403);
+
+  const uploadAdmin = await uploadFile('/api/v1/access-governance/rbac-documents', rbacDocPath,
+    { document_type: 'roles_responsibilities' }, adminToken);
+  assert('22.21', 'Admin CAN upload an RBAC document', uploadAdmin.s === 201 && uploadAdmin.b.data?.id);
+  const rbacDocumentId = uploadAdmin.b.data?.id;
+
+  fs.unlinkSync(rbacDocPath);
+
+  const listAuditor = await req('GET', '/api/v1/access-governance/rbac-documents', null, auditorToken);
+  assert('22.22', 'Auditor CAN list RBAC documents (read permission)', listAuditor.s === 200);
+
+  const listUser = await req('GET', '/api/v1/access-governance/rbac-documents', null, userToken);
+  assert('22.23', 'User CANNOT list RBAC documents', listUser.s === 403);
+
+  if (rbacDocumentId) {
+    if (crossOrgToken) {
+      const crossDelete = await req('DELETE', `/api/v1/access-governance/rbac-documents/${rbacDocumentId}`, null, crossOrgToken);
+      assert('22.24', 'Cross-org user CANNOT delete other org RBAC document', crossDelete.s === 404);
+    } else {
+      skip('22.24', 'Cross-org user CANNOT delete other org RBAC document', 'cross-org setup failed');
+    }
+
+    const deleteUser = await req('DELETE', `/api/v1/access-governance/rbac-documents/${rbacDocumentId}`, null, userToken);
+    assert('22.25', 'User CANNOT delete RBAC document', deleteUser.s === 403);
+
+    const deleteAdmin = await req('DELETE', `/api/v1/access-governance/rbac-documents/${rbacDocumentId}`, null, adminToken);
+    assert('22.26', 'Admin CAN delete RBAC document', deleteAdmin.s === 200);
+  } else {
+    ['22.24', '22.25', '22.26'].forEach((id) => skip(id, 'RBAC document delete', 'upload failed'));
   }
 
   // ══════════════════════════ RESULTS ══════════════════════════

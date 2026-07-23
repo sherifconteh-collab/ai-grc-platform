@@ -69,6 +69,7 @@ const navigationSections: NavigationSection[] = [
       { name: 'Organization Profile', href: '/dashboard/organization', icon: '🏢', requiredPermissions: ['organizations.read'] },
       { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
       { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'] },
+      { name: 'Access Governance', href: '/dashboard/access-governance', icon: '🔑', requiredPermissions: ['access_governance.read'] },
       { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'] },
       { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', requiredPermissionsAny: ['settings.manage', 'roles.manage'] },
       { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔', requiredPermissions: ['dashboard.read'] },

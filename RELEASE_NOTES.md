@@ -8,6 +8,10 @@
 
 > Changes staged but not yet released to production.
 
+### Added
+- **Access Governance module**: entitlement reporting (who-has-what across users, roles, and effective permissions, with over-privileged and dormant-access flags), separation-of-duties (SoD) toxic-combination rules with a live violations report, access review certification campaigns (draft → active → completed, generating an AC-2 evidence record on completion), and a role/permission simulator for positive/negative access testing before assigning a role. New `sod_rules`, `access_review_campaigns`, and `access_review_items` tables (migration `132`), gated by new `access_governance.read`/`.manage` permissions. New `/dashboard/access-governance` page. — @sherifconteh-collab
+- **AI-assisted RBAC document import**: upload an existing role definition spreadsheet, SoD matrix, or roles & responsibilities document (PDF/DOCX/TXT/MD/CSV) and have AI map its roles onto the platform's permission catalog, flag SoD conflicts (including contradictions with the document's own matrix), and suggest platform roles and SoD rules — each suggestion applied only via an explicit, reviewed action, never automatically. New `rbac_documents` table (migration `133`) and `rbac_analysis` AI feature (`POST /api/v1/ai/rbac-analysis`). — @sherifconteh-collab
+
 ### Changed
 - Complete NIST SP 800-53 Rev 5 base-control set (issue #217 Wave 1) ([#236](https://github.com/sherifconteh-collab/ai-grc-platform/pull/236)) — @sherifconteh-collab
 
