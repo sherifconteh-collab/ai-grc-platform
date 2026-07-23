@@ -396,6 +396,7 @@ Full asset and configuration inventory:
 - **PostgreSQL Row-Level Security** — `FORCE ROW SECURITY` on core tables; `withOrgContext()` wraps transactions for defense-in-depth isolation
 - Timing-safe webhook signature comparison (prevents timing-oracle attacks)
 - Separation of duties enforcement
+- **Access Governance** — entitlement reporting, toxic-permission-combination SoD rules, access review certification campaigns (AC-2), a role/permission simulator for positive/negative access testing, and AI-assisted import of existing RBAC documentation (role matrices, SoD matrices)
 - Per-organization SMTP configuration (org settings → env vars → platform settings)
 - Webhook integrations with HMAC-SHA-384 signatures
 - Notification system (in-app bell with unread tracking + email delivery)

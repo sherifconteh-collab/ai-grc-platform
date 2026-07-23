@@ -25,6 +25,7 @@ const EXEMPLAR_FILES = {
   evidence_suggest: 'evidence_suggestion.json', // alias
   finding: 'finding.json',
   audit_finding_draft: 'finding.json', // alias
+  rbac_analysis: 'rbac_analysis.json',
 };
 
 const _cache = new Map();

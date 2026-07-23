@@ -1,0 +1,108 @@
+[
+  {
+    "description": "Roles and responsibilities spreadsheet with an approver/creator conflict",
+    "document_type": "roles_responsibilities",
+    "document_excerpt": "Role, Responsibilities\nIT Security Manager, Creates and updates security controls; runs quarterly control assessments; approves control exceptions\nCompliance Analyst, Uploads audit evidence; prepares assessment workpapers\nHR Administrator, Creates user accounts; assigns system roles; deactivates leavers",
+    "output": {
+      "summary": "The document defines three roles. The IT Security Manager both implements controls and assesses them, a self-review conflict. The HR Administrator combines account creation with role assignment, which permits single-handed provisioning of privileged accounts. The Compliance Analyst's duties are compatible and map cleanly to evidence and assessment permissions.",
+      "roles": [
+        {
+          "name": "IT Security Manager",
+          "description": "Owns security control lifecycle and exception approval",
+          "duties": ["Creates and updates security controls", "Runs quarterly control assessments", "Approves control exceptions"],
+          "mapped_permissions": ["controls.read", "controls.write", "assessments.read", "assessments.write", "implementations.write"],
+          "notes": "Holding both controls.write and assessments.write enables self-review"
+        },
+        {
+          "name": "Compliance Analyst",
+          "description": "Evidence collection and workpaper preparation",
+          "duties": ["Uploads audit evidence", "Prepares assessment workpapers"],
+          "mapped_permissions": ["evidence.read", "evidence.write", "assessments.read", "assessments.write"]
+        },
+        {
+          "name": "HR Administrator",
+          "description": "Joiner/mover/leaver account administration",
+          "duties": ["Creates user accounts", "Assigns system roles", "Deactivates leavers"],
+          "mapped_permissions": ["users.read", "users.manage", "roles.manage"],
+          "notes": "Combines account creation with role assignment"
+        }
+      ],
+      "sod_conflicts": [
+        {
+          "title": "Control implementer assesses own controls",
+          "description": "The IT Security Manager both creates/updates controls and runs the assessments that judge them, so control weaknesses can be self-certified.",
+          "roles_involved": ["IT Security Manager"],
+          "conflicting_duties": ["Creates and updates security controls", "Runs quarterly control assessments"],
+          "severity": "medium",
+          "recommendation": "Move assessment execution to the Compliance Analyst or an independent assessor role."
+        },
+        {
+          "title": "Single-handed privileged provisioning",
+          "description": "The HR Administrator can create an account and grant it any role without a second person involved.",
+          "roles_involved": ["HR Administrator"],
+          "conflicting_duties": ["Creates user accounts", "Assigns system roles"],
+          "severity": "high",
+          "recommendation": "Split role assignment to a separate approver, or require a second-person review for privileged role grants."
+        }
+      ],
+      "suggested_platform_roles": [
+        {
+          "name": "Compliance Analyst",
+          "description": "Evidence collection and assessment workpaper preparation",
+          "permissions": ["dashboard.read", "evidence.read", "evidence.write", "assessments.read", "assessments.write"]
+        }
+      ],
+      "suggested_sod_rules": [
+        {
+          "name": "Account creation combined with role assignment",
+          "description": "Mirrors the HR Administrator conflict found in the document: one account holding both duties can self-provision privileged users.",
+          "conflicting_permissions": ["users.manage", "roles.manage"],
+          "severity": "high"
+        }
+      ],
+      "gaps_and_risks": [
+        {
+          "title": "No documented reviewer for exception approvals",
+          "detail": "Control exceptions are approved by the same role that owns the controls; the document names no independent reviewer or escalation path.",
+          "severity": "medium"
+        }
+      ]
+    }
+  },
+  {
+    "description": "SoD matrix fragment marking incompatible duty pairs",
+    "document_type": "sod_matrix",
+    "document_excerpt": "Duty pairs marked X are incompatible:\n, Create vendor, Approve vendor payment, Modify audit log\nCreate vendor, -, X, X\nApprove vendor payment, X, -, X\nCurrent assignment: Procurement Lead holds Create vendor AND Approve vendor payment.",
+    "output": {
+      "summary": "The matrix declares vendor creation and vendor payment approval incompatible, yet the stated current assignment gives the Procurement Lead both duties, so the organization is violating its own documented matrix. Audit log modification is correctly isolated from both duties.",
+      "roles": [
+        {
+          "name": "Procurement Lead",
+          "description": "Vendor lifecycle and payment approval",
+          "duties": ["Create vendor", "Approve vendor payment"],
+          "mapped_permissions": ["organizations.read", "organizations.write"],
+          "notes": "The platform catalog has no payment-approval permission; the conflict is at the documented-duty level"
+        }
+      ],
+      "sod_conflicts": [
+        {
+          "title": "Documented matrix violated by current assignment",
+          "description": "The organization's own matrix marks Create vendor and Approve vendor payment as incompatible, but the Procurement Lead currently holds both.",
+          "roles_involved": ["Procurement Lead"],
+          "conflicting_duties": ["Create vendor", "Approve vendor payment"],
+          "severity": "critical",
+          "recommendation": "Reassign payment approval to a finance role immediately; the violation contradicts the organization's approved SoD matrix."
+        }
+      ],
+      "suggested_platform_roles": [],
+      "suggested_sod_rules": [],
+      "gaps_and_risks": [
+        {
+          "title": "Matrix has no enforcement mechanism",
+          "detail": "The matrix documents incompatible pairs but nothing prevents an administrator from assigning both duties, as the current Procurement Lead assignment demonstrates.",
+          "severity": "high"
+        }
+      ]
+    }
+  }
+]
