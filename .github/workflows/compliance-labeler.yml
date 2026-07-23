@@ -4,7 +4,7 @@ on:
   issues:
     types: [opened, edited]
   pull_request:
-    types: [opened, edited]
+    types: [opened, edited, synchronize]
 
 permissions:
   contents: read
@@ -25,7 +25,24 @@ jobs:
 
             const title = (item.title || '').toLowerCase();
             const body = (item.body || '').toLowerCase();
-            const combined = `${title} ${body}`;
+            let combined = `${title} ${body}`;
+
+            // Title/body alone go stale after the PR is first opened — later
+            // commits (e.g. a follow-up security fix) never get re-scanned
+            // unless the description itself is hand-edited. Pull in commit
+            // messages too so a `synchronize` event (new pushes) has real
+            // content to match against.
+            if (isPR) {
+              const { data: commits } = await github.rest.pulls.listCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: item.number,
+                per_page: 100
+              });
+              const commitText = commits.map((c) => c.commit.message).join(' ').toLowerCase();
+              combined = `${combined} ${commitText}`;
+            }
+
             const number = item.number;
 
             // Mapping of keywords to compliance labels
@@ -36,9 +53,10 @@ jobs:
               { keywords: ['configuration', 'config change', 'env var'], label: 'compliance:CM-3' },
               { keywords: ['security test', 'sast', 'dast', 'codeql', 'pentest'], label: 'compliance:SA-11' },
               { keywords: ['audit', 'logging', 'audit log'], label: 'compliance:AU-2' },
-              { keywords: ['access control', 'authentication', 'authorization', 'rbac', 'jwt'], label: 'compliance:AC' },
+              { keywords: ['access control', 'authentication', 'authorization', 'rbac', 'jwt', 'row-level security'], label: 'compliance:AC' },
               { keywords: ['input validation', 'sanitiz', 'xss', 'injection'], label: 'compliance:SI-10' },
-              { keywords: ['sdlc', 'pipeline', 'ci/cd', 'build', 'deploy'], label: 'compliance:SA-3' }
+              { keywords: ['sdlc', 'pipeline', 'ci/cd', 'build', 'deploy'], label: 'compliance:SA-3' },
+              { keywords: ['encrypt', 'decrypt', 'cryptograph', 'aes-256', 'sha-384', 'sha384'], label: 'compliance:SC-13' }
             ];
 
             const labelsToAdd = [];
