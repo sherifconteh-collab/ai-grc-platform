@@ -95,11 +95,24 @@ jobs:
           [ "$FAILED" -eq 0 ] && echo "No new duplicate migration numbers"
           exit $FAILED
 
-      - name: Frontend - typecheck
+      - name: Frontend - typecheck, API types, and production build
         run: |
           cd frontend
           npm ci
           npm run typecheck
+          # `tsc --noEmit` alone is not enough of a gate. PR #213 bumped
+          # TypeScript to 7.0.2, passed typecheck, and still broke `npm run
+          # build` and `npm run lint` -- it had to be reverted in #232. The
+          # generate:api-types step catches a second class of break that
+          # typecheck also misses: a dependency whose API the openapi-typescript
+          # toolchain relies on shifting underneath it.
+          #
+          # `npm run lint` is deliberately NOT gated here yet: it currently fails
+          # on a pre-existing eslint-plugin-react / ESLint 10 incompatibility
+          # ("contextOrFilename.getFilename is not a function") that is unrelated
+          # to any individual PR. Add it once that is resolved.
+          npm run generate:api-types
+          npm run build
 
   migration-integrity:
     name: Migration Integrity (Real Postgres)
