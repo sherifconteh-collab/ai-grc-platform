@@ -89,7 +89,7 @@
     "openai": "^6.38.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
-    "pdfkit": "^0.18.0",
+    "pdfkit": "^0.19.1",
     "pg": "^8.18.0",
     "redis": "^6.0.0",
     "rss-parser": "^3.13.0",
