@@ -100,7 +100,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.29.5",
+    "@babel/preset-env": "^8.0.2",
     "eslint": "^10.4.0",
     "eslint-plugin-security": "^4.0.0",
     "globals": "^17.6.0",
