@@ -76,6 +76,14 @@ a custom role that does not carry `*`. If an independent-reviewer requirement
 matters for your AC-5 story, create such a role and assign reviewers to it
 rather than relying on the default admin grant.
 
+So that the generated evidence cannot be read as claiming more independence
+than the review actually had, campaign completion counts the items whose
+reviewer was also their subject and states it in the evidence description
+(for example, "1 of these item(s) were decided by the subject themselves under
+an administrator override, so 4 were independently reviewed"). The same count
+is available as `decision_counts.self_reviewed`, and each entry in the
+generated JSON summary carries a `self_reviewed` boolean.
+
 Revoke decisions are recorded for the certification record; actually removing
 roles is a separate step in **Settings → Users & Permissions** so the change
 passes the standard role-assignment safeguards.

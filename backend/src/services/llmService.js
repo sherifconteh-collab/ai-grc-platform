@@ -79,6 +79,7 @@ const {
   FEATURE_TASK_PROFILE,
   resolveTaskModel,
 } = require('./ai/providerConfig');
+const { sanitizePromptLabel } = require('./ai/promptSafety');
 
 
 // ---------- Org default provider ----------
@@ -2636,6 +2637,7 @@ function rbacAnalysisFeatureError(statusCode, message) {
   return error;
 }
 
+
 async function analyzeRbacDocument({ organizationId, documentId, provider, model, schemaRetryHint = null }) {
   const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   // 404 (not 400) for a malformed id: aiHandler rewrites any 400 into its
@@ -2675,7 +2677,7 @@ async function analyzeRbacDocument({ organizationId, documentId, provider, model
       role: 'user',
       content: `You are an identity and access governance analyst. An organization has uploaded its own RBAC documentation for review.${buildFewShotBlock('rbac_analysis')}
 
-Document: "${document.file_name}" (declared type: ${document.document_type})
+Document: "${sanitizePromptLabel(document.file_name)}" (declared type: ${document.document_type})
 Document content:
 """
 ${documentText}

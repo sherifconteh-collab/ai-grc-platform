@@ -61,7 +61,8 @@
     "seed:assessment-rich-all": "node scripts/seed-assessment-procedures-rich-all.js",
     "seed:assessment-remaining": "node scripts/seed-assessment-procedures-remaining.js",
     "security:generate-jwt-secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
-    "audit:check": "npm audit --audit-level=moderate"
+    "audit:check": "npm audit --audit-level=moderate",
+    "verify:rls": "node scripts/verify-rls-isolation.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",

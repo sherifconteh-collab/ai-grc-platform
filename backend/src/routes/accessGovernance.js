@@ -15,6 +15,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { requireSod } = require('../middleware/sod');
+const { log, serializeError } = require('../utils/logger');
 const auditService = require('../services/auditService');
 const accessGovernance = require('../services/accessGovernanceService');
 const { decrypt } = require('../utils/encrypt');
@@ -83,7 +84,7 @@ router.get('/entitlements', requirePermission('access_governance.read'), async (
     const report = await accessGovernance.getEntitlementReport(req.user.organization_id, { page, limit });
     res.json({ success: true, data: report });
   } catch (error) {
-    console.error('Entitlement report error:', error);
+    log('error', 'access_governance.entitlements.failed', { error: serializeError(error) });
     respondError(res, error, 'Failed to load entitlement report');
   }
 });
@@ -101,7 +102,7 @@ router.get('/sod/rules', requirePermission('access_governance.read'), async (req
     `, [req.user.organization_id]);
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('List SoD rules error:', error);
+    log('error', 'access_governance.sod_rules.list_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to load SoD rules' });
   }
 });
@@ -156,7 +157,7 @@ router.post('/sod/rules', requirePermission('access_governance.manage'), validat
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Create SoD rule error:', error);
+    log('error', 'access_governance.sod_rules.create_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to create SoD rule' });
   }
 });
@@ -201,7 +202,7 @@ router.patch('/sod/rules/:ruleId', requirePermission('access_governance.manage')
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error('Update SoD rule error:', error);
+    log('error', 'access_governance.sod_rules.update_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to update SoD rule' });
   }
 });
@@ -212,7 +213,7 @@ router.get('/sod/violations', requirePermission('access_governance.read'), async
     const result = await accessGovernance.evaluateSodViolations(req.user.organization_id);
     res.json({ success: true, data: result });
   } catch (error) {
-    console.error('SoD violations error:', error);
+    log('error', 'access_governance.sod_violations.failed', { error: serializeError(error) });
     respondError(res, error, 'Failed to evaluate SoD violations');
   }
 });
@@ -240,7 +241,7 @@ router.post('/simulate', requirePermission('access_governance.read'), validateBo
     });
     res.json({ success: true, data: result });
   } catch (error) {
-    console.error('Access simulation error:', error);
+    log('error', 'access_governance.simulate.failed', { error: serializeError(error) });
     respondError(res, error, 'Failed to run access simulation');
   }
 });
@@ -264,7 +265,7 @@ router.get('/campaigns', requirePermission('access_governance.read'), async (req
     `, [req.user.organization_id, limit, offset]);
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error('List campaigns error:', error);
+    log('error', 'access_governance.campaigns.list_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to load campaigns' });
   }
 });
@@ -291,7 +292,7 @@ router.post('/campaigns', requirePermission('access_governance.manage'), validat
 
     res.status(201).json({ success: true, data: campaign });
   } catch (error) {
-    console.error('Create campaign error:', error);
+    log('error', 'access_governance.campaigns.create_failed', { error: serializeError(error) });
     respondError(res, error, 'Failed to create campaign');
   }
 });
@@ -307,7 +308,7 @@ router.get('/campaigns/:campaignId', requirePermission('access_governance.read')
     const items = await accessGovernance.listCampaignItems(orgId, req.params.campaignId);
     res.json({ success: true, data: { ...campaign, items } });
   } catch (error) {
-    console.error('Get campaign error:', error);
+    log('error', 'access_governance.campaigns.get_failed', { error: serializeError(error) });
     respondError(res, error, 'Failed to load campaign');
   }
 });
@@ -331,7 +332,7 @@ async function transitionCampaignRoute(req, res, fromStatuses, toStatus, eventTy
 
     res.json({ success: true, data: campaign });
   } catch (error) {
-    console.error(`Campaign ${toStatus} error:`, error);
+    log('error', 'access_governance.campaigns.transition_failed', { toStatus, error: serializeError(error) });
     respondError(res, error, `Failed to ${toStatus === 'active' ? 'activate' : 'cancel'} campaign`);
   }
 }
@@ -396,7 +397,7 @@ router.patch('/campaigns/:campaignId/items/:itemId', requirePermission('access_g
 
     res.json({ success: true, data: decided });
   } catch (error) {
-    console.error('Review decision error:', error);
+    log('error', 'access_governance.review_decision.failed', { error: serializeError(error) });
     respondError(res, error, 'Failed to record review decision');
   }
 });
@@ -421,7 +422,7 @@ router.post('/campaigns/:campaignId/complete', requirePermission('access_governa
 
     res.json({ success: true, data: campaign });
   } catch (error) {
-    console.error('Complete campaign error:', error);
+    log('error', 'access_governance.campaigns.complete_failed', { error: serializeError(error) });
     respondError(res, error, 'Failed to complete campaign');
   }
 });
@@ -467,7 +468,7 @@ router.post('/rbac-documents', requirePermission('access_governance.manage'),
 
       res.status(201).json({ success: true, data: result.rows[0] });
     } catch (error) {
-      console.error('Upload RBAC document error:', error);
+      log('error', 'access_governance.rbac_document.upload_failed', { error: serializeError(error) });
       res.status(500).json({ success: false, error: 'Failed to upload RBAC document' });
     }
   });
@@ -496,7 +497,7 @@ router.get('/rbac-documents', requirePermission('access_governance.read'), async
     }));
     res.json({ success: true, data: rows });
   } catch (error) {
-    console.error('List RBAC documents error:', error);
+    log('error', 'access_governance.rbac_document.list_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to load RBAC documents' });
   }
 });
@@ -531,7 +532,7 @@ router.put('/rbac-documents/:documentId/analysis', requirePermission('access_gov
 
       res.json({ success: true, data: result.rows[0] });
     } catch (error) {
-      console.error('Save RBAC analysis error:', error);
+      log('error', 'access_governance.rbac_analysis.save_failed', { error: serializeError(error) });
       res.status(500).json({ success: false, error: 'Failed to save analysis' });
     }
   });
@@ -559,7 +560,7 @@ router.delete('/rbac-documents/:documentId', requirePermission('access_governanc
 
     res.json({ success: true, message: 'Document deleted' });
   } catch (error) {
-    console.error('Delete RBAC document error:', error);
+    log('error', 'access_governance.rbac_document.delete_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to delete RBAC document' });
   }
 });

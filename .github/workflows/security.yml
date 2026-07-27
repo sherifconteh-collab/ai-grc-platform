@@ -126,6 +126,14 @@ jobs:
           DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
         run: node scripts/migrate-all.js
 
+      - name: Verify row-level security actually isolates organizations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
+        # Re-connects as a throwaway NOSUPERUSER NOBYPASSRLS role, because RLS is
+        # invisible to the superuser this job otherwise runs as.
+        run: npm run verify:rls
+
       - name: Seed frameworks and verify against expected-counts manifest
         working-directory: backend
         env:
