@@ -661,7 +661,8 @@ export const rolesAPI = {
 
 // Access Governance APIs
 export const accessGovernanceAPI = {
-  getEntitlements: () => api.get('/access-governance/entitlements'),
+  getEntitlements: (params?: { page?: number; limit?: number }) =>
+    api.get('/access-governance/entitlements', { params }),
 
   getSodRules: () => api.get('/access-governance/sod/rules'),
 

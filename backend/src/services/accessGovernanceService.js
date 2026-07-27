@@ -86,8 +86,15 @@ function findRuleViolations(permissions, rules) {
  * Who-has-what report with over-privilege flags. Wildcard holders are surfaced
  * as over-privileged rather than being run through per-rule SoD matching
  * (a '*' account trivially violates every rule, which is noise, not signal).
+ *
+ * The `users` array is paginated so the response stays bounded on large
+ * tenants. Aggregates (permission_holder_counts, flags, totals) are
+ * deliberately computed over every org user, not just the current page --
+ * they describe the organization's posture, and a per-page count would be
+ * misleading. `flags` therefore carries org-wide user ids, which callers can
+ * still intersect with the returned page.
  */
-async function getEntitlementReport(orgId) {
+async function getEntitlementReport(orgId, { page = 1, limit = 50 } = {}) {
   const users = await getUserEntitlements(orgId);
 
   const permissionHolderCounts = users.reduce((acc, user) => {
@@ -97,8 +104,10 @@ async function getEntitlementReport(orgId) {
     return acc;
   }, {});
 
+  const offset = (page - 1) * limit;
+
   return {
-    users,
+    users: users.slice(offset, offset + limit),
     permission_holder_counts: permissionHolderCounts,
     flags: {
       wildcard_users: users.filter((user) => user.permissions.includes('*')).map((user) => user.id),
@@ -109,6 +118,12 @@ async function getEntitlementReport(orgId) {
     totals: {
       users: users.length,
       active_users: users.filter((user) => user.is_active).length
+    },
+    pagination: {
+      page,
+      limit,
+      total: users.length,
+      total_pages: Math.max(1, Math.ceil(users.length / limit))
     }
   };
 }
@@ -146,13 +161,16 @@ async function evaluateSodViolations(orgId) {
  */
 async function simulateAccess(orgId, { roleIds = [], permissions = [] }) {
   const proposed = new Set(permissions);
+  // Dedupe before the count comparison below: `= ANY(array)` is a set-membership
+  // test, so a repeated id yields one row and would otherwise fail validation.
+  const uniqueRoleIds = Array.from(new Set(roleIds));
 
-  if (roleIds.length > 0) {
+  if (uniqueRoleIds.length > 0) {
     const validRoles = await pool.query(
       `SELECT id FROM roles WHERE id = ANY($1::uuid[]) AND (organization_id = $2 OR is_system_role = true)`,
-      [roleIds, orgId]
+      [uniqueRoleIds, orgId]
     );
-    if (validRoles.rows.length !== roleIds.length) {
+    if (validRoles.rows.length !== uniqueRoleIds.length) {
       throw httpError(400, 'One or more roles are invalid for this organization');
     }
     const rolePerms = await pool.query(
@@ -160,7 +178,7 @@ async function simulateAccess(orgId, { roleIds = [], permissions = [] }) {
        FROM role_permissions rp
        JOIN permissions p ON p.id = rp.permission_id
        WHERE rp.role_id = ANY($1::uuid[])`,
-      [roleIds]
+      [uniqueRoleIds]
     );
     rolePerms.rows.forEach((row) => proposed.add(row.name));
   }
@@ -207,22 +225,25 @@ async function createCampaign(orgId, createdBy, { name, description, dueDate }) 
       [orgId, name, description || null, dueDate || null, createdBy]
     );
 
-    for (const user of activeUsers) {
-      const snapshot = {
-        roles: user.roles,
-        permissions: user.permissions,
-        primary_role: user.primary_role,
-        sod_violations: user.permissions.includes('*')
-          ? []
-          : findRuleViolations(user.permissions, rules).map((rule) => rule.name),
-        wildcard: user.permissions.includes('*')
-      };
-      await client.query(
-        `INSERT INTO access_review_items (campaign_id, organization_id, subject_user_id, entitlement_snapshot)
-         VALUES ($1, $2, $3, $4)`,
-        [campaign.id, orgId, user.id, JSON.stringify(snapshot)]
-      );
-    }
+    // Single multi-row insert via UNNEST rather than one round trip per user:
+    // a large tenant would otherwise hold the transaction open for thousands
+    // of sequential statements.
+    const subjectIds = activeUsers.map((user) => user.id);
+    const snapshots = activeUsers.map((user) => JSON.stringify({
+      roles: user.roles,
+      permissions: user.permissions,
+      primary_role: user.primary_role,
+      sod_violations: user.permissions.includes('*')
+        ? []
+        : findRuleViolations(user.permissions, rules).map((rule) => rule.name),
+      wildcard: user.permissions.includes('*')
+    }));
+    await client.query(
+      `INSERT INTO access_review_items (campaign_id, organization_id, subject_user_id, entitlement_snapshot)
+       SELECT $1, $2, subject_id, snapshot
+       FROM UNNEST($3::uuid[], $4::jsonb[]) AS t(subject_id, snapshot)`,
+      [campaign.id, orgId, subjectIds, snapshots]
+    );
 
     await client.query('COMMIT');
     return { ...campaign, item_count: activeUsers.length };

@@ -74,10 +74,13 @@ function respondError(res, error, fallbackMessage) {
   res.status(statusCode).json({ success: false, error: message });
 }
 
-// GET /entitlements — who-has-what report with over-privilege flags
+// GET /entitlements — who-has-what report with over-privilege flags.
+// The user list is paginated; the summary aggregates stay org-wide.
 router.get('/entitlements', requirePermission('access_governance.read'), async (req, res) => {
   try {
-    const report = await accessGovernance.getEntitlementReport(req.user.organization_id);
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const report = await accessGovernance.getEntitlementReport(req.user.organization_id, { page, limit });
     res.json({ success: true, data: report });
   } catch (error) {
     console.error('Entitlement report error:', error);
@@ -559,6 +562,22 @@ router.delete('/rbac-documents/:documentId', requirePermission('access_governanc
     console.error('Delete RBAC document error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete RBAC document' });
   }
+});
+
+// Upload failures are client errors. multer.MulterError (e.g. LIMIT_FILE_SIZE)
+// carries no status property, so without this handler the app-level handler
+// would fall through to 500 for an oversize file or an unsupported type.
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ success: false, error: 'File exceeds the 10MB upload limit' });
+    }
+    return res.status(400).json({ success: false, error: 'Invalid upload request' });
+  }
+  if (err?.message?.startsWith('Unsupported file type')) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+  return next(err);
 });
 
 module.exports = router;

@@ -13,17 +13,25 @@ jest.mock('../../src/config/database', () => ({ query: jest.fn(), connect: jest.
 jest.mock('../../src/services/subscriptionService', () => ({
   expireOrganizationTrialIfNeeded: jest.fn().mockResolvedValue(false)
 }));
-jest.mock('../../src/utils/encrypt', () => ({ decrypt: jest.fn((value) => value) }));
+// Deliberately NOT an identity function: users.email is encrypted at rest, so
+// the mock returns a distinguishable plaintext. An identity mock would pass
+// whether or not the service actually calls decrypt() -- which is exactly how
+// ciphertext once reached the UI unnoticed.
+jest.mock('../../src/utils/encrypt', () => ({
+  decrypt: jest.fn((value) => (typeof value === 'string' ? value.replace(/^enc:/, '') : value))
+}));
 
 const pool = require('../../src/config/database');
 const {
   resolveEffectivePermissions,
   findRuleViolations,
   evaluateSodViolations,
-  simulateAccess
+  simulateAccess,
+  getEntitlementReport
 } = require('../../src/services/accessGovernanceService');
 
 const ORG_ID = '11111111-1111-1111-1111-111111111111';
+const ROLE_ID = '22222222-2222-2222-2222-222222222222';
 
 const SOD_RULES = [
   {
@@ -48,11 +56,19 @@ function mockQueries() {
     if (sql.includes('FROM users u')) {
       return {
         rows: [
-          { id: 'u-admin', email: 'admin@test.com', primary_role: 'admin', is_active: true, roles: ['admin'], role_permissions: [] },
-          { id: 'u-toxic', email: 'toxic@test.com', primary_role: 'user', is_active: true, roles: ['ops'], role_permissions: ['users.manage', 'roles.manage', 'dashboard.read'] },
-          { id: 'u-clean', email: 'clean@test.com', primary_role: 'user', is_active: true, roles: ['viewer'], role_permissions: ['dashboard.read'] }
+          { id: 'u-admin', email: 'enc:admin@test.com', primary_role: 'admin', is_active: true, roles: ['admin'], role_permissions: [] },
+          { id: 'u-toxic', email: 'enc:toxic@test.com', primary_role: 'user', is_active: true, roles: ['ops'], role_permissions: ['users.manage', 'roles.manage', 'dashboard.read'] },
+          { id: 'u-clean', email: 'enc:clean@test.com', primary_role: 'user', is_active: true, roles: ['viewer'], role_permissions: ['dashboard.read'] }
         ]
       };
+    }
+    if (sql.includes('FROM roles WHERE id = ANY')) {
+      // Mirrors Postgres: `= ANY(array)` is set membership, so a repeated id
+      // still matches exactly one row.
+      return { rows: [{ id: ROLE_ID }] };
+    }
+    if (sql.includes('FROM role_permissions rp')) {
+      return { rows: [{ name: 'controls.write' }] };
     }
     if (sql.includes('FROM permissions ORDER BY')) {
       return {
@@ -115,6 +131,37 @@ describe('evaluateSodViolations', () => {
   });
 });
 
+describe('getEntitlementReport', () => {
+  beforeEach(() => mockQueries());
+
+  test('decrypts the encrypted email column', async () => {
+    const report = await getEntitlementReport(ORG_ID);
+
+    // Fails if the service stops calling decrypt() on users.email.
+    expect(report.users.map((user) => user.email)).toEqual([
+      'admin@test.com', 'toxic@test.com', 'clean@test.com'
+    ]);
+    report.users.forEach((user) => expect(user.email).not.toMatch(/^enc:/));
+  });
+
+  test('paginates the user list while keeping aggregates org-wide', async () => {
+    const report = await getEntitlementReport(ORG_ID, { page: 1, limit: 2 });
+
+    expect(report.users).toHaveLength(2);
+    expect(report.pagination).toEqual({ page: 1, limit: 2, total: 3, total_pages: 2 });
+    // Aggregates describe the whole org, not the page.
+    expect(report.totals.users).toBe(3);
+    expect(report.flags.wildcard_users).toEqual(['u-admin']);
+  });
+
+  test('returns the trailing page without overrunning', async () => {
+    const report = await getEntitlementReport(ORG_ID, { page: 2, limit: 2 });
+
+    expect(report.users.map((user) => user.id)).toEqual(['u-clean']);
+    expect(report.pagination.page).toBe(2);
+  });
+});
+
 describe('simulateAccess', () => {
   beforeEach(() => mockQueries());
 
@@ -142,5 +189,12 @@ describe('simulateAccess', () => {
     expect(result.wildcard).toBe(true);
     expect(result.denied_count).toBe(0);
     expect(result.sod_violations).toHaveLength(0);
+  });
+
+  test('accepts a repeated role id without failing validation', async () => {
+    const result = await simulateAccess(ORG_ID, { roleIds: [ROLE_ID, ROLE_ID] });
+
+    // Pre-dedupe this threw 400: one matched row was compared against two ids.
+    expect(result.proposed_permissions).toContain('controls.write');
   });
 });

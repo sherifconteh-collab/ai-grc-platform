@@ -17,6 +17,15 @@
 -- rows are visible. sod_rules additionally treats organization_id IS NULL
 -- (system rules) as always visible, matching its existing app-layer
 -- `organization_id = $1 OR organization_id IS NULL` query pattern.
+--
+-- LIMITATION: PostgreSQL always exempts roles with rolsuper or rolbypassrls
+-- from row-level security, and FORCE ROW LEVEL SECURITY does not change that
+-- (FORCE only removes the table *owner's* implicit exemption). On a deployment
+-- whose DATABASE_URL connects as a superuser these policies are inert, so the
+-- app-layer `WHERE organization_id = $1` filtering remains the primary control
+-- and this migration is strictly defense-in-depth. To get any benefit, connect
+-- as a non-superuser role created with NOSUPERUSER NOBYPASSRLS. This applies
+-- equally to the tables migration 105 already covers.
 
 ALTER TABLE sod_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sod_rules FORCE ROW LEVEL SECURITY;
