@@ -4,7 +4,16 @@ import Link from 'next/link';
 import { FormEvent, useMemo, useState } from 'react';
 import { getApiBaseUrl } from '@/lib/apiBase';
 
-type TierOption = 'community' | 'pro' | 'enterprise' | 'govcloud';
+type IndustryOption =
+  | 'financial'
+  | 'healthcare'
+  | 'defense'
+  | 'technology'
+  | 'energy'
+  | 'retail'
+  | 'pharma'
+  | 'education'
+  | 'auditfirm';
 
 const API_BASE = getApiBaseUrl();
 
@@ -12,7 +21,7 @@ export default function ContactPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
-  const [requestedTier, setRequestedTier] = useState<TierOption>('enterprise');
+  const [requestedIndustry, setRequestedIndustry] = useState<IndustryOption>('financial');
   const [wantsDemoAccount, setWantsDemoAccount] = useState(true);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +46,7 @@ export default function ContactPage() {
           name: name.trim(),
           email: email.trim(),
           company: company.trim(),
-          requestedTier,
+          requestedIndustry,
           wantsDemoAccount,
           message: message.trim()
         })
@@ -105,16 +114,21 @@ export default function ContactPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Preferred Demo Tier</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Industry Demo</label>
             <select
-              value={requestedTier}
-              onChange={(e) => setRequestedTier(e.target.value as TierOption)}
+              value={requestedIndustry}
+              onChange={(e) => setRequestedIndustry(e.target.value as IndustryOption)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-purple-500"
             >
-              <option value="community">Community</option>
-              <option value="pro">Pro</option>
-              <option value="enterprise">Enterprise</option>
-              <option value="govcloud">Gov Cloud &amp; Advisory</option>
+              <option value="financial">Financial Services</option>
+              <option value="healthcare">Healthcare</option>
+              <option value="defense">Defense &amp; Government Contracting</option>
+              <option value="technology">Technology / SaaS</option>
+              <option value="energy">Energy &amp; Utilities</option>
+              <option value="retail">Retail &amp; E-commerce</option>
+              <option value="pharma">Pharmaceuticals &amp; Life Sciences</option>
+              <option value="education">Higher Education</option>
+              <option value="auditfirm">Audit &amp; Assurance Firm</option>
             </select>
           </div>
 

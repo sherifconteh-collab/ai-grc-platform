@@ -2,14 +2,13 @@
 /**
  * seed-demo-accounts.js
  *
- * Creates one admin account per tier so every tier can be demoed.
+ * Creates one admin account per demo industry (see DEMO_ADMIN_ACCOUNTS in
+ * lib/demo-account-config.js) plus the external audit firm account.
  * Idempotent — safe to run multiple times.
  *
- * Accounts created:
- *   admin@enterprise.com   / ControlWeave!2026  — enterprise tier
- *   admin@govcloud.com     / ControlWeave!2026  — govcloud tier
- *   admin@pro.com          / ControlWeave!2026  — pro tier
- *   admin@community.com    / ControlWeave!2026  — community tier
+ * Each account's legacy tier-addressed email (admin@enterprise.com and
+ * friends) is also seeded as an admin in the same organization, so links and
+ * screenshots that predate the industry roster still log in.
  */
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
@@ -18,6 +17,7 @@ const { encrypt, hashForLookup } = require('../src/utils/encrypt');
 const {
   DEMO_ADMIN_ACCOUNTS,
   DEFAULT_DEMO_PASSWORD,
+  DEMO_BCRYPT_COST,
   resolveDemoAccountPassword
 } = require('./lib/demo-account-config');
 
@@ -54,64 +54,77 @@ async function upsertOrg(client, acct) {
   return res.rows[0].id;
 }
 
+/**
+ * Upserts one admin user into an organization and returns its id.
+ *
+ * users.email is field-level encrypted at rest (migrations/101_user_pii_encryption.sql);
+ * email_hash is the deterministic HMAC-SHA-384 lookup/uniqueness key, since
+ * encrypt() uses a random IV and never produces the same ciphertext twice.
+ *
+ * password_hash is only overwritten when DEMO_ACCOUNT_PASSWORD is explicitly
+ * set, so re-seeding never silently resets a password someone rotated.
+ */
+async function upsertDemoUser(client, { orgId, email, firstName, lastName, passwordHash }) {
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const passwordClause = HAS_EXPLICIT_PASSWORD_OVERRIDE
+    ? 'password_hash = EXCLUDED.password_hash,'
+    : '';
+
+  const userRes = await client.query(
+    `INSERT INTO users (organization_id, email, email_hash, password_hash, first_name, last_name, role, is_active, failed_login_attempts, locked_until)
+     VALUES ($1, $2, $3, $4, $5, $6, 'admin', true, 0, NULL)
+     ON CONFLICT (email_hash) DO UPDATE
+       SET organization_id        = EXCLUDED.organization_id,
+           ${passwordClause}
+           first_name             = EXCLUDED.first_name,
+           last_name              = EXCLUDED.last_name,
+           role                   = 'admin',
+           is_active              = true,
+           failed_login_attempts  = 0,
+           locked_until           = NULL
+     RETURNING id`,
+    [
+      orgId,
+      encrypt(normalizedEmail),
+      hashForLookup(normalizedEmail),
+      passwordHash,
+      firstName,
+      lastName
+    ]
+  );
+  return userRes.rows[0].id;
+}
+
 async function run() {
   const client = await pool.connect();
   try {
-    console.log('\n🌱 Seeding demo tier accounts...\n');
-    const passwordHash = await bcrypt.hash(PASSWORD, 12);
+    console.log('\n🌱 Seeding demo industry accounts...\n');
+    const passwordHash = await bcrypt.hash(PASSWORD, DEMO_BCRYPT_COST);
 
     for (const acct of ACCOUNTS) {
       await client.query('BEGIN');
       try {
         const orgId = await upsertOrg(client, acct);
 
-        // users.email is field-level encrypted at rest (migrations/101_user_pii_encryption.sql);
-        // email_hash is the deterministic HMAC-SHA-384 lookup/uniqueness key since encrypt()
-        // uses a random IV and never produces the same ciphertext twice.
-        const emailHash = hashForLookup(acct.email);
+        const userId = await upsertDemoUser(client, {
+          orgId,
+          email: acct.email,
+          firstName: acct.firstName,
+          lastName: acct.lastName,
+          passwordHash
+        });
 
-        // Upsert user (email_hash is the stable unique key across re-runs).
-        // Always reset lockout state and ensure account is active.
-        // Only update password_hash when DEMO_ACCOUNT_PASSWORD is explicitly provided.
-        if (HAS_EXPLICIT_PASSWORD_OVERRIDE) {
-          await client.query(
-            `INSERT INTO users (organization_id, email, email_hash, password_hash, first_name, last_name, role, is_active, failed_login_attempts, locked_until)
-             VALUES ($1, $2, $3, $4, $5, $6, 'admin', true, 0, NULL)
-             ON CONFLICT (email_hash) DO UPDATE
-               SET organization_id        = EXCLUDED.organization_id,
-                   email                  = EXCLUDED.email,
-                   password_hash          = EXCLUDED.password_hash,
-                   first_name             = EXCLUDED.first_name,
-                   last_name              = EXCLUDED.last_name,
-                   role                   = 'admin',
-                   is_active              = true,
-                   failed_login_attempts  = 0,
-                   locked_until           = NULL`,
-            [orgId, encrypt(acct.email), emailHash, passwordHash, acct.firstName, acct.lastName]
-          );
-        } else {
-          await client.query(
-            `INSERT INTO users (organization_id, email, email_hash, password_hash, first_name, last_name, role, is_active, failed_login_attempts, locked_until)
-             VALUES ($1, $2, $3, $4, $5, $6, 'admin', true, 0, NULL)
-             ON CONFLICT (email_hash) DO UPDATE
-               SET organization_id        = EXCLUDED.organization_id,
-                   email                  = EXCLUDED.email,
-                   first_name             = EXCLUDED.first_name,
-                   last_name              = EXCLUDED.last_name,
-                   role                   = 'admin',
-                   is_active              = true,
-                   failed_login_attempts  = 0,
-                   locked_until           = NULL`,
-            [orgId, encrypt(acct.email), emailHash, passwordHash, acct.firstName, acct.lastName]
-          );
+        // Legacy tier-addressed logins stay usable as separate admin users in
+        // the same organization so older docs and bookmarks do not break.
+        for (const aliasEmail of acct.aliasEmails || []) {
+          await upsertDemoUser(client, {
+            orgId,
+            email: aliasEmail,
+            firstName: acct.firstName,
+            lastName: acct.lastName,
+            passwordHash
+          });
         }
-
-        // Get user id for profile
-        const userRes = await client.query(
-          'SELECT id FROM users WHERE email_hash = $1',
-          [emailHash]
-        );
-        const userId = userRes.rows[0].id;
 
         // Mark onboarding complete so login goes straight to dashboard
         await client.query(
@@ -126,7 +139,8 @@ async function run() {
         );
 
         await client.query('COMMIT');
-        console.log(`  ✓ ${acct.tier.padEnd(12)} — ${acct.email}`);
+        const aliasNote = acct.aliasEmails?.length ? ` (alias: ${acct.aliasEmails.join(', ')})` : '';
+        console.log(`  ✓ ${acct.industry.padEnd(32)} — ${acct.email}${aliasNote}`);
       } catch (err) {
         await client.query('ROLLBACK');
         console.error(`  ✗ Failed for ${acct.email}: ${err.message}`);

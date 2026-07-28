@@ -181,6 +181,30 @@ npm run dev                  # starts Next.js on port 3000
 
 **First login:** Visit http://localhost:3000/register to create your account!
 
+### 4. Optional: seed the demo organizations
+
+```bash
+cd backend
+npm run seed:demo-accounts          # one organization per industry, plus an audit firm
+npm run seed:auditor-accounts       # an auditor login for each of them
+npm run seed:demo:industries        # frameworks + control implementations
+npm run seed:demo:audit-workbench   # engagements, PBC, workpapers, findings, signoffs
+npm run qa:demo:verify-logins       # verify every login and that the workbench is populated
+```
+
+This creates nine demo organizations — financial services, healthcare, defense,
+technology, energy, retail, pharma, higher education, and an audit firm — each
+with `admin@<industry>.com` and `auditor@<industry>.com` logins sharing the
+password `ControlWeave!2026` (override with `DEMO_ACCOUNT_PASSWORD`, minimum 15
+characters). `admin@auditfirm.com` is the account to use for the audit
+workbench: its organization ships with engagements in planning, fieldwork, and
+reporting so every workbench screen has real data.
+
+The four original tier-addressed logins (`admin@enterprise.com`,
+`admin@pro.com`, `admin@govcloud.com`, `admin@community.com`) still work and
+resolve to the financial, healthcare, defense, and technology organizations
+respectively.
+
 > 💡 For detailed setup including environment variables and advanced configuration, see [QUICKSTART.md](./QUICKSTART.md).
 
 ### Optional: Redis
