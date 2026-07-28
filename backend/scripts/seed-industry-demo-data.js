@@ -18,7 +18,11 @@
  */
 require('dotenv').config();
 const pool = require('../src/config/database');
-const { DEMO_ADMIN_ACCOUNTS, aiFrameworksFor } = require('./lib/demo-account-config');
+const {
+  DEMO_ADMIN_ACCOUNTS,
+  aiFrameworksFor,
+  aiGovernanceFrameworksFor
+} = require('./lib/demo-account-config');
 
 // Ordered so the cumulative share below reads as "best posture first".
 const STATUS_LADDER = Object.freeze(['verified', 'implemented', 'in_progress', 'needs_review', 'not_started']);
@@ -197,15 +201,16 @@ async function seedAccount(client, account) {
     );
   }
 
-  // The config guard proves an AI framework is declared; this proves one
-  // actually resolved against the catalog, so the AI governance and AI
-  // monitoring screens are never empty for this organization.
+  // The config guard proves an AI governance framework is declared; this proves
+  // one actually resolved against the catalog, so the AI governance assessment
+  // is never empty for this organization.
   const missingSet = new Set(missing);
   const resolvedAi = aiFrameworksFor(account).filter((code) => !missingSet.has(code));
-  if (resolvedAi.length === 0) {
+  const resolvedAiGovernance = aiGovernanceFrameworksFor(account).filter((code) => !missingSet.has(code));
+  if (resolvedAiGovernance.length === 0) {
     throw new Error(
-      `${account.orgName} resolved no AI framework. Declared: `
-      + `${aiFrameworksFor(account).join(', ') || 'none'}. Run seed:frameworks first.`
+      `${account.orgName} resolved no AI governance framework. Declared: `
+      + `${aiGovernanceFrameworksFor(account).join(', ') || 'none'}. Run seed:frameworks first.`
     );
   }
 

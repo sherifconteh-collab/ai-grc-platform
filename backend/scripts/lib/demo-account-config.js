@@ -36,7 +36,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Alice',
     lastName: 'Chen',
     persona: 'admin',
-    frameworks: ['ffiec', 'sr_11_7', 'sec_markets_ai_risk', 'soc2'],
+    frameworks: ['ffiec', 'sr_11_7', 'sec_markets_ai_risk', 'soc2', 'nist_ai_rmf'],
     targetCompliance: 0.8
   },
   {
@@ -108,7 +108,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     persona: 'admin',
     // pci_dss_v4 is only in the ControlWeaver-Pro catalog; iso_27001 is in both,
     // so this organization has a real posture in either mirror.
-    frameworks: ['pci_dss_v4', 'ccpa_cpra', 'iso_27001', 'state_ai_governance'],
+    frameworks: ['pci_dss_v4', 'ccpa_cpra', 'iso_27001', 'state_ai_governance', 'nist_ai_rmf'],
     targetCompliance: 0.6
   },
   {
@@ -156,33 +156,57 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
 ]);
 
 /**
- * Framework codes that govern AI systems specifically. Every demo
- * organization carries at least one so the AI governance, AI monitoring, and
- * AI-framework surfaces have real data in every industry — an org with only
- * classic security frameworks demos those screens as empty.
+ * Framework codes the AI governance assessment actually reads. This list is
+ * not "frameworks that mention AI" — it must stay in sync with the `f.code IN
+ * (...)` filter in the checkAIGovernance feature, because a framework outside
+ * it contributes no controls to that analysis no matter how AI-focused it is.
+ *
+ * Every demo organization carries at least one of these so the AI governance
+ * screens have real data in every industry rather than demoing as empty.
  */
-const AI_FRAMEWORK_CODES = Object.freeze([
+const AI_GOVERNANCE_FRAMEWORK_CODES = Object.freeze([
+  'eu_ai_act',
   'nist_ai_rmf',
   'iso_42001',
   'iso_42005',
-  'eu_ai_act',
-  'aiuc_1',
+  'aiuc_1'
+]);
+
+/**
+ * AI-focused regulatory frameworks that are genuinely about AI but are NOT
+ * consumed by the AI governance assessment. Good for industry flavor; they do
+ * not on their own make that analysis non-empty, so they never satisfy the
+ * guard below.
+ */
+const AI_REGULATORY_FRAMEWORK_CODES = Object.freeze([
   'international_ai_governance',
   'state_ai_governance',
   'finra_supervisory_ai',
   'sec_markets_ai_risk'
 ]);
 
+const AI_FRAMEWORK_CODES = Object.freeze([
+  ...AI_GOVERNANCE_FRAMEWORK_CODES,
+  ...AI_REGULATORY_FRAMEWORK_CODES
+]);
+
 function aiFrameworksFor(account) {
   return account.frameworks.filter((code) => AI_FRAMEWORK_CODES.includes(code));
 }
 
+function aiGovernanceFrameworksFor(account) {
+  return account.frameworks.filter((code) => AI_GOVERNANCE_FRAMEWORK_CODES.includes(code));
+}
+
 // Fail at require time rather than letting a roster edit quietly ship an
-// organization with no AI framework.
-const accountsWithoutAi = DEMO_ADMIN_ACCOUNTS.filter((account) => aiFrameworksFor(account).length === 0);
+// organization whose AI governance assessment would come back empty.
+const accountsWithoutAi = DEMO_ADMIN_ACCOUNTS.filter(
+  (account) => aiGovernanceFrameworksFor(account).length === 0
+);
 if (accountsWithoutAi.length > 0) {
   throw new Error(
-    'Every demo account must include at least one AI framework from AI_FRAMEWORK_CODES. '
+    'Every demo account must include at least one framework from '
+    + 'AI_GOVERNANCE_FRAMEWORK_CODES (the set the AI governance assessment reads). '
     + `Missing for: ${accountsWithoutAi.map((account) => account.email).join(', ')}`
   );
 }
@@ -306,7 +330,10 @@ function resolveDemoAccountPassword(...candidates) {
 module.exports = {
   DEFAULT_DEMO_PASSWORD,
   AI_FRAMEWORK_CODES,
+  AI_GOVERNANCE_FRAMEWORK_CODES,
+  AI_REGULATORY_FRAMEWORK_CODES,
   aiFrameworksFor,
+  aiGovernanceFrameworksFor,
   MIN_DEMO_PASSWORD_LENGTH,
   DEMO_BCRYPT_COST,
   DEMO_ADMIN_ACCOUNTS,
