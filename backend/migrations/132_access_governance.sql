@@ -85,23 +85,34 @@ CREATE INDEX IF NOT EXISTS idx_access_review_items_subject ON access_review_item
 -- 4. Seed system SoD rules (organization_id NULL = visible to all orgs).
 -- Wildcard ('*') admins are intentionally excluded from per-rule matching by
 -- the evaluation service and surfaced separately as over-privileged accounts.
-INSERT INTO sod_rules (organization_id, name, description, conflicting_permissions, severity)
+--
+-- is_active matters here. The three administrative rules below describe
+-- combinations no ordinary account holds, so they are enabled on day one and
+-- fire only on genuinely over-broad grants. The two self-review rules are
+-- seeded DISABLED: the platform's own default 'user' role grants
+-- controls.write, evidence.write and assessments.write together, so leaving
+-- them active would flag every standard user in every organization the moment
+-- the module is installed -- roughly two violations per user, which buries the
+-- real findings. They describe a legitimate AC-5 conflict, so they ship ready
+-- to enable once an organization has narrowed its roles; that is a deliberate
+-- opt-in, not an oversight.
+INSERT INTO sod_rules (organization_id, name, description, conflicting_permissions, severity, is_active)
 VALUES
   (NULL, 'User provisioning combined with role administration',
    'A single account that can both create users and grant roles can provision fully privileged accounts on its own (AC-5).',
-   '["users.manage", "roles.manage"]'::jsonb, 'high'),
+   '["users.manage", "roles.manage"]'::jsonb, 'high', TRUE),
   (NULL, 'Role administration combined with audit record creation',
    'An account that can change role grants and also write audit records could alter access and shape the audit trail that would reveal it (AU-9).',
-   '["roles.manage", "audit.write"]'::jsonb, 'critical'),
+   '["roles.manage", "audit.write"]'::jsonb, 'critical', TRUE),
   (NULL, 'System configuration combined with audit record creation',
    'An account that can change organization settings and also write audit records can obscure configuration changes (AU-9).',
-   '["settings.manage", "audit.write"]'::jsonb, 'high'),
+   '["settings.manage", "audit.write"]'::jsonb, 'high', TRUE),
   (NULL, 'Control implementation combined with assessment execution',
    'An account that both implements controls and executes assessments can attest to its own work (AC-5, self-review threat).',
-   '["controls.write", "assessments.write"]'::jsonb, 'medium'),
+   '["controls.write", "assessments.write"]'::jsonb, 'medium', FALSE),
   (NULL, 'Evidence authoring combined with assessment execution',
    'An account that both uploads evidence and executes assessments can certify compliance with evidence it authored (AC-5, self-review threat).',
-   '["evidence.write", "assessments.write"]'::jsonb, 'medium')
+   '["evidence.write", "assessments.write"]'::jsonb, 'medium', FALSE)
 ON CONFLICT ON CONSTRAINT sod_rules_org_name_unique DO NOTHING;
 
 -- 5. Seed access_governance permissions and grants

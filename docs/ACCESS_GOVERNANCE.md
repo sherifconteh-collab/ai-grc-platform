@@ -36,10 +36,32 @@ describe your whole posture while you page through the list.
 ## Separation of Duties
 
 SoD rules define permission combinations that are toxic when held by a single
-account. ControlWeave ships five system rules (for example, `users.manage` +
-`roles.manage`, which lets one account provision fully privileged users on its
-own). Administrators can add organization-specific rules and enable or disable
-them; system rules are read-only.
+account. ControlWeave ships five system rules. Administrators can add
+organization-specific rules and enable or disable any rule; system rules cannot
+be edited or deleted, only toggled.
+
+Three ship **enabled** — they describe administrative combinations no ordinary
+account holds, so they fire only on genuinely over-broad grants:
+
+| Rule | Severity |
+|---|---|
+| `roles.manage` + `audit.write` | critical |
+| `users.manage` + `roles.manage` | high |
+| `settings.manage` + `audit.write` | high |
+
+Two ship **disabled**, deliberately:
+
+| Rule | Severity |
+|---|---|
+| `controls.write` + `assessments.write` | medium |
+| `evidence.write` + `assessments.write` | medium |
+
+Both describe a real AC-5 self-review conflict, but the platform's built-in
+`user` role already grants `controls.write`, `evidence.write` and
+`assessments.write` together. Enabled out of the box they would flag every
+standard user in the organization — about two violations per person — which
+buries the findings that matter. Narrow your roles first, then enable them on
+the SoD tab.
 
 The violations panel evaluates every active rule against every user's
 effective permissions. Wildcard accounts are excluded from per-rule matching —

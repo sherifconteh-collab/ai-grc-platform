@@ -813,6 +813,17 @@ function dbQuery(sql, params = []) {
   assert('22.4', 'Admin sees seeded system SoD rules',
     sodRulesAdmin.s === 200 && Array.isArray(sodRulesAdmin.b.data) && sodRulesAdmin.b.data.length >= 5);
 
+  // The two self-review rules ship disabled on purpose: the built-in 'user'
+  // role grants controls.write + evidence.write + assessments.write, so leaving
+  // them active would flag every ordinary user in every org. If this assertion
+  // fails, a fresh install has become noisy again.
+  const seededActive = (sodRulesAdmin.b.data || []).filter((r) => r.is_system_rule && r.is_active);
+  const seededInactive = (sodRulesAdmin.b.data || []).filter((r) => r.is_system_rule && !r.is_active);
+  assert('22.4a', 'Three administrative system rules ship enabled', seededActive.length === 3);
+  assert('22.4b', 'Two self-review system rules ship disabled', seededInactive.length === 2);
+  assert('22.4c', 'The disabled pair are the assessment self-review rules',
+    seededInactive.every((r) => (r.conflicting_permissions || []).includes('assessments.write')));
+
   const sodRulesUser = await req('GET', '/api/v1/access-governance/sod/rules', null, userToken);
   assert('22.5', 'User CANNOT list SoD rules', sodRulesUser.s === 403);
 
@@ -830,9 +841,12 @@ function dbQuery(sql, params = []) {
   }, adminToken);
   assert('22.7', 'Admin CAN create org SoD rule', sodCreateAdmin.s === 201 && sodCreateAdmin.b.data?.id);
 
-  // Simulation: positive/negative matrix + toxic-combination detection
+  // Simulation: positive/negative matrix + toxic-combination detection.
+  // Uses users.manage + roles.manage, one of the three rules that ship ENABLED.
+  // controls.write + assessments.write would not fire here: that rule is seeded
+  // disabled precisely because the default 'user' role already holds it.
   const simToxic = await req('POST', '/api/v1/access-governance/simulate', {
-    permissions: ['controls.write', 'assessments.write']
+    permissions: ['users.manage', 'roles.manage']
   }, adminToken);
   assert('22.8', 'Simulation flags toxic permission combination',
     simToxic.s === 200 && Array.isArray(simToxic.b.data?.sod_violations) && simToxic.b.data.sod_violations.length >= 1);
