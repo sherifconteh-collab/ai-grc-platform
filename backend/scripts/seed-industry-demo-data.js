@@ -18,7 +18,7 @@
  */
 require('dotenv').config();
 const pool = require('../src/config/database');
-const { DEMO_ADMIN_ACCOUNTS } = require('./lib/demo-account-config');
+const { DEMO_ADMIN_ACCOUNTS, aiFrameworksFor } = require('./lib/demo-account-config');
 
 // Ordered so the cumulative share below reads as "best posture first".
 const STATUS_LADDER = Object.freeze(['verified', 'implemented', 'in_progress', 'needs_review', 'not_started']);
@@ -114,6 +114,67 @@ async function seedImplementations(client, orgId, frameworkCodes, target) {
   return inserted.rowCount;
 }
 
+/**
+ * Brings the organization's AI frameworks up to its target posture.
+ *
+ * Older tier seeders already linked some AI frameworks and left every control
+ * at `not_started`, which seedImplementations() correctly skips — the result is
+ * an AI framework showing 0%, which demos as an empty AI governance dashboard.
+ * This promotes only rows that are still `not_started` AND carry no
+ * implementation narrative, so hand-written or tier-seeded content is never
+ * overwritten.
+ */
+async function promoteAiFrameworkPosture(client, orgId, aiFrameworkCodes, target) {
+  if (aiFrameworkCodes.length === 0) return 0;
+
+  const untouched = await client.query(
+    `SELECT ci.control_id, f.code AS framework_code
+     FROM control_implementations ci
+     JOIN framework_controls fc ON fc.id = ci.control_id
+     JOIN frameworks f ON f.id = fc.framework_id
+     WHERE ci.organization_id = $1
+       AND f.code = ANY($2::text[])
+       AND ci.status = 'not_started'
+       AND (ci.implementation_notes IS NULL OR ci.implementation_notes = '')
+       AND (ci.implementation_narrative IS NULL OR ci.implementation_narrative = '')
+     ORDER BY f.code, ci.control_id`,
+    [orgId, aiFrameworkCodes]
+  );
+
+  if (untouched.rows.length === 0) return 0;
+
+  const byFramework = new Map();
+  for (const row of untouched.rows) {
+    if (!byFramework.has(row.framework_code)) byFramework.set(row.framework_code, []);
+    byFramework.get(row.framework_code).push(row.control_id);
+  }
+
+  const controlIds = [];
+  const statuses = [];
+  for (const ids of byFramework.values()) {
+    ids.forEach((controlId, index) => {
+      const status = statusForIndex(index, ids.length, target);
+      if (status === 'not_started') return;
+      controlIds.push(controlId);
+      statuses.push(status);
+    });
+  }
+
+  if (controlIds.length === 0) return 0;
+
+  const updated = await client.query(
+    `UPDATE control_implementations ci
+     SET status = t.status,
+         implementation_notes = 'Seeded AI governance demo posture — replace with your own implementation narrative.',
+         updated_at = NOW()
+     FROM UNNEST($2::uuid[], $3::text[]) AS t(control_id, status)
+     WHERE ci.organization_id = $1 AND ci.control_id = t.control_id`,
+    [orgId, controlIds, statuses]
+  );
+
+  return updated.rowCount;
+}
+
 async function seedAccount(client, account) {
   const orgId = await resolveOrganization(client, account);
   if (!orgId) {
@@ -136,10 +197,24 @@ async function seedAccount(client, account) {
     );
   }
 
+  // The config guard proves an AI framework is declared; this proves one
+  // actually resolved against the catalog, so the AI governance and AI
+  // monitoring screens are never empty for this organization.
+  const missingSet = new Set(missing);
+  const resolvedAi = aiFrameworksFor(account).filter((code) => !missingSet.has(code));
+  if (resolvedAi.length === 0) {
+    throw new Error(
+      `${account.orgName} resolved no AI framework. Declared: `
+      + `${aiFrameworksFor(account).join(', ') || 'none'}. Run seed:frameworks first.`
+    );
+  }
+
   const implementations = await seedImplementations(client, orgId, account.frameworks, account.targetCompliance);
+  const promoted = await promoteAiFrameworkPosture(client, orgId, resolvedAi, account.targetCompliance);
   console.log(
     `  ✓ ${account.industry.padEnd(32)} ${account.orgName.padEnd(28)} `
-    + `frameworks +${linked} implementations +${implementations}`
+    + `frameworks +${linked} implementations +${implementations} `
+    + `AI: ${resolvedAi.join(', ')}${promoted ? ` (+${promoted} promoted)` : ''}`
   );
   return true;
 }

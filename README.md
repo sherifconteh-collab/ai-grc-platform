@@ -200,6 +200,12 @@ characters). `admin@auditfirm.com` is the account to use for the audit
 workbench: its organization ships with engagements in planning, fieldwork, and
 reporting so every workbench screen has real data.
 
+Every organization carries at least one AI framework fitting its vertical (SEC
+Markets AI Risk, NIST AI RMF, ISO 42001, ISO 42005, EU AI Act, or State AI
+Governance), so the AI governance and AI-framework screens have real data in
+every industry. The seed refuses to run if any organization declares no AI
+framework or if a declared one is missing from the catalog.
+
 The four original tier-addressed logins (`admin@enterprise.com`,
 `admin@pro.com`, `admin@govcloud.com`, `admin@community.com`) still work and
 resolve to the financial, healthcare, defense, and technology organizations

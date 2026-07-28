@@ -50,7 +50,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Sam',
     lastName: 'Rivera',
     persona: 'admin',
-    frameworks: ['hipaa', 'hitech'],
+    frameworks: ['hipaa', 'hitech', 'nist_ai_rmf'],
     targetCompliance: 0.4
   },
   {
@@ -64,7 +64,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Eve',
     lastName: 'Marshall',
     persona: 'admin',
-    frameworks: ['cmmc_2.0', 'nist_800_171', 'fedramp_high'],
+    frameworks: ['cmmc_2.0', 'nist_800_171', 'fedramp_high', 'nist_ai_rmf'],
     targetCompliance: 0.9
   },
   {
@@ -78,7 +78,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Fred',
     lastName: 'Okafor',
     persona: 'admin',
-    frameworks: ['soc2', 'iso_27001', 'gdpr'],
+    frameworks: ['soc2', 'iso_27001', 'gdpr', 'iso_42001'],
     targetCompliance: 0.2
   },
   {
@@ -92,7 +92,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Dana',
     lastName: 'Whitfield',
     persona: 'admin',
-    frameworks: ['nerc_cip', 'nist_csf_2.0'],
+    frameworks: ['nerc_cip', 'nist_csf_2.0', 'nist_ai_rmf'],
     targetCompliance: 0.75
   },
   {
@@ -108,7 +108,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     persona: 'admin',
     // pci_dss_v4 is only in the ControlWeaver-Pro catalog; iso_27001 is in both,
     // so this organization has a real posture in either mirror.
-    frameworks: ['pci_dss_v4', 'ccpa_cpra', 'iso_27001'],
+    frameworks: ['pci_dss_v4', 'ccpa_cpra', 'iso_27001', 'state_ai_governance'],
     targetCompliance: 0.6
   },
   {
@@ -122,7 +122,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Nadia',
     lastName: 'Volkov',
     persona: 'admin',
-    frameworks: ['iso_27001', 'gdpr', 'iso_27701'],
+    frameworks: ['iso_27001', 'gdpr', 'iso_27701', 'eu_ai_act'],
     targetCompliance: 0.55
   },
   {
@@ -136,7 +136,7 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Theo',
     lastName: 'Nakamura',
     persona: 'admin',
-    frameworks: ['nist_csf_2.0', 'nist_800_171', 'ccpa_cpra'],
+    frameworks: ['nist_csf_2.0', 'nist_800_171', 'ccpa_cpra', 'iso_42005'],
     targetCompliance: 0.35
   },
   {
@@ -150,10 +150,42 @@ const DEMO_ADMIN_ACCOUNTS = Object.freeze([
     firstName: 'Rosalind',
     lastName: 'Sterling',
     persona: 'audit_firm',
-    frameworks: ['soc2', 'iso_27001', 'nist_800_53'],
+    frameworks: ['soc2', 'iso_27001', 'nist_800_53', 'iso_42001'],
     targetCompliance: 0.7
   }
 ]);
+
+/**
+ * Framework codes that govern AI systems specifically. Every demo
+ * organization carries at least one so the AI governance, AI monitoring, and
+ * AI-framework surfaces have real data in every industry — an org with only
+ * classic security frameworks demos those screens as empty.
+ */
+const AI_FRAMEWORK_CODES = Object.freeze([
+  'nist_ai_rmf',
+  'iso_42001',
+  'iso_42005',
+  'eu_ai_act',
+  'aiuc_1',
+  'international_ai_governance',
+  'state_ai_governance',
+  'finra_supervisory_ai',
+  'sec_markets_ai_risk'
+]);
+
+function aiFrameworksFor(account) {
+  return account.frameworks.filter((code) => AI_FRAMEWORK_CODES.includes(code));
+}
+
+// Fail at require time rather than letting a roster edit quietly ship an
+// organization with no AI framework.
+const accountsWithoutAi = DEMO_ADMIN_ACCOUNTS.filter((account) => aiFrameworksFor(account).length === 0);
+if (accountsWithoutAi.length > 0) {
+  throw new Error(
+    'Every demo account must include at least one AI framework from AI_FRAMEWORK_CODES. '
+    + `Missing for: ${accountsWithoutAi.map((account) => account.email).join(', ')}`
+  );
+}
 
 /**
  * The organization whose demo data is built around the audit workbench —
@@ -273,6 +305,8 @@ function resolveDemoAccountPassword(...candidates) {
 
 module.exports = {
   DEFAULT_DEMO_PASSWORD,
+  AI_FRAMEWORK_CODES,
+  aiFrameworksFor,
   MIN_DEMO_PASSWORD_LENGTH,
   DEMO_BCRYPT_COST,
   DEMO_ADMIN_ACCOUNTS,
