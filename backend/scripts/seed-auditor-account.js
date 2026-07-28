@@ -108,10 +108,13 @@ async function run() {
       throw new Error('No auditor accounts were seeded — no demo organizations found.');
     }
 
+    // Never echo the credential itself: when the operator supplies
+    // DEMO_ACCOUNT_PASSWORD it is a secret at rest, and printing the built-in
+    // default trains people to copy it out of CI logs.
     if (HAS_EXPLICIT_PASSWORD_OVERRIDE) {
-      console.log(`\n  Password for all auditor accounts (reset): ${PASSWORD}`);
+      console.log('\n  Auditor account passwords reset to the value supplied via DEMO_ACCOUNT_PASSWORD.');
     } else {
-      console.log(`\n  New auditor accounts password: ${PASSWORD}`);
+      console.log('\n  New auditor accounts use the default demo password documented in the repository README.');
       console.log('  Existing auditor passwords were preserved (set DEMO_ACCOUNT_PASSWORD to rotate).');
     }
     console.log('\n✅ Auditor demo accounts ready.\n');

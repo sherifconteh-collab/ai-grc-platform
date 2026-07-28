@@ -151,7 +151,7 @@ async function run() {
       // Do not echo the credential: the operator supplied it and it is a secret at rest.
       console.log('\n  Account passwords reset to the value supplied via the DEMO_ACCOUNT_PASSWORD environment variable.');
     } else {
-      console.log('\n  New accounts use the default demo password documented in this script\'s header comment.');
+      console.log('\n  New accounts use the default demo password documented in the repository README.');
       console.log('  Existing account passwords were preserved (set DEMO_ACCOUNT_PASSWORD to rotate them).');
     }
     console.log('  Account lockouts cleared and is_active=true ensured for all accounts.');
