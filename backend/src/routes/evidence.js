@@ -281,7 +281,12 @@ router.get('/types',
   }
 });
 
-router.get('/', requirePermission('evidence.read'), async (req, res) => {
+// Read-heavy list endpoint; limiter added because the evidence router uses
+// per-route limiters rather than a router-level one, so a route without an
+// explicit one gets none.
+router.get('/',
+  createRateLimiter({ label: 'evidence-list', windowMs: 60 * 1000, max: 120 }),
+  requirePermission('evidence.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { search, tags, limit, offset , evidence_type: evidenceTypeFilter } = req.query;
