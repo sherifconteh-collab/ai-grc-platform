@@ -7,6 +7,7 @@ const { validateBody, requireFields, isUuid } = require('../middleware/validate'
 const { createNotification } = require('../services/notificationService');
 const { invalidateAICache } = require('../services/llmService');
 const crosswalkCredits = require('../services/crosswalkCreditService');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { decrypt } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
 
@@ -288,7 +289,11 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
 });
 
 // PATCH /implementations/:id/status
-router.patch('/:id/status', requirePermission('implementations.write'), validateBody((body) => {
+// Leaving a crediting status triggers crosswalk withdrawal, which walks every
+// control this one was holding up — more work than the single-row update looks.
+router.patch('/:id/status',
+  createRateLimiter({ label: 'implementation-status-update', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('implementations.write'), validateBody((body) => {
   const errors = requireFields(body, ['status']);
   const allowedStatuses = ['not_started', 'in_progress', 'implemented', 'needs_review', 'satisfied_via_crosswalk', 'verified', 'not_applicable'];
   if (body.status && !allowedStatuses.includes(body.status)) {

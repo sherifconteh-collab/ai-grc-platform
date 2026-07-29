@@ -8,6 +8,7 @@ const { validateBody, requireFields, isUuid } = require('../middleware/validate'
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { enqueueWebhookEvent } = require('../services/webhookService');
 const crosswalkCredits = require('../services/crosswalkCreditService');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
 
 const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
@@ -15,7 +16,9 @@ const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
 router.use(authenticate);
 
 // GET /controls/:id
-router.get('/:id', requirePermission('controls.read'), async (req, res) => {
+router.get('/:id',
+  createRateLimiter({ label: 'control-detail', windowMs: 60 * 1000, max: 120 }),
+  requirePermission('controls.read'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT fc.id, fc.control_id,
@@ -64,7 +67,12 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
 });
 
 // PUT /controls/:id/implementation
-router.put('/:id/implementation', requirePermission('controls.write'), validateBody((body) => {
+// Crosswalk propagation makes this one status change fan out into a mapping
+// query plus a read-modify-write per credited control, so it costs far more
+// than the single row it appears to update.
+router.put('/:id/implementation',
+  createRateLimiter({ label: 'control-implementation-update', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('controls.write'), validateBody((body) => {
   const errors = requireFields(body, ['status']);
   const allowedStatuses = ['not_started', 'in_progress', 'implemented', 'needs_review', 'satisfied_via_crosswalk', 'verified', 'not_applicable'];
   if (body.status && !allowedStatuses.includes(body.status)) {
@@ -425,7 +433,11 @@ router.put('/:id/implementation', requirePermission('controls.write'), validateB
 
 // POST /controls/:id/inherit
 // Manually trigger inheritance to mapped controls with dynamic threshold support.
-router.post('/:id/inherit', requirePermission('controls.write'), async (req, res) => {
+// The heaviest route here: several queries per mapped control, and a control
+// can carry dozens of mappings. Held well below the ordinary write limit.
+router.post('/:id/inherit',
+  createRateLimiter({ label: 'control-inherit', windowMs: 60 * 1000, max: 20 }),
+  requirePermission('controls.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const sourceControlId = req.params.id;
