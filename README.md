@@ -101,6 +101,10 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
 - 📜 AU-2 compliant immutable audit logging
 - 🛡️ RBAC with Admin, ISSE, Auditor, and Read-Only roles
+- 🔑 **Access Governance** — entitlement reporting with over-privileged and dormant-access flags, separation-of-duties toxic-combination rules, access review certification campaigns (AC-2 evidence on completion), a role/permission simulator, and AI-assisted import of your existing RBAC documentation
+- 🏷️ **Framework-neutral evidence types** — a 14-value vocabulary that labels evidence consistently no matter which framework you are working against
+- 🧭 **Control function classification** — preventive / detective / corrective, filterable across every framework
+- ✅ **SOC 2 across all five Trust Services Criteria** — Security, Availability, Confidentiality, Processing Integrity, and Privacy, each with an examine/interview/test audit program
 
 ### AI & Intelligence
 - 🤖 **AI Copilot** — org-aware conversational assistant with 25+ analysis features (gap analysis, compliance forecast, policy generation, remediation playbooks)

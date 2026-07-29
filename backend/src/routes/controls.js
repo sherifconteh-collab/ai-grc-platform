@@ -14,6 +14,13 @@ const { log } = require('../utils/logger');
 
 const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
 
+// Statuses POST /:id/inherit may write to mapped controls. Mirrors the
+// allowlist PUT /:id/implementation validates against.
+const INHERITABLE_STATUSES = [
+  'not_started', 'in_progress', 'implemented', 'needs_review',
+  'satisfied_via_crosswalk', 'verified', 'not_applicable'
+];
+
 // IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
 // can trace a recognized rate-limiting middleware covering every route below —
 // it does not model this repo's own createRateLimiter, so the per-route limits
@@ -339,7 +346,8 @@ router.put('/:id/implementation',
                  (SELECT status FROM upserted) AS new_status
         `, [mappedControlId, orgId, `Auto-satisfied via crosswalk (${mapping.similarity_score}% ${mapping.mapping_type || 'mapped'} match)`]);
 
-        if (credited.rows[0]?.new_status === 'satisfied_via_crosswalk') {
+        const creditApplied = credited.rows[0]?.new_status === 'satisfied_via_crosswalk';
+        if (creditApplied) {
           appliedCredits.push({
             targetControlId: mappedControlId,
             similarityScore: mapping.similarity_score,
@@ -372,7 +380,11 @@ router.put('/:id/implementation',
           title: mapping.mapped_title,
           framework: mapping.framework_name,
           similarity: mapping.similarity_score,
-          mappingType: mapping.mapping_type || null
+          mappingType: mapping.mapping_type || null,
+          // False when the target was already implemented, verified, or
+          // otherwise claimed by human work — the mapping matched, but no
+          // credit was applied and nothing was recorded in the ledger.
+          credited: creditApplied
         });
       }
 
@@ -476,6 +488,19 @@ router.post('/:id/inherit',
       [orgId, sourceControlId]
     );
     const sourceStatus = sourceImpl.rows[0]?.status || 'in_progress';
+    // inheritedStatus comes straight from the request body and is written to
+    // control_implementations.status for every mapped control. There is no CHECK
+    // constraint on that column, and dashboards, reminders, and scheduled
+    // reports all branch on its value — an unrecognized string would silently
+    // drop those controls out of every calculation. Validate against the same
+    // allowlist PUT /:id/implementation uses.
+    if (inheritedStatus && !INHERITABLE_STATUSES.includes(inheritedStatus)) {
+      return res.status(400).json({
+        success: false,
+        error: `inheritedStatus must be one of: ${INHERITABLE_STATUSES.join(', ')}`
+      });
+    }
+
     const nextStatus = inheritedStatus || (sourceStatus === 'implemented' ? 'satisfied_via_crosswalk' : sourceStatus);
     const evidencePropagationConfig = await getConfigValue(orgId, 'crosswalk', 'auto_propagate_evidence_exact', { value: false });
     const shouldPropagateEvidence = typeof propagateEvidence === 'boolean'
@@ -510,8 +535,18 @@ router.post('/:id/inherit',
            OR cm.similarity_score = 100
          )
          AND cm.source_control_id != cm.target_control_id
+         -- Same activated-framework scope the automatic path applies, so
+         -- inheritance cannot credit a framework the organization has not
+         -- adopted just because it was triggered manually.
+         AND (
+           NOT EXISTS (SELECT 1 FROM organization_frameworks scope WHERE scope.organization_id = $4)
+           OR EXISTS (
+             SELECT 1 FROM organization_frameworks scope
+             WHERE scope.organization_id = $4 AND scope.framework_id = fc.framework_id
+           )
+         )
        ORDER BY cm.similarity_score DESC`,
-      [sourceControlId, resolvedThreshold, STRICT_CROSSWALK_MAPPING_TYPES]
+      [sourceControlId, resolvedThreshold, STRICT_CROSSWALK_MAPPING_TYPES, orgId]
     );
 
     const processed = [];
