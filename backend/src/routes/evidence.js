@@ -264,7 +264,9 @@ function normalizeRetentionDate(input) {
 // Served from the database so the picker and the validation agree, and so a
 // new type never needs a frontend release. Declared before '/' so it is not
 // shadowed by any '/:id' route below.
-router.get('/types', requirePermission('evidence.read'), async (req, res) => {
+router.get('/types',
+  createRateLimiter({ label: 'evidence-types', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('evidence.read'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT code, label, description
@@ -562,6 +564,13 @@ router.post('/bulk-upload', createRateLimiter({ label: 'evidence-bulk-upload', w
   const piiClassification = ALLOWED_PII_CLASSIFICATIONS.includes(rawPiiClassification) ? rawPiiClassification : 'none';
   const rawDataSensitivity = req.body.data_sensitivity || 'internal';
   const dataSensitivity = ALLOWED_DATA_SENSITIVITIES.includes(rawDataSensitivity) ? rawDataSensitivity : 'internal';
+
+  // Same shared vocabulary as the single-file upload. The evidence page posts
+  // here, so omitting this silently dropped the type the user picked.
+  const bulkEvidenceTypeCodes = await getEvidenceTypeCodes();
+  const rawBulkEvidenceType = String(req.body.evidence_type || req.body.evidenceType || '').trim();
+  const bulkEvidenceType = bulkEvidenceTypeCodes.has(rawBulkEvidenceType) ? rawBulkEvidenceType : null;
+
   const rawPiiTypes = req.body.pii_types
     ? (typeof req.body.pii_types === 'string' ? req.body.pii_types.split(',').map(t => t.trim()) : req.body.pii_types)
     : [];
@@ -618,6 +627,7 @@ router.post('/bulk-upload', createRateLimiter({ label: 'evidence-bulk-upload', w
       if (evidenceColumns.has('pii_classification'))     { insertColumns.push('pii_classification');     insertValues.push(filePiiClass); }
       if (evidenceColumns.has('pii_types'))              { insertColumns.push('pii_types');              insertValues.push(filePiiTypes); }
       if (evidenceColumns.has('data_sensitivity'))       { insertColumns.push('data_sensitivity');       insertValues.push(fileSensitivity); }
+      if (evidenceColumns.has('evidence_type'))          { insertColumns.push('evidence_type');          insertValues.push(bulkEvidenceType); }
 
       const placeholders = insertValues.map((_, idx) => `$${idx + 1}`).join(', ');
       const dbResult = await pool.query(
