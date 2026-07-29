@@ -7,9 +7,16 @@ const { validateBody, requireFields, isUuid } = require('../middleware/validate'
 const { createNotification } = require('../services/notificationService');
 const { invalidateAICache } = require('../services/llmService');
 const crosswalkCredits = require('../services/crosswalkCreditService');
+const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { decrypt } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
+
+// IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
+// can trace a recognized rate-limiting middleware covering every route below —
+// it does not model this repo's own createRateLimiter. Same pattern as
+// routes/accessGovernance.js; the per-route limits remain the real control.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1500 }));
 
 router.use(authenticate);
 

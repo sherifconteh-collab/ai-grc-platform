@@ -7,11 +7,20 @@ const fs = require('fs');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
+const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { evidenceUploaded } = require('../services/realtimeEventService');
 const ragService = require('../services/orgRagService');
 const aiSecurity = require('../utils/aiSecurity');
 const { log, serializeError } = require('../utils/logger');
+
+// IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
+// can trace a recognized rate-limiting middleware covering every route below —
+// it does not model this repo's own createRateLimiter, so the per-route limits
+// further down (download and integrity-check at 30/min, and the rest) are
+// invisible to it. Set above those caps so they stay the binding constraint.
+// Same pattern as routes/accessGovernance.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000 }));
 
 router.use(authenticate);
 router.use(requireTier('pro'));

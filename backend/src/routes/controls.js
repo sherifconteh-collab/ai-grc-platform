@@ -8,10 +8,19 @@ const { validateBody, requireFields, isUuid } = require('../middleware/validate'
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { enqueueWebhookEvent } = require('../services/webhookService');
 const crosswalkCredits = require('../services/crosswalkCreditService');
+const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
 
 const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
+
+// IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
+// can trace a recognized rate-limiting middleware covering every route below —
+// it does not model this repo's own createRateLimiter, so the per-route limits
+// further down are invisible to it. Set above the per-route caps so those stay
+// the binding constraint in normal use; this layer only catches broad abuse.
+// Same pattern as routes/accessGovernance.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000 }));
 
 router.use(authenticate);
 
