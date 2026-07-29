@@ -243,7 +243,7 @@ export const organizationAPI = {
   removeFramework: (orgId: string, frameworkId: string) =>
     api.delete(`/organizations/${orgId}/frameworks/${frameworkId}`),
 
-  getControls: (orgId: string, params?: { frameworkId?: string; status?: string; page?: number; limit?: number }) =>
+  getControls: (orgId: string, params?: { frameworkId?: string; status?: string; control_function?: string; page?: number; limit?: number }) =>
     api.get(`/organizations/${orgId}/controls`, { params }),
 
   exportControlAnswers: (
@@ -609,9 +609,19 @@ export const dataGovernanceAPI = {
 };
 
 // Evidence APIs
+export interface EvidenceType {
+  code: string;
+  label: string;
+  description: string;
+}
+
 export const evidenceAPI = {
-  getAll: (params?: { search?: string; tags?: string; limit?: number; offset?: number }) =>
+  getAll: (params?: { search?: string; tags?: string; limit?: number; offset?: number; evidence_type?: string }) =>
     api.get('/evidence', { params }),
+
+  // The framework-neutral evidence vocabulary, served from the database so the
+  // picker always matches what the API will accept.
+  getTypes: () => api.get('/evidence/types'),
 
   upload: (formData: FormData) =>
     api.post('/evidence/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: UPLOAD_TIMEOUT }),

@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+
+const ALLOWED_CONTROL_FUNCTIONS = ['preventive', 'detective', 'corrective'];
 const pool = require('../config/database');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
@@ -1420,7 +1422,7 @@ router.get('/:orgId/controls', requirePermission('organizations.read'), async (r
       SELECT fc.id, fc.control_id,
              COALESCE(occ.title, fc.title) as title,
              COALESCE(occ.description, fc.description) as description,
-             fc.control_type, fc.priority,
+             fc.control_type, fc.control_functions, fc.priority,
              f.name as framework_name, f.code as framework_code,
              COALESCE(ci.status, 'not_started') as status,
              ci.assigned_to, ci.notes,
@@ -1457,6 +1459,19 @@ router.get('/:orgId/controls', requirePermission('organizations.read'), async (r
         params.push(status);
         paramIndex++;
       }
+    }
+
+    // Overlap (&&) not containment, so a control labeled detective+corrective
+    // matches a request for either one.
+    const requestedFunctions = String(req.query.control_function || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => ALLOWED_CONTROL_FUNCTIONS.includes(value));
+
+    if (requestedFunctions.length > 0) {
+      query += ` AND fc.control_functions && $${paramIndex}::text[]`;
+      params.push(requestedFunctions);
+      paramIndex++;
     }
 
     query += ' ORDER BY f.name, fc.control_id, fc.id';
@@ -1938,6 +1953,7 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
         COALESCE(occ.title, fc.title) as title,
         COALESCE(occ.description, fc.description) as description,
         fc.control_type,
+        fc.control_functions,
         fc.priority,
         COALESCE(ci.status, 'not_started') as status,
         ci.implementation_notes,
@@ -1999,6 +2015,7 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
       'title',
       'description',
       'control_type',
+      'control_functions',
       'priority',
       'status',
       'implementation_notes',
@@ -2008,6 +2025,14 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
       'assigned_to_name',
       'due_date'
     ];
+
+    // control_functions is a text[]; flatten it so both CSV and XLSX render a
+    // readable cell instead of a stringified array.
+    rows.forEach((row) => {
+      if (Array.isArray(row.control_functions)) {
+        row.control_functions = row.control_functions.join('; ');
+      }
+    });
 
     const stamp = new Date().toISOString().slice(0, 10);
     const filename = `controlweave-control-answers-${orgId}-${stamp}.${format}`;

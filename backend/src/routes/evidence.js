@@ -11,6 +11,7 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const { evidenceUploaded } = require('../services/realtimeEventService');
 const ragService = require('../services/orgRagService');
 const aiSecurity = require('../utils/aiSecurity');
+const { log, serializeError } = require('../utils/logger');
 
 router.use(authenticate);
 router.use(requireTier('pro'));
@@ -44,6 +45,34 @@ if (!fs.existsSync(uploadsDir)) {
 const resolvedUploadsDir = path.resolve(uploadsDir);
 
 const ALLOWED_PII_CLASSIFICATIONS = ['none', 'low', 'moderate', 'high', 'critical'];
+let evidenceTypesCache = { codes: null, expiresAt: 0 };
+
+/**
+ * The evidence type vocabulary lives in the `evidence_types` table rather than
+ * a CHECK constraint so new types can be added without a migration. Cached the
+ * same way as the column list, since it changes about as often.
+ */
+async function getEvidenceTypeCodes() {
+  const now = Date.now();
+  if (evidenceTypesCache.codes && evidenceTypesCache.expiresAt > now) {
+    return evidenceTypesCache.codes;
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT code FROM evidence_types WHERE is_active = true'
+    );
+    const codes = new Set(result.rows.map((row) => row.code));
+    evidenceTypesCache = { codes, expiresAt: now + 60 * 1000 };
+    return codes;
+  } catch (error) {
+    // Table absent (evidence type migration not yet applied) -- treat as "no
+    // vocabulary", which makes evidence_type unusable rather than breaking uploads.
+    log('warn', 'evidence.types.unavailable', { error: serializeError(error) });
+    return new Set();
+  }
+}
+
 const ALLOWED_DATA_SENSITIVITIES = ['public', 'internal', 'confidential', 'restricted'];
 const ALLOWED_PII_TYPES = ['name', 'email', 'ssn', 'address', 'phone', 'dob', 'financial', 'health', 'biometric', 'other'];
 
@@ -231,10 +260,29 @@ function normalizeRetentionDate(input) {
 }
 
 // GET /evidence
+// GET /evidence/types — the shared, framework-neutral evidence vocabulary.
+// Served from the database so the picker and the validation agree, and so a
+// new type never needs a frontend release. Declared before '/' so it is not
+// shadowed by any '/:id' route below.
+router.get('/types', requirePermission('evidence.read'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT code, label, description
+       FROM evidence_types
+       WHERE is_active = true
+       ORDER BY sort_order, label`
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'evidence.types.list_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Failed to load evidence types' });
+  }
+});
+
 router.get('/', requirePermission('evidence.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { search, tags, limit, offset } = req.query;
+    const { search, tags, limit, offset , evidence_type: evidenceTypeFilter } = req.query;
     const evidenceColumns = await getEvidenceColumns();
 
     const optionalSelect = [
@@ -243,7 +291,8 @@ router.get('/', requirePermission('evidence.read'), async (req, res) => {
       evidenceColumns.has('integrity_verified_at') ? 'e.integrity_verified_at' : 'NULL::timestamp AS integrity_verified_at',
       evidenceColumns.has('pii_classification') ? 'e.pii_classification' : "'none'::text AS pii_classification",
       evidenceColumns.has('pii_types') ? 'e.pii_types' : 'NULL::text[] AS pii_types',
-      evidenceColumns.has('data_sensitivity') ? 'e.data_sensitivity' : "'internal'::text AS data_sensitivity"
+      evidenceColumns.has('data_sensitivity') ? 'e.data_sensitivity' : "'internal'::text AS data_sensitivity",
+      evidenceColumns.has('evidence_type') ? 'e.evidence_type' : 'NULL::text AS evidence_type'
     ].join(',\n             ');
 
     let query = `
@@ -269,6 +318,17 @@ router.get('/', requirePermission('evidence.read'), async (req, res) => {
       query += ` AND e.tags && $${idx}::text[]`;
       params.push(`{${tags}}`);
       idx++;
+    }
+
+    if (evidenceTypeFilter && evidenceColumns.has('evidence_type')) {
+      const requested = String(evidenceTypeFilter).split(',').map((code) => code.trim()).filter(Boolean);
+      const typeCodes = await getEvidenceTypeCodes();
+      const valid = requested.filter((code) => typeCodes.has(code));
+      if (valid.length > 0) {
+        query += ` AND e.evidence_type = ANY($${idx}::text[])`;
+        params.push(valid);
+        idx++;
+      }
     }
 
     query += ' ORDER BY e.created_at DESC';
@@ -312,6 +372,13 @@ router.post('/upload', createRateLimiter({ label: 'evidence-upload', windowMs: 6
 
     const rawDataSensitivity = req.body.data_sensitivity || 'internal';
     const dataSensitivity = ALLOWED_DATA_SENSITIVITIES.includes(rawDataSensitivity) ? rawDataSensitivity : 'internal';
+
+    // What kind of artifact this is, from the shared framework-neutral
+    // vocabulary. Unrecognized values are dropped rather than rejected so an
+    // upload never fails on a label; the artifact just stays untyped.
+    const evidenceTypeCodes = await getEvidenceTypeCodes();
+    const rawEvidenceType = String(req.body.evidence_type || req.body.evidenceType || '').trim();
+    const evidenceType = evidenceTypeCodes.has(rawEvidenceType) ? rawEvidenceType : null;
 
     const rawPiiTypes = req.body.pii_types
       ? (typeof req.body.pii_types === 'string' ? req.body.pii_types.split(',').map(t => t.trim()) : req.body.pii_types)
@@ -376,6 +443,10 @@ router.post('/upload', createRateLimiter({ label: 'evidence-upload', windowMs: 6
     if (evidenceColumns.has('data_sensitivity')) {
       insertColumns.push('data_sensitivity');
       insertValues.push(finalDataSensitivity);
+    }
+    if (evidenceColumns.has('evidence_type')) {
+      insertColumns.push('evidence_type');
+      insertValues.push(evidenceType);
     }
 
     const placeholders = insertValues.map((_, idx) => `$${idx + 1}`).join(', ');

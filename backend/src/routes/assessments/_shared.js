@@ -281,6 +281,7 @@ async function getAssessmentProcedureById(procedureId) {
       ap.title,
       ap.description,
       ap.expected_evidence,
+      ap.expected_evidence_types,
       ap.assessor_notes,
       ap.depth,
       fc.id AS framework_control_id,
