@@ -6,6 +6,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
 const { invalidateAICache } = require('../services/llmService');
+const crosswalkCredits = require('../services/crosswalkCreditService');
 const { decrypt } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
 
@@ -326,13 +327,27 @@ router.patch('/:id/status', requirePermission('implementations.write'), validate
       WHERE id = $3 AND organization_id = $5 RETURNING *
     `, [status, notes || null, req.params.id, status, req.user.organization_id]);
 
+    // Forward-only enforcement still permits implemented -> needs_review /
+    // not_applicable, so this path can also drop a source out of a crediting
+    // status and must withdraw whatever it was holding up.
+    let withdrawnCredits = 0;
+    if (crosswalkCredits.CREDITING_STATUSES.includes(oldStatus)) {
+      const withdrawal = await crosswalkCredits.handleSourceStatusChange({
+        organizationId: req.user.organization_id,
+        controlId: existing.rows[0].control_id,
+        newStatus: status,
+        actorUserId: req.user.id
+      });
+      withdrawnCredits = withdrawal.withdrawn || 0;
+    }
+
     // Log audit — resource_id references the framework_control id, matching
     // how controls.js logs control status changes (not the implementation id).
     await pool.query(
       `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
        VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
       [req.user.organization_id, req.user.id, existing.rows[0].control_id,
-       JSON.stringify({ old_status: oldStatus, status, notes })]
+       JSON.stringify({ old_status: oldStatus, status, notes, withdrawn_crosswalk_credits: withdrawnCredits })]
     );
 
     // Notify org when a control reaches 'verified'

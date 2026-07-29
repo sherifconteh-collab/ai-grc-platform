@@ -22,7 +22,7 @@
 - ✅ 35+ frameworks seeded (NIST, ISO, SOC 2, HIPAA, GDPR, CCPA, FFIEC, NERC CIP, EU AI Act, AIUC-1, and more)
 - ✅ 1,000+ controls across all frameworks
 - ✅ 80+ cross-framework crosswalk mappings
-- ✅ Auto-crosswalk engine (90%+ similarity threshold)
+- ✅ Auto-crosswalk engine (90%+ similarity threshold, per-source credit ledger with automatic withdrawal)
 - ✅ Control management, filtering, and health tracking
 - ✅ RMF Lifecycle (NIST SP 800-37 Rev 2) — full 7-step workflow with ATO/DATO/IATT tracking
 

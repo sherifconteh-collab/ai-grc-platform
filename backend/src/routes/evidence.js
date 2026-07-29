@@ -699,7 +699,11 @@ router.post('/bulk-upload', createRateLimiter({ label: 'evidence-bulk-upload', w
 });
 
 // GET /evidence/:id/integrity-check
-router.get('/:id/integrity-check', requirePermission('evidence.read'), async (req, res) => {
+// Re-hashes the stored file on every call, so it is the most expensive read on
+// this router — limited well below the plain metadata reads.
+router.get('/:id/integrity-check',
+  createRateLimiter({ label: 'evidence-integrity-check', windowMs: 60 * 1000, max: 30 }),
+  requirePermission('evidence.read'), async (req, res) => {
   try {
     const evidenceColumns = await getEvidenceColumns();
     const hashSelect = evidenceColumns.has('integrity_hash_sha256')
@@ -753,7 +757,9 @@ router.get('/:id/integrity-check', requirePermission('evidence.read'), async (re
 });
 
 // GET /evidence/:id
-router.get('/:id', requirePermission('evidence.read'), async (req, res) => {
+router.get('/:id',
+  createRateLimiter({ label: 'evidence-detail', windowMs: 60 * 1000, max: 120 }),
+  requirePermission('evidence.read'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT e.*, u.first_name || ' ' || u.last_name as uploaded_by_name
@@ -784,7 +790,12 @@ router.get('/:id', requirePermission('evidence.read'), async (req, res) => {
 });
 
 // GET /evidence/:id/download
-router.get('/:id/download', requirePermission('evidence.read'), async (req, res) => {
+// The bulk-exfiltration path: evidence files carry PII and an org's whole
+// evidence library is enumerable by id from the list endpoint. Tightest limit
+// on the router.
+router.get('/:id/download',
+  createRateLimiter({ label: 'evidence-download', windowMs: 60 * 1000, max: 30 }),
+  requirePermission('evidence.read'), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT file_name, file_path, mime_type FROM evidence WHERE id = $1 AND organization_id = $2',
@@ -814,7 +825,9 @@ router.get('/:id/download', requirePermission('evidence.read'), async (req, res)
 });
 
 // PUT /evidence/:id
-router.put('/:id', requirePermission('evidence.write'), async (req, res) => {
+router.put('/:id',
+  createRateLimiter({ label: 'evidence-update', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('evidence.write'), async (req, res) => {
   try {
     const { description, tags, retention_until, pii_classification, pii_types, data_sensitivity } = req.body;
     const evidenceColumns = await getEvidenceColumns();
@@ -884,7 +897,10 @@ router.put('/:id', requirePermission('evidence.write'), async (req, res) => {
 });
 
 // DELETE /evidence/:id
-router.delete('/:id', requirePermission('evidence.write'), async (req, res) => {
+// Destructive and irreversible, so limited harder than the other mutations.
+router.delete('/:id',
+  createRateLimiter({ label: 'evidence-delete', windowMs: 60 * 1000, max: 30 }),
+  requirePermission('evidence.write'), async (req, res) => {
   try {
     const hold = await pool.query(
       `SELECT id, hold_name
@@ -929,7 +945,9 @@ router.delete('/:id', requirePermission('evidence.write'), async (req, res) => {
 });
 
 // POST /evidence/:id/link
-router.post('/:id/link', requirePermission('evidence.write'), async (req, res) => {
+router.post('/:id/link',
+  createRateLimiter({ label: 'evidence-link', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('evidence.write'), async (req, res) => {
   try {
     const { controlIds, notes } = req.body;
 
@@ -959,7 +977,9 @@ router.post('/:id/link', requirePermission('evidence.write'), async (req, res) =
 });
 
 // DELETE /evidence/:evidenceId/unlink/:controlId
-router.delete('/:evidenceId/unlink/:controlId', requirePermission('evidence.write'), async (req, res) => {
+router.delete('/:evidenceId/unlink/:controlId',
+  createRateLimiter({ label: 'evidence-unlink', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('evidence.write'), async (req, res) => {
   try {
     await pool.query(
       'DELETE FROM evidence_control_links WHERE evidence_id = $1 AND control_id = $2',

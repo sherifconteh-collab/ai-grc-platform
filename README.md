@@ -98,7 +98,7 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 - 📊 Compliance dashboard with real-time metrics and custom dashboard builder
 - 🎯 Framework selection (15+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
-- 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks)
+- 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
 - 📜 AU-2 compliant immutable audit logging
 - 🛡️ RBAC with Admin, ISSE, Auditor, and Read-Only roles
 
@@ -359,7 +359,10 @@ Full RMF lifecycle management without leaving the platform:
 
 - **When you implement ONE control, the platform automatically satisfies similar controls across other frameworks**
 - Example: Implement NIST CSF "GV.OC-01" → Auto-satisfies ISO 27001 "A.5.1.1" + SOC 2 "CC1.1"
-- 90%+ similarity threshold ensures defensible mappings
+- 90%+ similarity threshold ensures defensible mappings (configurable per organization)
+- **Every credit is recorded with its source** — the control detail view shows which implementation justifies a satisfied control, in which framework, at what similarity score, and whether that source is still implemented today
+- **Credit is reversible.** If the source control stops being implemented, the credit is withdrawn automatically and the credited control returns to the status it held before. A control credited by more than one source stays satisfied until the last of them lapses.
+- Credit only ever writes to controls at *Not Started*, and only in frameworks your organization has activated — it never overwrites work in progress or inflates posture in a framework you are not pursuing
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
