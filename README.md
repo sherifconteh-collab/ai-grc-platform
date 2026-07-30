@@ -98,9 +98,13 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 - 📊 Compliance dashboard with real-time metrics and custom dashboard builder
 - 🎯 Framework selection (15+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
-- 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks)
+- 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
 - 📜 AU-2 compliant immutable audit logging
 - 🛡️ RBAC with Admin, ISSE, Auditor, and Read-Only roles
+- 🔑 **Access Governance** — entitlement reporting with over-privileged and dormant-access flags, separation-of-duties toxic-combination rules, access review certification campaigns (AC-2 evidence on completion), a role/permission simulator, and AI-assisted import of your existing RBAC documentation
+- 🏷️ **Framework-neutral evidence types** — a 14-value vocabulary that labels evidence consistently no matter which framework you are working against
+- 🧭 **Control function classification** — preventive / detective / corrective, filterable across every framework
+- ✅ **SOC 2 across all five Trust Services Criteria** — Security, Availability, Confidentiality, Processing Integrity, and Privacy, each with an examine/interview/test audit program
 
 ### AI & Intelligence
 - 🤖 **AI Copilot** — org-aware conversational assistant with 25+ analysis features (gap analysis, compliance forecast, policy generation, remediation playbooks)
@@ -180,6 +184,38 @@ npm run dev                  # starts Next.js on port 3000
 ```
 
 **First login:** Visit http://localhost:3000/register to create your account!
+
+### 4. Optional: seed the demo organizations
+
+```bash
+cd backend
+npm run seed:demo-accounts          # one organization per industry, plus an audit firm
+npm run seed:auditor-accounts       # an auditor login for each of them
+npm run seed:demo:industries        # frameworks + control implementations
+npm run seed:demo:audit-workbench   # engagements, PBC, workpapers, findings, signoffs
+npm run qa:demo:verify-logins       # verify every login and that the workbench is populated
+```
+
+This creates nine demo organizations — financial services, healthcare, defense,
+technology, energy, retail, pharma, higher education, and an audit firm — each
+with `admin@<industry>.com` and `auditor@<industry>.com` logins sharing the
+password `ControlWeave!2026` (override with `DEMO_ACCOUNT_PASSWORD`, minimum 15
+characters). `admin@auditfirm.com` is the account to use for the audit
+workbench: its organization ships with engagements in planning, fieldwork, and
+reporting so every workbench screen has real data.
+
+Every organization carries at least one AI governance framework fitting its
+vertical — NIST AI RMF, ISO 42001, ISO 42005, or EU AI Act — so the AI
+governance assessment has real controls to read in every industry. Those four
+plus AIUC-1 are the only codes that analysis accepts; other AI-focused
+frameworks (SEC Markets AI Risk, State AI Governance) are tracked alongside
+them but do not feed it. The seed refuses to run if any organization declares
+no AI governance framework, or if a declared one is missing from the catalog.
+
+The four original tier-addressed logins (`admin@enterprise.com`,
+`admin@pro.com`, `admin@govcloud.com`, `admin@community.com`) still work and
+resolve to the financial, healthcare, defense, and technology organizations
+respectively.
 
 > 💡 For detailed setup including environment variables and advanced configuration, see [QUICKSTART.md](./QUICKSTART.md).
 
@@ -327,7 +363,10 @@ Full RMF lifecycle management without leaving the platform:
 
 - **When you implement ONE control, the platform automatically satisfies similar controls across other frameworks**
 - Example: Implement NIST CSF "GV.OC-01" → Auto-satisfies ISO 27001 "A.5.1.1" + SOC 2 "CC1.1"
-- 90%+ similarity threshold ensures defensible mappings
+- 90%+ similarity threshold ensures defensible mappings (configurable per organization)
+- **Every credit is recorded with its source** — the control detail view shows which implementation justifies a satisfied control, in which framework, at what similarity score, and whether that source is still implemented today
+- **Credit is reversible.** If the source control stops being implemented, the credit is withdrawn automatically and the credited control returns to the status it held before. A control credited by more than one source stays satisfied until the last of them lapses.
+- Credit only ever writes to controls at *Not Started*, and only in frameworks your organization has activated — it never overwrites work in progress or inflates posture in a framework you are not pursuing
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
@@ -396,6 +435,7 @@ Full asset and configuration inventory:
 - **PostgreSQL Row-Level Security** — `FORCE ROW SECURITY` on core tables; `withOrgContext()` wraps transactions for defense-in-depth isolation
 - Timing-safe webhook signature comparison (prevents timing-oracle attacks)
 - Separation of duties enforcement
+- **Access Governance** — entitlement reporting, toxic-permission-combination SoD rules, access review certification campaigns (AC-2), a role/permission simulator for positive/negative access testing, and AI-assisted import of existing RBAC documentation (role matrices, SoD matrices)
 - Per-organization SMTP configuration (org settings → env vars → platform settings)
 - Webhook integrations with HMAC-SHA-384 signatures
 - Notification system (in-app bell with unread tracking + email delivery)

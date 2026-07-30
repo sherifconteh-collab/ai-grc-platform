@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { evidenceAPI, implementationsAPI, integrationsAPI, autoEvidenceAPI, pendingEvidenceAPI } from '@/lib/api';
+import type { EvidenceType } from '@/lib/api';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/lib/access';
@@ -16,6 +17,7 @@ interface EvidenceFile {
   mime_type: string;
   file_size: number;
   tags: string[];
+  evidence_type: string | null;
   pii_classification: string;
   pii_types: string[];
   data_sensitivity: string;
@@ -123,6 +125,8 @@ export default function EvidencePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadTags, setUploadTags] = useState('');
+  const [uploadEvidenceType, setUploadEvidenceType] = useState('');
+  const [evidenceTypes, setEvidenceTypes] = useState<EvidenceType[]>([]);
   const [uploadPiiClassification, setUploadPiiClassification] = useState('none');
   const [uploadDataSensitivity, setUploadDataSensitivity] = useState('internal');
   const [uploadPiiTypes, setUploadPiiTypes] = useState<string[]>([]);
@@ -190,6 +194,7 @@ export default function EvidencePage() {
 
   useEffect(() => {
     loadEvidence();
+    loadEvidenceTypes();
     loadSplunkConfig();
     loadCollectionRules();
     loadSourceMeta();
@@ -198,6 +203,17 @@ export default function EvidencePage() {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
+  };
+
+  // The vocabulary comes from the API, so adding a type server-side shows up
+  // in the picker without a frontend release. Failure is non-fatal.
+  const loadEvidenceTypes = async () => {
+    try {
+      const response = await evidenceAPI.getTypes();
+      setEvidenceTypes(response.data?.data || []);
+    } catch {
+      setEvidenceTypes([]);
+    }
   };
 
   const loadEvidence = async () => {
@@ -556,6 +572,7 @@ export default function EvidencePage() {
       selectedFiles.forEach(file => formData.append('files', file));
       if (uploadDescription) formData.append('description', uploadDescription);
       if (uploadTags) formData.append('tags', uploadTags);
+      if (uploadEvidenceType) formData.append('evidence_type', uploadEvidenceType);
       formData.append('pii_classification', uploadPiiClassification);
       formData.append('data_sensitivity', uploadDataSensitivity);
       if (uploadPiiTypes.length) formData.append('pii_types', uploadPiiTypes.join(','));
@@ -858,6 +875,23 @@ export default function EvidencePage() {
 
           {/* PII Classification Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label htmlFor="evidence-type" className="block text-sm font-medium text-gray-700 mb-1">Evidence Type</label>
+              <select
+                id="evidence-type"
+                value={uploadEvidenceType}
+                onChange={(e) => setUploadEvidenceType(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="">Unlabeled</option>
+                {evidenceTypes.map((type) => (
+                  <option key={type.code} value={type.code}>{type.label}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                What kind of artifact this is. Assessment procedures declare the types they expect.
+              </p>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">PII Classification</label>
               <select
@@ -1224,6 +1258,13 @@ export default function EvidencePage() {
                       <td className="px-6 py-4 text-sm text-gray-600">{ev.description || '—'}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
+                          {ev.evidence_type ? (
+                            <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                              {evidenceTypes.find((t) => t.code === ev.evidence_type)?.label || ev.evidence_type}
+                            </span>
+                          ) : (
+                            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Untyped</span>
+                          )}
                           {ev.pii_classification && ev.pii_classification !== 'none' ? (
                             <span className={`text-xs px-2 py-0.5 rounded ${PII_CLASSIFICATION_LABELS[ev.pii_classification]?.color || 'bg-gray-100 text-gray-600'}`}>
                               {PII_CLASSIFICATION_LABELS[ev.pii_classification]?.label || ev.pii_classification}

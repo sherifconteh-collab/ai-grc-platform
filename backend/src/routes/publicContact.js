@@ -2,7 +2,8 @@ const express = require('express')
 const router = express.Router()
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate')
 const {
-  DEMO_ADMIN_ACCOUNTS,
+  DEMO_ACCOUNT_BY_INDUSTRY,
+  DEFAULT_DEMO_ACCOUNT_EMAIL,
   resolveDemoAccountPassword
 } = require('../../scripts/lib/demo-account-config')
 const {
@@ -12,38 +13,51 @@ const {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const DEMO_ACCOUNT_BY_TIER = Object.freeze(
-  Object.fromEntries(
-    DEMO_ADMIN_ACCOUNTS.map((account) => [account.tier, account.email])
-  )
-)
-
-const LEGACY_TIER_ALIASES = Object.freeze({
-  free: 'community',
-  starter: 'pro',
-  professional: 'pro',
-  utilities: 'govcloud'
+// The demo roster is keyed by industry now that tiers are gone. Prospects who
+// still submit an old tier name are mapped onto the industry account that used
+// to serve that tier, so historical marketing links keep working.
+const LEGACY_TIER_TO_INDUSTRY = Object.freeze({
+  free: 'technology',
+  community: 'technology',
+  starter: 'healthcare',
+  pro: 'healthcare',
+  professional: 'healthcare',
+  enterprise: 'financial',
+  utilities: 'energy',
+  govcloud: 'defense'
 })
 
-function normalizeTier(value) {
-  const tier = String(value || '').trim().toLowerCase()
-  const normalizedTier = LEGACY_TIER_ALIASES[tier] || tier
-  if (DEMO_ACCOUNT_BY_TIER[normalizedTier]) return normalizedTier
-  return 'pro'
+/**
+ * Resolves a prospect's requested vertical to a demo login. Always returns a
+ * real address — an unknown value falls back to the default demo account
+ * rather than emailing out an undefined credential.
+ */
+function resolveDemoSelection(value) {
+  const requested = String(value || '').trim().toLowerCase()
+  const industryKey = LEGACY_TIER_TO_INDUSTRY[requested] || requested
+  const email = DEMO_ACCOUNT_BY_INDUSTRY[industryKey]
+  if (email) return { key: industryKey, email }
+  return { key: 'technology', email: DEMO_ACCOUNT_BY_INDUSTRY.technology || DEFAULT_DEMO_ACCOUNT_EMAIL }
 }
 
 function isValidEmail(value) {
   return EMAIL_REGEX.test(String(value || '').trim().toLowerCase())
 }
 
-function formatTierLabel(tier) {
-  switch (String(tier || '').trim().toLowerCase()) {
-    case 'community': return 'Community'
-    case 'pro': return 'Pro'
-    case 'enterprise': return 'Enterprise'
-    case 'govcloud': return 'Gov Cloud & Advisory'
-    default: return String(tier || 'Pro')
-  }
+const INDUSTRY_LABELS = Object.freeze({
+  financial: 'Financial Services',
+  healthcare: 'Healthcare',
+  defense: 'Defense & Government Contracting',
+  technology: 'Technology / SaaS',
+  energy: 'Energy & Utilities',
+  retail: 'Retail & E-commerce',
+  pharma: 'Pharmaceuticals & Life Sciences',
+  education: 'Higher Education',
+  auditfirm: 'Audit & Assurance Firm'
+})
+
+function formatIndustryLabel(industryKey) {
+  return INDUSTRY_LABELS[String(industryKey || '').trim().toLowerCase()] || 'Technology / SaaS'
 }
 
 router.post(
@@ -68,24 +82,25 @@ router.post(
       const email = String(sanitizeInput(req.body.email) || '').trim().toLowerCase()
       const company = String(sanitizeInput(req.body.company || '') || '').trim()
       const message = String(sanitizeInput(req.body.message || '') || '').trim()
-      const requestedTier = normalizeTier(req.body.requestedTier)
-      const requestedTierLabel = formatTierLabel(requestedTier)
+      const selection = resolveDemoSelection(req.body.requestedIndustry || req.body.requestedTier)
+      const requestedTier = selection.key
+      const requestedTierLabel = formatIndustryLabel(selection.key)
       const wantsDemoAccount = req.body.wantsDemoAccount !== false
 
-      const demoAccountEmail = DEMO_ACCOUNT_BY_TIER[requestedTier]
+      const demoAccountEmail = selection.email
       const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
       const bookingUrl = process.env.SALES_BOOKING_URL || appUrl + '/contact'
 
       const valueBullets = [
         'Review framework coverage for your target compliance scope',
         'Walk through control + evidence workflows with audit trails',
-        'Validate tier fit based on your current maturity and team needs'
+        'Validate framework fit based on your industry and current maturity'
       ]
 
       const leadSummary = [
         `Inbound contact request from ${name} (${email})`,
         company ? `Company: ${company}` : null,
-        `Requested tier: ${requestedTierLabel}`,
+        `Requested industry demo: ${requestedTierLabel}`,
         `Wants demo account: ${wantsDemoAccount ? 'yes' : 'no'}`,
         '',
         'Message:',
@@ -132,6 +147,7 @@ router.post(
         data: {
           message: 'Contact request received',
           tier: requestedTier,
+          industry: requestedTier,
           demo_account_email: wantsDemoAccount ? demoAccountEmail : null,
           onboarding_required: false
         }

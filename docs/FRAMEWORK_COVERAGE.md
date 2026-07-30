@@ -90,25 +90,35 @@ This platform provides **comprehensive coverage of 7 major compliance and govern
 **Status:** ✅ Complete  
 **Published:** 2017 (AICPA)  
 **Category:** Service Organization Controls  
-**Controls:** 60+ controls across 5 trust categories  
+**Controls:** 55 controls across all 5 trust services categories  
 
 **Coverage:**
-- **COMMON CRITERIA (CC):** 20 foundation controls
+- **COMMON CRITERIA (CC) — the Security category:** 27 controls
   - CC1: Control Environment (COSO Principles 1-5)
   - CC2: Communication and Information (COSO Principles 13-15)
   - CC3: Risk Assessment (COSO Principles 6-9)
   - CC4: Monitoring Activities (COSO Principles 16-17)
   - CC5: Control Activities (COSO Principles 10-12)
-  - CC6: Logical and Physical Access Controls (8 controls)
-  - CC7: System Operations (5 controls)
+  - CC6: Logical and Physical Access Controls
+  - CC7: System Operations
   - CC8: Change Management
   - CC9: Risk Mitigation
 
-- **SECURITY (Additional Criteria A1):** 3 controls
-- **AVAILABILITY (Additional Criteria A1):** 3 controls
-- **PROCESSING INTEGRITY (P1-P7):** 7 controls (relevant for AI systems)
-- **CONFIDENTIALITY (C1):** 2 controls
-- **PRIVACY (P1-P8):** 13 controls
+- **AVAILABILITY (A1.1-A1.3):** 3 criteria — capacity, environmental
+  protections and backup, recovery testing
+- **CONFIDENTIALITY (C1.1-C1.2):** 2 criteria — identification and disposal
+- **PROCESSING INTEGRITY (PI1.1-PI1.5):** 5 criteria — specifications, inputs,
+  processing, output delivery, storage (relevant for AI systems)
+- **PRIVACY (P1.1-P8.1):** 18 criteria — notice, choice and consent,
+  collection, use/retention/disposal, access, disclosure and notification,
+  data quality, and complaint handling
+
+Every criterion carries a three-procedure examine / interview / test program
+(165 procedures in total), so an engagement scoped to any category has a real
+audit program rather than bare control text.
+
+Control descriptions are ControlWeave's own paraphrase of each criterion — the
+AICPA Trust Services Criteria text is copyrighted and is not reproduced.
 
 **Key Features:**
 - Based on COSO Internal Control Framework

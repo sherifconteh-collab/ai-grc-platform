@@ -243,7 +243,7 @@ export const organizationAPI = {
   removeFramework: (orgId: string, frameworkId: string) =>
     api.delete(`/organizations/${orgId}/frameworks/${frameworkId}`),
 
-  getControls: (orgId: string, params?: { frameworkId?: string; status?: string; page?: number; limit?: number }) =>
+  getControls: (orgId: string, params?: { frameworkId?: string; status?: string; control_function?: string; page?: number; limit?: number }) =>
     api.get(`/organizations/${orgId}/controls`, { params }),
 
   exportControlAnswers: (
@@ -609,9 +609,19 @@ export const dataGovernanceAPI = {
 };
 
 // Evidence APIs
+export interface EvidenceType {
+  code: string;
+  label: string;
+  description: string;
+}
+
 export const evidenceAPI = {
-  getAll: (params?: { search?: string; tags?: string; limit?: number; offset?: number }) =>
+  getAll: (params?: { search?: string; tags?: string; limit?: number; offset?: number; evidence_type?: string }) =>
     api.get('/evidence', { params }),
+
+  // The framework-neutral evidence vocabulary, served from the database so the
+  // picker always matches what the API will accept.
+  getTypes: () => api.get('/evidence/types'),
 
   upload: (formData: FormData) =>
     api.post('/evidence/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: UPLOAD_TIMEOUT }),
@@ -657,6 +667,67 @@ export const rolesAPI = {
   getUserRoles: (userId: string) => api.get(`/roles/user/${userId}`),
 
   bootstrapAuditorSubroles: () => api.post('/roles/bootstrap-auditor-subroles'),
+};
+
+// Access Governance APIs
+export const accessGovernanceAPI = {
+  getEntitlements: (params?: { page?: number; limit?: number }) =>
+    api.get('/access-governance/entitlements', { params }),
+
+  getSodRules: () => api.get('/access-governance/sod/rules'),
+
+  createSodRule: (data: {
+    name: string;
+    description?: string;
+    conflictingPermissions: string[];
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+  }) => api.post('/access-governance/sod/rules', data),
+
+  updateSodRule: (ruleId: string, data: {
+    description?: string;
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    isActive?: boolean;
+  }) => api.patch(`/access-governance/sod/rules/${ruleId}`, data),
+
+  getSodViolations: () => api.get('/access-governance/sod/violations'),
+
+  simulate: (data: { roleIds?: string[]; permissions?: string[] }) =>
+    api.post('/access-governance/simulate', data),
+
+  getCampaigns: () => api.get('/access-governance/campaigns'),
+
+  createCampaign: (data: { name: string; description?: string; dueDate?: string }) =>
+    api.post('/access-governance/campaigns', data),
+
+  getCampaign: (campaignId: string) => api.get(`/access-governance/campaigns/${campaignId}`),
+
+  activateCampaign: (campaignId: string) =>
+    api.post(`/access-governance/campaigns/${campaignId}/activate`),
+
+  cancelCampaign: (campaignId: string) =>
+    api.post(`/access-governance/campaigns/${campaignId}/cancel`),
+
+  decideItem: (campaignId: string, itemId: string, data: {
+    decision: 'certified' | 'revoked';
+    notes?: string;
+  }) => api.patch(`/access-governance/campaigns/${campaignId}/items/${itemId}`, data),
+
+  completeCampaign: (campaignId: string) =>
+    api.post(`/access-governance/campaigns/${campaignId}/complete`),
+
+  uploadRbacDocument: (formData: FormData) =>
+    api.post('/access-governance/rbac-documents', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT,
+    }),
+
+  getRbacDocuments: () => api.get('/access-governance/rbac-documents'),
+
+  saveRbacAnalysis: (documentId: string, analysis: Record<string, unknown>) =>
+    api.put(`/access-governance/rbac-documents/${documentId}/analysis`, { analysis }),
+
+  deleteRbacDocument: (documentId: string) =>
+    api.delete(`/access-governance/rbac-documents/${documentId}`),
 };
 
 // Users APIs
@@ -728,6 +799,8 @@ export const aiAPI = {
   getStatus: () => api.get('/ai/status'),
   gapAnalysis: (data?: { provider?: string; model?: string }) =>
     api.post('/ai/gap-analysis', data || {}, { timeout: AI_REQUEST_TIMEOUT }),
+  rbacAnalysis: (documentId: string, data?: { provider?: string; model?: string }) =>
+    api.post('/ai/rbac-analysis', { documentId, ...(data || {}) }, { timeout: AI_REQUEST_TIMEOUT }),
   crosswalkOptimizer: (data?: { provider?: string; model?: string }) =>
     api.post('/ai/crosswalk-optimizer', data || {}, { timeout: AI_REQUEST_TIMEOUT }),
   complianceForecast: (data?: { provider?: string; model?: string }) =>

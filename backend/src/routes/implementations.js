@@ -6,8 +6,17 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
 const { invalidateAICache } = require('../services/llmService');
+const crosswalkCredits = require('../services/crosswalkCreditService');
+const rateLimit = require('express-rate-limit');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { decrypt } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
+
+// IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
+// can trace a recognized rate-limiting middleware covering every route below —
+// it does not model this repo's own createRateLimiter. Same pattern as
+// routes/accessGovernance.js; the per-route limits remain the real control.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1500 }));
 
 router.use(authenticate);
 
@@ -287,7 +296,11 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
 });
 
 // PATCH /implementations/:id/status
-router.patch('/:id/status', requirePermission('implementations.write'), validateBody((body) => {
+// Leaving a crediting status triggers crosswalk withdrawal, which walks every
+// control this one was holding up — more work than the single-row update looks.
+router.patch('/:id/status',
+  createRateLimiter({ label: 'implementation-status-update', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('implementations.write'), validateBody((body) => {
   const errors = requireFields(body, ['status']);
   const allowedStatuses = ['not_started', 'in_progress', 'implemented', 'needs_review', 'satisfied_via_crosswalk', 'verified', 'not_applicable'];
   if (body.status && !allowedStatuses.includes(body.status)) {
@@ -326,13 +339,27 @@ router.patch('/:id/status', requirePermission('implementations.write'), validate
       WHERE id = $3 AND organization_id = $5 RETURNING *
     `, [status, notes || null, req.params.id, status, req.user.organization_id]);
 
+    // Forward-only enforcement still permits implemented -> needs_review /
+    // not_applicable, so this path can also drop a source out of a crediting
+    // status and must withdraw whatever it was holding up.
+    let withdrawnCredits = 0;
+    if (crosswalkCredits.CREDITING_STATUSES.includes(oldStatus)) {
+      const withdrawal = await crosswalkCredits.handleSourceStatusChange({
+        organizationId: req.user.organization_id,
+        controlId: existing.rows[0].control_id,
+        newStatus: status,
+        actorUserId: req.user.id
+      });
+      withdrawnCredits = withdrawal.withdrawn || 0;
+    }
+
     // Log audit — resource_id references the framework_control id, matching
     // how controls.js logs control status changes (not the implementation id).
     await pool.query(
       `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
        VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
       [req.user.organization_id, req.user.id, existing.rows[0].control_id,
-       JSON.stringify({ old_status: oldStatus, status, notes })]
+       JSON.stringify({ old_status: oldStatus, status, notes, withdrawn_crosswalk_credits: withdrawnCredits })]
     );
 
     // Notify org when a control reaches 'verified'

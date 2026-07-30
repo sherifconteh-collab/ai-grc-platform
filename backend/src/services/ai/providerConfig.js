@@ -128,7 +128,8 @@ const FEATURE_TASK_PROFILE = {
   security_posture:         'reasoning',
   ai_governance:            'reasoning',
   compliance_query:         'chat',
-  iavm_asset_alert:         'extraction'
+  iavm_asset_alert:         'extraction',
+  rbac_analysis:            'reasoning'
 };
 
 /**
