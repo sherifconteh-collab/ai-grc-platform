@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-22 | PR #236: Complete NIST SP 800-53 Rev 5 base-control set (issue #217 Wave 1) -->
+<!-- LAST_UPDATED: 2026-07-30 | PR #237: feat(access-governance): add access governance module + AI-assisted RBAC import -->
 
 ## 🎯 What is This?
 
@@ -970,7 +970,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Tables**: 170+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 115 sequential, idempotent migrations
 - **API Routes**: 70+ route modules
-- **Services**: 52 service modules
+- **Services**: 54 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
