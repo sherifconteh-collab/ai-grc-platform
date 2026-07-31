@@ -91,7 +91,6 @@ const navigationSections: NavigationSection[] = [
         label: 'Register',
         items: [
           { name: 'Risk Register', href: '/dashboard/risks', icon: '🎲', requiredPermissions: ['risks.read'] },
-          { name: 'Business Objectives', href: '/dashboard/objectives', icon: '🎯', requiredPermissions: ['objectives.read'] },
           { name: 'Indicators', href: '/dashboard/indicators', icon: '📉', requiredPermissions: ['indicators.read'] },
         ],
       },
@@ -167,7 +166,7 @@ const navigationSections: NavigationSection[] = [
         label: 'Structure',
         items: [
           { name: 'Organization Profile', href: '/dashboard/organization', icon: '🏢', requiredPermissions: ['organizations.read'] },
-          { name: 'Departments', href: '/dashboard/departments', icon: '🏛️', requiredPermissions: ['departments.read'] },
+          { name: 'Structure', href: '/dashboard/structure', icon: '🏛️', requiredPermissionsAny: ['departments.read', 'objectives.read'] },
           { name: 'My Organizations', href: '/dashboard/my-organizations', icon: '🔀', requiredPermissions: ['organizations.read'] },
         ],
       },
