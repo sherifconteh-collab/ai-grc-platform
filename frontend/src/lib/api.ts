@@ -1996,4 +1996,253 @@ export const pushTokensAPI = {
   unregister: (token: string) => api.delete(`/push-tokens/${encodeURIComponent(token)}`),
 };
 
+// ---------------------------------------------------------------------------
+// Risk and resilience registers
+//
+// Shared vocabularies are exported so pages, filters and badges all agree with
+// the CHECK constraints in migrations 139-143 rather than each re-declaring a
+// slightly different list.
+// ---------------------------------------------------------------------------
+
+export type RiskCategory =
+  | 'strategic' | 'operational' | 'financial' | 'compliance' | 'cyber' | 'privacy'
+  | 'third_party' | 'legal' | 'reputational' | 'environmental' | 'health_safety'
+  | 'technology' | 'ai' | 'other';
+
+export type RiskStatus =
+  | 'identified' | 'assessed' | 'treatment_planned' | 'treated' | 'accepted'
+  | 'monitoring' | 'closed';
+
+export type TreatmentStrategy = 'avoid' | 'mitigate' | 'transfer' | 'accept';
+export type TreatmentStatus = 'planned' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
+export type SeverityBand = 'low' | 'medium' | 'high' | 'critical';
+
+export type IncidentCategory =
+  | 'security' | 'privacy' | 'availability' | 'integrity' | 'compliance'
+  | 'third_party' | 'physical' | 'fraud' | 'safety' | 'ai' | 'other';
+
+export type IncidentStatus =
+  | 'new' | 'triaged' | 'investigating' | 'contained' | 'eradicated'
+  | 'recovered' | 'closed' | 'false_positive';
+
+export type ObligationSourceType =
+  | 'regulation' | 'statute' | 'contract' | 'standard' | 'certification'
+  | 'internal_policy' | 'customer_commitment' | 'court_order' | 'other';
+
+export type ComplianceStatus =
+  | 'not_assessed' | 'compliant' | 'partially_compliant' | 'non_compliant' | 'not_applicable';
+
+export type AttestationOutcome =
+  | 'met' | 'partially_met' | 'not_met' | 'not_applicable' | 'waived';
+
+export type ObjectiveCategory = 'strategic' | 'operational' | 'reporting' | 'compliance';
+export type IndicatorType = 'kri' | 'kpi' | 'kci';
+export type IndicatorDirection = 'lower_is_better' | 'higher_is_better';
+export type BreachLevel = 'green' | 'amber' | 'red';
+
+export const RISK_CATEGORIES: RiskCategory[] = [
+  'strategic', 'operational', 'financial', 'compliance', 'cyber', 'privacy',
+  'third_party', 'legal', 'reputational', 'environmental', 'health_safety',
+  'technology', 'ai', 'other'
+];
+
+export const RISK_STATUSES: RiskStatus[] = [
+  'identified', 'assessed', 'treatment_planned', 'treated', 'accepted',
+  'monitoring', 'closed'
+];
+
+export const INCIDENT_CATEGORIES: IncidentCategory[] = [
+  'security', 'privacy', 'availability', 'integrity', 'compliance',
+  'third_party', 'physical', 'fraud', 'safety', 'ai', 'other'
+];
+
+export const INCIDENT_STATUSES: IncidentStatus[] = [
+  'new', 'triaged', 'investigating', 'contained', 'eradicated',
+  'recovered', 'closed', 'false_positive'
+];
+
+export const OBLIGATION_SOURCE_TYPES: ObligationSourceType[] = [
+  'regulation', 'statute', 'contract', 'standard', 'certification',
+  'internal_policy', 'customer_commitment', 'court_order', 'other'
+];
+
+export const departmentsAPI = {
+  list: (params?: { page?: number; limit?: number; includeInactive?: boolean }) =>
+    api.get('/departments', { params }),
+  get: (id: string) => api.get(`/departments/${id}`),
+  create: (data: {
+    name: string; code?: string; description?: string;
+    parentId?: string; headUserId?: string; costCenter?: string;
+  }) => api.post('/departments', data),
+  update: (id: string, data: {
+    name?: string; code?: string; description?: string; parentId?: string | null;
+    headUserId?: string | null; costCenter?: string; isActive?: boolean;
+  }) => api.put(`/departments/${id}`, data),
+  remove: (id: string) => api.delete(`/departments/${id}`),
+};
+
+export const objectivesAPI = {
+  list: (params?: {
+    page?: number; limit?: number; category?: ObjectiveCategory;
+    status?: string; departmentId?: string;
+  }) => api.get('/objectives', { params }),
+  get: (id: string) => api.get(`/objectives/${id}`),
+  create: (data: {
+    title: string; description?: string; category?: ObjectiveCategory;
+    reference?: string; ownerUserId?: string; departmentId?: string;
+    status?: string; targetDate?: string;
+  }) => api.post('/objectives', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/objectives/${id}`, data),
+  remove: (id: string) => api.delete(`/objectives/${id}`),
+};
+
+export const risksAPI = {
+  list: (params?: {
+    page?: number; limit?: number; category?: RiskCategory; status?: RiskStatus;
+    departmentId?: string; ownerUserId?: string; minResidualScore?: number;
+    reviewOverdue?: boolean;
+  }) => api.get('/risks', { params }),
+  get: (id: string) => api.get(`/risks/${id}`),
+  summary: () => api.get('/risks/summary'),
+  heatMap: () => api.get('/risks/heat-map'),
+  create: (data: {
+    title: string; description?: string; category?: RiskCategory;
+    threatSource?: string; vulnerability?: string;
+    inherentLikelihood?: number; inherentImpact?: number;
+    residualLikelihood?: number; residualImpact?: number;
+    treatmentStrategy?: TreatmentStrategy; status?: RiskStatus;
+    ownerUserId?: string; departmentId?: string;
+    identifiedDate?: string; nextReviewDate?: string; tags?: string[];
+  }) => api.post('/risks', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/risks/${id}`, data),
+  remove: (id: string) => api.delete(`/risks/${id}`),
+
+  accept: (id: string, data: { rationale: string; acceptedUntil?: string }) =>
+    api.post(`/risks/${id}/accept`, data),
+  addReview: (id: string, data: {
+    outcome?: 'unchanged' | 'reassessed' | 'escalated' | 'de_escalated' | 'closed';
+    notes?: string; nextReviewDate?: string;
+  }) => api.post(`/risks/${id}/reviews`, data),
+
+  addTreatment: (id: string, data: {
+    title: string; description?: string; treatmentType?: TreatmentStrategy;
+    status?: TreatmentStatus; ownerUserId?: string; dueDate?: string;
+    targetResidualScore?: number; estimatedCost?: number;
+  }) => api.post(`/risks/${id}/treatments`, data),
+  updateTreatment: (id: string, treatmentId: string, data: Record<string, unknown>) =>
+    api.put(`/risks/${id}/treatments/${treatmentId}`, data),
+
+  linkControl: (id: string, data: {
+    controlId: string;
+    effectiveness?: 'not_assessed' | 'ineffective' | 'partially_effective' | 'effective';
+    notes?: string;
+  }) => api.post(`/risks/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/risks/${id}/controls/${controlId}`),
+  linkAsset: (id: string, data: { assetId: string }) => api.post(`/risks/${id}/assets`, data),
+  unlinkAsset: (id: string, assetId: string) => api.delete(`/risks/${id}/assets/${assetId}`),
+  linkObjective: (id: string, data: { objectiveId: string }) =>
+    api.post(`/risks/${id}/objectives`, data),
+  unlinkObjective: (id: string, objectiveId: string) =>
+    api.delete(`/risks/${id}/objectives/${objectiveId}`),
+};
+
+export const incidentsAPI = {
+  list: (params?: {
+    page?: number; limit?: number; category?: IncidentCategory;
+    severity?: SeverityBand; status?: IncidentStatus; departmentId?: string;
+    ownerUserId?: string; openOnly?: boolean; breachesOnly?: boolean;
+  }) => api.get('/incidents', { params }),
+  get: (id: string) => api.get(`/incidents/${id}`),
+  metrics: () => api.get('/incidents/metrics'),
+  create: (data: {
+    title: string; description?: string; category?: IncidentCategory;
+    severity?: SeverityBand; detectionSource?: string;
+    occurredAt?: string; detectedAt?: string; ownerUserId?: string;
+    departmentId?: string; impactSummary?: string; isBreach?: boolean;
+    affectedRecordCount?: number; affectedDataTypes?: string[];
+    regulatoryNotificationRequired?: boolean; notificationDeadline?: string;
+    tags?: string[];
+  }) => api.post('/incidents', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/incidents/${id}`, data),
+
+  // Status changes go through their own endpoint so the phase timestamp and
+  // timeline entry cannot be skipped; update() deliberately does not take one.
+  changeStatus: (id: string, data: { status: IncidentStatus; note?: string }) =>
+    api.post(`/incidents/${id}/status`, data),
+  recordNotification: (id: string, data: {
+    audience: 'regulator' | 'data_subjects'; notifiedAt?: string; detail?: string;
+  }) => api.post(`/incidents/${id}/notify`, data),
+  addTimelineEntry: (id: string, data: {
+    summary: string; entryType?: string; detail?: string; occurredAt?: string;
+  }) => api.post(`/incidents/${id}/timeline`, data),
+
+  linkRisk: (id: string, data: {
+    riskId: string; relationship?: 'materialized' | 'related' | 'identified_new_risk';
+  }) => api.post(`/incidents/${id}/risks`, data),
+  unlinkRisk: (id: string, riskId: string) => api.delete(`/incidents/${id}/risks/${riskId}`),
+  linkControl: (id: string, data: {
+    controlId: string; relationship?: 'failed' | 'detected' | 'contained' | 'related';
+  }) => api.post(`/incidents/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/incidents/${id}/controls/${controlId}`),
+  linkAsset: (id: string, data: {
+    assetId: string; impact?: 'none' | 'degraded' | 'unavailable' | 'compromised' | 'destroyed';
+  }) => api.post(`/incidents/${id}/assets`, data),
+  unlinkAsset: (id: string, assetId: string) => api.delete(`/incidents/${id}/assets/${assetId}`),
+};
+
+export const obligationsAPI = {
+  list: (params?: {
+    page?: number; limit?: number; sourceType?: ObligationSourceType;
+    status?: string; complianceStatus?: ComplianceStatus; criticality?: SeverityBand;
+    departmentId?: string; jurisdiction?: string; overdueOnly?: boolean;
+  }) => api.get('/obligations', { params }),
+  get: (id: string) => api.get(`/obligations/${id}`),
+  summary: () => api.get('/obligations/summary'),
+  create: (data: {
+    title: string; description?: string; sourceType?: ObligationSourceType;
+    sourceName?: string; citation?: string; jurisdiction?: string;
+    frameworkId?: string; ownerUserId?: string; departmentId?: string;
+    status?: string; criticality?: SeverityBand; frequency?: string;
+    effectiveDate?: string; nextDueDate?: string; penaltyDescription?: string;
+    tags?: string[];
+  }) => api.post('/obligations', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/obligations/${id}`, data),
+  remove: (id: string) => api.delete(`/obligations/${id}`),
+
+  attest: (id: string, data: {
+    outcome: AttestationOutcome; notes?: string;
+    periodStart?: string; periodEnd?: string; evidenceId?: string;
+  }) => api.post(`/obligations/${id}/attestations`, data),
+  linkControl: (id: string, data: { controlId: string; notes?: string }) =>
+    api.post(`/obligations/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/obligations/${id}/controls/${controlId}`),
+};
+
+export const indicatorsAPI = {
+  list: (params?: {
+    page?: number; limit?: number; indicatorType?: IndicatorType;
+    breachLevel?: BreachLevel; riskId?: string; departmentId?: string;
+    activeOnly?: boolean;
+  }) => api.get('/indicators', { params }),
+  get: (id: string, params?: { measurementLimit?: number }) =>
+    api.get(`/indicators/${id}`, { params }),
+  summary: () => api.get('/indicators/summary'),
+  create: (data: {
+    name: string; description?: string; indicatorType?: IndicatorType;
+    unit?: string; targetValue?: number; amberThreshold?: number;
+    redThreshold?: number; direction?: IndicatorDirection;
+    measurementFrequency?: string; ownerUserId?: string; departmentId?: string;
+    riskId?: string; objectiveId?: string; controlId?: string; dataSource?: string;
+  }) => api.post('/indicators', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/indicators/${id}`, data),
+  remove: (id: string) => api.delete(`/indicators/${id}`),
+
+  recordMeasurement: (id: string, data: {
+    value: number; measuredAt?: string; notes?: string;
+  }) => api.post(`/indicators/${id}/measurements`, data),
+};
+
 export default api;

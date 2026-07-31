@@ -37,6 +37,7 @@ const navigationSections: NavigationSection[] = [
       { name: 'Frameworks', href: '/dashboard/frameworks', icon: '📐', requiredPermissions: ['organizations.read'] },
       { name: 'Evidence', href: '/dashboard/evidence', icon: '📄', requiredPermissions: ['evidence.read'] },
       { name: 'Assessments', href: '/dashboard/assessments', icon: '📋', requiredPermissions: ['assessments.read'] },
+      { name: 'Obligations', href: '/dashboard/obligations', icon: '⚖️', requiredPermissions: ['obligations.read'] },
       { name: 'Reports', href: '/dashboard/reports', icon: '📑', requiredPermissions: ['reports.read'] },
       { name: 'RMF Lifecycle', href: '/dashboard/rmf', icon: '🔄', requiredPermissions: ['assessments.read'], isVisible: (u) => hasRmfFramework(u) },
       { name: 'Cyber Resilience', href: '/dashboard/resilience', icon: '🛟', requiredPermissions: ['assessments.read'] },
@@ -51,6 +52,9 @@ const navigationSections: NavigationSection[] = [
   {
     label: 'Assets & Risk',
     items: [
+      { name: 'Risk Register', href: '/dashboard/risks', icon: '🎲', requiredPermissions: ['risks.read'] },
+      { name: 'Incidents', href: '/dashboard/incidents', icon: '🚨', requiredPermissions: ['incidents.read'] },
+      { name: 'Indicators', href: '/dashboard/indicators', icon: '📉', requiredPermissions: ['indicators.read'] },
       { name: 'Assets', href: '/dashboard/assets', icon: '🏗️', requiredPermissions: ['assets.read'] },
       { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: '🛡️', requiredPermissions: ['assets.read'] },
       { name: 'SBOM', href: '/dashboard/sbom', icon: '📦', requiredPermissions: ['assets.read'] },
@@ -67,6 +71,8 @@ const navigationSections: NavigationSection[] = [
     items: [
       { name: 'My Organizations', href: '/dashboard/my-organizations', icon: '🔀', requiredPermissions: ['organizations.read'] },
       { name: 'Organization Profile', href: '/dashboard/organization', icon: '🏢', requiredPermissions: ['organizations.read'] },
+      { name: 'Departments', href: '/dashboard/departments', icon: '🏛️', requiredPermissions: ['departments.read'] },
+      { name: 'Business Objectives', href: '/dashboard/objectives', icon: '🎯', requiredPermissions: ['objectives.read'] },
       { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
       { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'] },
       { name: 'Access Governance', href: '/dashboard/access-governance', icon: '🔑', requiredPermissions: ['access_governance.read'] },
