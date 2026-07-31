@@ -63,10 +63,34 @@ function sanitizeInput(value) {
   return sanitizeHtml(value.replace(/\0/g, ''), { allowedTags: [], allowedAttributes: {} });
 }
 
+/**
+ * Strips HTML like sanitizeInput, then decodes the entities the stripper leaves
+ * behind, for values stored as plain text and rendered by React.
+ *
+ * sanitizeInput escapes `&` to `&amp;`, so a department named "Legal &
+ * Compliance" is stored as "Legal &amp; Compliance" and rendered literally with
+ * the entity visible — React escapes on output, so escaping again on input
+ * double-escapes. Tags are already gone by the time this decoding runs, so
+ * turning `&amp;` back into `&` cannot reintroduce markup.
+ *
+ * Use this for names, titles, and descriptions. Keep sanitizeInput where the
+ * value may legitimately still contain markup-ish text.
+ */
+function sanitizeText(value) {
+  if (typeof value !== 'string') return value;
+  return sanitizeInput(value)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
 module.exports = {
   validateBody,
   requireFields,
   isUuid,
   isNonEmptyString,
-  sanitizeInput
+  sanitizeInput,
+  sanitizeText
 };

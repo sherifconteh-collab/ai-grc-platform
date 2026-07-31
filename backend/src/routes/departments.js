@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const { isUuid, isNonEmptyString, sanitizeInput } = require('../middleware/validate');
+const { isUuid, isNonEmptyString, sanitizeText } = require('../middleware/validate');
 const { log, serializeError } = require('../utils/logger');
 const auditService = require('../services/auditService');
 
@@ -165,12 +165,12 @@ router.post('/', requirePermission('departments.write'), async (req, res) => {
        RETURNING *`,
       [
         req.user.organization_id,
-        sanitizeInput(name).trim(),
-        code ? sanitizeInput(code).trim() : null,
-        description ? sanitizeInput(description) : null,
+        sanitizeText(name).trim(),
+        code ? sanitizeText(code).trim() : null,
+        description ? sanitizeText(description) : null,
         parentId || null,
         headUserId || null,
-        costCenter ? sanitizeInput(costCenter).trim() : null,
+        costCenter ? sanitizeText(costCenter).trim() : null,
         req.user.id
       ]
     );
@@ -231,14 +231,14 @@ router.put('/:id', requirePermission('departments.write'), async (req, res) => {
       [
         req.params.id,
         req.user.organization_id,
-        name ? sanitizeInput(name).trim() : null,
-        code !== undefined && code !== null ? sanitizeInput(code).trim() : null,
-        description !== undefined && description !== null ? sanitizeInput(description) : null,
+        name ? sanitizeText(name).trim() : null,
+        code !== undefined && code !== null ? sanitizeText(code).trim() : null,
+        description !== undefined && description !== null ? sanitizeText(description) : null,
         parentId !== undefined,
         parentId || null,
         headUserId !== undefined,
         headUserId || null,
-        costCenter !== undefined && costCenter !== null ? sanitizeInput(costCenter).trim() : null,
+        costCenter !== undefined && costCenter !== null ? sanitizeText(costCenter).trim() : null,
         isActive === undefined ? null : Boolean(isActive)
       ]
     );

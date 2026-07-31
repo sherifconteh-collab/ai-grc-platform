@@ -10,7 +10,7 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const { isUuid, isNonEmptyString, sanitizeInput } = require('../middleware/validate');
+const { isUuid, isNonEmptyString, sanitizeText } = require('../middleware/validate');
 const { log, serializeError } = require('../utils/logger');
 const auditService = require('../services/auditService');
 const obligationService = require('../services/obligationService');
@@ -105,7 +105,7 @@ router.get('/', requirePermission('obligations.read'), async (req, res) => {
       complianceStatus || null,
       criticality || null,
       departmentId || null,
-      jurisdiction ? sanitizeInput(jurisdiction) : null,
+      jurisdiction ? sanitizeText(jurisdiction) : null,
       overdueOnly
     ];
 
@@ -268,12 +268,12 @@ router.post('/', requirePermission('obligations.write'), async (req, res) => {
       [
         req.user.organization_id,
         resolvedReference,
-        sanitizeInput(title).trim(),
-        description ? sanitizeInput(description) : null,
+        sanitizeText(title).trim(),
+        description ? sanitizeText(description) : null,
         sourceType || 'regulation',
-        sourceName ? sanitizeInput(sourceName) : null,
-        citation ? sanitizeInput(citation) : null,
-        jurisdiction ? sanitizeInput(jurisdiction) : null,
+        sourceName ? sanitizeText(sourceName) : null,
+        citation ? sanitizeText(citation) : null,
+        jurisdiction ? sanitizeText(jurisdiction) : null,
         frameworkId && isUuid(frameworkId) ? frameworkId : null,
         ownerUserId || null,
         departmentId && isUuid(departmentId) ? departmentId : null,
@@ -282,8 +282,8 @@ router.post('/', requirePermission('obligations.write'), async (req, res) => {
         frequency || null,
         effectiveDate || null,
         derivedDueDate || null,
-        penaltyDescription ? sanitizeInput(penaltyDescription) : null,
-        Array.isArray(tags) ? tags.map((tag) => sanitizeInput(String(tag))) : null,
+        penaltyDescription ? sanitizeText(penaltyDescription) : null,
+        Array.isArray(tags) ? tags.map((tag) => sanitizeText(String(tag))) : null,
         req.user.id
       ]
     );
@@ -357,11 +357,11 @@ router.put('/:id', requirePermission('obligations.write'), async (req, res) => {
       [
         req.params.id,
         req.user.organization_id,
-        title ? sanitizeInput(title).trim() : null,
-        description !== undefined && description !== null ? sanitizeInput(description) : null,
-        sourceName !== undefined && sourceName !== null ? sanitizeInput(sourceName) : null,
-        citation !== undefined && citation !== null ? sanitizeInput(citation) : null,
-        jurisdiction !== undefined && jurisdiction !== null ? sanitizeInput(jurisdiction) : null,
+        title ? sanitizeText(title).trim() : null,
+        description !== undefined && description !== null ? sanitizeText(description) : null,
+        sourceName !== undefined && sourceName !== null ? sanitizeText(sourceName) : null,
+        citation !== undefined && citation !== null ? sanitizeText(citation) : null,
+        jurisdiction !== undefined && jurisdiction !== null ? sanitizeText(jurisdiction) : null,
         ownerUserId !== undefined,
         ownerUserId || null,
         departmentId !== undefined,
@@ -372,8 +372,8 @@ router.put('/:id', requirePermission('obligations.write'), async (req, res) => {
         frequency || null,
         nextDueDate || null,
         penaltyDescription !== undefined && penaltyDescription !== null
-          ? sanitizeInput(penaltyDescription) : null,
-        Array.isArray(tags) ? tags.map((tag) => sanitizeInput(String(tag))) : null
+          ? sanitizeText(penaltyDescription) : null,
+        Array.isArray(tags) ? tags.map((tag) => sanitizeText(String(tag))) : null
       ]
     );
 
@@ -451,7 +451,7 @@ router.post('/:id/attestations', requirePermission('obligations.write'), async (
         periodEnd || null,
         obligation.next_due_date,
         outcome,
-        notes ? sanitizeInput(notes) : null,
+        notes ? sanitizeText(notes) : null,
         evidenceId || null,
         req.user.id
       ]
@@ -541,7 +541,7 @@ router.post('/:id/controls', requirePermission('obligations.write'), async (req,
         req.user.organization_id,
         req.params.id,
         controlId,
-        notes ? sanitizeInput(notes) : null,
+        notes ? sanitizeText(notes) : null,
         req.user.id
       ]
     );

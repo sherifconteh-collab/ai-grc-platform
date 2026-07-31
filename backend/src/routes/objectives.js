@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const { isUuid, isNonEmptyString, sanitizeInput } = require('../middleware/validate');
+const { isUuid, isNonEmptyString, sanitizeText } = require('../middleware/validate');
 const { log, serializeError } = require('../utils/logger');
 const auditService = require('../services/auditService');
 const { nextReference } = require('../utils/referenceGenerator');
@@ -185,7 +185,7 @@ router.post('/', requirePermission('objectives.write'), async (req, res) => {
     }
 
     const resolvedReference = isNonEmptyString(reference)
-      ? sanitizeInput(reference).trim()
+      ? sanitizeText(reference).trim()
       : await nextReference(pool, 'objective', req.user.organization_id);
 
     const { rows } = await pool.query(
@@ -197,8 +197,8 @@ router.post('/', requirePermission('objectives.write'), async (req, res) => {
       [
         req.user.organization_id,
         resolvedReference,
-        sanitizeInput(title).trim(),
-        description ? sanitizeInput(description) : null,
+        sanitizeText(title).trim(),
+        description ? sanitizeText(description) : null,
         category || 'strategic',
         ownerUserId || null,
         departmentId || null,
@@ -262,8 +262,8 @@ router.put('/:id', requirePermission('objectives.write'), async (req, res) => {
       [
         req.params.id,
         req.user.organization_id,
-        title ? sanitizeInput(title).trim() : null,
-        description !== undefined && description !== null ? sanitizeInput(description) : null,
+        title ? sanitizeText(title).trim() : null,
+        description !== undefined && description !== null ? sanitizeText(description) : null,
         category || null,
         ownerUserId !== undefined,
         ownerUserId || null,

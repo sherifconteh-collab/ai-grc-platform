@@ -10,7 +10,7 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const { isUuid, isNonEmptyString, sanitizeInput } = require('../middleware/validate');
+const { isUuid, isNonEmptyString, sanitizeText } = require('../middleware/validate');
 const { log, serializeError } = require('../utils/logger');
 const auditService = require('../services/auditService');
 const incidentService = require('../services/incidentService');
@@ -313,25 +313,25 @@ router.post('/', requirePermission('incidents.write'), async (req, res) => {
       [
         req.user.organization_id,
         resolvedReference,
-        sanitizeInput(title).trim(),
-        description ? sanitizeInput(description) : null,
+        sanitizeText(title).trim(),
+        description ? sanitizeText(description) : null,
         category || 'other',
         severity || 'medium',
-        detectionSource ? sanitizeInput(detectionSource) : null,
+        detectionSource ? sanitizeText(detectionSource) : null,
         occurredAt || null,
         detectedAt || null,
         req.user.id,
         ownerUserId || null,
         departmentId || null,
-        impactSummary ? sanitizeInput(impactSummary) : null,
+        impactSummary ? sanitizeText(impactSummary) : null,
         Boolean(isBreach),
         affectedRecordCount ?? null,
         Array.isArray(affectedDataTypes)
-          ? affectedDataTypes.map((type) => sanitizeInput(String(type)))
+          ? affectedDataTypes.map((type) => sanitizeText(String(type)))
           : null,
         Boolean(regulatoryNotificationRequired),
         notificationDeadline || null,
-        Array.isArray(tags) ? tags.map((tag) => sanitizeInput(String(tag))) : null,
+        Array.isArray(tags) ? tags.map((tag) => sanitizeText(String(tag))) : null,
         req.user.id
       ]
     );
@@ -349,7 +349,7 @@ router.post('/', requirePermission('incidents.write'), async (req, res) => {
         rows[0].detected_at,
         req.user.id,
         'Incident reported',
-        detectionSource ? `Detection source: ${sanitizeInput(detectionSource)}` : null
+        detectionSource ? `Detection source: ${sanitizeText(detectionSource)}` : null
       ]
     );
 
@@ -432,28 +432,28 @@ router.put('/:id', requirePermission('incidents.write'), async (req, res) => {
       [
         req.params.id,
         req.user.organization_id,
-        title ? sanitizeInput(title).trim() : null,
-        description !== undefined && description !== null ? sanitizeInput(description) : null,
+        title ? sanitizeText(title).trim() : null,
+        description !== undefined && description !== null ? sanitizeText(description) : null,
         category || null,
         severity || null,
         ownerUserId !== undefined,
         ownerUserId || null,
         departmentId !== undefined,
         departmentId || null,
-        impactSummary !== undefined && impactSummary !== null ? sanitizeInput(impactSummary) : null,
-        rootCause !== undefined && rootCause !== null ? sanitizeInput(rootCause) : null,
-        lessonsLearned !== undefined && lessonsLearned !== null ? sanitizeInput(lessonsLearned) : null,
+        impactSummary !== undefined && impactSummary !== null ? sanitizeText(impactSummary) : null,
+        rootCause !== undefined && rootCause !== null ? sanitizeText(rootCause) : null,
+        lessonsLearned !== undefined && lessonsLearned !== null ? sanitizeText(lessonsLearned) : null,
         isBreach === undefined ? null : Boolean(isBreach),
         affectedRecordCount ?? null,
         Array.isArray(affectedDataTypes)
-          ? affectedDataTypes.map((type) => sanitizeInput(String(type)))
+          ? affectedDataTypes.map((type) => sanitizeText(String(type)))
           : null,
         regulatoryNotificationRequired === undefined
           ? null
           : Boolean(regulatoryNotificationRequired),
         notificationDeadline || null,
         estimatedCost ?? null,
-        Array.isArray(tags) ? tags.map((tag) => sanitizeInput(String(tag))) : null
+        Array.isArray(tags) ? tags.map((tag) => sanitizeText(String(tag))) : null
       ]
     );
 
@@ -494,7 +494,7 @@ router.post('/:id/status', requirePermission('incidents.write'), async (req, res
       incidentId: req.params.id,
       toStatus: status,
       actorUserId: req.user.id,
-      note: note ? sanitizeInput(note) : null
+      note: note ? sanitizeText(note) : null
     });
 
     if (result.notFound) {
@@ -564,7 +564,7 @@ router.post('/:id/notify', requirePermission('incidents.write'), async (req, res
         req.params.id,
         req.user.id,
         audience === 'regulator' ? 'Regulator notified' : 'Data subjects notified',
-        detail ? sanitizeInput(detail) : null
+        detail ? sanitizeText(detail) : null
       ]
     );
 
@@ -614,8 +614,8 @@ router.post('/:id/timeline', requirePermission('incidents.write'), async (req, r
         entryType || 'note',
         occurredAt || null,
         req.user.id,
-        sanitizeInput(summary).trim(),
-        detail ? sanitizeInput(detail) : null
+        sanitizeText(summary).trim(),
+        detail ? sanitizeText(detail) : null
       ]
     );
 

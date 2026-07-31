@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import BrandLogo from './BrandLogo';
@@ -16,80 +17,219 @@ interface NavigationItem {
   isVisible?: (user: AccessUser | null | undefined) => boolean;
 }
 
-interface NavigationSection {
-  label: string;
+/**
+ * A labelled run of links inside a section. `label` is optional: the first
+ * group in a section is usually the section's primary items and does not need
+ * a heading repeating what the section already says.
+ */
+interface NavigationGroup {
+  label?: string;
   items: NavigationItem[];
 }
 
+interface NavigationSection {
+  label: string;
+  icon: string;
+  groups: NavigationGroup[];
+  /** Amber treatment for the platform-admin section. */
+  tone?: 'default' | 'admin';
+  /**
+   * Platform-admin gating needs the account's email (demo accounts are excluded)
+   * and `AccessUser` deliberately does not carry one — it models permissions,
+   * not identity. Declared as a flag here and evaluated in the component, where
+   * the auth user is in scope, rather than widening the access type.
+   */
+  requiresPlatformAdmin?: boolean;
+}
+
+// Rendered above the sections, always visible, never collapsed.
+const HOME_ITEM: NavigationItem = {
+  name: 'Dashboard', href: '/dashboard', icon: '📊', requiredPermissions: ['dashboard.read'],
+};
+
+/**
+ * Eight collapsible sections rather than four flat lists of a dozen-plus links
+ * each. Grouping follows the GRC domains people already think in — compliance,
+ * risk, regulatory obligations, assets and security — so a reader looking for
+ * the risk register does not have to scan a "Compliance" list of sixteen.
+ */
 const navigationSections: NavigationSection[] = [
   {
-    label: '',
-    items: [
-      { name: 'Dashboard', href: '/dashboard', icon: '📊', requiredPermissions: ['dashboard.read'] },
-    ],
-  },
-  {
     label: 'Compliance',
-    items: [
-      { name: 'Controls', href: '/dashboard/controls', icon: '✅', requiredPermissions: ['organizations.read'] },
-      { name: 'AI Control Assessments', href: '/dashboard/controls/pending-assessments', icon: '🤖', requiredPermissions: ['implementations.read'] },
-      { name: 'Exceptions', href: '/dashboard/exceptions', icon: '⚠️', requiredPermissions: ['controls.read'] },
-      { name: 'Frameworks', href: '/dashboard/frameworks', icon: '📐', requiredPermissions: ['organizations.read'] },
-      { name: 'Evidence', href: '/dashboard/evidence', icon: '📄', requiredPermissions: ['evidence.read'] },
-      { name: 'Assessments', href: '/dashboard/assessments', icon: '📋', requiredPermissions: ['assessments.read'] },
-      { name: 'Obligations', href: '/dashboard/obligations', icon: '⚖️', requiredPermissions: ['obligations.read'] },
-      { name: 'Reports', href: '/dashboard/reports', icon: '📑', requiredPermissions: ['reports.read'] },
-      { name: 'RMF Lifecycle', href: '/dashboard/rmf', icon: '🔄', requiredPermissions: ['assessments.read'], isVisible: (u) => hasRmfFramework(u) },
-      { name: 'Cyber Resilience', href: '/dashboard/resilience', icon: '🛟', requiredPermissions: ['assessments.read'] },
-      { name: 'Auditor Workspace', href: '/dashboard/auditor-workspace', icon: '🗂️', requiredPermissions: ['assessments.read'], isVisible: (u) => canAccessAuditorWorkspace(u) },
-      { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },
-      { name: 'AI Insights', href: '/dashboard/ai-insights', icon: '📈', requiredPermissions: ['ai.use'] },
-      { name: 'AI Laws', href: '/dashboard/ai-laws', icon: '⚖️', requiredPermissions: ['frameworks.read'] },
-      { name: 'Dashboard Views', href: '/dashboard/views', icon: '🧩', requiredPermissions: ['dashboard.read'] },
-      { name: 'Training', href: '/dashboard/training', icon: '🎓', requiredPermissions: ['dashboard.read'] },
+    icon: '✅',
+    groups: [
+      {
+        items: [
+          { name: 'Controls', href: '/dashboard/controls', icon: '✅', requiredPermissions: ['organizations.read'] },
+          { name: 'AI Control Assessments', href: '/dashboard/controls/pending-assessments', icon: '🤖', requiredPermissions: ['implementations.read'] },
+          { name: 'Exceptions', href: '/dashboard/exceptions', icon: '⚠️', requiredPermissions: ['controls.read'] },
+          { name: 'Frameworks', href: '/dashboard/frameworks', icon: '📐', requiredPermissions: ['organizations.read'] },
+        ],
+      },
+      {
+        label: 'Evidence & Audit',
+        items: [
+          { name: 'Evidence', href: '/dashboard/evidence', icon: '📄', requiredPermissions: ['evidence.read'] },
+          { name: 'Assessments', href: '/dashboard/assessments', icon: '📋', requiredPermissions: ['assessments.read'] },
+          { name: 'Auditor Workspace', href: '/dashboard/auditor-workspace', icon: '🗂️', requiredPermissions: ['assessments.read'], isVisible: (u) => canAccessAuditorWorkspace(u) },
+        ],
+      },
+      {
+        label: 'Programs',
+        items: [
+          { name: 'RMF Lifecycle', href: '/dashboard/rmf', icon: '🔄', requiredPermissions: ['assessments.read'], isVisible: (u) => hasRmfFramework(u) },
+          { name: 'Cyber Resilience', href: '/dashboard/resilience', icon: '🛟', requiredPermissions: ['assessments.read'] },
+        ],
+      },
     ],
   },
   {
-    label: 'Assets & Risk',
-    items: [
-      { name: 'Risk Register', href: '/dashboard/risks', icon: '🎲', requiredPermissions: ['risks.read'] },
-      { name: 'Incidents', href: '/dashboard/incidents', icon: '🚨', requiredPermissions: ['incidents.read'] },
-      { name: 'Indicators', href: '/dashboard/indicators', icon: '📉', requiredPermissions: ['indicators.read'] },
-      { name: 'Assets', href: '/dashboard/assets', icon: '🏗️', requiredPermissions: ['assets.read'] },
-      { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: '🛡️', requiredPermissions: ['assets.read'] },
-      { name: 'SBOM', href: '/dashboard/sbom', icon: '📦', requiredPermissions: ['assets.read'] },
-      { name: 'Security Posture', href: '/dashboard/security-posture', icon: '🛡️', requiredPermissions: ['ai.use'] },
-      { name: 'Threat Intelligence', href: '/dashboard/threat-intel', icon: '🎯', requiredPermissions: ['assets.read'] },
-      { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'] },
-      { name: 'Vendor Contracts', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'] },
-      { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['organizations.read'] },
-      { name: 'Financial Compliance', href: '/dashboard/cmdb/financial-services-workspace', icon: '🏦', requiredPermissions: ['assets.read'] },
+    label: 'Risk',
+    icon: '🎲',
+    groups: [
+      {
+        label: 'Register',
+        items: [
+          { name: 'Risk Register', href: '/dashboard/risks', icon: '🎲', requiredPermissions: ['risks.read'] },
+          { name: 'Business Objectives', href: '/dashboard/objectives', icon: '🎯', requiredPermissions: ['objectives.read'] },
+          { name: 'Indicators', href: '/dashboard/indicators', icon: '📉', requiredPermissions: ['indicators.read'] },
+        ],
+      },
+      {
+        label: 'Response',
+        items: [
+          { name: 'Incidents', href: '/dashboard/incidents', icon: '🚨', requiredPermissions: ['incidents.read'] },
+        ],
+      },
+      {
+        label: 'Third Party',
+        items: [
+          { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['organizations.read'] },
+          { name: 'Vendor Contracts', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'] },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Regulatory',
+    icon: '⚖️',
+    groups: [
+      {
+        items: [
+          { name: 'Obligations', href: '/dashboard/obligations', icon: '⚖️', requiredPermissions: ['obligations.read'] },
+          { name: 'Regulatory News', href: '/dashboard/regulatory-news', icon: '📰', requiredPermissions: ['organizations.read'] },
+          { name: 'AI Laws', href: '/dashboard/ai-laws', icon: '🏛️', requiredPermissions: ['frameworks.read'] },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Assets & Security',
+    icon: '🛡️',
+    groups: [
+      {
+        label: 'Inventory',
+        items: [
+          { name: 'Assets', href: '/dashboard/assets', icon: '🏗️', requiredPermissions: ['assets.read'] },
+          { name: 'SBOM', href: '/dashboard/sbom', icon: '📦', requiredPermissions: ['assets.read'] },
+          { name: 'Financial Compliance', href: '/dashboard/cmdb/financial-services-workspace', icon: '🏦', requiredPermissions: ['assets.read'] },
+        ],
+      },
+      {
+        label: 'Threat & Vulnerability',
+        items: [
+          { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: '🐞', requiredPermissions: ['assets.read'] },
+          { name: 'Threat Intelligence', href: '/dashboard/threat-intel', icon: '🎯', requiredPermissions: ['assets.read'] },
+          { name: 'Security Posture', href: '/dashboard/security-posture', icon: '🛡️', requiredPermissions: ['ai.use'] },
+          { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'] },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Insights & Reporting',
+    icon: '📈',
+    groups: [
+      {
+        items: [
+          { name: 'AI Insights', href: '/dashboard/ai-insights', icon: '📈', requiredPermissions: ['ai.use'] },
+          { name: 'Reports', href: '/dashboard/reports', icon: '📑', requiredPermissions: ['reports.read'] },
+          { name: 'Dashboard Views', href: '/dashboard/views', icon: '🧩', requiredPermissions: ['dashboard.read'] },
+        ],
+      },
     ],
   },
   {
     label: 'Organization',
-    items: [
-      { name: 'My Organizations', href: '/dashboard/my-organizations', icon: '🔀', requiredPermissions: ['organizations.read'] },
-      { name: 'Organization Profile', href: '/dashboard/organization', icon: '🏢', requiredPermissions: ['organizations.read'] },
-      { name: 'Departments', href: '/dashboard/departments', icon: '🏛️', requiredPermissions: ['departments.read'] },
-      { name: 'Business Objectives', href: '/dashboard/objectives', icon: '🎯', requiredPermissions: ['objectives.read'] },
-      { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
-      { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'] },
-      { name: 'Access Governance', href: '/dashboard/access-governance', icon: '🔑', requiredPermissions: ['access_governance.read'] },
-      { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'] },
-      { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', requiredPermissionsAny: ['settings.manage', 'roles.manage'] },
-      { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔', requiredPermissions: ['dashboard.read'] },
-      { name: 'Help Center', href: '/dashboard/help', icon: '❓', requiredPermissions: ['dashboard.read'] },
-      { name: 'Report Issue', href: '/dashboard/report-issue', icon: '🐛', requiredPermissions: ['dashboard.read'] },
+    icon: '🏢',
+    groups: [
+      {
+        label: 'Structure',
+        items: [
+          { name: 'Organization Profile', href: '/dashboard/organization', icon: '🏢', requiredPermissions: ['organizations.read'] },
+          { name: 'Departments', href: '/dashboard/departments', icon: '🏛️', requiredPermissions: ['departments.read'] },
+          { name: 'My Organizations', href: '/dashboard/my-organizations', icon: '🔀', requiredPermissions: ['organizations.read'] },
+        ],
+      },
+      {
+        label: 'Governance',
+        items: [
+          { name: 'Access Governance', href: '/dashboard/access-governance', icon: '🔑', requiredPermissions: ['access_governance.read'] },
+          { name: 'Data Governance', href: '/dashboard/data-governance', icon: '🔒', requiredPermissions: ['settings.manage'] },
+          { name: 'Operations', href: '/dashboard/operations', icon: '🧭', requiredPermissions: ['settings.manage'] },
+        ],
+      },
+      {
+        label: 'Preferences',
+        items: [
+          { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', requiredPermissionsAny: ['settings.manage', 'roles.manage'] },
+          { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔', requiredPermissions: ['dashboard.read'] },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Learn & Support',
+    icon: '📚',
+    groups: [
+      {
+        items: [
+          { name: 'Knowledge Base', href: '/dashboard/knowledge-base', icon: '📚', requiredPermissions: ['ai.use'] },
+          { name: 'Training', href: '/dashboard/training', icon: '🎓', requiredPermissions: ['dashboard.read'] },
+          { name: 'Help Center', href: '/dashboard/help', icon: '❓', requiredPermissions: ['dashboard.read'] },
+          { name: 'Report Issue', href: '/dashboard/report-issue', icon: '🐛', requiredPermissions: ['dashboard.read'] },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Platform Admin',
+    icon: '🛰️',
+    tone: 'admin',
+    requiresPlatformAdmin: true,
+    groups: [
+      {
+        items: [
+          { name: 'Platform Overview', href: '/dashboard/platform', icon: '🛰️' },
+          { name: 'Feature Flags', href: '/dashboard/platform/settings', icon: '🎛️' },
+          { name: 'All Organizations', href: '/dashboard/platform/organizations', icon: '🏢' },
+          { name: 'LLM Status', href: '/dashboard/platform/llm-status', icon: '🔌' },
+          { name: 'Backups', href: '/dashboard/platform/backups', icon: '💾' },
+          { name: 'Security', href: '/dashboard/platform/security', icon: '🔒' },
+          { name: 'License', href: '/dashboard/platform/license', icon: '🪪' },
+        ],
+      },
     ],
   },
 ];
+
+const COLLAPSE_STORAGE_KEY = 'sidebarCollapsedSections';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
-  const isItemVisible = (item: NavigationItem) => {
+  const isItemVisible = useCallback((item: NavigationItem) => {
     const hasRequiredPermission = item.requiredPermissions
       ? item.requiredPermissions.every((permission) => hasPermission(user, permission))
       : true;
@@ -99,14 +239,108 @@ export default function Sidebar() {
     const passesVisibilityGate = item.isVisible ? item.isVisible(user) : true;
 
     return hasRequiredPermission && hasAnyRequiredPermission && passesVisibilityGate;
-  };
+  }, [user]);
 
-  const visibleSections = navigationSections
+  // Sections and groups that end up empty after permission filtering are
+  // dropped entirely, so a collapsed header never opens onto nothing.
+  const showPlatformAdmin = isPlatformAdmin(user) && !isDemoEmail(user?.email);
+
+  const visibleSections = useMemo(() => navigationSections
+    .filter((section) => (section.requiresPlatformAdmin ? showPlatformAdmin : true))
     .map((section) => ({
       ...section,
-      items: section.items.filter(isItemVisible),
+      groups: section.groups
+        .map((group) => ({ ...group, items: group.items.filter(isItemVisible) }))
+        .filter((group) => group.items.length > 0),
     }))
-    .filter((section) => section.items.length > 0);
+    .filter((section) => section.groups.length > 0), [user, isItemVisible]);
+
+  /**
+   * Longest-matching href wins, so /dashboard/controls/pending-assessments
+   * highlights "AI Control Assessments" and not "Controls" as well. A plain
+   * startsWith check lights up both, which is how a sidebar starts lying about
+   * where you are.
+   */
+  const activeHref = useMemo(() => {
+    const candidates = [
+      HOME_ITEM,
+      ...visibleSections.flatMap((s) => s.groups.flatMap((g) => g.items)),
+    ];
+    let best = '';
+    candidates.forEach((item) => {
+      const matches = item.href === '/dashboard'
+        ? pathname === '/dashboard'
+        : pathname === item.href || pathname.startsWith(`${item.href}/`);
+      if (matches && item.href.length > best.length) best = item.href;
+    });
+    return best;
+  }, [pathname, visibleSections]);
+
+  const sectionContainingActive = useMemo(() => visibleSections.find(
+    (section) => section.groups.some((group) => group.items.some((item) => item.href === activeHref))
+  )?.label, [visibleSections, activeHref]);
+
+  // Everything starts collapsed; the section you are in opens itself. Undefined
+  // until the stored preference is read so the first paint does not flash a
+  // different state than the one the user left behind.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    let stored: Record<string, boolean> = {};
+    try {
+      const raw = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          stored = Object.fromEntries(
+            Object.entries(parsed as Record<string, unknown>)
+              .filter(([, value]) => typeof value === 'boolean')
+          ) as Record<string, boolean>;
+        }
+      }
+    } catch {
+      // A corrupt or unavailable preference is not worth breaking navigation
+      // over — fall through to the default collapsed state.
+      stored = {};
+    }
+    const defaults = Object.fromEntries(
+      navigationSections.map((section) => [section.label, true])
+    );
+    setCollapsed({ ...defaults, ...stored });
+  }, []);
+
+  // Navigating into a collapsed section expands it, so a deep link never lands
+  // you on a page whose nav entry is hidden.
+  useEffect(() => {
+    if (!sectionContainingActive) return;
+    setCollapsed((current) => {
+      if (!current || current[sectionContainingActive] === false) return current;
+      return { ...current, [sectionContainingActive]: false };
+    });
+  }, [sectionContainingActive]);
+
+  const toggleSection = (label: string) => {
+    setCollapsed((current) => {
+      const next = { ...(current || {}), [label]: !(current?.[label] ?? true) };
+      try {
+        window.localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Preference persistence is a nicety; ignore quota or privacy-mode errors.
+      }
+      return next;
+    });
+  };
+
+  const isCollapsed = (label: string) => (collapsed ? collapsed[label] ?? true : label !== sectionContainingActive);
+
+  const itemClasses = (isActive: boolean, tone: 'default' | 'admin') => {
+    if (isActive) {
+      return tone === 'admin' ? 'bg-amber-600 text-white' : 'bg-purple-600 text-white';
+    }
+    return tone === 'admin'
+      ? 'text-amber-100/90 hover:bg-amber-800/40 hover:text-white'
+      : 'text-gray-300 hover:bg-gray-800 hover:text-white';
+  };
 
   return (
     <div className="relative z-20 flex h-screen flex-col w-64 bg-gray-900 overflow-hidden">
@@ -144,120 +378,94 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
-        {visibleSections.map((section) => (
-          <div key={section.label || '__root'}>
-            {section.label && (
-              <div className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                {section.label}
-              </div>
-            )}
-            {section.items.map((item) => {
-              const isActive = item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={`${item.href}-${item.name}`}
-                  href={item.href}
-                  className={`
-                    flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                    ${
-                      isActive
-                        ? 'bg-purple-600 text-white'
-                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                    }
-                  `}
-                >
-                  <span className="mr-3 text-base">{item.icon}</span>
-                  {item.name}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-        {isPlatformAdmin(user) && !isDemoEmail(user?.email) && (
-          <>
-            <div className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
-              Platform Admin
-            </div>
-            <Link
-              href="/dashboard/platform"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🛰️</span>
-              Platform Overview
-            </Link>
-            <Link
-              href="/dashboard/platform/settings"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform/settings'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🎛️</span>
-              Feature Flags
-            </Link>
-            <Link
-              href="/dashboard/platform/organizations"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname.startsWith('/dashboard/platform/organizations')
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🏢</span>
-              All Organizations
-            </Link>
-            <Link
-              href="/dashboard/platform/llm-status"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform/llm-status'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🔌</span>
-              LLM Status
-            </Link>
-            <Link
-              href="/dashboard/platform/backups"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform/backups'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">💾</span>
-              Backups
-            </Link>
-            <Link
-              href="/dashboard/platform/security"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform/security'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🔒</span>
-              Security
-            </Link>
-            <Link
-              href="/dashboard/platform/license"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                pathname === '/dashboard/platform/license'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-amber-100 hover:bg-amber-800/40 hover:text-white'
-              }`}
-            >
-              <span className="mr-3 text-lg">🪪</span>
-              License
-            </Link>
-          </>
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1" aria-label="Main navigation">
+        {isItemVisible(HOME_ITEM) && (
+          <Link
+            href={HOME_ITEM.href}
+            aria-current={activeHref === HOME_ITEM.href ? 'page' : undefined}
+            className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${itemClasses(activeHref === HOME_ITEM.href, 'default')}`}
+          >
+            <span className="mr-3 text-base">{HOME_ITEM.icon}</span>
+            {HOME_ITEM.name}
+          </Link>
         )}
+
+        {visibleSections.map((section) => {
+          const tone = section.tone || 'default';
+          const sectionId = `nav-section-${section.label.replace(/\s+/g, '-').toLowerCase()}`;
+          const collapsedNow = isCollapsed(section.label);
+          const containsActive = section.label === sectionContainingActive;
+
+          return (
+            <div key={section.label} className="pt-1">
+              <button
+                type="button"
+                onClick={() => toggleSection(section.label)}
+                aria-expanded={!collapsedNow}
+                aria-controls={sectionId}
+                className={`
+                  w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold
+                  uppercase tracking-wider transition-colors
+                  ${tone === 'admin'
+                    ? 'text-amber-300 hover:bg-amber-800/30'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}
+                `}
+              >
+                <span className="text-sm" aria-hidden="true">{section.icon}</span>
+                <span className="flex-1 text-left">{section.label}</span>
+                {/* A dot marks the section you are in while it is closed, so
+                    collapsing does not lose your place. */}
+                {collapsedNow && containsActive && (
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${tone === 'admin' ? 'bg-amber-400' : 'bg-purple-400'}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <svg
+                  className={`h-3.5 w-3.5 shrink-0 transition-transform ${collapsedNow ? '' : 'rotate-90'}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M7.21 5.21a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 11-1.06-1.06L10.94 10 7.21 6.27a.75.75 0 010-1.06z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+
+              <div id={sectionId} hidden={collapsedNow} className="mt-0.5 space-y-0.5">
+                {section.groups.map((group, groupIndex) => (
+                  <div key={group.label || `group-${groupIndex}`}>
+                    {group.label && (
+                      <div className="px-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                        {group.label}
+                      </div>
+                    )}
+                    {group.items.map((item) => {
+                      const isActive = item.href === activeHref;
+                      return (
+                        <Link
+                          key={`${item.href}-${item.name}`}
+                          href={item.href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={`
+                            flex items-center pl-6 pr-3 py-2 text-sm font-medium rounded-lg
+                            transition-colors ${itemClasses(isActive, tone)}
+                          `}
+                        >
+                          <span className="mr-2.5 text-base" aria-hidden="true">{item.icon}</span>
+                          <span className="truncate">{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Footer */}

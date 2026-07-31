@@ -10,7 +10,7 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const { isUuid, isNonEmptyString, sanitizeInput } = require('../middleware/validate');
+const { isUuid, isNonEmptyString, sanitizeText } = require('../middleware/validate');
 const { log, serializeError } = require('../utils/logger');
 const auditService = require('../services/auditService');
 const indicatorService = require('../services/indicatorService');
@@ -262,7 +262,7 @@ router.post('/', requirePermission('indicators.write'), async (req, res) => {
     }
 
     const resolvedReference = isNonEmptyString(reference)
-      ? sanitizeInput(reference).trim()
+      ? sanitizeText(reference).trim()
       : await nextReference(pool, 'indicator', req.user.organization_id);
 
     const { rows } = await pool.query(
@@ -276,10 +276,10 @@ router.post('/', requirePermission('indicators.write'), async (req, res) => {
       [
         req.user.organization_id,
         resolvedReference,
-        sanitizeInput(name).trim(),
-        description ? sanitizeInput(description) : null,
+        sanitizeText(name).trim(),
+        description ? sanitizeText(description) : null,
         indicatorType || 'kri',
-        unit ? sanitizeInput(unit).trim() : null,
+        unit ? sanitizeText(unit).trim() : null,
         parsed.target.value,
         parsed.amber.value,
         parsed.red.value,
@@ -290,7 +290,7 @@ router.post('/', requirePermission('indicators.write'), async (req, res) => {
         riskId && isUuid(riskId) ? riskId : null,
         objectiveId && isUuid(objectiveId) ? objectiveId : null,
         controlId && isUuid(controlId) ? controlId : null,
-        dataSource ? sanitizeInput(dataSource) : null,
+        dataSource ? sanitizeText(dataSource) : null,
         req.user.id
       ]
     );
@@ -364,9 +364,9 @@ router.put('/:id', requirePermission('indicators.write'), async (req, res) => {
       [
         req.params.id,
         req.user.organization_id,
-        name ? sanitizeInput(name).trim() : null,
-        description !== undefined && description !== null ? sanitizeInput(description) : null,
-        unit !== undefined && unit !== null ? sanitizeInput(unit).trim() : null,
+        name ? sanitizeText(name).trim() : null,
+        description !== undefined && description !== null ? sanitizeText(description) : null,
+        unit !== undefined && unit !== null ? sanitizeText(unit).trim() : null,
         parsed.target.value,
         parsed.amber.value,
         parsed.red.value,
@@ -376,7 +376,7 @@ router.put('/:id', requirePermission('indicators.write'), async (req, res) => {
         ownerUserId || null,
         departmentId !== undefined,
         departmentId || null,
-        dataSource !== undefined && dataSource !== null ? sanitizeInput(dataSource) : null,
+        dataSource !== undefined && dataSource !== null ? sanitizeText(dataSource) : null,
         isActive === undefined ? null : Boolean(isActive)
       ]
     );
@@ -422,7 +422,7 @@ router.post('/:id/measurements', requirePermission('indicators.write'), async (r
       indicatorId: req.params.id,
       value: parsedValue.value,
       measuredAt: measuredAt || null,
-      notes: notes ? sanitizeInput(notes) : null,
+      notes: notes ? sanitizeText(notes) : null,
       recordedBy: req.user.id
     });
 

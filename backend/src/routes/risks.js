@@ -13,7 +13,7 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
-const { isUuid, isNonEmptyString, sanitizeInput } = require('../middleware/validate');
+const { isUuid, isNonEmptyString, sanitizeText } = require('../middleware/validate');
 const { log, serializeError } = require('../utils/logger');
 const auditService = require('../services/auditService');
 const riskService = require('../services/riskRegisterService');
@@ -342,11 +342,11 @@ router.post('/', requirePermission('risks.write'), async (req, res) => {
       [
         req.user.organization_id,
         resolvedReference,
-        sanitizeInput(title).trim(),
-        description ? sanitizeInput(description) : null,
+        sanitizeText(title).trim(),
+        description ? sanitizeText(description) : null,
         category || 'operational',
-        threatSource ? sanitizeInput(threatSource) : null,
-        vulnerability ? sanitizeInput(vulnerability) : null,
+        threatSource ? sanitizeText(threatSource) : null,
+        vulnerability ? sanitizeText(vulnerability) : null,
         inherentLikelihood ?? null,
         inherentImpact ?? null,
         residualLikelihood ?? null,
@@ -357,7 +357,7 @@ router.post('/', requirePermission('risks.write'), async (req, res) => {
         departmentId || null,
         identifiedDate || null,
         nextReviewDate || null,
-        Array.isArray(tags) ? tags.map((tag) => sanitizeInput(String(tag))) : null,
+        Array.isArray(tags) ? tags.map((tag) => sanitizeText(String(tag))) : null,
         req.user.id
       ]
     );
@@ -454,11 +454,11 @@ router.put('/:id', requirePermission('risks.write'), async (req, res) => {
       [
         req.params.id,
         req.user.organization_id,
-        title ? sanitizeInput(title).trim() : null,
-        description !== undefined && description !== null ? sanitizeInput(description) : null,
+        title ? sanitizeText(title).trim() : null,
+        description !== undefined && description !== null ? sanitizeText(description) : null,
         category || null,
-        threatSource !== undefined && threatSource !== null ? sanitizeInput(threatSource) : null,
-        vulnerability !== undefined && vulnerability !== null ? sanitizeInput(vulnerability) : null,
+        threatSource !== undefined && threatSource !== null ? sanitizeText(threatSource) : null,
+        vulnerability !== undefined && vulnerability !== null ? sanitizeText(vulnerability) : null,
         inherentLikelihood ?? null,
         inherentImpact ?? null,
         residualLikelihood ?? null,
@@ -470,8 +470,8 @@ router.put('/:id', requirePermission('risks.write'), async (req, res) => {
         departmentId !== undefined,
         departmentId || null,
         nextReviewDate || null,
-        closureRationale ? sanitizeInput(closureRationale) : null,
-        Array.isArray(tags) ? tags.map((tag) => sanitizeInput(String(tag))) : null
+        closureRationale ? sanitizeText(closureRationale) : null,
+        Array.isArray(tags) ? tags.map((tag) => sanitizeText(String(tag))) : null
       ]
     );
 
@@ -525,7 +525,7 @@ router.post('/:id/accept', requirePermission('risks.write'), async (req, res) =>
         req.params.id,
         req.user.organization_id,
         req.user.id,
-        sanitizeInput(rationale),
+        sanitizeText(rationale),
         acceptedUntil || null
       ]
     );
@@ -571,7 +571,7 @@ router.post('/:id/reviews', requirePermission('risks.write'), async (req, res) =
       riskId: req.params.id,
       reviewedBy: req.user.id,
       outcome: outcome || 'unchanged',
-      notes: notes ? sanitizeInput(notes) : null,
+      notes: notes ? sanitizeText(notes) : null,
       nextReviewDate: nextReviewDate || null
     });
 
@@ -641,8 +641,8 @@ router.post('/:id/treatments', requirePermission('risks.write'), async (req, res
       [
         req.user.organization_id,
         req.params.id,
-        sanitizeInput(title).trim(),
-        description ? sanitizeInput(description) : null,
+        sanitizeText(title).trim(),
+        description ? sanitizeText(description) : null,
         treatmentType || 'mitigate',
         status || 'planned',
         ownerUserId || null,
@@ -712,8 +712,8 @@ router.put('/:id/treatments/:treatmentId', requirePermission('risks.write'), asy
         req.user.organization_id,
         req.params.id,
         req.params.treatmentId,
-        title ? sanitizeInput(title).trim() : null,
-        description !== undefined && description !== null ? sanitizeInput(description) : null,
+        title ? sanitizeText(title).trim() : null,
+        description !== undefined && description !== null ? sanitizeText(description) : null,
         status || null,
         ownerUserId !== undefined,
         ownerUserId || null,
@@ -830,7 +830,7 @@ async function handleLink(req, res, kindKey) {
       riskId: req.params.id,
       targetId,
       effectiveness: effectiveness || null,
-      notes: notes ? sanitizeInput(notes) : null,
+      notes: notes ? sanitizeText(notes) : null,
       userId: req.user.id
     }));
 
