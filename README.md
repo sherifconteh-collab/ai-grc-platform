@@ -11,7 +11,7 @@
 ---
 
 <a id="desktop-app"></a>
-### 📥 Download the Desktop App
+## 📥 Download the Desktop App
 
 Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 

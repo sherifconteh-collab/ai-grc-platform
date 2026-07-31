@@ -1,3 +1,4 @@
+# Release Notes
 
 > ControlWeave is fully open source. Every feature is available in this build —
 > there are no tier-gated or premium-only capabilities.
