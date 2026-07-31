@@ -36,6 +36,18 @@ jobs:
           npm ci
           npm audit --audit-level=moderate
 
+      # The desktop wrapper was previously unaudited, which let eight high
+      # advisories sit in electron-builder's tree unnoticed — including a
+      # credential leak on cross-origin redirect in builder-util-runtime and an
+      # uncontrolled search path in AppImage builds. electron-builder is a
+      # devDependency, so the production-only audit further down cannot catch
+      # it, but it is the tool that produces the installer users download.
+      - name: Electron - npm audit
+        run: |
+          cd electron
+          npm ci
+          npm audit --audit-level=moderate
+
   version-sync:
     name: Version Sync Check
     runs-on: ubuntu-latest
@@ -622,6 +634,10 @@ jobs:
           }
           (cd frontend && npm audit --omit=dev --audit-level=high) || {
             echo "❌ High/critical vulnerability in frontend production dependencies (NIST 800-160 SA-12)"
+            FAIL=1
+          }
+          (cd electron && npm audit --omit=dev --audit-level=high) || {
+            echo "❌ High/critical vulnerability in electron production dependencies (NIST 800-160 SA-12)"
             FAIL=1
           }
 
