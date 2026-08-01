@@ -18,7 +18,7 @@ Thank you for your interest in contributing to ControlWeave! We welcome contribu
 
 ## 📜 Code of Conduct
 
-This project follows our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold this code.
+This project's code of conduct is set out below. By participating, you agree to uphold it.
 
 In short:
 - Be respectful and inclusive

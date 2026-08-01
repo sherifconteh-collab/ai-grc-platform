@@ -349,6 +349,15 @@ const auditRoutes = require('./routes/audit');
 const auditFieldsRoutes = require('./routes/auditFields');
 const rolesRoutes = require('./routes/roles');
 const accessGovernanceRoutes = require('./routes/accessGovernance');
+// Risk and resilience registers. Ordered as they depend on one another:
+// departments and objectives are the organizational spine, risks hang off
+// them, incidents and indicators reference risks.
+const departmentsRoutes = require('./routes/departments');
+const objectivesRoutes = require('./routes/objectives');
+const risksRoutes = require('./routes/risks');
+const incidentsRoutes = require('./routes/incidents');
+const obligationsRoutes = require('./routes/obligations');
+const indicatorsRoutes = require('./routes/indicators');
 const usersRoutes = require('./routes/users');
 const cmdbRoutes = safeRequire('./routes/cmdb');
 const assetsRoutes = safeRequire('./routes/assets');
@@ -440,6 +449,12 @@ app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/audit', auditFieldsRoutes); // Dynamic fields management under same base path
 app.use('/api/v1/roles', rolesRoutes);
 app.use('/api/v1/access-governance', accessGovernanceRoutes);
+app.use('/api/v1/departments', departmentsRoutes);
+app.use('/api/v1/objectives', objectivesRoutes);
+app.use('/api/v1/risks', risksRoutes);
+app.use('/api/v1/incidents', incidentsRoutes);
+app.use('/api/v1/obligations', obligationsRoutes);
+app.use('/api/v1/indicators', indicatorsRoutes);
 app.use('/api/v1/users', usersRoutes);
 if (cmdbRoutes) app.use('/api/v1/cmdb', cmdbRoutes);
 if (assetsRoutes) app.use('/api/v1/assets', assetsRoutes);

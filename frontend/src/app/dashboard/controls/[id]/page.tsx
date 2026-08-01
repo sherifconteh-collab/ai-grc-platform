@@ -221,8 +221,11 @@ export default function ControlDetailPage() {
         poamAPI.getList({ controlId: id, limit: 10 }),
         vulnerabilitiesAPI.getAll({ limit: 10 }),
       ]);
-      if (poamRes.status === 'fulfilled') setControlPoams(poamRes.value.data?.data || []);
-      if (vulnRes.status === 'fulfilled') setControlVulns(vulnRes.value.data?.data || []);
+      // Both endpoints wrap their rows in { data: { items, ... } }; reading
+      // .data directly yields an object whose .length is undefined, which
+      // silently hides the whole risk panel.
+      if (poamRes.status === 'fulfilled') setControlPoams(poamRes.value.data?.data?.items || []);
+      if (vulnRes.status === 'fulfilled') setControlVulns(vulnRes.value.data?.data?.items || []);
     } finally {
       setRiskLoading(false);
     }

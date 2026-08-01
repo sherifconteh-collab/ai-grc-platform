@@ -115,7 +115,9 @@ export default function OperationsCenterPage() {
     try {
       setPoamLoading(true);
       const res = await poamAPI.getList({ limit: 200 });
-      setPoams(res.data?.data || []);
+      // GET /poam returns { data: { items, summary, pagination } } — the rows
+      // are under .items, not .data itself.
+      setPoams(res.data?.data?.items || []);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load POA&Ms');
     } finally {

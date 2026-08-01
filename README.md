@@ -11,7 +11,7 @@
 ---
 
 <a id="desktop-app"></a>
-### 📥 Download the Desktop App
+## 📥 Download the Desktop App
 
 Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 
@@ -372,7 +372,7 @@ Full RMF lifecycle management without leaving the platform:
 ### 📋 Multi-Framework Compliance Management
 - Track compliance across 15+ frameworks simultaneously
 - **Cross-framework control mapping (Crosswalks)** — 80+ mappings showing control overlaps
-- Unified risk register
+- Unified risk register with inherent/residual scoring, treatments and named acceptance
 - Gap analysis across standards
 - Framework-gated sidebar navigation
 
@@ -716,8 +716,8 @@ controlweave/
 - `control_implementations` — Org-specific implementation status
 
 ### AI-Specific Tables
-- `ai_systems` — AI system inventory and classification
-- `ai_system_controls` — AI-to-control mappings
+- `assets` (category `AI Agent`) — AI system inventory and classification
+- `asset_control_mappings` — AI-to-control mappings
 - `ai_decision_log` — AI feature decisions with `structured JSONB` for validated output
 - `ai_usage_log` — Per-org AI usage tracking
 
@@ -731,23 +731,42 @@ controlweave/
 - `device_push_tokens` — Mobile push token lifecycle with `UNIQUE(token)` cross-account protection
 - `server_license` — Persisted license key with `local_public_key` for self-signed community keys
 
-### Risk & Evidence
-- `risks` — Enterprise risk register
-- `risk_treatments` — Risk mitigation actions
+### Risk Register
+- `risks` — ISO 31000 / 27005 risk register with inherent and residual assessment (likelihood × impact, 1–5), treatment strategy, named acceptance with expiry
+- `risk_treatments` — Treatment actions with target residual score, so treatment effectiveness can be measured after completion
+- `risk_reviews` — Periodic review history; snapshots the assessment as it stood at review time
+- `risk_control_links` / `risk_asset_links` / `risk_objective_links` — What treats the risk, what is exposed, what is threatened
+
+### Incidents
+- `incidents` — NIST SP 800-61 lifecycle with per-phase timestamps (dwell time, time to contain) and the regulatory notification clock
+- `incident_timeline` — Chronological response record
+- `incident_risk_links` / `incident_control_links` / `incident_asset_links` — Which risk materialized, which control failed or detected it, what was affected
+
+### Obligations & Indicators
+- `compliance_obligations` — Statute, contract, licence condition and customer commitment, with recurring deadlines
+- `obligation_attestations` — Per-period attestation history (evidence of operation over a period, which a status column cannot give)
+- `obligation_control_links` — Which controls demonstrate the obligation is met
+- `indicators` / `indicator_measurements` — KRI / KPI / KCI with amber and red thresholds and an explicit direction
+
+### Organizational Structure
+- `departments` — Hierarchical business units that own risks, incidents, obligations and objectives
+- `business_objectives` — COSO-categorized objectives (strategic / operational / reporting / compliance)
+
+### Evidence
 - `control_mappings` — Cross-framework mappings
-- `evidence_items` — Versioned evidence storage with PII classification
-- `control_evidence` — Evidence-to-control linkage
+- `evidence` — Versioned evidence storage with PII classification
+- `evidence_control_links` — Evidence-to-control linkage
 
 ### Assessment & Audit
-- `assessments` — Audit and assessment tracking
-- `assessment_findings` — Gap identification
-- `audit_events` — Immutable audit log
+- `assessment_plans` — Audit and assessment tracking
+- `audit_findings` — Gap identification
+- `audit_logs` — Immutable audit log
 
 ### Policy & Operations
-- `policies` — Policy lifecycle management
+- `organization_policies` — Policy lifecycle management
 - `notifications` — In-app notification system with type-based filtering
 - `notification_preferences` — Per-user delivery preferences (in-app vs. email)
-- `webhooks` — External integration events
+- `webhook_subscriptions` / `webhook_deliveries` — External integration endpoints and their delivery log
 - `llm_configurations` — Per-org LLM API key storage (encrypted) for BYOK providers
 - `integrations_hub_connectors` — Integration hub connector templates and instances
 

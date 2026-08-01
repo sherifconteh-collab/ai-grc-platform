@@ -308,8 +308,8 @@ export default function ReportIssuePage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-800">
             <strong>Tip:</strong> For general questions, try the{' '}
-            <Link href="/dashboard/help" className="underline font-medium">Help Center</Link> or the{' '}
-            <span className="font-medium">AI Copilot</span> (bottom-right corner). Issue reports are forwarded to our development team for review.
+            <Link href="/dashboard/help" className="underline font-medium">Help Center</Link> or{' '}
+            <Link href="/dashboard/ai-insights" className="underline font-medium">AI Insights</Link>. Issue reports are forwarded to our development team for review.
           </p>
         </div>
       </div>
