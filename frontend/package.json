@@ -19,10 +19,10 @@
     "axios": "^1.16.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.16.0",
-    "next": "16.2.11",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "recharts": "^3.9.2",
+    "next": "^16.2.12",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.1",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
@@ -32,7 +32,7 @@
     "@types/react": "^19.2.16",
     "@types/react-dom": "^19.0.0",
     "eslint": "^10.7.0",
-    "eslint-config-next": "^16.2.6",
+    "eslint-config-next": "^16.2.12",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.3"

@@ -69,7 +69,7 @@
     "verify:rls": "node scripts/verify-rls-isolation.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.98.0",
+    "@anthropic-ai/sdk": "^0.115.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@noble/post-quantum": "^0.6.1",
     "@sentry/node": "^10.53.1",
@@ -95,9 +95,9 @@
     "openai": "^6.38.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
-    "pdfkit": "^0.18.0",
-    "pg": "^8.18.0",
-    "redis": "^6.0.0",
+    "pdfkit": "^0.19.1",
+    "pg": "^8.22.0",
+    "redis": "^6.2.0",
     "rss-parser": "^3.13.0",
     "sanitize-html": "2.17.5",
     "socket.io": "^4.8.1",
@@ -106,7 +106,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.29.5",
+    "@babel/preset-env": "^8.0.2",
     "eslint": "^10.4.0",
     "eslint-plugin-security": "^4.0.0",
     "globals": "^17.6.0",
