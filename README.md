@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-07-30 | PR #237: feat(access-governance): add access governance module + AI-assisted RBAC import -->
+<!-- LAST_UPDATED: 2026-08-01 | PR #250: feat(registers): risk register, incidents, obligations, objectives, indicators and departments -->
 
 ## 🎯 What is This?
 
@@ -986,10 +986,10 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
-- **Tables**: 170+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
+- **Tables**: 190+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 115 sequential, idempotent migrations
-- **API Routes**: 70+ route modules
-- **Services**: 54 service modules
+- **API Routes**: 80+ route modules
+- **Services**: 58 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
