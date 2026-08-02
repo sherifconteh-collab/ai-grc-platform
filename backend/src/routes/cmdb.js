@@ -6,6 +6,7 @@ const { authenticate, requireTier } = require('../middleware/auth');
 const { requireProEdition } = require('../middleware/edition');
 const { validateBody, requireFields } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { log, serializeError } = require('../utils/logger');
 
 router.use(authenticate);
 router.use(requireProEdition('cmdb')); // Edition check BEFORE tier check
@@ -457,6 +458,242 @@ router.get('/assets', async (req, res) => {
     );
     res.json({ success: true, data: result.rows });
   } catch (error) { res.status(500).json({ success: false, error: 'Failed to load assets' }); }
+});
+
+// ---------- ASSET ↔ CONTROL MAPPINGS ----------
+// asset_control_mappings has existed since migration 005, commented "Links
+// assets to compliance controls for traceability" and indexed on both foreign
+// keys, but nothing ever read or wrote it. CM-8 (System Component Inventory)
+// is the control an asset inventory exists to satisfy, so an inventory that
+// cannot be tied to a control cannot evidence one. These routes wire it up.
+const MAPPING_COMPLIANCE_STATUS = ['compliant', 'non_compliant', 'partial', 'not_applicable'];
+const MAPPING_FIELDS = ['compliance_status', 'last_assessed', 'next_assessment', 'evidence_url', 'notes'];
+
+async function assertOrgAsset(assetId, orgId) {
+  const { rows } = await pool.query(
+    'SELECT id FROM assets WHERE id = $1 AND organization_id = $2',
+    [assetId, orgId]
+  );
+  return rows.length > 0;
+}
+
+router.get('/assets/:assetId/controls', async (req, res) => {
+  try {
+    if (!(await assertOrgAsset(req.params.assetId, req.user.organization_id))) {
+      return res.status(404).json({ success: false, error: 'Asset not found' });
+    }
+    const result = await pool.query(`
+      SELECT acm.id, acm.control_id, acm.compliance_status, acm.last_assessed,
+             acm.next_assessment, acm.evidence_url, acm.notes, acm.created_at,
+             fc.control_id AS control_ref, fc.title AS control_title,
+             f.code AS framework_code, f.name AS framework_name
+      FROM asset_control_mappings acm
+      JOIN framework_controls fc ON fc.id = acm.control_id
+      JOIN frameworks f ON f.id = fc.framework_id
+      WHERE acm.asset_id = $1 AND acm.organization_id = $2
+      ORDER BY f.code, fc.control_id`,
+      [req.params.assetId, req.user.organization_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'cmdb.request_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+router.post('/assets/:assetId/controls',
+  validateBody((body) => requireFields(body, ['control_id'])),
+  async (req, res) => {
+    try {
+      const orgId = req.user.organization_id;
+      if (!(await assertOrgAsset(req.params.assetId, orgId))) {
+        return res.status(404).json({ success: false, error: 'Asset not found' });
+      }
+
+      const { control_id, compliance_status } = req.body;
+      if (compliance_status && !MAPPING_COMPLIANCE_STATUS.includes(compliance_status)) {
+        return res.status(400).json({
+          success: false,
+          error: `compliance_status must be one of: ${MAPPING_COMPLIANCE_STATUS.join(', ')}`
+        });
+      }
+
+      const control = await pool.query('SELECT id FROM framework_controls WHERE id = $1', [control_id]);
+      if (control.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Control not found' });
+      }
+
+      const result = await pool.query(`
+        INSERT INTO asset_control_mappings
+          (asset_id, control_id, organization_id, compliance_status, last_assessed, next_assessment, evidence_url, notes)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        ON CONFLICT (asset_id, control_id, organization_id) DO UPDATE SET
+          compliance_status = EXCLUDED.compliance_status,
+          last_assessed     = EXCLUDED.last_assessed,
+          next_assessment   = EXCLUDED.next_assessment,
+          evidence_url      = EXCLUDED.evidence_url,
+          notes             = EXCLUDED.notes
+        RETURNING *`,
+        [req.params.assetId, control_id, orgId, compliance_status || null,
+         req.body.last_assessed || null, req.body.next_assessment || null,
+         req.body.evidence_url || null, req.body.notes || null]
+      );
+      res.status(201).json({ success: true, data: result.rows[0] });
+    } catch (error) {
+      log('error', 'cmdb.request_failed', { error: serializeError(error) });
+      res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+  });
+
+router.put('/assets/:assetId/controls/:controlId', async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    if (!(await assertOrgAsset(req.params.assetId, orgId))) {
+      return res.status(404).json({ success: false, error: 'Asset not found' });
+    }
+    if (req.body.compliance_status && !MAPPING_COMPLIANCE_STATUS.includes(req.body.compliance_status)) {
+      return res.status(400).json({
+        success: false,
+        error: `compliance_status must be one of: ${MAPPING_COMPLIANCE_STATUS.join(', ')}`
+      });
+    }
+
+    const updates = MAPPING_FIELDS
+      .filter((field) => Object.prototype.hasOwnProperty.call(req.body, field))
+      .map((field) => [field, req.body[field]]);
+    if (updates.length === 0) return res.status(400).json({ success: false, error: 'No fields to update' });
+
+    const setClauses = updates.map(([col], index) => `${col} = $${index + 1}`);
+    const values = updates.map(([, value]) => value);
+    values.push(req.params.assetId, req.params.controlId, orgId);
+
+    const result = await pool.query(
+      `UPDATE asset_control_mappings SET ${setClauses.join(', ')}
+       WHERE asset_id = $${updates.length + 1} AND control_id = $${updates.length + 2}
+         AND organization_id = $${updates.length + 3} RETURNING *`,
+      values
+    );
+    if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Mapping not found' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    log('error', 'cmdb.request_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+router.delete('/assets/:assetId/controls/:controlId', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM asset_control_mappings
+       WHERE asset_id = $1 AND control_id = $2 AND organization_id = $3 RETURNING id`,
+      [req.params.assetId, req.params.controlId, req.user.organization_id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Mapping not found' });
+    res.json({ success: true, message: 'Unlinked' });
+  } catch (error) {
+    log('error', 'cmdb.request_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Reverse lookup, so a control can show the assets that evidence it.
+router.get('/controls/:controlId/assets', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT acm.id, acm.compliance_status, acm.last_assessed, acm.next_assessment,
+             acm.evidence_url, acm.notes,
+             a.id AS asset_id, a.name AS asset_name, a.status AS asset_status,
+             a.criticality, ac.name AS category_name, ac.code AS category_code,
+             e.name AS environment_name
+      FROM asset_control_mappings acm
+      JOIN assets a ON a.id = acm.asset_id
+      JOIN asset_categories ac ON ac.id = a.category_id
+      LEFT JOIN environments e ON e.id = a.environment_id
+      WHERE acm.control_id = $1 AND acm.organization_id = $2
+      ORDER BY ac.name, a.name`,
+      [req.params.controlId, req.user.organization_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'cmdb.request_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ---------- ASSET ↔ RISK ----------
+// risk_asset_links and the write side (POST/DELETE /risks/:id/assets) shipped
+// with migration 136, but only the risk half. From an asset there was no way to
+// see what it is exposed to, which is the direction an asset owner actually
+// asks the question in. These are the reverse views; linking still happens on
+// the risk, so there is one place that owns the relationship.
+router.get('/assets/:assetId/risks', async (req, res) => {
+  try {
+    if (!(await assertOrgAsset(req.params.assetId, req.user.organization_id))) {
+      return res.status(404).json({ success: false, error: 'Asset not found' });
+    }
+    const result = await pool.query(`
+      SELECT r.id, r.title, r.category, r.status,
+             r.inherent_likelihood, r.inherent_impact, r.inherent_score,
+             r.residual_likelihood, r.residual_impact, r.residual_score,
+             r.next_review_date, ral.created_at AS linked_at
+      FROM risk_asset_links ral
+      JOIN risks r ON r.id = ral.risk_id
+      WHERE ral.asset_id = $1 AND ral.organization_id = $2
+      ORDER BY COALESCE(r.residual_score, r.inherent_score) DESC NULLS LAST, r.title`,
+      [req.params.assetId, req.user.organization_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'cmdb.request_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Risk exposure for a whole category of assets, so a register can show it as a
+// column without issuing one query per row.
+router.get('/risk-exposure', async (req, res) => {
+  try {
+    const params = [req.user.organization_id];
+    let categoryFilter = '';
+    if (req.query.category) {
+      const { rows } = await pool.query(
+        'SELECT id FROM asset_categories WHERE code = $1',
+        [req.query.category]
+      );
+      if (rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'Unknown asset category' });
+      }
+      params.push(rows[0].id);
+      categoryFilter = 'AND a.category_id = $2';
+    }
+
+    // LEFT JOIN LATERAL over the link table rather than a correlated subquery,
+    // per .claude/rules/database.md, and COUNT(DISTINCT) so an asset linked to
+    // several risks is not inflated by the join.
+    const result = await pool.query(`
+      SELECT a.id AS asset_id, a.name AS asset_name, a.criticality,
+             exposure.open_risks, exposure.max_residual, exposure.top_risk_title
+      FROM assets a
+      LEFT JOIN LATERAL (
+        SELECT COUNT(DISTINCT r.id)::int AS open_risks,
+               MAX(COALESCE(r.residual_score, r.inherent_score)) AS max_residual,
+               (ARRAY_AGG(r.title ORDER BY COALESCE(r.residual_score, r.inherent_score) DESC NULLS LAST))[1]
+                 AS top_risk_title
+        FROM risk_asset_links ral
+        JOIN risks r ON r.id = ral.risk_id
+        WHERE ral.asset_id = a.id
+          AND ral.organization_id = a.organization_id
+          AND r.status NOT IN ('closed', 'accepted')
+      ) exposure ON TRUE
+      WHERE a.organization_id = $1 ${categoryFilter}
+      ORDER BY exposure.max_residual DESC NULLS LAST, a.name`,
+      params
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'cmdb.request_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 // ---------- ASSET RELATIONSHIPS ----------
