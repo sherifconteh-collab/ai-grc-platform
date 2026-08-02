@@ -5,6 +5,34 @@
 
 ---
 
+## [4.8.0] — 2026-08-02
+
+### Added
+
+- **Evidence version history** (migration `144`, issue #570): "versioning" was an integer counter. `PUT /evidence/:id` incremented `evidence_version` and overwrote the row, so a prior version's file, hash or PII classification could not be retrieved — the number went up and nothing was kept. `evidence_versions` now holds an immutable snapshot of the row as it stood *before* each update, taken inside the update's own transaction. Integrity stays demonstrable across a re-upload because the superseded file and its hash are both retained, and a reclassification no longer destroys the record of what the evidence was classified as while it was being relied on. New `GET/POST /evidence/:id/versions` and `GET /evidence/:id/versions/:versionNumber/download`. Hashing is SHA-384 throughout, per this repo's CNSA Suite 1.0 floor. — @sherifconteh-collab
+- **Federal POA&M structure** (migration `145`, issue #569): `poam_milestones` (a federal POA&M is a list of discrete milestones with their own target dates, not one overall `due_date`), `resources_required`, and `scheduled_completion_date` separated from `due_date` so slippage is visible rather than silently erased when a date is revised. — @sherifconteh-collab
+- **POA&M CSV and PDF export** — `GET /poam/export?format=csv|pdf`, carrying every linked control, the framework type, both dates with computed slippage in days, milestone counts, resources required, and any linked risks and treatment. — @sherifconteh-collab
+- **Risk register ↔ POA&M linkage** (migration `146`): migration `140` tied risks to controls (what treats the risk), assets (what is exposed) and objectives (what is threatened) — but not to the remediation work itself, so the register recorded the decision to treat a risk and had no link to what was being done about it. Adds `risk_poam_links` (many-to-many; one remediation routinely addresses several risks) plus `poam_items.treatment_id` for the tighter case where a POA&M executes one specific treatment. `POST /poam/from-risk/:riskId` sets priority from the residual score. Closing remediation deliberately does **not** move a residual score: inherent and residual are stored separately so an assessor can see what the controls achieved, and a score that moved on its own would destroy that evidence — the risk is flagged review-due instead. — @sherifconteh-collab
+- **Many-to-many POA&M ↔ control linkage** (migration `147`): `poam_items.control_id` was a single nullable FK, so one remediation could not span several controls even though evidence (`evidence_control_links`) and risks (`risk_control_links`) both could. One access-review remediation commonly closes findings against AC-2, AC-3 and AC-6 at once. Existing `control_id` values are backfilled and the column is retained as the originating control. — @sherifconteh-collab
+- **POA&M register and detail pages** (`/dashboard/poam`, `/dashboard/poam/[id]`) with a sidebar entry at `controls.read`, matching what the endpoints require. Fields, milestones, progress timeline, submit-for-review, approval history, the auditor decision panel with its separation-of-duties guard, control and risk links, and export. The control detail page has linked to `/dashboard/poam` for as long as it has had a POA&M panel; the route did not exist, so the link 404'd. — @sherifconteh-collab
+- **Evidence detail drawer** — metadata editing with a change note, version history showing each version's PII classification as it was, prior-version download, file replacement, and the integrity check. `GET /evidence/:id/integrity-check` existed and was absent from the API client entirely. — @sherifconteh-collab
+- **Risk detail page** (`/dashboard/risks/[id]`) — the page `GET /risks/:id` never had. Inherent vs residual assessment, treatments, reviews, acceptance, control/asset/objective links, and the new remediation panel. The register was a list and a heat map; clicking a row did nothing. — @sherifconteh-collab
+- **Framework-appropriate terminology** — an ISO 27001 organization sees "Corrective Action Request", SOC 2 "Deficiency", FISCAM and HIPAA "Corrective Action Plan", PCI DSS "Risk Assessment & Validation", NIST and FedRAMP "POA&M". The seven vocabularies have shipped in `frameworkPoamService.js` since the feature was built and were unreachable (see Fixed). Labels only — URLs, tables and API paths are unchanged. — @sherifconteh-collab
+
+### Fixed
+
+- **The compliance gate was enforced on a code path the product does not use.** `PUT /controls/:id` demanded a `poam_justification`, created the POA&M and filed an approval request. The dashboard calls `PATCH /implementations/:id/status` and `PATCH /implementations/:id/test-result`, and neither had a single POA&M reference — so a control could be marked compliant from the UI with no justification and nothing produced for an auditor. The rule now lives in `services/poamGateService.js` and is applied on all three paths, preserving the `requires_poam_submission` 400 contract for existing API clients. — @sherifconteh-collab
+- **Nothing that found a gap raised remediation.** Recording a control test or an assessment procedure as `other_than_satisfied` — NIST SP 800-53A for "this control has gaps" — produced nothing, and `routes/assessments/findings.js` had no POA&M references at all. Across every `INSERT INTO poam_items` site only `'control'` and `'vulnerability'` were ever written; `'audit_finding'` and `'assessment'` were declared in `ALLOWED_SOURCE_TYPE` and dead. Those three events now raise a draft POA&M against the control, idempotent per (control, source), with owner, dates and remediation plan deliberately left blank for a human. Nothing is auto-closed, auto-approved or auto-assigned. — @sherifconteh-collab
+- **`GET /poam/framework-types` was unreachable.** Declared after `/:id`, so Express bound `id="framework-types"` and returned "POA&M item not found". The entire multi-framework vocabulary was dead code behind it, which is why every screen said "POA&M" regardless of framework. It now resolves and is scoped to the organization's activated frameworks. — @sherifconteh-collab
+- **`routes/poam.js` had no rate limiter at all**, unlike its sibling `routes/poamMilestones.js`. — @sherifconteh-collab
+- The control detail page's Risk & Compliance panel rendered only when a POA&M or vulnerability already existed, so a control with neither showed nothing, offered no way to raise one, and its empty state was unreachable code. — @sherifconteh-collab
+
+### Changed
+
+- `csvEscape` extracted from `routes/rmfInheritance.js` into `utils/csv.js` and shared with the POA&M export, so two compliance exporters cannot drift into subtly different field escaping. — @sherifconteh-collab
+
+---
+
 ## [Unreleased]
 
 > Changes staged but not yet released to production.

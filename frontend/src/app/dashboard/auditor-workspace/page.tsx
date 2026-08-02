@@ -2,14 +2,43 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
-import { assessmentsAPI, aiAPI } from '@/lib/api';
+import { assessmentsAPI, aiAPI, poamAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessAuditorWorkspace, hasPermission } from '@/lib/access';
+import { PriorityBadge } from '@/components/poam/PoamStatusBadge';
+import type { PoamItem } from '@/lib/poamTypes';
 import { groupByControlFamily, sameControlRef } from '@/lib/controlFamilies';
 import { useToast } from '@/hooks/useToast';
 
-type WorkspaceTab = 'summary' | 'procedures' | 'pbc' | 'workpapers' | 'findings' | 'signoffs' | 'analytics' | 'ai_insights' | 'client_portal';
+type WorkspaceTab = 'summary' | 'procedures' | 'pbc' | 'workpapers' | 'findings' | 'signoffs' | 'poam_review' | 'analytics' | 'ai_insights' | 'client_portal';
+
+/**
+ * Free-form model output. The API returns either a plain string or an object
+ * carrying the text under .analysis or .content, so the render sites narrow
+ * before displaying rather than trusting a shape.
+ */
+type AiNarrative = string | { analysis?: string; content?: string; [key: string]: unknown } | null;
+
+interface SwarmAgentResult {
+  agentId: string;
+  label: string;
+  status: string;
+  durationMs?: number;
+  provider?: string;
+  /** Model output: a string, or a structured object rendered as JSON. */
+  result?: string | Record<string, unknown> | null;
+  error?: string;
+}
+
+interface SwarmResult {
+  totalDurationMs: number;
+  successCount: number;
+  failureCount: number;
+  ragContextUsed?: boolean;
+  agents?: SwarmAgentResult[];
+}
 
 const engagementStatuses = ['planning', 'fieldwork', 'reporting', 'completed', 'archived'];
 const pbcStatuses = ['open', 'in_progress', 'submitted', 'accepted', 'rejected', 'closed'];
@@ -131,12 +160,20 @@ export default function AuditorWorkspacePage() {
   const [findingStatusDraft, setFindingStatusDraft] = useState('open');
 
   // AI Insights state
-  const [aiRiskAssessment, setAiRiskAssessment] = useState<any>(null);
-  const [aiExecutiveSummary, setAiExecutiveSummary] = useState<any>(null);
-  const [aiComplianceForecast, setAiComplianceForecast] = useState<any>(null);
-  const [aiGapAnalysis, setAiGapAnalysis] = useState<any>(null);
+  // Free-form model output: a string, or an object carrying the text under
+  // .analysis/.content. Typed as AiNarrative rather than any so the render
+  // sites have to keep narrowing it (which they already do).
+  const [aiRiskAssessment, setAiRiskAssessment] = useState<AiNarrative>(null);
+  const [aiExecutiveSummary, setAiExecutiveSummary] = useState<AiNarrative>(null);
+  const [aiComplianceForecast, setAiComplianceForecast] = useState<AiNarrative>(null);
+  const [aiGapAnalysis, setAiGapAnalysis] = useState<AiNarrative>(null);
   const [aiLoading, setAiLoading] = useState<string | null>(null);
-  const [swarmResult, setSwarmResult] = useState<any>(null);
+  const [swarmResult, setSwarmResult] = useState<SwarmResult | null>(null);
+
+  // POA&M review queue. The review workflow has existed on the API since the
+  // feature shipped with no UI at all -- POAM.md said so in as many words.
+  const [reviewQueue, setReviewQueue] = useState<PoamItem[]>([]);
+  const [reviewQueueLoading, setReviewQueueLoading] = useState(false);
   const [swarmRunning, setSwarmRunning] = useState(false);
 
   // Client portal state
@@ -296,6 +333,23 @@ export default function AuditorWorkspacePage() {
       setLinksLoading(false);
     }
   }, []);
+
+  const loadReviewQueue = useCallback(async () => {
+    try {
+      setReviewQueueLoading(true);
+      const res = await poamAPI.getList({ status: 'pending_auditor_review', limit: 200 });
+      setReviewQueue(res.data?.data?.items || []);
+    } catch {
+      // The queue is one tab of many; a failure here must not blank the page.
+      setReviewQueue([]);
+    } finally {
+      setReviewQueueLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedTab === 'poam_review') loadReviewQueue();
+  }, [selectedTab, loadReviewQueue]);
 
   const clientPortalLoaded = useRef(false);
   useEffect(() => {
@@ -909,7 +963,7 @@ export default function AuditorWorkspacePage() {
 
                 <div className="bg-white rounded-lg shadow-md p-2">
                   <div className="flex flex-wrap gap-2">
-                    {(['summary', 'procedures', 'pbc', 'workpapers', 'findings', 'signoffs', 'analytics', 'ai_insights', 'client_portal'] as WorkspaceTab[]).map((tab) => {
+                    {(['summary', 'procedures', 'pbc', 'workpapers', 'findings', 'signoffs', 'poam_review', 'analytics', 'ai_insights', 'client_portal'] as WorkspaceTab[]).map((tab) => {
                       const tabLabels: Record<WorkspaceTab, string> = {
                         summary: '📊 Summary',
                         procedures: '🔍 Procedures & AI',
@@ -917,6 +971,7 @@ export default function AuditorWorkspacePage() {
                         workpapers: '📝 Workpapers',
                         findings: '⚠️ Findings',
                         signoffs: '✅ Sign-offs',
+                        poam_review: '📝 POA&M Review',
                         analytics: '📈 Analytics',
                         ai_insights: '🤖 AI Insights',
                         client_portal: '🔗 Client Portal',
@@ -1570,6 +1625,72 @@ export default function AuditorWorkspacePage() {
                   </div>
                 )}
 
+                {selectedTab === 'poam_review' && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg shadow-md p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">POA&amp;M Review Queue</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Remediation submitted for auditor sign-off. Open an item to record a decision.
+                          </p>
+                        </div>
+                        <button
+                          onClick={loadReviewQueue}
+                          disabled={reviewQueueLoading}
+                          className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {reviewQueueLoading ? 'Refreshing...' : 'Refresh'}
+                        </button>
+                      </div>
+
+                      {reviewQueueLoading ? (
+                        <p className="text-sm text-gray-500">Loading the queue...</p>
+                      ) : reviewQueue.length === 0 ? (
+                        <p className="text-sm text-gray-400">
+                          Nothing awaiting review. Items arrive here when someone claims a control is
+                          compliant or submits remediation for sign-off.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Control</th>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Raised by</th>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Submitted</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {reviewQueue.map((item) => (
+                                <tr key={item.id} className="hover:bg-gray-50">
+                                  <td className="px-3 py-2">
+                                    <Link href={`/dashboard/poam/${item.id}`} className="text-purple-700 hover:underline font-medium">
+                                      {item.title}
+                                    </Link>
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-600">{item.control_code || '—'}</td>
+                                  <td className="px-3 py-2 text-gray-600 capitalize">
+                                    {String(item.source_type || 'manual').replace(/_/g, ' ')}
+                                  </td>
+                                  <td className="px-3 py-2"><PriorityBadge value={item.priority} /></td>
+                                  <td className="px-3 py-2 text-gray-600">
+                                    {item.submitted_for_review_at
+                                      ? new Date(item.submitted_for_review_at).toLocaleDateString()
+                                      : '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {selectedTab === 'analytics' && (
                   <div className="space-y-4">
                     {/* Audit Health Score */}
@@ -1791,11 +1912,17 @@ export default function AuditorWorkspacePage() {
                             {swarmResult.failureCount > 0 && <span className="text-red-600">❌ {swarmResult.failureCount} failed</span>}
                             {swarmResult.ragContextUsed && <span className="text-purple-600">📚 RAG enriched</span>}
                           </div>
-                          {swarmResult.agents?.map((agent: any) => (
+                          {swarmResult.agents?.map((agent) => (
                             <div key={agent.agentId} className={`border rounded-lg p-3 ${agent.status === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
                               <div className="flex items-center justify-between mb-1">
                                 <span className="font-medium text-sm">{agent.status === 'success' ? '✅' : '❌'} {agent.label}</span>
-                                <span className="text-xs text-gray-500">{(agent.durationMs / 1000).toFixed(1)}s{agent.provider ? ` · ${agent.provider}` : ''}</span>
+                                {/* durationMs is optional; dividing undefined
+                                    rendered a literal "NaNs" before this state
+                                    was typed. */}
+                                <span className="text-xs text-gray-500">
+                                  {typeof agent.durationMs === 'number' ? `${(agent.durationMs / 1000).toFixed(1)}s` : '—'}
+                                  {agent.provider ? ` · ${agent.provider}` : ''}
+                                </span>
                               </div>
                               {agent.status === 'success' && agent.result && (
                                 <pre className="text-xs bg-white/70 rounded p-2 whitespace-pre-wrap break-words max-h-48 overflow-y-auto border mt-1">

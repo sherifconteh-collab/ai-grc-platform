@@ -616,7 +616,7 @@ export interface EvidenceType {
 }
 
 export const evidenceAPI = {
-  getAll: (params?: { search?: string; tags?: string; limit?: number; offset?: number; evidence_type?: string }) =>
+  getAll: (params?: { search?: string; tags?: string; evidence_type?: string; limit?: number; offset?: number }) =>
     api.get('/evidence', { params }),
 
   // The framework-neutral evidence vocabulary, served from the database so the
@@ -633,8 +633,27 @@ export const evidenceAPI = {
 
   download: (id: string) => api.get(`/evidence/${id}/download`, { responseType: 'blob' }),
 
-  update: (id: string, data: { description?: string; tags?: string[]; pii_classification?: string; pii_types?: string[]; data_sensitivity?: string }) =>
+  update: (id: string, data: { description?: string; tags?: string[]; pii_classification?: string; pii_types?: string[]; data_sensitivity?: string; evidence_type?: string; change_note?: string }) =>
     api.put(`/evidence/${id}`, data),
+
+  // Version history. The current version is the evidence record itself;
+  // getVersions returns the superseded ones, newest first.
+  getVersions: (id: string) => api.get(`/evidence/${id}/versions`),
+
+  // Replace the file with a new revision. The superseded file and its hash are
+  // retained, so integrity stays demonstrable across the replacement.
+  createVersion: (id: string, formData: FormData) =>
+    api.post(`/evidence/${id}/versions`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT
+    }),
+
+  downloadVersion: (id: string, versionNumber: number) =>
+    api.get(`/evidence/${id}/versions/${versionNumber}/download`, { responseType: 'blob' }),
+
+  // Recompute the file's SHA-256 and compare it against the hash recorded at
+  // upload. Returns { matches, expected_hash, current_hash, previous_verified_at }.
+  integrityCheck: (id: string) => api.get(`/evidence/${id}/integrity-check`),
 
   remove: (id: string) => api.delete(`/evidence/${id}`),
 
@@ -1425,11 +1444,85 @@ export const opsAPI = {
 
 // POA&M APIs
 export const poamAPI = {
-  getList: (params?: { status?: string; priority?: string; controlId?: string; limit?: number; offset?: number }) =>
-    api.get('/poam', { params }),
+  getList: (params?: {
+    status?: string; priority?: string; source_type?: string; controlId?: string;
+    riskId?: string; vulnerabilityId?: string; ownerId?: string;
+    limit?: number; offset?: number;
+  }) => api.get('/poam', { params }),
+
+  // Returns { item, updates, controls, risks } — the timeline and both link
+  // sets come back with the detail fetch, so a detail page needs one call.
   getById: (id: string) => api.get(`/poam/${id}`),
   create: (data: Record<string, unknown>) => api.post('/poam', data),
   update: (id: string, data: Record<string, unknown>) => api.patch(`/poam/${id}`, data),
+
+  addUpdate: (id: string, note: string) => api.post(`/poam/${id}/updates`, { note }),
+
+  submitForReview: (id: string, data: {
+    control_id?: string; previous_control_status?: string; new_control_status?: string;
+    justification?: string; supporting_evidence_ids?: string[];
+    framework_specific_type?: string; framework_specific_data?: Record<string, unknown>;
+  }) => api.post(`/poam/${id}/submit-for-review`, data),
+
+  // Comments must be at least 10 characters — the backend rejects shorter ones,
+  // so validate client-side at the same threshold rather than letting a review
+  // be composed and then refused.
+  review: (id: string, data: { outcome: 'approved' | 'rejected' | 'changes_requested'; comments: string }) =>
+    api.post(`/poam/${id}/review`, data),
+
+  getApprovalHistory: (id: string) => api.get(`/poam/${id}/approval-history`),
+
+  // The per-framework remediation vocabulary (ISO CAR/OFI, SOC 2 deficiency,
+  // FISCAM CAP/NFR, HIPAA CAP, PCI RAV, NIST, FedRAMP). Scoped to the org's
+  // activated frameworks unless `all` is passed.
+  getFrameworkTypes: (params?: { framework_code?: string; all?: boolean }) =>
+    api.get('/poam/framework-types', { params }),
+
+  getAuditorGuidance: (frameworkCode: string, typeCode: string) =>
+    api.get(`/poam/auditor-guidance/${encodeURIComponent(frameworkCode)}/${encodeURIComponent(typeCode)}`),
+
+  getApprovalRequestContext: (approvalRequestId: string) =>
+    api.get(`/poam/approval-request/${approvalRequestId}/context`),
+
+  createFromVulnerability: (vulnerabilityId: string, data?: Record<string, unknown>) =>
+    api.post(`/poam/from-vulnerability/${vulnerabilityId}`, data || {}),
+
+  createFromRisk: (riskId: string, data?: {
+    treatment_id?: string | null; control_id?: string | null; title?: string; due_date?: string;
+  }) => api.post(`/poam/from-risk/${riskId}`, data || {}),
+
+  // Many-to-many control linkage (migration 141). poam_items.control_id remains
+  // the originating control; these cover the rest.
+  linkControl: (id: string, data: { control_id: string; notes?: string }) =>
+    api.post(`/poam/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/poam/${id}/controls/${controlId}`),
+
+  exportUrl: (format: 'csv' | 'pdf', params?: Record<string, string | undefined>) => {
+    const search = new URLSearchParams({ format });
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value) search.set(key, value);
+    });
+    return `/poam/export?${search.toString()}`;
+  },
+  download: (format: 'csv' | 'pdf', params?: Record<string, string | undefined>) =>
+    api.get(poamAPI.exportUrl(format, params), { responseType: 'blob' }),
+};
+
+// than in the already-oversized routes/poam.js.
+export const poamMilestonesAPI = {
+  getAll: (poamItemId: string) => api.get(`/poam/${poamItemId}/milestones`),
+
+  create: (poamItemId: string, data: {
+    description: string; target_date?: string | null; status?: string; sort_order?: number;
+  }) => api.post(`/poam/${poamItemId}/milestones`, data),
+
+  update: (poamItemId: string, milestoneId: string, data: {
+    description?: string; target_date?: string | null; status?: string; sort_order?: number;
+  }) => api.patch(`/poam/${poamItemId}/milestones/${milestoneId}`, data),
+
+  remove: (poamItemId: string, milestoneId: string) =>
+    api.delete(`/poam/${poamItemId}/milestones/${milestoneId}`),
 };
 
 // SSO APIs
@@ -2145,6 +2238,11 @@ export const risksAPI = {
     api.post(`/risks/${id}/objectives`, data),
   unlinkObjective: (id: string, objectiveId: string) =>
     api.delete(`/risks/${id}/objectives/${objectiveId}`),
+
+  // Remediation linkage (migration 140). To create a new POA&M from a risk
+  // rather than link an existing one, use poamAPI.createFromRisk.
+  linkPoam: (id: string, data: { poamItemId: string }) => api.post(`/risks/${id}/poam`, data),
+  unlinkPoam: (id: string, poamItemId: string) => api.delete(`/risks/${id}/poam/${poamItemId}`),
 };
 
 export const incidentsAPI = {

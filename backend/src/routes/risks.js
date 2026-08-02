@@ -213,7 +213,7 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
       return res.status(404).json({ error: 'Risk not found' });
     }
 
-    const [treatments, controls, assets, objectives, reviews] = await Promise.all([
+    const [treatments, controls, assets, objectives, reviews, poams] = await Promise.all([
       pool.query(
         `SELECT * FROM risk_treatments
          WHERE risk_id = $1 AND organization_id = $2
@@ -259,8 +259,36 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
          ORDER BY rr.reviewed_at DESC
          LIMIT 50`,
         [req.params.id, orgId]
+      ),
+      // What is actually being done about this risk. The register recorded the
+      // treatment decision but had no link to the remediation work until
+      // migration 140.
+      pool.query(
+        `SELECT rpl.id, rpl.poam_item_id, rpl.notes,
+                p.title, p.status, p.priority, p.due_date,
+                p.scheduled_completion_date, p.treatment_id,
+                owner.email AS owner_email
+         FROM risk_poam_links rpl
+         JOIN poam_items p ON p.id = rpl.poam_item_id
+         LEFT JOIN users owner ON owner.id = p.owner_id
+         WHERE rpl.risk_id = $1 AND rpl.organization_id = $2
+         ORDER BY
+           CASE p.priority
+             WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4
+           END,
+           p.due_date NULLS LAST`,
+        [req.params.id, orgId]
       )
     ]);
+
+    // Remediation being finished is a prompt to reassess, not a reassessment.
+    // Deliberately does not touch residual_score: migration 136 stores inherent
+    // and residual separately so an assessor can see what the controls actually
+    // did, and a score that moves on its own destroys that evidence.
+    const openPoams = poams.rows.filter(
+      (row) => !['closed', 'risk_accepted', 'auditor_approved'].includes(String(row.status))
+    );
+    const remediationComplete = poams.rows.length > 0 && openPoams.length === 0;
 
     res.json({
       success: true,
@@ -270,7 +298,13 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
         controls: controls.rows,
         assets: assets.rows,
         objectives: objectives.rows,
-        reviews: reviews.rows
+        reviews: reviews.rows,
+        poams: poams.rows,
+        remediation_complete: remediationComplete,
+        review_due: remediationComplete || (
+          rows[0].next_review_date !== null
+          && new Date(rows[0].next_review_date) <= new Date()
+        )
       }
     });
   } catch (error) {
@@ -782,6 +816,20 @@ const LINK_KINDS = {
              WHERE organization_id = $1 AND risk_id = $2 AND objective_id = $3`,
     bodyKey: 'objectiveId',
     eventType: 'risk.objective_linked'
+  },
+  // Migration 136 tied risks to controls (what treats them), assets (what is
+  // exposed) and objectives (what is threatened) -- but not to the remediation
+  // work itself. Added by migration 140.
+  poam: {
+    insert: `INSERT INTO risk_poam_links (organization_id, risk_id, poam_item_id, created_by)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT ON CONSTRAINT risk_poam_links_unique DO NOTHING
+             RETURNING *`,
+    exists: 'SELECT 1 FROM poam_items WHERE id = $1 AND organization_id = $2',
+    delete: `DELETE FROM risk_poam_links
+             WHERE organization_id = $1 AND risk_id = $2 AND poam_item_id = $3`,
+    bodyKey: 'poamItemId',
+    eventType: 'risk.poam_linked'
   }
 };
 
@@ -879,6 +927,8 @@ router.post('/:id/assets', requirePermission('risks.write'), (req, res) => handl
 router.delete('/:id/assets/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'assets'));
 router.post('/:id/objectives', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'objectives'));
 router.delete('/:id/objectives/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'objectives'));
+router.post('/:id/poam', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'poam'));
+router.delete('/:id/poam/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'poam'));
 
 // DELETE /api/v1/risks/:id
 router.delete('/:id', requirePermission('risks.write'), async (req, res) => {

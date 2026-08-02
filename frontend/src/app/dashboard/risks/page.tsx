@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import {
   risksAPI, departmentsAPI, usersAPI,
@@ -568,7 +569,12 @@ export default function RisksPage() {
                       {risk.reference || '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">{risk.title}</p>
+                      <Link
+                        href={`/dashboard/risks/${risk.id}`}
+                        className="text-sm font-medium text-purple-700 hover:text-purple-900 hover:underline"
+                      >
+                        {risk.title}
+                      </Link>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {humanize(risk.category)}
                         {risk.department_name ? ` · ${risk.department_name}` : ''}
