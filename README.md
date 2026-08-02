@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v4.6.1-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v4.8.0-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -403,7 +403,8 @@ Full asset and configuration inventory:
 
 ### 📎 Evidence Management
 - Upload evidence as files (PDF, DOCX, XLSX, images) or link external URLs
-- Automatic versioning of all evidence items
+- Real version history — every superseded version keeps its own file, hash and PII classification, so a prior version can be retrieved, integrity stays demonstrable across a file replacement, and a reclassification does not destroy the record of what the evidence was classified as while it was being relied on
+- Integrity verification — recompute a file's hash and compare it against the one recorded at upload, showing both so a mismatch can be reported precisely
 - PII data labeling and classification
 - Bulk upload via CSV with field mapping UI
 - Auto-evidence collection and pending review workflow
@@ -413,7 +414,11 @@ Full asset and configuration inventory:
 - Control verification (verified / not verified / requires remediation)
 - Assessment procedures and findings tracking
 - Immutable audit trail for every action
-- Remediation workflows with POA&M (Plan of Action & Milestones)
+- Remediation workflows with POA&M (Plan of Action & Milestones) — items are raised automatically when a control test or assessment procedure comes back *other than satisfied*, or an audit finding is recorded at medium severity or above, with owner, dates and plan left blank for a human
+- Gated compliance claims — marking a control compliant requires a written justification and produces a POA&M in *pending auditor review* with an approval request attached
+- Auditor review queue with approve / reject / request-changes decisions, framework-specific guidance, and separation of duties enforced so a submitter cannot review their own item
+- Discrete milestones, resources required, and slippage measured against the originally scheduled completion date
+- POA&M CSV and PDF export for federal and regulatory reporting
 
 ### 📊 Dashboards & Reporting
 - Executive compliance dashboard with real-time metrics
@@ -736,6 +741,17 @@ controlweave/
 - `risk_treatments` — Treatment actions with target residual score, so treatment effectiveness can be measured after completion
 - `risk_reviews` — Periodic review history; snapshots the assessment as it stood at review time
 - `risk_control_links` / `risk_asset_links` / `risk_objective_links` — What treats the risk, what is exposed, what is threatened
+- `risk_poam_links` — What is being *done* about the risk. Many-to-many, because one remediation routinely addresses several risks
+
+### Remediation (POA&M)
+- `poam_items` — Plan of Action & Milestones, with `resources_required` and `scheduled_completion_date` held separately from `due_date` so slippage against the original commitment stays visible
+- `poam_milestones` — Discrete milestones with their own target dates and completion state; a federal POA&M is a list of these, not one overall date
+- `poam_control_links` — Many-to-many POA&M ↔ control, so one remediation can span several controls across different frameworks
+- `poam_item_updates` — Progress notes and status changes, newest first
+- `poam_approval_requests` — The auditor review trail: what was claimed, by whom, the justification, and the decision
+
+### Evidence Versioning
+- `evidence_versions` — An immutable snapshot of an evidence row as it stood *before* each update, taken in the same transaction. Keeps the superseded file, its hash and its PII classification, so a prior version is retrievable and a reclassification is recoverable
 
 ### Incidents
 - `incidents` — NIST SP 800-61 lifecycle with per-phase timestamps (dwell time, time to contain) and the regulatory notification clock
@@ -796,6 +812,7 @@ controlweave/
 ### For Risk Managers
 - Maintain enterprise risk register
 - Map risks to controls across frameworks
+- See what is actually being done about a risk — POA&M items link to the risks they burn down, and can be raised straight from one
 - Prioritize vulnerabilities with live CISA KEV and NVD intelligence
 - Track risk treatment effectiveness
 - Use AI-powered risk scoring and remediation suggestions
