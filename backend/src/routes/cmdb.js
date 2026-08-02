@@ -7,6 +7,18 @@ const { requireProEdition } = require('../middleware/edition');
 const { validateBody, requireFields } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { log, serializeError } = require('../utils/logger');
+const rateLimit = require('express-rate-limit');
+
+// Three layers, in this specific order, matching rmfInheritance.js: (1) a
+// cheap per-process IP-based limiter first, so requests are bounded before
+// authenticate does JWT and DB work -- and, importantly, this is the
+// middleware CodeQL's static analysis can actually trace as guarding the
+// router; (2) authenticate; (3) the org-scoped limiter below.
+//
+// The org-scoped createRateLimiter alone is a real limiter but an invisible
+// one to js/missing-rate-limiting, which raised seven high-severity alerts
+// against these handlers even though every one of them was already bounded.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600 }));
 
 router.use(authenticate);
 router.use(requireProEdition('cmdb')); // Edition check BEFORE tier check
