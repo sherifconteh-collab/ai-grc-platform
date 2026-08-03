@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@noble/post-quantum": "^0.6.1",
     "@sentry/node": "^10.53.1",
     "@simplewebauthn/server": "^13.3.1",
