@@ -57,6 +57,20 @@
 
 ### Added
 
+- **CMDB: asset-to-control mapping and risk exposure.** `asset_control_mappings`
+  (migration 005) and `risk_asset_links` (migration 140) both existed with no
+  reachable API. Adds `GET`/`POST`/`PUT`/`DELETE /cmdb/assets/:assetId/controls`,
+  `GET /cmdb/controls/:controlId/assets`, `GET /cmdb/assets/:assetId/risks` and
+  `GET /cmdb/risk-exposure`.
+- **Risk register: vendor linkage.** Migration 148 adds `risk_vendor_links`, the
+  fourth link table alongside controls, assets and objectives. `tprm_vendors`
+  carried a `risk_tier`, but that is a static onboarding classification rather
+  than a scored, treated and reviewed risk, so vendor concentration was
+  invisible to the register and the register invisible during a vendor review.
+  `POST`/`DELETE /risks/:id/vendors/:vendorId`, vendors in `GET /risks/:id`, and
+  `risks` / `open_risk_count` / `max_residual_score` on the TPRM vendor detail
+  response.
+
 - **Evidence version history** (migration `144`, issue #570): "versioning" was an integer counter. `PUT /evidence/:id` incremented `evidence_version` and overwrote the row, so a prior version's file, hash or PII classification could not be retrieved — the number went up and nothing was kept. `evidence_versions` now holds an immutable snapshot of the row as it stood *before* each update, taken inside the update's own transaction. Integrity stays demonstrable across a re-upload because the superseded file and its hash are both retained, and a reclassification no longer destroys the record of what the evidence was classified as while it was being relied on. New `GET/POST /evidence/:id/versions` and `GET /evidence/:id/versions/:versionNumber/download`. Hashing is SHA-384 throughout, per this repo's CNSA Suite 1.0 floor. — @sherifconteh-collab
 - **Federal POA&M structure** (migration `145`, issue #569): `poam_milestones` (a federal POA&M is a list of discrete milestones with their own target dates, not one overall `due_date`), `resources_required`, and `scheduled_completion_date` separated from `due_date` so slippage is visible rather than silently erased when a date is revised. — @sherifconteh-collab
 - **POA&M CSV and PDF export** — `GET /poam/export?format=csv|pdf`, carrying every linked control, the framework type, both dates with computed slippage in days, milestone counts, resources required, and any linked risks and treatment. — @sherifconteh-collab

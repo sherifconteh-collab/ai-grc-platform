@@ -213,7 +213,7 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
       return res.status(404).json({ error: 'Risk not found' });
     }
 
-    const [treatments, controls, assets, objectives, reviews, poams] = await Promise.all([
+    const [treatments, controls, assets, objectives, reviews, poams, vendors] = await Promise.all([
       pool.query(
         `SELECT * FROM risk_treatments
          WHERE risk_id = $1 AND organization_id = $2
@@ -262,7 +262,7 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
       ),
       // What is actually being done about this risk. The register recorded the
       // treatment decision but had no link to the remediation work until
-      // migration 140.
+      // migration 146.
       pool.query(
         `SELECT rpl.id, rpl.poam_item_id, rpl.notes,
                 p.title, p.status, p.priority, p.due_date,
@@ -278,11 +278,29 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
            END,
            p.due_date NULLS LAST`,
         [req.params.id, orgId]
+      ),
+      // Third parties, added by migration 148. risk_tier is the vendor's static
+      // onboarding classification and is returned alongside the link so the two
+      // can be compared -- a "low" tier vendor carrying a critical risk is
+      // exactly the disagreement worth surfacing.
+      pool.query(
+        `SELECT rvl.id, rvl.vendor_id, rvl.notes,
+                v.name, v.vendor_type, v.risk_tier, v.review_status,
+                v.data_access_level
+         FROM risk_vendor_links rvl
+         JOIN tprm_vendors v ON v.id = rvl.vendor_id
+         WHERE rvl.risk_id = $1 AND rvl.organization_id = $2
+         ORDER BY
+           CASE v.risk_tier
+             WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4
+           END,
+           v.name`,
+        [req.params.id, orgId]
       )
     ]);
 
     // Remediation being finished is a prompt to reassess, not a reassessment.
-    // Deliberately does not touch residual_score: migration 136 stores inherent
+    // Deliberately does not touch residual_score: migration 140 stores inherent
     // and residual separately so an assessor can see what the controls actually
     // did, and a score that moves on its own destroys that evidence.
     const openPoams = poams.rows.filter(
@@ -300,6 +318,7 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
         objectives: objectives.rows,
         reviews: reviews.rows,
         poams: poams.rows,
+        vendors: vendors.rows,
         remediation_complete: remediationComplete,
         review_due: remediationComplete || (
           rows[0].next_review_date !== null
@@ -819,7 +838,7 @@ const LINK_KINDS = {
   },
   // Migration 136 tied risks to controls (what treats them), assets (what is
   // exposed) and objectives (what is threatened) -- but not to the remediation
-  // work itself. Added by migration 140.
+  // work itself. Added by migration 146.
   poam: {
     insert: `INSERT INTO risk_poam_links (organization_id, risk_id, poam_item_id, created_by)
              VALUES ($1, $2, $3, $4)
@@ -830,6 +849,24 @@ const LINK_KINDS = {
              WHERE organization_id = $1 AND risk_id = $2 AND poam_item_id = $3`,
     bodyKey: 'poamItemId',
     eventType: 'risk.poam_linked'
+  },
+  // Third parties were the remaining gap. tprm_vendors carries a risk_tier,
+  // but that is a static classification set at onboarding -- "this is a
+  // critical supplier" -- not a scored, reviewed risk with a likelihood, an
+  // impact and a treatment. Added by migration 148 so vendor concentration is
+  // visible to the register, and register entries are visible during a vendor
+  // review.
+  vendors: {
+    insert: `INSERT INTO risk_vendor_links (organization_id, risk_id, vendor_id, notes, created_by)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT ON CONSTRAINT risk_vendor_links_unique DO UPDATE
+               SET notes = EXCLUDED.notes
+             RETURNING *`,
+    exists: 'SELECT 1 FROM tprm_vendors WHERE id = $1 AND organization_id = $2',
+    delete: `DELETE FROM risk_vendor_links
+             WHERE organization_id = $1 AND risk_id = $2 AND vendor_id = $3`,
+    bodyKey: 'vendorId',
+    eventType: 'risk.vendor_linked'
   }
 };
 
@@ -840,6 +877,9 @@ const LINK_KINDS = {
 function linkInsertParams(kindKey, { organizationId, riskId, targetId, effectiveness, notes, userId }) {
   if (kindKey === 'controls') {
     return [organizationId, riskId, targetId, effectiveness, notes, userId];
+  }
+  if (kindKey === 'vendors') {
+    return [organizationId, riskId, targetId, notes, userId];
   }
   return [organizationId, riskId, targetId, userId];
 }
@@ -929,6 +969,8 @@ router.post('/:id/objectives', requirePermission('risks.write'), (req, res) => h
 router.delete('/:id/objectives/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'objectives'));
 router.post('/:id/poam', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'poam'));
 router.delete('/:id/poam/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'poam'));
+router.post('/:id/vendors', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'vendors'));
+router.delete('/:id/vendors/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'vendors'));
 
 // DELETE /api/v1/risks/:id
 router.delete('/:id', requirePermission('risks.write'), async (req, res) => {

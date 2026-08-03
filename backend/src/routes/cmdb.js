@@ -634,7 +634,7 @@ router.get('/controls/:controlId/assets', async (req, res) => {
 
 // ---------- ASSET ↔ RISK ----------
 // risk_asset_links and the write side (POST/DELETE /risks/:id/assets) shipped
-// with migration 136, but only the risk half. From an asset there was no way to
+// with migration 140, but only the risk half. From an asset there was no way to
 // see what it is exposed to, which is the direction an asset owner actually
 // asks the question in. These are the reverse views; linking still happens on
 // the risk, so there is one place that owns the relationship.

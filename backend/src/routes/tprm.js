@@ -4,7 +4,14 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 const { requireProEdition } = require('../middleware/edition');
+
+// A cheap per-process IP limiter ahead of authenticate. The org-scoped
+// createRateLimiter below is the real quota, but js/missing-rate-limiting only
+// recognizes express-rate-limit, so without this every DB-touching handler here
+// reads as unprotected to static analysis.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600 }));
 
 router.use(authenticate);
 router.use(requireProEdition('tprm')); // Edition check BEFORE tier check
@@ -110,12 +117,41 @@ router.get('/vendors/:id', requirePermission('organizations.read'), async (req, 
       [id]
     );
 
+    // Register entries arising from this vendor (migration 148). The vendor's
+    // own risk_tier is a static onboarding classification; these are scored,
+    // treated and reviewed risks. Returned here rather than behind a separate
+    // call so a vendor review sees them without knowing to ask.
+    const risks = await pool.query(
+      `SELECT r.id, r.title, r.category, r.status,
+              r.inherent_score, r.residual_score, r.next_review_date,
+              rvl.notes AS link_notes
+       FROM risk_vendor_links rvl
+       JOIN risks r ON r.id = rvl.risk_id
+       WHERE rvl.vendor_id = $1 AND rvl.organization_id = $2
+       ORDER BY COALESCE(r.residual_score, r.inherent_score) DESC NULLS LAST, r.title`,
+      [id, orgId]
+    );
+
+    const openRisks = risks.rows.filter(
+      (row) => !['closed', 'accepted'].includes(String(row.status))
+    );
+
     res.json({
       success: true,
       data: {
         ...result.rows[0],
         questionnaires: questionnaires.rows,
-        documents: documents.rows
+        documents: documents.rows,
+        risks: risks.rows,
+        // Surfaced separately because it is the number a reviewer acts on, and
+        // because it is the one that can contradict risk_tier: a vendor tiered
+        // 'low' carrying an open critical risk is exactly the disagreement
+        // worth seeing during a review.
+        open_risk_count: openRisks.length,
+        max_residual_score: openRisks.reduce(
+          (worst, row) => Math.max(worst, row.residual_score ?? row.inherent_score ?? 0),
+          0
+        ) || null
       }
     });
   } catch (error) {
