@@ -742,6 +742,8 @@ controlweave/
 - `risk_reviews` — Periodic review history; snapshots the assessment as it stood at review time
 - `risk_control_links` / `risk_asset_links` / `risk_objective_links` — What treats the risk, what is exposed, what is threatened
 - `risk_poam_links` — What is being *done* about the risk. Many-to-many, because one remediation routinely addresses several risks
+- `risk_vendor_links` — Which third party the risk arises from. `tprm_vendors.risk_tier` is a static onboarding classification, not a scored and reviewed risk, so vendor concentration needs its own edge into the register
+- `risk_evidence_links` — What proves the risk is under management, carrying a `relevance` (assessment / treatment / monitoring / acceptance). Going via the risk's controls only answers transitively, and only when those controls happen to carry the document
 
 ### Remediation (POA&M)
 - `poam_items` — Plan of Action & Milestones, with `resources_required` and `scheduled_completion_date` held separately from `due_date` so slippage against the original commitment stays visible

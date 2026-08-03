@@ -70,6 +70,18 @@
   `POST`/`DELETE /risks/:id/vendors/:vendorId`, vendors in `GET /risks/:id`, and
   `risks` / `open_risk_count` / `max_residual_score` on the TPRM vendor detail
   response.
+- **Risk register: evidence linkage.** Migration 149 adds `risk_evidence_links`,
+  the last of the register's unconnected edges. Evidence has been linkable to
+  controls since migration 009/014, so a risk's evidence was only reachable
+  transitively — via its controls, and only when those controls happened to
+  carry the document. "Show me you are managing this exposure" is a different
+  question from "show me these controls exist". The link carries a `relevance`
+  (`assessment` / `treatment` / `monitoring` / `acceptance`) because the same
+  document supports different risks for different reasons. `POST`/`DELETE
+  /risks/:id/evidence/:evidenceId`, evidence in `GET /risks/:id`, and the
+  reverse read `GET /evidence/:id/risks`. The row carries this repo's
+  `retention_until` rather than the sibling repo's `expires_at`, which here
+  belongs to `legal_holds`.
 
 - **Evidence version history** (migration `144`, issue #570): "versioning" was an integer counter. `PUT /evidence/:id` incremented `evidence_version` and overwrote the row, so a prior version's file, hash or PII classification could not be retrieved — the number went up and nothing was kept. `evidence_versions` now holds an immutable snapshot of the row as it stood *before* each update, taken inside the update's own transaction. Integrity stays demonstrable across a re-upload because the superseded file and its hash are both retained, and a reclassification no longer destroys the record of what the evidence was classified as while it was being relied on. New `GET/POST /evidence/:id/versions` and `GET /evidence/:id/versions/:versionNumber/download`. Hashing is SHA-384 throughout, per this repo's CNSA Suite 1.0 floor. — @sherifconteh-collab
 - **Federal POA&M structure** (migration `145`, issue #569): `poam_milestones` (a federal POA&M is a list of discrete milestones with their own target dates, not one overall `due_date`), `resources_required`, and `scheduled_completion_date` separated from `due_date` so slippage is visible rather than silently erased when a date is revised. — @sherifconteh-collab

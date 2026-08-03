@@ -784,6 +784,45 @@ router.post('/:id/versions',
   }
 });
 
+// GET /evidence/:id/risks — the register risks this document supports.
+//
+// The reverse of POST /risks/:id/evidence (migration 149). Evidence could
+// already be linked to controls, so a document's relationship to a risk was
+// only reachable transitively -- and only when the risk happened to have
+// controls linked and those controls happened to have this evidence. This
+// answers it directly, which is the question an auditor actually asks.
+//
+// Read-only: linking is owned by the risk, the same as every other risk link,
+// so exactly one screen writes the relationship.
+router.get('/:id/risks',
+  createRateLimiter({ label: 'evidence-risks-list', windowMs: 60 * 1000, max: 120 }),
+  requirePermission('evidence.read'), async (req, res) => {
+  try {
+    const exists = await pool.query(
+      'SELECT id FROM evidence WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
+    );
+    if (exists.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence not found' });
+    }
+
+    const result = await pool.query(
+      `SELECT rel.id, rel.risk_id, rel.relevance, rel.notes, rel.created_at AS linked_at,
+              r.title, r.category, r.status,
+              r.inherent_score, r.residual_score, r.next_review_date
+       FROM risk_evidence_links rel
+       JOIN risks r ON r.id = rel.risk_id
+       WHERE rel.evidence_id = $1 AND rel.organization_id = $2
+       ORDER BY COALESCE(r.residual_score, r.inherent_score) DESC NULLS LAST, r.title`,
+      [req.params.id, req.user.organization_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'evidence.risks_list_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 // GET /evidence/:id/versions — superseded versions, newest first. The current
 // version is the evidence row itself and is not repeated here.
 router.get('/:id/versions',
