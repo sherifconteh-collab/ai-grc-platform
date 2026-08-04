@@ -237,8 +237,9 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
       const validControlIds = validRows.rows.map((row) => row.id);
       if (validControlIds.length > 0) {
         await pool.query(
-          `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-           SELECT $1, unnest($2::uuid[]), $3
+          `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+           SELECT $1, unnest($2::uuid[]), $3, e.organization_id
+           FROM evidence e WHERE e.id = $1
            ON CONFLICT DO NOTHING`,
           [evidenceRecord.id, validControlIds, `Auto-linked by rule "${rule.name}"`]
         );
@@ -313,8 +314,9 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
     const validControlIds = validRows.rows.map((row) => row.id);
     if (validControlIds.length > 0) {
       await pool.query(
-        `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-         SELECT $1, unnest($2::uuid[]), $3
+        `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+         SELECT $1, unnest($2::uuid[]), $3, e.organization_id
+         FROM evidence e WHERE e.id = $1
          ON CONFLICT DO NOTHING`,
         [evidenceRecord.id, validControlIds, `Auto-linked by rule "${rule.name}"`]
       );
