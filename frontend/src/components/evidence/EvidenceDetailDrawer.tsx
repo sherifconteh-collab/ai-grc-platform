@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { evidenceAPI } from '@/lib/api';
 import { errorMessage } from '@/lib/poamTypes';
+import EvidenceRiskLinks from '@/components/evidence/EvidenceRiskLinks';
 
 export interface EvidenceSummary {
   id: string;
@@ -72,7 +73,7 @@ interface EvidenceDetailDrawerProps {
 export default function EvidenceDetailDrawer({
   evidence, canWrite, onClose, onChanged,
 }: EvidenceDetailDrawerProps) {
-  const [tab, setTab] = useState<'metadata' | 'versions' | 'integrity'>('metadata');
+  const [tab, setTab] = useState<'metadata' | 'versions' | 'integrity' | 'risks'>('metadata');
   const [versions, setVersions] = useState<EvidenceVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [integrity, setIntegrity] = useState<IntegrityResult | null>(null);
@@ -201,6 +202,7 @@ export default function EvidenceDetailDrawer({
     { id: 'metadata', label: 'Metadata' },
     { id: 'versions', label: `Version history${versions.length ? ` (${versions.length})` : ''}` },
     { id: 'integrity', label: 'Integrity' },
+    { id: 'risks', label: 'Risks' },
   ];
 
   return (
@@ -410,7 +412,12 @@ export default function EvidenceDetailDrawer({
           {tab === 'integrity' && (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">
-                Recomputes the file&apos;s SHA-256 and compares it against the hash recorded at upload.
+                {/* SHA-384, not SHA-256: this repo hashes evidence with
+                    computeFileHash per the CNSA Suite 1.0 floor in
+                    .claude/rules/security.md. The column is still named
+                    integrity_hash_sha256, which records the history rather than
+                    the current algorithm. */}
+                Recomputes the file&apos;s SHA-384 and compares it against the hash recorded at upload.
                 A mismatch means the stored file has changed since it was accepted as evidence.
               </p>
               <button
@@ -454,6 +461,11 @@ export default function EvidenceDetailDrawer({
               )}
             </div>
           )}
+
+          {/* Migration 149. Evidence has been linkable to controls since 009/014,
+              which only ever answered "does a control exist" -- not "is this
+              particular exposure under management". */}
+          {tab === 'risks' && <EvidenceRiskLinks evidenceId={evidence.id} />}
         </div>
       </div>
     </div>

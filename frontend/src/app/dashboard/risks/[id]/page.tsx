@@ -24,6 +24,8 @@ import {
   SeverityChip, Pill, ErrorBanner, SuccessBanner, humanize, formatDate, severityForScore,
 } from '@/components/registers/RegisterUI';
 import { StatusBadge, PriorityBadge, POAM_STATUS_COLORS } from '@/components/poam/PoamStatusBadge';
+import RiskVendorLinks from '@/components/risk/RiskVendorLinks';
+import RiskEvidenceLinks from '@/components/risk/RiskEvidenceLinks';
 import { errorMessage } from '@/lib/poamTypes';
 
 interface RiskTreatment {
@@ -115,8 +117,38 @@ interface RiskDetail {
   objectives: LinkedObjective[];
   reviews: RiskReview[];
   poams: LinkedPoam[];
+  vendors: LinkedVendor[];
+  evidence: LinkedEvidence[];
   remediation_complete: boolean;
   review_due: boolean;
+}
+
+// Migration 148. Returned alongside the vendor's own risk_tier so a "low" tier
+// supplier carrying a critical register entry is visible as the disagreement
+// it is.
+interface LinkedVendor {
+  id: string;
+  vendor_id: string;
+  notes: string | null;
+  name: string;
+  vendor_type: string | null;
+  risk_tier: string | null;
+  review_status: string | null;
+  data_access_level: string | null;
+}
+
+// Migration 149. retention_until, not expires_at -- see the note in
+// components/risk/RiskEvidenceLinks.tsx.
+interface LinkedEvidence {
+  id: string;
+  evidence_id: string;
+  relevance: string;
+  notes: string | null;
+  file_name: string | null;
+  description: string | null;
+  evidence_type: string | null;
+  pii_classification: string | null;
+  retention_until: string | null;
 }
 
 export default function RiskDetailPage() {
@@ -556,6 +588,24 @@ export default function RiskDetailPage() {
                 </li>
               ))}
             </LinkSection>
+
+            {/* The two newest edges are writable here because this is the only
+                screen that can create them. Controls, assets and objectives
+                above remain read-only in this repo -- a pre-existing gap, not
+                one introduced alongside these. */}
+            <RiskVendorLinks
+              riskId={id}
+              linked={risk.vendors ?? []}
+              canWrite={canWrite}
+              onChanged={load}
+            />
+
+            <RiskEvidenceLinks
+              riskId={id}
+              linked={risk.evidence ?? []}
+              canWrite={canWrite}
+              onChanged={load}
+            />
           </aside>
         </div>
       </div>

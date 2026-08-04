@@ -6,6 +6,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { tprmAPI, aiAPI, tprmPublicAPI, vendorSecurityAPI } from '@/lib/api';
+import VendorRiskLinks from '@/components/tprm/VendorRiskLinks';
 import { useToast } from '@/hooks/useToast';
 
 type RiskTier = 'critical' | 'high' | 'medium' | 'low';
@@ -1155,6 +1156,14 @@ export default function TprmPage() {
                     <p className="text-gray-700">{selectedVendor.services_provided}</p>
                   </div>
                 )}
+
+                {/* Migration 148. The risk_tier above is an onboarding
+                    classification; these are scored register entries, and the
+                    two are allowed to disagree. */}
+                <VendorRiskLinks
+                  vendorId={selectedVendor.id}
+                  riskTier={selectedVendor.risk_tier}
+                />
                 {selectedVendor.ai_risk_summary && (
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <p className="text-xs font-semibold text-purple-700 mb-2">🤖 AI Risk Assessment</p>

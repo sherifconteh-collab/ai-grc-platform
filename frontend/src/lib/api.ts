@@ -655,6 +655,12 @@ export const evidenceAPI = {
   // upload. Returns { matches, expected_hash, current_hash, previous_verified_at }.
   integrityCheck: (id: string) => api.get(`/evidence/${id}/integrity-check`),
 
+  // The register risks this document supports (migration 149). Read-only:
+  // linking is owned by the risk, so exactly one screen writes the
+  // relationship. Going via the document's controls only answers the question
+  // transitively, and only when those controls happen to carry it.
+  getRisks: (id: string) => api.get(`/evidence/${id}/risks`),
+
   remove: (id: string) => api.delete(`/evidence/${id}`),
 
   link: (id: string, data: { controlIds: string[]; notes?: string }) =>
@@ -797,6 +803,11 @@ function cmdbResource(routePath: string) {
   };
 }
 
+// Mirrors MAPPING_COMPLIANCE_STATUS in backend/src/routes/cmdb.js. Kept as a
+// named type so a value the server would reject cannot be constructed here.
+export type AssetControlComplianceStatus =
+  | 'not_assessed' | 'compliant' | 'partially_compliant' | 'non_compliant' | 'not_applicable';
+
 export const cmdbAPI = {
   hardware:        cmdbResource("hardware"),
   software:        cmdbResource("software"),
@@ -811,6 +822,38 @@ export const cmdbAPI = {
     create:     (data: Record<string, unknown>)        => api.post('/cmdb/relationships', data),
     remove:     (id: string)                           => api.delete(`/cmdb/relationships/${id}`),
   },
+
+  // asset_control_mappings has existed since migration 005 with no API and no
+  // UI reaching it. These are both ends of that mapping.
+  // Body keys are snake_case here, matching this repo's cmdb router
+  // (requireFields checks 'control_id', and MAPPING_FIELDS drives the update
+  // whitelist). The risks router next door takes camelCase -- the two
+  // conventions genuinely differ, so these are not interchangeable.
+  assetControls: {
+    list:   (assetId: string) => api.get(`/cmdb/assets/${assetId}/controls`),
+    create: (assetId: string, data: {
+      control_id: string;
+      compliance_status?: AssetControlComplianceStatus;
+      notes?: string;
+    }) => api.post(`/cmdb/assets/${assetId}/controls`, data),
+    update: (assetId: string, controlId: string, data: {
+      compliance_status?: AssetControlComplianceStatus;
+      last_assessed?: string;
+      next_assessment?: string;
+      evidence_url?: string;
+      notes?: string;
+    }) => api.put(`/cmdb/assets/${assetId}/controls/${controlId}`, data),
+    remove: (assetId: string, controlId: string) =>
+      api.delete(`/cmdb/assets/${assetId}/controls/${controlId}`),
+  },
+  controlAssets: (controlId: string) => api.get(`/cmdb/controls/${controlId}/assets`),
+
+  // The reverse of risk_asset_links (migration 140), which was wired on the
+  // risk side only -- an asset owner could never ask what this is exposed to.
+  assetRisks: {
+    list: (assetId: string) => api.get(`/cmdb/assets/${assetId}/risks`),
+  },
+  riskExposure: () => api.get('/cmdb/risk-exposure'),
 };
 
 // AI Analysis APIs
@@ -2243,6 +2286,25 @@ export const risksAPI = {
   // rather than link an existing one, use poamAPI.createFromRisk.
   linkPoam: (id: string, data: { poamItemId: string }) => api.post(`/risks/${id}/poam`, data),
   unlinkPoam: (id: string, poamItemId: string) => api.delete(`/risks/${id}/poam/${poamItemId}`),
+
+  // Third-party linkage (migration 148). tprm_vendors.risk_tier is a static
+  // onboarding classification, not a scored and reviewed risk, so this is the
+  // edge that makes vendor concentration visible to the register.
+  linkVendor: (id: string, data: { vendorId: string; notes?: string }) =>
+    api.post(`/risks/${id}/vendors`, data),
+  unlinkVendor: (id: string, vendorId: string) =>
+    api.delete(`/risks/${id}/vendors/${vendorId}`),
+
+  // Evidence linkage (migration 149). `relevance` records why the document is
+  // evidence for this risk: the same file supports different risks for
+  // different reasons, so the reason belongs on the link.
+  linkEvidence: (id: string, data: {
+    evidenceId: string;
+    relevance?: 'assessment' | 'treatment' | 'monitoring' | 'acceptance';
+    notes?: string;
+  }) => api.post(`/risks/${id}/evidence`, data),
+  unlinkEvidence: (id: string, evidenceId: string) =>
+    api.delete(`/risks/${id}/evidence/${evidenceId}`),
 };
 
 export const incidentsAPI = {
