@@ -247,8 +247,8 @@ async function rehydrateImplementationsForFrameworkSelection({
 
     if (propagateEvidence) {
       const propagated = await client.query(
-        `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-         SELECT DISTINCT ecl.evidence_id, $2::uuid, $3
+        `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+         SELECT DISTINCT ecl.evidence_id, $2::uuid, $3, e.organization_id
          FROM evidence_control_links ecl
          JOIN evidence e ON e.id = ecl.evidence_id
          WHERE ecl.control_id = $4::uuid
