@@ -25,6 +25,7 @@
     "qa:e2e:auditor": "node scripts/qa-auditor-workflow.js",
     "qa:e2e:rbac": "node scripts/qa-rbac-mega-test.js",
     "qa:e2e:dynamic": "node scripts/qa-dynamic.js",
+    "qa:e2e:links": "bash scripts/qa-link-routes-e2e.sh",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "qa:e2e:dynamic:all": "node scripts/qa-dynamic.js --suites=syntax,mega,dynamic,auditor,rbac",

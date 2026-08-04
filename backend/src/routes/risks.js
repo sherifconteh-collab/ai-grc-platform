@@ -289,8 +289,10 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
       // can be compared -- a "low" tier vendor carrying a critical risk is
       // exactly the disagreement worth surfacing.
       pool.query(
+        // This repo's column is vendor_name; the sibling repo's is name.
+        // Aliased to `name` so the response shape stays identical across both.
         `SELECT rvl.id, rvl.vendor_id, rvl.notes,
-                v.name, v.vendor_type, v.risk_tier, v.review_status,
+                v.vendor_name AS name, v.vendor_type, v.risk_tier, v.review_status,
                 v.data_access_level
          FROM risk_vendor_links rvl
          JOIN tprm_vendors v ON v.id = rvl.vendor_id
@@ -299,7 +301,7 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
            CASE v.risk_tier
              WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4
            END,
-           v.name`,
+           v.vendor_name`,
         [req.params.id, orgId]
       ),
       // Evidence, added by migration 149. pii_classification travels with the

@@ -19,22 +19,28 @@ import { useAuth } from '@/contexts/AuthContext';
  * worth being able to record.
  */
 
+// Exactly MAPPING_COMPLIANCE_STATUS from backend/src/routes/cmdb.js. This repo
+// uses 'partial', not the sibling repo's 'partially_compliant', and has no
+// 'not_assessed' value -- an unassessed mapping is simply NULL, which is also
+// the column's default.
 const STATUS_OPTIONS: Array<{ value: AssetControlComplianceStatus; label: string; className: string }> = [
-  { value: 'not_assessed', label: 'Not assessed', className: 'bg-gray-100 text-gray-600' },
   { value: 'compliant', label: 'Compliant', className: 'bg-green-100 text-green-700' },
-  { value: 'partially_compliant', label: 'Partial', className: 'bg-yellow-100 text-yellow-700' },
+  { value: 'partial', label: 'Partial', className: 'bg-yellow-100 text-yellow-700' },
   { value: 'non_compliant', label: 'Non-compliant', className: 'bg-red-100 text-red-700' },
   { value: 'not_applicable', label: 'N/A', className: 'bg-blue-100 text-blue-700' },
 ];
 
-function statusStyle(status: string) {
-  return STATUS_OPTIONS.find((option) => option.value === status) ?? STATUS_OPTIONS[0];
+const UNASSESSED = { label: 'Not assessed', className: 'bg-gray-100 text-gray-600' };
+
+function statusStyle(status: string | null) {
+  if (!status) return UNASSESSED;
+  return STATUS_OPTIONS.find((option) => option.value === status) ?? UNASSESSED;
 }
 
 interface MappedControl {
   id: string;
   control_id: string;
-  compliance_status: string;
+  compliance_status: string | null;
   notes: string | null;
   last_assessed: string | null;
   next_assessment: string | null;
@@ -231,12 +237,13 @@ export default function AssetControlLinks({ assetId, canWrite }: AssetControlLin
                   {canWrite ? (
                     <div className="flex items-center gap-1 shrink-0">
                       <select
-                        value={row.compliance_status}
+                        value={row.compliance_status ?? ''}
                         onChange={(e) => changeStatus(row.control_id, e.target.value as AssetControlComplianceStatus)}
                         disabled={busy}
                         aria-label={`Compliance status for ${row.control_ref} on this asset`}
                         className={`text-xs rounded px-1.5 py-0.5 border-0 ${style.className}`}
                       >
+                        <option value="" disabled>Not assessed</option>
                         {STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}

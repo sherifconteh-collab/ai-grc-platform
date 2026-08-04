@@ -805,8 +805,13 @@ function cmdbResource(routePath: string) {
 
 // Mirrors MAPPING_COMPLIANCE_STATUS in backend/src/routes/cmdb.js. Kept as a
 // named type so a value the server would reject cannot be constructed here.
+//
+// This repo's vocabulary is NOT the sibling repo's: it uses 'partial' rather
+// than 'partially_compliant', and has no 'not_assessed'. There is no CHECK
+// constraint on the column, so a wrong value here is caught only by the
+// route's own validation -- as a 400, at runtime.
 export type AssetControlComplianceStatus =
-  | 'not_assessed' | 'compliant' | 'partially_compliant' | 'non_compliant' | 'not_applicable';
+  | 'compliant' | 'partial' | 'non_compliant' | 'not_applicable';
 
 export const cmdbAPI = {
   hardware:        cmdbResource("hardware"),
