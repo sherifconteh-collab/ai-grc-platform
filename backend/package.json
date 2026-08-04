@@ -85,7 +85,7 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
-    "geoip-lite": "^2.0.2",
+    "geoip-lite": "^2.0.3",
     "hono": "^4.12.34",
     "ioredis": "^5.11.0",
     "js-yaml": "^4.2.0",
