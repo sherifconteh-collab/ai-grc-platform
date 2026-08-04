@@ -722,7 +722,7 @@ controlweave/
 
 ### AI-Specific Tables
 - `assets` (category `AI Agent`) — AI system inventory and classification
-- `asset_control_mappings` — AI-to-control mappings
+- `asset_control_mappings` — Which controls apply to an asset, and whether that asset satisfies them. Not AI-specific despite living in this section: it covers every CMDB asset, and the compliance status is the asset's own, so a control implemented org-wide can still be non-compliant on one host
 - `ai_decision_log` — AI feature decisions with `structured JSONB` for validated output
 - `ai_usage_log` — Per-org AI usage tracking
 

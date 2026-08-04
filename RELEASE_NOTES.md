@@ -83,6 +83,28 @@
   `retention_until` rather than the sibling repo's `expires_at`, which here
   belongs to `legal_holds`.
 
+- **Link UIs for the CMDB, vendor and evidence edges.** `AssetControlLinks`
+  (writable — the only place in the product that creates an
+  `asset_control_mappings` row), `AssetRiskLinks`, `RiskVendorLinks`,
+  `RiskEvidenceLinks`, `VendorRiskLinks`, and a Risks tab on the evidence
+  drawer. Wired into `/dashboard/assets`, `/dashboard/risks/[id]`,
+  `/dashboard/tprm` and `/dashboard/evidence`. Adapted to this repo rather than
+  copied: the controls picker reads `organizationAPI.getControls` scoped to the
+  organization's activated frameworks, the `cmdb` router takes snake_case
+  bodies while the `risks` router next door takes camelCase, evidence expiry
+  renders `retention_until`, and the compliance vocabulary is this repo's
+  (`partial`, with an unassessed mapping represented as NULL) rather than the
+  sibling's.
+- **End-to-end verification harness** — `scripts/qa-link-routes-e2e.sh`
+  (`npm run qa:e2e:links`), shared with ControlWeaver-Pro. 35 assertions against
+  a running API covering both directions of every link in 146–149, the
+  migration 005 mapping, generated-column arithmetic, `relevance` validation
+  returning a 400 that names the options rather than a 500 from the CHECK
+  constraint, `ON CONFLICT` idempotency, unlink, and cross-organization
+  isolation on all three new read paths. `DEMO_PASSWORD` comes from the
+  environment; the cross-tenant checks skip when it is unset rather than
+  silently passing.
+
 - **Evidence version history** (migration `144`, issue #570): "versioning" was an integer counter. `PUT /evidence/:id` incremented `evidence_version` and overwrote the row, so a prior version's file, hash or PII classification could not be retrieved — the number went up and nothing was kept. `evidence_versions` now holds an immutable snapshot of the row as it stood *before* each update, taken inside the update's own transaction. Integrity stays demonstrable across a re-upload because the superseded file and its hash are both retained, and a reclassification no longer destroys the record of what the evidence was classified as while it was being relied on. New `GET/POST /evidence/:id/versions` and `GET /evidence/:id/versions/:versionNumber/download`. Hashing is SHA-384 throughout, per this repo's CNSA Suite 1.0 floor. — @sherifconteh-collab
 - **Federal POA&M structure** (migration `145`, issue #569): `poam_milestones` (a federal POA&M is a list of discrete milestones with their own target dates, not one overall `due_date`), `resources_required`, and `scheduled_completion_date` separated from `due_date` so slippage is visible rather than silently erased when a date is revised. — @sherifconteh-collab
 - **POA&M CSV and PDF export** — `GET /poam/export?format=csv|pdf`, carrying every linked control, the framework type, both dates with computed slippage in days, milestone counts, resources required, and any linked risks and treatment. — @sherifconteh-collab
@@ -95,12 +117,53 @@
 
 ### Fixed
 
+- **The backend did not boot.** `routes/assessments.js` requires
+  `./assessments/_shared`, and the earlier dead-code cleanup deleted that whole
+  directory — including `_shared.js`, a legitimate extraction from the
+  3366-line monolith rather than one of the copied sub-routers. `server.js`
+  requires `assessments.js` at startup, so the tree could not start a server at
+  all. `check:syntax` parses each file without ever resolving a `require`, and
+  `npm run build` is a stub that prints a line, so both gates passed on it.
+- **`GET /risks/:id` returned 500 for every risk.** The vendors query added with
+  migration 148 selected `v.name`; the column is `vendor_name`. The six link
+  queries share one `Promise.all`, so that single wrong column took down the
+  whole endpoint — controls, assets, objectives, POA&Ms, vendors and evidence
+  all unreachable, not just vendors.
+- **The asset-control picker offered values the server rejects.**
+  `MAPPING_COMPLIANCE_STATUS` here is `compliant` / `non_compliant` / `partial`
+  / `not_applicable`; the first version of the component used
+  `partially_compliant` plus a `not_assessed` value that does not exist. Every
+  status change would have returned 400. There is no CHECK constraint on that
+  column, so only the route's own validation would have caught it.
+- **The evidence drawer described its integrity check as recomputing SHA-256.**
+  This repo hashes evidence with SHA-384 per the CNSA Suite 1.0 floor in
+  `.claude/rules/security.md`; only the column name is legacy.
+
 - **The compliance gate was enforced on a code path the product does not use.** `PUT /controls/:id` demanded a `poam_justification`, created the POA&M and filed an approval request. The dashboard calls `PATCH /implementations/:id/status` and `PATCH /implementations/:id/test-result`, and neither had a single POA&M reference — so a control could be marked compliant from the UI with no justification and nothing produced for an auditor. The rule now lives in `services/poamGateService.js` and is applied on all three paths, preserving the `requires_poam_submission` 400 contract for existing API clients. — @sherifconteh-collab
 - **Nothing that found a gap raised remediation.** Recording a control test or an assessment procedure as `other_than_satisfied` — NIST SP 800-53A for "this control has gaps" — produced nothing, and the finding-creation handler in `routes/assessments.js` had no POA&M references at all. Across every `INSERT INTO poam_items` site only `'control'` and `'vulnerability'` were ever written; `'audit_finding'` and `'assessment'` were declared in `ALLOWED_SOURCE_TYPE` and dead. Those three events now raise a draft POA&M against the control, idempotent per (control, source), with owner, dates and remediation plan deliberately left blank for a human. Nothing is auto-closed, auto-approved or auto-assigned. — @sherifconteh-collab
 - **`GET /poam/framework-types` was unreachable.** Declared after `/:id`, so Express bound `id="framework-types"` and returned "POA&M item not found". The entire multi-framework vocabulary was dead code behind it, which is why every screen said "POA&M" regardless of framework. It now resolves and is scoped to the organization's activated frameworks. — @sherifconteh-collab
 - **`routes/poam.js` had no rate limiter at all**, unlike its sibling `routes/poamMilestones.js`. — @sherifconteh-collab
 - **`routes/assessments.js` had no rate limiting either.** It carries the entire assessment surface — procedures, results, engagements, PBC, workpapers, findings and sign-offs — behind `authenticate` and nothing else. Surfaced by CodeQL while reviewing this change, and closed the same way the six route files in v4.6.0 were: an explicit per-router limiter, because CodeQL cannot trace the app-wide `apiRateLimiter` mounted on `/api/v1`. 1500 per 15 minutes, above `risks.js`'s 400 because an auditor working through an engagement legitimately makes many calls in one session. — @sherifconteh-collab
 - The control detail page's Risk & Compliance panel rendered only when a POA&M or vulnerability already existed, so a control with neither showed nothing, offered no way to raise one, and its empty state was unreachable code. — @sherifconteh-collab
+
+### Security
+
+- **`express-rate-limit` was undeclared in `package.json`.** It resolved only as
+  a transitive dependency of `@modelcontextprotocol/sdk` while **29 route files
+  require it directly** — if that SDK dropped or relocated it, none of those
+  routers would load and the backend would stop booting. Declared at `^8.5.2`
+  rather than the `^8.2.2` that was resolved, because 8.2.2 pins
+  `ip-address@10.1.0`, inside the range flagged for decoding leading-zero octets
+  as decimal and bypassing SSRF checks. The pre-existing exact-version override
+  became `$express-rate-limit` so it follows the declared range instead of
+  conflicting with it.
+- **Five advisories cleared across both dependency trees**, each a pin that was
+  correct when written and had fallen one patch short: `brace-expansion`
+  `>=5.0.9`, `hono` `^4.12.34`, `socket.io-parser` `>=4.2.7`, `fast-uri`
+  `>=4.1.2`, `ip-address` `>=10.4.0`. `fast-uri` resolves on the 4.x line here
+  and on 3.x in the sibling repo, so the fixed version genuinely differs between
+  them — checked rather than copied. Backend and frontend both report zero
+  vulnerabilities under the flags CI uses.
 
 ### Changed
 
