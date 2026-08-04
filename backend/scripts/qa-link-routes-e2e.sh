@@ -8,6 +8,21 @@ TOKEN=${ACCESS_TOKEN:-$(cat "${TOKEN_FILE:-/tmp/token.txt}")}
 AUTH="Authorization: Bearer $TOKEN"
 JSON="Content-Type: application/json"
 
+# The cross-tenant section needs a second organization's credentials. Supplied
+# by the caller rather than written here: even the documented demo password is
+# a literal a secret scanner will flag, and rightly -- a script that carries one
+# is a script someone will copy with a real one substituted.
+#   DEMO_PASSWORD=... npm run qa:e2e:links
+# Unset, the isolation checks skip rather than silently passing.
+DEMO_PASSWORD="${DEMO_PASSWORD:-}"
+SECOND_ORG_EMAIL="${SECOND_ORG_EMAIL:-admin@financial.com}"
+
+# Evidence expiry: retention_until in this repo (migration 012), expires_at in
+# ControlWeaver-Pro. Asserting the specific column is the point of the check --
+# a blind port between the repos substitutes one for the other and 500s at
+# runtime while every static gate still passes.
+EXPIRY_FIELD="${EVIDENCE_EXPIRY_FIELD:-retention_until}"
+
 pass=0; fail=0
 check() { # check <label> <actual> <expected>
   if [ "$2" = "$3" ]; then echo "  PASS  $1 ($2)"; pass=$((pass+1));
@@ -80,8 +95,8 @@ check "evidence on GET /risks/:id" "$(echo "$RDET" | jqf "j.data.evidence.length
 check "relevance persisted" "$(echo "$RDET" | jqf "j.data.evidence[0].relevance")" "assessment"
 # The column substitution that would have 500'd if ported blind.
 RU=$(echo "$RDET" | jqf "j.data.evidence[0]")
-echo "$RU" | grep -q "retention_until" && echo "  PASS  retention_until present (not expires_at)" && pass=$((pass+1)) \
-  || { echo "  FAIL  retention_until missing from the evidence row"; fail=$((fail+1)); }
+echo "$RU" | grep -q "$EXPIRY_FIELD" && echo "  PASS  $EXPIRY_FIELD present on the evidence row" && pass=$((pass+1)) \
+  || { echo "  FAIL  $EXPIRY_FIELD missing from the evidence row"; fail=$((fail+1)); }
 
 echo "== reverse read: GET /evidence/:id/risks =="
 ERISKS=$(curl -s -H "$AUTH" "$API/evidence/$EV_ID/risks")
@@ -94,10 +109,9 @@ ASSET=$(curl -s -X POST "$API/cmdb/hardware" -H "$AUTH" -H "$JSON" \
 ASSET_ID=$(echo "$ASSET" | jqf "j.data.id")
 check "asset created" "$([ -n "$ASSET_ID" ] && echo yes || echo no)" "yes"
 
-CTRL_ID=$(curl -s -H "$AUTH" "$API/organizations/$(curl -s -H "$AUTH" "$API/auth/me" | jqf "j.data.organization_id" )/controls?limit=1" | jqf "j.data[0].id")
-if [ -z "$CTRL_ID" ]; then
-  CTRL_ID=$(PGPASSWORD= psql -h /tmp -p 5433 -U postgres -d controlweave -tAc "SELECT id FROM framework_controls LIMIT 1")
-fi
+# /auth/me nests the organization, so the id is data.organization.id.
+ORG_ID=$(curl -s -H "$AUTH" "$API/auth/me" | jqf "j.data.organization.id")
+CTRL_ID=$(curl -s -H "$AUTH" "$API/organizations/$ORG_ID/controls?limit=1" | jqf "j.data[0].id")
 echo "  control_id=$CTRL_ID"
 
 CODE=$(curl -s -o /tmp/o -w '%{http_code}' -X POST "$API/cmdb/assets/$ASSET_ID/controls" -H "$AUTH" -H "$JSON" \
@@ -128,8 +142,9 @@ check "risk-exposure responds" \
 
 echo "== multi-tenant isolation =="
 # A second org's token must not see or reach the first org's rows.
-T2=$(curl -s -X POST "$API/auth/login" -H "$JSON" \
-  -d '{"email":"admin@financial.com","password":"ControlWeave!2026"}' | jqf "j.data.tokens.accessToken")
+T2=""
+[ -n "$DEMO_PASSWORD" ] && T2=$(curl -s -X POST "$API/auth/login" -H "$JSON" \
+  -d "{\"email\":\"$SECOND_ORG_EMAIL\",\"password\":\"$DEMO_PASSWORD\"}" | jqf "j.data.tokens.accessToken")
 if [ -n "$T2" ]; then
   check "cross-org risk read is 404" \
     "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $T2" "$API/risks/$RISK_ID")" "404"
@@ -138,7 +153,7 @@ if [ -n "$T2" ]; then
   check "cross-org asset controls is 404" \
     "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $T2" "$API/cmdb/assets/$ASSET_ID/controls")" "404"
 else
-  echo "  SKIP  second org token unavailable"
+  echo "  SKIP  cross-tenant checks — set DEMO_PASSWORD to run them"
 fi
 
 echo "== unlink =="
