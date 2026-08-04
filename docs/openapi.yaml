@@ -322,7 +322,7 @@ paths:
 
   /api/v1/evidence/{id}/integrity-check:
     get:
-      summary: Verify evidence file integrity using SHA-256
+      summary: Verify evidence file integrity by recomputing its SHA-384
       operationId: checkEvidenceIntegrity
       tags: [Evidence]
       parameters:
@@ -340,6 +340,334 @@ paths:
                 $ref: '#/components/schemas/EvidenceIntegrityResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/risks:
+    get:
+      summary: List register risks
+      operationId: listRisks
+      tags: [Risk Register]
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: departmentId, in: query, schema: { type: string, format: uuid } }
+        - { name: ownerUserId, in: query, schema: { type: string, format: uuid } }
+        - { name: minResidualScore, in: query, schema: { type: integer, minimum: 1, maximum: 25 } }
+        - { name: reviewOverdue, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200 } }
+      responses:
+        '200': { description: Paginated risks }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/risks/{id}:
+    get:
+      summary: Risk detail with every link type
+      description: >
+        Returns the risk plus its treatments, reviews and all six link
+        collections: controls, assets, objectives, poams, vendors and evidence.
+        Also returns remediation_complete and review_due, which are derived --
+        closing remediation flags the risk for review and deliberately does not
+        move its residual score.
+      operationId: getRisk
+      tags: [Risk Register]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Risk detail }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/risks/{id}/vendors:
+    post:
+      summary: Link a third-party vendor to a risk
+      description: >
+        tprm_vendors.risk_tier is a static onboarding classification, not a
+        scored risk. This link is what makes vendor concentration visible to
+        the register.
+      operationId: linkRiskVendor
+      tags: [Risk Register]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vendorId]
+              properties:
+                vendorId: { type: string, format: uuid }
+                notes: { type: string }
+      responses:
+        '201': { description: Linked }
+        '200': { description: Already linked; notes updated }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/risks/{id}/vendors/{vendorId}:
+    delete:
+      summary: Unlink a vendor from a risk
+      operationId: unlinkRiskVendor
+      tags: [Risk Register]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: vendorId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Unlinked }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/risks/{id}/evidence:
+    post:
+      summary: Attach evidence to a risk
+      description: >
+        relevance records why this document is evidence for this risk, because
+        the same document supports different risks for different reasons. An
+        unrecognized value returns 400 naming the valid options rather than a
+        database constraint error.
+      operationId: linkRiskEvidence
+      tags: [Risk Register]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [evidenceId]
+              properties:
+                evidenceId: { type: string, format: uuid }
+                relevance:
+                  type: string
+                  enum: [assessment, treatment, monitoring, acceptance]
+                  default: monitoring
+                notes: { type: string }
+      responses:
+        '201': { description: Attached }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/risks/{id}/evidence/{evidenceId}:
+    delete:
+      summary: Detach evidence from a risk
+      operationId: unlinkRiskEvidence
+      tags: [Risk Register]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: evidenceId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Detached }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/evidence/{id}/risks:
+    get:
+      summary: Register risks a document supports
+      description: >
+        The reverse of POST /risks/{id}/evidence. Read-only: linking is owned
+        by the risk, so exactly one screen writes the relationship.
+      operationId: getEvidenceRisks
+      tags: [Evidence]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Supported risks, worst residual first }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/evidence/{id}/versions:
+    get:
+      summary: Superseded versions of an evidence item
+      description: >
+        The current version is the evidence row itself and is not repeated
+        here. Each snapshot retains the file, its hash and the PII
+        classification as it stood, so a reclassification does not destroy the
+        record of how the document was classified while it was relied on.
+      operationId: listEvidenceVersions
+      tags: [Evidence]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Versions, newest first }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+    post:
+      summary: Replace the file, snapshotting the current version first
+      operationId: createEvidenceVersion
+      tags: [Evidence]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                change_note: { type: string }
+      responses:
+        '201': { description: New version created }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/cmdb/assets/{assetId}/controls:
+    get:
+      summary: Controls mapped to an asset
+      description: >
+        asset_control_mappings has existed since migration 005; these are the
+        first routes to reach it. The compliance status recorded here is the
+        asset's own -- a control implemented organization-wide can still be
+        non-compliant on one host.
+      operationId: listAssetControls
+      tags: [CMDB]
+      parameters:
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Mappings with control reference and framework }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+    post:
+      summary: Map a control to an asset
+      operationId: createAssetControlMapping
+      tags: [CMDB]
+      parameters:
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [control_id]
+              properties:
+                control_id: { type: string, format: uuid }
+                compliance_status:
+                  type: string
+                  enum: [compliant, partial, non_compliant, not_applicable]
+                notes: { type: string }
+      responses:
+        '201': { description: Mapped }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/cmdb/assets/{assetId}/controls/{controlId}:
+    put:
+      summary: Update an asset-control mapping
+      operationId: updateAssetControlMapping
+      tags: [CMDB]
+      parameters:
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: controlId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                compliance_status:
+                  type: string
+                  enum: [compliant, partial, non_compliant, not_applicable]
+                last_assessed: { type: string, format: date }
+                next_assessment: { type: string, format: date }
+                evidence_url: { type: string }
+                notes: { type: string }
+      responses:
+        '200': { description: Updated }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+    delete:
+      summary: Remove an asset-control mapping
+      operationId: deleteAssetControlMapping
+      tags: [CMDB]
+      parameters:
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: controlId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Removed }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/cmdb/controls/{controlId}/assets:
+    get:
+      summary: Assets a control is mapped to
+      operationId: listControlAssets
+      tags: [CMDB]
+      parameters:
+        - { name: controlId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Mapped assets }
+
+  /api/v1/cmdb/assets/{assetId}/risks:
+    get:
+      summary: Risks an asset is exposed to
+      description: >
+        The read side of risk_asset_links, which was previously reachable only
+        from the risk. Read-only; linking is owned by the risk.
+      operationId: listAssetRisks
+      tags: [CMDB]
+      parameters:
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Linked risks, worst residual first }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/cmdb/risk-exposure:
+    get:
+      summary: Risk exposure rollup across assets
+      description: >
+        Aggregated so a register can show exposure as a column without issuing
+        one query per row.
+      operationId: getCmdbRiskExposure
+      tags: [CMDB]
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Exposure per asset }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/poam/export:
+    get:
+      summary: Export the remediation register as CSV or PDF
+      description: >
+        Declared before /poam/{id} so 'export' is not parsed as an identifier.
+        Rate-limited to 10/min because it streams the whole register, and
+        audit-logged as an AU-2 event.
+      operationId: exportPoam
+      tags: [POA&M]
+      parameters:
+        - { name: format, in: query, required: true, schema: { type: string, enum: [csv, pdf] } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: priority, in: query, schema: { type: string } }
+        - { name: controlId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: CSV or PDF stream }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '429': { description: Rate limit exceeded }
+
+  /api/v1/poam/framework-types:
+    get:
+      summary: Framework-specific remediation vocabularies
+      description: >
+        Scoped to the organization's activated frameworks rather than returning
+        all seven. Declared before /poam/{id}; when it was declared after,
+        Express bound id="framework-types" and the whole vocabulary was
+        unreachable.
+      operationId: listPoamFrameworkTypes
+      tags: [POA&M]
+      responses:
+        '200': { description: Types with required_fields and review_levels }
+
+  /api/v1/poam/from-risk/{riskId}:
+    post:
+      summary: Raise a POA&M from a risk
+      operationId: createPoamFromRisk
+      tags: [POA&M]
+      parameters:
+        - { name: riskId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                treatment_id: { type: string, format: uuid, nullable: true }
+      responses:
+        '201': { description: Created and linked to the risk }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
 
 components:
   responses:
