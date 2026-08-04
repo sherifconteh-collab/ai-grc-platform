@@ -47,6 +47,130 @@
 - **Eight high-severity advisories cleared in the desktop wrapper, and `electron/` added to the audit in CI.** The directory had never been audited — `security.yml` covered `backend/` and `frontend/` only — so the advisories had accumulated unseen: a credential leak in `builder-util-runtime` (<9.7.0) that forwards `PRIVATE-TOKEN` and mixed-case `Authorization` headers across an origin redirect, an uncontrolled search path in AppImage builds in `app-builder-lib` (<26.15.0), and an unbounded-expansion DoS in `brace-expansion` (<5.0.8, where the existing `>=5.0.6` override was one patch short). Fixed by moving `electron-builder` to 26.15.3 and tightening the override. `electron-builder` is a devDependency, so the production-only `--omit=dev` gate could never have caught this — it is nonetheless the tool that builds the installer users download, which is why the new step audits the full tree. — @sherifconteh-collab
 - **`sanitize-html` pinned to 2.17.5, closing GHSA-vccv-cmxp-4j9h.** Incomplete URI-scheme validation let `javascript:` URIs through the `action`, `formaction`, `data`, `poster` and `background` attributes on every version up to and including 2.17.4. This sits directly under `middleware/validate.js`'s `sanitizeText`, so it is in the path of the same input this release hardened against double-escaping. **Pinned exactly rather than `^2.17.5`:** 2.17.6 moves to `htmlparser2@^12`, which dropped its `require` export condition and is ESM-only, so a caret range floats onto a version that cannot be `require()`d from this CommonJS backend on the Node 20 that CI runs — it fails the Jest suite outright and would throw `ERR_REQUIRE_ESM` at boot. 2.17.5 stays on `htmlparser2@10`, which still ships a dual CJS/ESM build. — @sherifconteh-collab
 
+## [4.8.0] — 2026-08-02
+
+> **Numbering note**: there is no `[4.7.0]` section. The three `package.json`
+> files were already at 4.7.0 while the newest heading here was `[4.6.1]`, and
+> the work in that gap is the content still sitting under `[Unreleased]` above.
+> This entry does not retitle someone else's section to close the gap; it
+> records what this release adds and leaves the earlier drift visible.
+
+### Added
+
+- **CMDB: asset-to-control mapping and risk exposure.** `asset_control_mappings`
+  (migration 005) and `risk_asset_links` (migration 140) both existed with no
+  reachable API. Adds `GET`/`POST`/`PUT`/`DELETE /cmdb/assets/:assetId/controls`,
+  `GET /cmdb/controls/:controlId/assets`, `GET /cmdb/assets/:assetId/risks` and
+  `GET /cmdb/risk-exposure`.
+- **Risk register: vendor linkage.** Migration 148 adds `risk_vendor_links`, the
+  fourth link table alongside controls, assets and objectives. `tprm_vendors`
+  carried a `risk_tier`, but that is a static onboarding classification rather
+  than a scored, treated and reviewed risk, so vendor concentration was
+  invisible to the register and the register invisible during a vendor review.
+  `POST`/`DELETE /risks/:id/vendors/:vendorId`, vendors in `GET /risks/:id`, and
+  `risks` / `open_risk_count` / `max_residual_score` on the TPRM vendor detail
+  response.
+- **Risk register: evidence linkage.** Migration 149 adds `risk_evidence_links`,
+  the last of the register's unconnected edges. Evidence has been linkable to
+  controls since migration 009/014, so a risk's evidence was only reachable
+  transitively — via its controls, and only when those controls happened to
+  carry the document. "Show me you are managing this exposure" is a different
+  question from "show me these controls exist". The link carries a `relevance`
+  (`assessment` / `treatment` / `monitoring` / `acceptance`) because the same
+  document supports different risks for different reasons. `POST`/`DELETE
+  /risks/:id/evidence/:evidenceId`, evidence in `GET /risks/:id`, and the
+  reverse read `GET /evidence/:id/risks`. The row carries this repo's
+  `retention_until` rather than the sibling repo's `expires_at`, which here
+  belongs to `legal_holds`.
+
+- **Link UIs for the CMDB, vendor and evidence edges.** `AssetControlLinks`
+  (writable — the only place in the product that creates an
+  `asset_control_mappings` row), `AssetRiskLinks`, `RiskVendorLinks`,
+  `RiskEvidenceLinks`, `VendorRiskLinks`, and a Risks tab on the evidence
+  drawer. Wired into `/dashboard/assets`, `/dashboard/risks/[id]`,
+  `/dashboard/tprm` and `/dashboard/evidence`. Adapted to this repo rather than
+  copied: the controls picker reads `organizationAPI.getControls` scoped to the
+  organization's activated frameworks, the `cmdb` router takes snake_case
+  bodies while the `risks` router next door takes camelCase, evidence expiry
+  renders `retention_until`, and the compliance vocabulary is this repo's
+  (`partial`, with an unassessed mapping represented as NULL) rather than the
+  sibling's.
+- **End-to-end verification harness** — `scripts/qa-link-routes-e2e.sh`
+  (`npm run qa:e2e:links`), shared with ControlWeaver-Pro. 35 assertions against
+  a running API covering both directions of every link in 146–149, the
+  migration 005 mapping, generated-column arithmetic, `relevance` validation
+  returning a 400 that names the options rather than a 500 from the CHECK
+  constraint, `ON CONFLICT` idempotency, unlink, and cross-organization
+  isolation on all three new read paths. `DEMO_PASSWORD` comes from the
+  environment; the cross-tenant checks skip when it is unset rather than
+  silently passing.
+
+- **Evidence version history** (migration `144`, issue #570): "versioning" was an integer counter. `PUT /evidence/:id` incremented `evidence_version` and overwrote the row, so a prior version's file, hash or PII classification could not be retrieved — the number went up and nothing was kept. `evidence_versions` now holds an immutable snapshot of the row as it stood *before* each update, taken inside the update's own transaction. Integrity stays demonstrable across a re-upload because the superseded file and its hash are both retained, and a reclassification no longer destroys the record of what the evidence was classified as while it was being relied on. New `GET/POST /evidence/:id/versions` and `GET /evidence/:id/versions/:versionNumber/download`. Hashing is SHA-384 throughout, per this repo's CNSA Suite 1.0 floor. — @sherifconteh-collab
+- **Federal POA&M structure** (migration `145`, issue #569): `poam_milestones` (a federal POA&M is a list of discrete milestones with their own target dates, not one overall `due_date`), `resources_required`, and `scheduled_completion_date` separated from `due_date` so slippage is visible rather than silently erased when a date is revised. — @sherifconteh-collab
+- **POA&M CSV and PDF export** — `GET /poam/export?format=csv|pdf`, carrying every linked control, the framework type, both dates with computed slippage in days, milestone counts, resources required, and any linked risks and treatment. — @sherifconteh-collab
+- **Risk register ↔ POA&M linkage** (migration `146`): migration `140` tied risks to controls (what treats the risk), assets (what is exposed) and objectives (what is threatened) — but not to the remediation work itself, so the register recorded the decision to treat a risk and had no link to what was being done about it. Adds `risk_poam_links` (many-to-many; one remediation routinely addresses several risks) plus `poam_items.treatment_id` for the tighter case where a POA&M executes one specific treatment. `POST /poam/from-risk/:riskId` sets priority from the residual score. Closing remediation deliberately does **not** move a residual score: inherent and residual are stored separately so an assessor can see what the controls achieved, and a score that moved on its own would destroy that evidence — the risk is flagged review-due instead. — @sherifconteh-collab
+- **Many-to-many POA&M ↔ control linkage** (migration `147`): `poam_items.control_id` was a single nullable FK, so one remediation could not span several controls even though evidence (`evidence_control_links`) and risks (`risk_control_links`) both could. One access-review remediation commonly closes findings against AC-2, AC-3 and AC-6 at once. Existing `control_id` values are backfilled and the column is retained as the originating control. — @sherifconteh-collab
+- **POA&M register and detail pages** (`/dashboard/poam`, `/dashboard/poam/[id]`) with a sidebar entry at `controls.read`, matching what the endpoints require. Fields, milestones, progress timeline, submit-for-review, approval history, the auditor decision panel with its separation-of-duties guard, control and risk links, and export. The control detail page has linked to `/dashboard/poam` for as long as it has had a POA&M panel; the route did not exist, so the link 404'd. — @sherifconteh-collab
+- **Evidence detail drawer** — metadata editing with a change note, version history showing each version's PII classification as it was, prior-version download, file replacement, and the integrity check. `GET /evidence/:id/integrity-check` existed and was absent from the API client entirely. — @sherifconteh-collab
+- **Risk detail page** (`/dashboard/risks/[id]`) — the page `GET /risks/:id` never had. Inherent vs residual assessment, treatments, reviews, acceptance, control/asset/objective links, and the new remediation panel. The register was a list and a heat map; clicking a row did nothing. — @sherifconteh-collab
+- **Framework-appropriate terminology** — an ISO 27001 organization sees "Corrective Action Request", SOC 2 "Deficiency", FISCAM and HIPAA "Corrective Action Plan", PCI DSS "Risk Assessment & Validation", NIST and FedRAMP "POA&M". The seven vocabularies have shipped in `frameworkPoamService.js` since the feature was built and were unreachable (see Fixed). Labels only — URLs, tables and API paths are unchanged. — @sherifconteh-collab
+
+### Fixed
+
+- **The backend did not boot.** `routes/assessments.js` requires
+  `./assessments/_shared`, and the earlier dead-code cleanup deleted that whole
+  directory — including `_shared.js`, a legitimate extraction from the
+  3366-line monolith rather than one of the copied sub-routers. `server.js`
+  requires `assessments.js` at startup, so the tree could not start a server at
+  all. `check:syntax` parses each file without ever resolving a `require`, and
+  `npm run build` is a stub that prints a line, so both gates passed on it.
+- **`GET /risks/:id` returned 500 for every risk.** The vendors query added with
+  migration 148 selected `v.name`; the column is `vendor_name`. The six link
+  queries share one `Promise.all`, so that single wrong column took down the
+  whole endpoint — controls, assets, objectives, POA&Ms, vendors and evidence
+  all unreachable, not just vendors.
+- **The asset-control picker offered values the server rejects.**
+  `MAPPING_COMPLIANCE_STATUS` here is `compliant` / `non_compliant` / `partial`
+  / `not_applicable`; the first version of the component used
+  `partially_compliant` plus a `not_assessed` value that does not exist. Every
+  status change would have returned 400. There is no CHECK constraint on that
+  column, so only the route's own validation would have caught it.
+- **The evidence drawer described its integrity check as recomputing SHA-256.**
+  This repo hashes evidence with SHA-384 per the CNSA Suite 1.0 floor in
+  `.claude/rules/security.md`; only the column name is legacy.
+
+- **The compliance gate was enforced on a code path the product does not use.** `PUT /controls/:id` demanded a `poam_justification`, created the POA&M and filed an approval request. The dashboard calls `PATCH /implementations/:id/status` and `PATCH /implementations/:id/test-result`, and neither had a single POA&M reference — so a control could be marked compliant from the UI with no justification and nothing produced for an auditor. The rule now lives in `services/poamGateService.js` and is applied on all three paths, preserving the `requires_poam_submission` 400 contract for existing API clients. — @sherifconteh-collab
+- **Nothing that found a gap raised remediation.** Recording a control test or an assessment procedure as `other_than_satisfied` — NIST SP 800-53A for "this control has gaps" — produced nothing, and the finding-creation handler in `routes/assessments.js` had no POA&M references at all. Across every `INSERT INTO poam_items` site only `'control'` and `'vulnerability'` were ever written; `'audit_finding'` and `'assessment'` were declared in `ALLOWED_SOURCE_TYPE` and dead. Those three events now raise a draft POA&M against the control, idempotent per (control, source), with owner, dates and remediation plan deliberately left blank for a human. Nothing is auto-closed, auto-approved or auto-assigned. — @sherifconteh-collab
+- **`GET /poam/framework-types` was unreachable.** Declared after `/:id`, so Express bound `id="framework-types"` and returned "POA&M item not found". The entire multi-framework vocabulary was dead code behind it, which is why every screen said "POA&M" regardless of framework. It now resolves and is scoped to the organization's activated frameworks. — @sherifconteh-collab
+- **`routes/poam.js` had no rate limiter at all**, unlike its sibling `routes/poamMilestones.js`. — @sherifconteh-collab
+- **`routes/assessments.js` had no rate limiting either.** It carries the entire assessment surface — procedures, results, engagements, PBC, workpapers, findings and sign-offs — behind `authenticate` and nothing else. Surfaced by CodeQL while reviewing this change, and closed the same way the six route files in v4.6.0 were: an explicit per-router limiter, because CodeQL cannot trace the app-wide `apiRateLimiter` mounted on `/api/v1`. 1500 per 15 minutes, above `risks.js`'s 400 because an auditor working through an engagement legitimately makes many calls in one session. — @sherifconteh-collab
+- The control detail page's Risk & Compliance panel rendered only when a POA&M or vulnerability already existed, so a control with neither showed nothing, offered no way to raise one, and its empty state was unreachable code. — @sherifconteh-collab
+
+### Security
+
+- **`express-rate-limit` was undeclared in `package.json`.** It resolved only as
+  a transitive dependency of `@modelcontextprotocol/sdk` while **29 route files
+  require it directly** — if that SDK dropped or relocated it, none of those
+  routers would load and the backend would stop booting. Declared at `^8.5.2`
+  rather than the `^8.2.2` that was resolved, because 8.2.2 pins
+  `ip-address@10.1.0`, inside the range flagged for decoding leading-zero octets
+  as decimal and bypassing SSRF checks. The pre-existing exact-version override
+  became `$express-rate-limit` so it follows the declared range instead of
+  conflicting with it.
+- **Five advisories cleared across both dependency trees**, each a pin that was
+  correct when written and had fallen one patch short: `brace-expansion`
+  `>=5.0.9`, `hono` `^4.12.34`, `socket.io-parser` `>=4.2.7`, `fast-uri`
+  `>=4.1.2`, `ip-address` `>=10.4.0`. `fast-uri` resolves on the 4.x line here
+  and on 3.x in the sibling repo, so the fixed version genuinely differs between
+  them — checked rather than copied. Backend and frontend both report zero
+  vulnerabilities under the flags CI uses.
+
+### Changed
+
+- `csvEscape` extracted from `routes/rmfInheritance.js` into `utils/csv.js` and shared with the POA&M export, so two compliance exporters cannot drift into subtly different field escaping. — @sherifconteh-collab
+
+---
+
 ## [4.6.1] — 2026-07-21
 
 ### Changed

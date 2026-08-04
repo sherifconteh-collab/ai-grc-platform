@@ -373,6 +373,7 @@ const vulnerabilitiesRoutes = safeRequire('./routes/vulnerabilities');
 const sbomRoutes = safeRequire('./routes/sbom');
 const dynamicConfigRoutes = require('./routes/dynamicConfig');
 const poamRoutes = require('./routes/poam');
+const poamMilestonesRoutes = require('./routes/poamMilestones');
 const exceptionsRoutes = require('./routes/exceptions');
 const controlHealthRoutes = require('./routes/controlHealth');
 const dashboardBuilderRoutes = require('./routes/dashboardBuilder');
@@ -473,7 +474,10 @@ if (splunkRoutes) app.use('/api/v1/integrations', splunkRoutes);
 if (vulnerabilitiesRoutes) app.use('/api/v1/vulnerabilities', vulnerabilitiesRoutes);
 if (sbomRoutes) app.use('/api/v1/sbom', sbomRoutes);
 app.use('/api/v1/config', dynamicConfigRoutes);
+// Milestones mount on the same base path; poamMilestones.js declares only
+// /:id/milestones routes, so ordering between the two does not collide.
 app.use('/api/v1/poam', poamRoutes);
+app.use('/api/v1/poam', poamMilestonesRoutes);
 app.use('/api/v1/exceptions', exceptionsRoutes);
 app.use('/api/v1/control-health', controlHealthRoutes);
 app.use('/api/v1/dashboard-builder', dashboardBuilderRoutes);

@@ -63,6 +63,12 @@ const navigationSections: NavigationSection[] = [
           { name: 'Controls', href: '/dashboard/controls', icon: '✅', requiredPermissions: ['organizations.read'] },
           { name: 'AI Control Assessments', href: '/dashboard/controls/pending-assessments', icon: '🤖', requiredPermissions: ['implementations.read'] },
           { name: 'Exceptions', href: '/dashboard/exceptions', icon: '⚠️', requiredPermissions: ['controls.read'] },
+          // Remediation sits at controls.read because that is what every POA&M
+          // endpoint requires. It used to be reachable only as a tab on
+          // Operations, which is gated on settings.manage -- so a compliance
+          // analyst who could read and write POA&Ms via the API could not find
+          // them in the product.
+          { name: 'POA&M', href: '/dashboard/poam', icon: '📝', requiredPermissions: ['controls.read'] },
           { name: 'Frameworks', href: '/dashboard/frameworks', icon: '📐', requiredPermissions: ['organizations.read'] },
         ],
       },

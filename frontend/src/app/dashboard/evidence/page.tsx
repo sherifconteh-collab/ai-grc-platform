@@ -9,6 +9,7 @@ import type { EvidenceType } from '@/lib/api';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/lib/access';
+import EvidenceDetailDrawer from '@/components/evidence/EvidenceDetailDrawer';
 
 interface EvidenceFile {
   id: string;
@@ -157,6 +158,9 @@ export default function EvidencePage() {
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Detail drawer: metadata editing, version history and integrity check.
+  const [detailEvidence, setDetailEvidence] = useState<EvidenceFile | null>(null);
 
   // Auto-collection rules state
   const [collectionRules, setCollectionRules] = useState<CollectionRule[]>([]);
@@ -1293,6 +1297,12 @@ export default function EvidencePage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <button
+                            onClick={() => setDetailEvidence(ev)}
+                            className="text-xs text-gray-700 hover:text-gray-900 font-medium"
+                          >
+                            Details
+                          </button>
+                          <button
                             onClick={() => handleDownload(ev.id, ev.file_name)}
                             className="text-xs text-purple-600 hover:text-purple-800 font-medium"
                           >
@@ -1327,6 +1337,15 @@ export default function EvidencePage() {
             </div>
           )}
         </div>
+
+        {detailEvidence && (
+          <EvidenceDetailDrawer
+            evidence={detailEvidence}
+            canWrite={canWriteEvidence}
+            onClose={() => setDetailEvidence(null)}
+            onChanged={loadEvidence}
+          />
+        )}
 
         {/* Link to Controls Modal */}
         {linkModalOpen && canWriteEvidence && (

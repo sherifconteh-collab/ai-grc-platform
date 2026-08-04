@@ -6,6 +6,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
 const { invalidateAICache } = require('../services/llmService');
+const poamGate = require('../services/poamGateService');
 const crosswalkCredits = require('../services/crosswalkCreditService');
 const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -333,11 +334,47 @@ router.patch('/:id/status',
       return res.status(403).json({ success: false, error: 'Only auditors or admins can set status to Verified.' });
     }
 
+    // Claiming compliance is gated here exactly as it is on PUT /controls/:id.
+    // This is the endpoint the control detail page actually calls, so until the
+    // gate moved into poamGateService the dashboard could mark a control
+    // compliant without a justification and without producing anything for an
+    // auditor to review.
+    const isComplianceChange = poamGate.isComplianceTransition(oldStatus, status);
+    const poamJustification = req.body.poam_justification;
+    if (isComplianceChange && !poamJustification) {
+      return res.status(400).json(poamGate.justificationRequiredResponse());
+    }
+
     const result = await pool.query(`
       UPDATE control_implementations SET status = $1, notes = COALESCE($2, notes),
         implementation_date = CASE WHEN $4 = 'implemented' THEN CURRENT_DATE ELSE implementation_date END
       WHERE id = $3 AND organization_id = $5 RETURNING *
     `, [status, notes || null, req.params.id, status, req.user.organization_id]);
+
+    let poamItem = null;
+    if (isComplianceChange && poamJustification) {
+      poamItem = await poamGate.inTransaction((client) =>
+        poamGate.recordComplianceTransition(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          controlId: existing.rows[0].control_id,
+          previousStatus: oldStatus,
+          newStatus: status,
+          justification: poamJustification,
+          frameworkSpecificType: req.body.framework_specific_type,
+          frameworkSpecificData: req.body.framework_specific_data
+        })
+      );
+
+      await poamGate.notifyComplianceTransition({
+        orgId: req.user.organization_id,
+        userId: req.user.id,
+        controlId: existing.rows[0].control_id,
+        previousStatus: oldStatus,
+        newStatus: status,
+        poamItem
+      });
+    }
 
     // Forward-only enforcement still permits implemented -> needs_review /
     // not_applicable, so this path can also drop a source out of a crediting
@@ -387,7 +424,12 @@ router.patch('/:id/status',
     // This ensures gap analysis and compliance forecasting reflect the latest data
     invalidateAICache(req.user.organization_id);
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({
+      success: true,
+      data: result.rows[0],
+      poam_item: poamItem,
+      requires_auditor_review: isComplianceChange
+    });
   } catch (error) {
     log('error', 'update_status_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update status' });
@@ -478,6 +520,17 @@ router.patch('/:id/test-result', requirePermission('assessments.write'), validat
 
     const oldTestResult = existing.rows[0].test_result;
     const hasTestNotes = Object.prototype.hasOwnProperty.call(req.body || {}, 'test_notes');
+    const controlId = existing.rows[0].control_id;
+
+    // NIST SP 800-53A outcomes drive remediation in both directions:
+    // 'satisfied' claims the control passes and is gated like any other
+    // compliance claim; 'other_than_satisfied' declares a gap and raises a
+    // draft POA&M so the gap cannot be recorded and then quietly forgotten.
+    const isComplianceChange = poamGate.isTestResultComplianceTransition(oldTestResult, test_result);
+    const poamJustification = req.body.poam_justification;
+    if (isComplianceChange && !poamJustification) {
+      return res.status(400).json(poamGate.justificationRequiredResponse());
+    }
 
     const result = await pool.query(
       `UPDATE control_implementations
@@ -495,11 +548,57 @@ router.patch('/:id/test-result', requirePermission('assessments.write'), validat
     await pool.query(
       `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
        VALUES ($1, $2, 'test_result_changed', 'control', $3, $4)`,
-      [req.user.organization_id, req.user.id, existing.rows[0].control_id,
+      [req.user.organization_id, req.user.id, controlId,
        JSON.stringify({ old_status: oldTestResult, status: test_result, notes: result.rows[0]?.test_notes })]
     );
 
-    res.json({ success: true, data: result.rows[0] });
+    let poamItem = null;
+    if (isComplianceChange && poamJustification) {
+      poamItem = await poamGate.inTransaction((client) =>
+        poamGate.recordComplianceTransition(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          controlId,
+          previousStatus: 'needs_review',
+          newStatus: 'verified',
+          justification: poamJustification,
+          frameworkSpecificType: req.body.framework_specific_type,
+          frameworkSpecificData: req.body.framework_specific_data
+        })
+      );
+      await poamGate.notifyComplianceTransition({
+        orgId: req.user.organization_id,
+        userId: req.user.id,
+        controlId,
+        previousStatus: oldTestResult,
+        newStatus: test_result,
+        poamItem
+      });
+    } else if (poamGate.isTestResultGap(test_result)) {
+      // swallowErrors: recording the test result is the user's action and must
+      // stand on its own. A failure to raise the follow-up POA&M is logged, not
+      // surfaced as a failed test submission.
+      poamItem = await poamGate.inTransaction(
+        (client) => poamGate.raiseFromGap(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          source: 'test_result',
+          sourceId: req.params.id,
+          controlId,
+          description: result.rows[0]?.test_notes
+            ? `Control test recorded as other than satisfied. Tester notes: ${result.rows[0].test_notes}`
+            : undefined
+        }),
+        { swallowErrors: true, context: 'poam_gate.raise_from_test_result' }
+      );
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      poam_item: poamItem,
+      requires_auditor_review: isComplianceChange
+    });
   } catch (error) {
     log('error', 'test_result_update_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update test result' });
