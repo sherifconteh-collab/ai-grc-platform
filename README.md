@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-04 | PR #252: feat(poam): port the remediation UI and its integrations from ControlWeaver-Pro -->
+<!-- LAST_UPDATED: 2026-08-09 | PR #266: fix(db): reconcile 17 tables whose columns never existed after a shadowed migration -->
 
 ## 🎯 What is This?
 
@@ -689,7 +689,7 @@ controlweave/
 │   │   ├── config/          # Database, Redis, and security configuration
 │   │   └── utils/           # Logging, encryption, TOTP, AI security, password
 │   │                        #   policy, Redis cache, Sentry integration
-│   ├── migrations/          # Database migrations (115)
+│   ├── migrations/          # Database migrations (162)
 │   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
@@ -1006,7 +1006,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
-- **Migrations**: 115 sequential, idempotent migrations
+- **Migrations**: 162 sequential, idempotent migrations
 - **API Routes**: 80+ route modules
 - **Services**: 60 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
