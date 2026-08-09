@@ -22,6 +22,7 @@
     "db:backup": "node scripts/db-backup.js",
     "db:capacity": "node scripts/db-capacity-check.js",
     "check:syntax": "node scripts/check-syntax.js",
+    "check:migration-drift": "node scripts/check-migration-schema-drift.js",
     "qa:e2e:auditor": "node scripts/qa-auditor-workflow.js",
     "qa:e2e:rbac": "node scripts/qa-rbac-mega-test.js",
     "qa:e2e:dynamic": "node scripts/qa-dynamic.js",
