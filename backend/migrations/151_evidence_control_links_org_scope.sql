@@ -1,5 +1,5 @@
 -- =============================================================================
--- 150_evidence_control_links_org_scope.sql
+-- 151_evidence_control_links_org_scope.sql
 --
 -- Gives evidence_control_links the organization_id every other link table in
 -- this schema already carries. Flagged in migration 149's header as the weaker
