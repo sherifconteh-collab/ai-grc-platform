@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-04 | PR #252: feat(poam): port the remediation UI and its integrations from ControlWeaver-Pro -->
+<!-- LAST_UPDATED: 2026-08-09 | PR #266: fix(db): reconcile 17 tables whose columns never existed after a shadowed migration -->
 
 ## 🎯 What is This?
 
