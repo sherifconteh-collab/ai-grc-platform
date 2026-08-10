@@ -22,7 +22,17 @@ module.exports = {
     'owasp_agentic_top10',
     'state_ai_governance',
     'international_ai_governance',
-    'nist_800_53', // issue #217 Wave 1: full 20-family base-control set
+    // Full 20-family catalog: 300 base controls AND all 714 non-withdrawn
+    // enhancements, with NIST SP 800-53B baseline membership. Previously
+    // 'comprehensive' on a base-only basis, which was a defensible reading of
+    // the word but understated what is now actually seeded.
+    'nist_800_53',
+    // All 110 Level 2 practices, ported from the sibling repository's
+    // OSCAL-imported module. This repo previously carried 50 while its own
+    // framework description claimed 110 -- the description was right about the
+    // standard and wrong about the data. Level 1's 17 practices are still
+    // absent, so this is comprehensive for L2 only.
+    'cmmc_2.0',
   ],
   representative: [
     'nist_privacy',

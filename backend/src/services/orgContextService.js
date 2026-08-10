@@ -212,11 +212,20 @@ async function buildOrgContext(organizationId, contextLevel = 'compact') {
     // NIST control family breakdown — only if org has NIST 800-53 active
     const nistFamilyResult = await pool.query(
       `SELECT
-         SPLIT_PART(fc.control_number, '-', 1) AS family,
+         -- fc.control_number does not exist and never has -- no migration
+         -- creates it. This query has therefore been throwing since it was
+         -- written, so the NIST family breakdown has silently never appeared
+         -- in AI context. The column is control_id; SPLIT_PART on '-' gives
+         -- the family prefix for both base controls (AU-6) and enhancements
+         -- (AU-6(3)), which is what this wants.
+         SPLIT_PART(fc.control_id, '-', 1) AS family,
          COUNT(fc.id) AS total,
-         COUNT(ci.id) FILTER (WHERE ci.status = 'implemented') AS implemented,
+         -- Match the statuses the rest of the platform counts as done; this
+         -- query alone treated a verified or crosswalk-credited control as
+         -- not implemented.
+         COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'verified', 'satisfied_via_crosswalk')) AS implemented,
          ROUND(
-           COUNT(ci.id) FILTER (WHERE ci.status = 'implemented')::numeric
+           COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'verified', 'satisfied_via_crosswalk'))::numeric
            / NULLIF(COUNT(fc.id), 0) * 100, 0
          ) AS pct
        FROM organization_frameworks of2
@@ -226,7 +235,7 @@ async function buildOrgContext(organizationId, contextLevel = 'compact') {
          ON ci.control_id = fc.id AND ci.organization_id = $1
        WHERE of2.organization_id = $1
          AND f.code IN ('nist_800_53', 'nist_800_53_rev5', 'nist_800_53_r5')
-       GROUP BY SPLIT_PART(fc.control_number, '-', 1)
+       GROUP BY SPLIT_PART(fc.control_id, '-', 1)
        HAVING COUNT(fc.id) > 0
        ORDER BY pct ASC`,
       [organizationId]
