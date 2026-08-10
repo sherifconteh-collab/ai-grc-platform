@@ -6,7 +6,7 @@ const pool = require('../config/database');
 const { processPendingWebhookDeliveries } = require('./webhookService');
 const { generateReportFile } = require('./scheduledReportService');
 const { sendReportEmail } = require('./emailService');
-const { log } = require('../utils/logger');
+const { log, serializeError } = require('../utils/logger');
 
 const SCHEDULE_INTERVAL_MS = Object.freeze({
   daily: 24 * 60 * 60 * 1000,
@@ -96,6 +96,138 @@ async function runRetentionCleanup({ organizationId }) {
   return { removed, skipped, policy_days: strictestDays };
 }
 
+// AU-11 (Audit Record Retention).
+//
+// Audit records previously had no retention path at all: data_retention_policies
+// names 'audit_logs' as an intended resource_type, but enforcement only ever
+// looked at evidence, so records accumulated indefinitely. Two properties make
+// deleting audit records different from deleting evidence, and both are
+// enforced here rather than left to the caller.
+//
+// 1. A floor. Retention that can be set arbitrarily low is an attacker's
+//    delete button: set the policy to one day, wait, and the trail is gone
+//    within policy. AUDIT_LOG_MIN_RETENTION_DAYS raises the floor for a
+//    deployment (FedRAMP High wants 1095), and AUDIT_RETENTION_ABSOLUTE_FLOOR
+//    is the value no policy or environment variable can go below.
+//
+// 2. The append-only trigger. Purging necessarily disables the protection
+//    added for AU-9, which is the one moment the table is writable. The window
+//    is therefore held inside a single transaction -- so a failure rolls the
+//    trigger back on -- kept as narrow as possible, and the purge itself is
+//    written to the audit trail so the deletion is visible in the record it
+//    modified.
+//
+// Legal holds are honored: a hold covering audit_logs suspends the purge
+// entirely rather than deleting around it, because a partial purge under hold
+// is harder to explain to an assessor than none at all.
+const AUDIT_RETENTION_ABSOLUTE_FLOOR_DAYS = 90;
+
+async function runAuditLogRetention({ organizationId }) {
+  const configuredFloor = Number(process.env.AUDIT_LOG_MIN_RETENTION_DAYS || 365);
+  const floorDays = Math.max(
+    AUDIT_RETENTION_ABSOLUTE_FLOOR_DAYS,
+    Number.isFinite(configuredFloor) ? configuredFloor : 365
+  );
+
+  const policyResult = await pool.query(
+    `SELECT id, retention_days
+       FROM data_retention_policies
+      WHERE organization_id = $1
+        AND active = true
+        AND auto_enforce = true
+        AND resource_type = 'audit_logs'
+      ORDER BY retention_days ASC`,
+    [organizationId]
+  );
+
+  if (policyResult.rows.length === 0) {
+    return { removed: 0, reason: 'No active audit_logs retention policy.' };
+  }
+
+  const holdResult = await pool.query(
+    `SELECT 1
+       FROM legal_holds
+      WHERE organization_id = $1
+        AND active = true
+        AND resource_type = 'audit_logs'
+      LIMIT 1`,
+    [organizationId]
+  );
+  if (holdResult.rows.length > 0) {
+    return { removed: 0, reason: 'Legal hold active on audit_logs; purge suspended.' };
+  }
+
+  const requestedDays = Math.min(...policyResult.rows.map((p) => Number(p.retention_days || floorDays)));
+  const effectiveDays = Math.max(floorDays, requestedDays);
+  const floorApplied = effectiveDays !== requestedDays;
+
+  const client = await pool.connect();
+  let removed = 0;
+  try {
+    await client.query('BEGIN');
+
+    const { rows: [{ count }] } = await client.query(
+      `SELECT COUNT(*)::int AS count
+         FROM audit_logs
+        WHERE organization_id = $1
+          AND created_at < NOW() - ($2 || ' days')::interval`,
+      [organizationId, String(effectiveDays)]
+    );
+
+    if (count > 0) {
+      // The narrowest possible window in which audit_logs is writable.
+      await client.query('ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_update');
+      try {
+        const del = await client.query(
+          `DELETE FROM audit_logs
+            WHERE organization_id = $1
+              AND created_at < NOW() - ($2 || ' days')::interval`,
+          [organizationId, String(effectiveDays)]
+        );
+        removed = del.rowCount || 0;
+      } finally {
+        await client.query('ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_no_update');
+      }
+
+      // Record the purge in the trail it just modified. Inside the same
+      // transaction, so a rollback discards the claim along with the deletion.
+      await client.query(
+        `INSERT INTO audit_logs
+           (organization_id, event_type, resource_type, details, success, outcome, source_system, created_at)
+         VALUES ($1, 'audit.retention_purge', 'audit_log', $2::jsonb, true, 'success', 'retention-job', NOW())`,
+        [organizationId, JSON.stringify({
+          removed,
+          effective_retention_days: effectiveDays,
+          requested_retention_days: requestedDays,
+          floor_days: floorDays,
+          floor_applied: floorApplied,
+          policy_ids: policyResult.rows.map((p) => p.id)
+        })]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    log('error', 'audit.retention_purge_failed',
+      { organizationId, effectiveDays, error: serializeError(error) });
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  if (floorApplied) {
+    log('warn', 'audit.retention_floor_applied', {
+      organizationId,
+      requestedDays,
+      effectiveDays,
+      floorDays
+    });
+  }
+
+  return { removed, effective_retention_days: effectiveDays, floor_applied: floorApplied };
+}
+
 async function runJob(jobRow) {
   const payload = jobRow.payload || {};
   switch (jobRow.job_type) {
@@ -109,6 +241,11 @@ async function runJob(jobRow) {
         return { removed: 0, skipped: 0, reason: 'No organization_id on job.' };
       }
       return runRetentionCleanup({ organizationId: jobRow.organization_id });
+    case 'audit_log_retention':
+      if (!jobRow.organization_id) {
+        return { removed: 0, reason: 'No organization_id on job.' };
+      }
+      return runAuditLogRetention({ organizationId: jobRow.organization_id });
     case 'integration_sync':
       return { synced: true, connector_id: payload.connectorId || null, mode: payload.mode || 'manual' };
     case 'evidence_auto_collect':
@@ -455,5 +592,6 @@ module.exports = {
   enqueueJob,
   processPendingJobs,
   runRetentionCleanup,
+  runAuditLogRetention,
   runScheduledReport
 };

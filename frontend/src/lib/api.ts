@@ -469,6 +469,20 @@ export const auditAPI = {
   getStats: (params: { startDate?: string; endDate?: string }) =>
     api.get('/audit/stats', { params }),
 
+  // AU-7. Returns the raw response as a Blob so the caller can hand it
+  // straight to a download; the endpoint streams, so this must not be parsed
+  // as JSON for the CSV format.
+  exportLogs: (params: {
+    format?: 'csv' | 'json';
+    userId?: string;
+    eventType?: string;
+    resourceType?: string;
+    resourceId?: string;
+    outcome?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => api.get('/audit/export', { params, responseType: 'blob' }),
+
   getEventTypes: () => api.get('/audit/event-types'),
 
   getUserLogs: (userId: string) => api.get(`/audit/user/${userId}`),

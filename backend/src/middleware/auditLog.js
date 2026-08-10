@@ -9,6 +9,7 @@
  */
 
 const { createAuditLog } = require('../services/auditService');
+const { log, serializeError } = require('../utils/logger');
 const { extractIpFromRequest } = require('../services/geolocationService');
 
 /**
@@ -71,12 +72,15 @@ function auditLog(eventType, options = {}) {
           requestId: req.requestId || null,
           actorName: user.username || user.email || null
         }).catch(err => {
-          // Log error but don't fail the request
-          console.error('Failed to create audit log:', err);
+          // AU-5: the request still succeeds, but this event never made it
+          // into the audit trail -- do not let that pass unreported.
+          log('error', 'audit.write_failed',
+            { eventType, path: req.path, method: req.method, error: serializeError(err) });
         });
       } catch (error) {
-        // Silently fail - audit logging should not break the application
-        console.error('Audit log middleware error:', error);
+        // Do not break the request, but do not fail silently either.
+        log('error', 'audit.middleware_failed',
+          { eventType, path: req.path, method: req.method, error: serializeError(error) });
       }
     };
     

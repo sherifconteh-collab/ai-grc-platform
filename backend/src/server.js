@@ -44,6 +44,8 @@ const _reminderMod = safeRequire('./services/reminderService');
 const startReminderScheduler = _reminderMod ? _reminderMod.startReminderScheduler : null;
 const _reportSchedulerMod = safeRequire('./services/reportScheduler');
 const startReportScheduler = _reportSchedulerMod ? _reportSchedulerMod.startReportScheduler : null;
+const _retentionSchedulerMod = safeRequire('./services/retentionScheduler');
+const startRetentionScheduler = _retentionSchedulerMod ? _retentionSchedulerMod.startRetentionScheduler : null;
 const { SECURITY_CONFIG } = require('./config/security');
 const { validateEdition, getEditionInfo, attachEditionInfo } = require('./middleware/edition');
 const { getRedisAdapterStatus } = require('./services/websocketService');
@@ -865,6 +867,7 @@ async function ensureLicenseFromDb() {
 // procedures) are intentionally deferred until after the server is listening.
 let stopReminders = () => {};
 let stopReportScheduler = () => {};
+let stopRetentionScheduler = () => {};
 const HOST = process.env.HOST || '0.0.0.0';
 
 ensureLicenseFromDb()
@@ -890,6 +893,7 @@ ensureLicenseFromDb()
       if (databaseConfigured) {
         stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
         stopReportScheduler = startReportScheduler ? startReportScheduler() : () => {};
+        stopRetentionScheduler = startRetentionScheduler ? startRetentionScheduler() : () => {};
 
         // Start scheduled database backups if enabled.
         // In PM2 cluster mode pm_id is set per-worker (0-indexed); only worker 0
@@ -925,6 +929,7 @@ ensureLicenseFromDb()
       log('warn', 'server.shutdown.requested', { signal });
       stopReminders();
       stopReportScheduler();
+      stopRetentionScheduler();
       const _bs = safeRequire('./services/backupScheduler');
       if (_bs) _bs.stop();
       server.close(() => {
