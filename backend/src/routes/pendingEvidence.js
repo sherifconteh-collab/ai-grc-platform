@@ -411,8 +411,8 @@ router.post(
         );
         for (const row of validRows.rows) {
           await pool.query(
-            `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-             VALUES ($1, $2, $3)
+            `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+             SELECT $1, $2, $3, e.organization_id FROM evidence e WHERE e.id = $1
              ON CONFLICT DO NOTHING`,
             [evidenceRecord.id, row.id, `AI-suggested mapping (approved by user)`]
           );

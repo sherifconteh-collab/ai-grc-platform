@@ -1168,7 +1168,9 @@ router.post('/:id/link',
 
     for (const cid of controlIds) {
       await pool.query(
-        'INSERT INTO evidence_control_links (evidence_id, control_id, notes) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+         SELECT $1, $2, $3, e.organization_id FROM evidence e WHERE e.id = $1
+         ON CONFLICT DO NOTHING`,
         [req.params.id, cid, notes || null]
       );
     }

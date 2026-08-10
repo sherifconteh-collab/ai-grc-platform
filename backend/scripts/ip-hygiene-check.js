@@ -70,6 +70,36 @@ const COMPETITOR_RULES = [
 const STANDARD_CITATION = /\b(?:ISO\/IEC\s*\d{4,5}(?::\d{4})?|ISO\s*27001|ISO\s*42001|SOC\s*2|AICPA|Trust Services Criteria|45\s*CFR\s*(?:160|162|164)|HIPAA)\b/i;
 const SHALL_GLOBAL = /\bshall\b/gi;
 const SOC_CRITERIA_ID = /\bCC\d\.\d{1,2}\b/i;
+const QUOTE_CHARS = ['"', "'", '`'];
+const LONG_QUOTE_CHARS = 120;
+
+// Length of the longest single quotation on a line, used by rule 3 below.
+//
+// Delimiters are paired in order of appearance, so two short quotations with
+// prose between them are never measured as one long quotation. A straight
+// apostrophe with word characters on both sides (404'd, the organization's
+// scope) is punctuation, not an opening delimiter, and is skipped -- otherwise
+// ordinary English possessives pair with each other across a whole sentence.
+function longestQuotedSpan(line) {
+  let longest = 0;
+
+  for (const quote of QUOTE_CHARS) {
+    const positions = [];
+
+    for (let i = 0; i < line.length; i += 1) {
+      if (line[i] !== quote) continue;
+      const glued = /[A-Za-z0-9]/.test(line[i - 1] || '') && /[A-Za-z0-9]/.test(line[i + 1] || '');
+      if (quote === "'" && glued) continue;
+      positions.push(i);
+    }
+
+    for (let i = 0; i + 1 < positions.length; i += 2) {
+      longest = Math.max(longest, positions[i + 1] - positions[i] - 1);
+    }
+  }
+
+  return longest;
+}
 
 function shouldIgnoreLine(line) {
   return /ip-hygiene:\s*ignore/i.test(line);
@@ -187,7 +217,7 @@ function checkPotentialStandardsCopy(filePath, text, warnings) {
   lines.forEach((line, index) => {
     if (shouldIgnoreLine(line)) return;
     if (!STANDARD_CITATION.test(line)) return;
-    if (!/(["'`]).{120,}\1/.test(line)) return;
+    if (longestQuotedSpan(line) < LONG_QUOTE_CHARS) return;
 
     warnings.push({
       file: rel,
