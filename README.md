@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-09 | PR #266: fix(db): reconcile 17 tables whose columns never existed after a shadowed migration -->
+<!-- LAST_UPDATED: 2026-08-10 | PR #264: security(evidence): org-scope evidence_control_links, add the guides tree, document the new endpoints -->
 
 ## 🎯 What is This?
 
