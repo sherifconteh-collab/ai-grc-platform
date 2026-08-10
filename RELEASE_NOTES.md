@@ -53,6 +53,10 @@
 - **Eight high-severity advisories cleared in the desktop wrapper, and `electron/` added to the audit in CI.** The directory had never been audited — `security.yml` covered `backend/` and `frontend/` only — so the advisories had accumulated unseen: a credential leak in `builder-util-runtime` (<9.7.0) that forwards `PRIVATE-TOKEN` and mixed-case `Authorization` headers across an origin redirect, an uncontrolled search path in AppImage builds in `app-builder-lib` (<26.15.0), and an unbounded-expansion DoS in `brace-expansion` (<5.0.8, where the existing `>=5.0.6` override was one patch short). Fixed by moving `electron-builder` to 26.15.3 and tightening the override. `electron-builder` is a devDependency, so the production-only `--omit=dev` gate could never have caught this — it is nonetheless the tool that builds the installer users download, which is why the new step audits the full tree. — @sherifconteh-collab
 - **`sanitize-html` pinned to 2.17.5, closing GHSA-vccv-cmxp-4j9h.** Incomplete URI-scheme validation let `javascript:` URIs through the `action`, `formaction`, `data`, `poster` and `background` attributes on every version up to and including 2.17.4. This sits directly under `middleware/validate.js`'s `sanitizeText`, so it is in the path of the same input this release hardened against double-escaping. **Pinned exactly rather than `^2.17.5`:** 2.17.6 moves to `htmlparser2@^12`, which dropped its `require` export condition and is ESM-only, so a caret range floats onto a version that cannot be `require()`d from this CommonJS backend on the Node 20 that CI runs — it fails the Jest suite outright and would throw `ERR_REQUIRE_ESM` at boot. 2.17.5 stays on `htmlparser2@10`, which still ships a dual CJS/ESM build. — @sherifconteh-collab
 
+### Documentation
+
+- docs(fedramp): correct AU-2 through AU-12 and immutability claims ([#268](https://github.com/sherifconteh-collab/ai-grc-platform/pull/268)) — @sherifconteh-collab
+
 ## [4.8.0] — 2026-08-02
 
 > **Numbering note**: there is no `[4.7.0]` section. The three `package.json`
