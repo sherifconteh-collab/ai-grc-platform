@@ -68,7 +68,8 @@
     "seed:assessment-remaining": "node scripts/seed-assessment-procedures-remaining.js",
     "security:generate-jwt-secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
     "audit:check": "npm audit --audit-level=moderate",
-    "verify:rls": "node scripts/verify-rls-isolation.js"
+    "verify:rls": "node scripts/verify-rls-isolation.js",
+    "verify:audit-chain": "node scripts/verify-audit-chain.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
