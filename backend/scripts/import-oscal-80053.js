@@ -88,6 +88,18 @@ function convertCatalog(catalogPath) {
     throw new Error(`Invalid OSCAL catalog: no top-level "catalog" property in ${catalogPath}`);
   }
 
+  // rel="related" hrefs use OSCAL ids; the catalog stores display ids. Index
+  // one to the other first so the walk can resolve links in a single pass.
+  const byOscalId = new Map();
+  for (const group of catalog.groups || []) {
+    for (const control of group.controls || []) {
+      if (!isWithdrawn(control)) byOscalId.set(control.id.toLowerCase(), displayId(control));
+      for (const sub of control.controls || []) {
+        if (!isWithdrawn(sub)) byOscalId.set(sub.id.toLowerCase(), displayId(sub));
+      }
+    }
+  }
+
   const controls = [];
   const groups = Array.isArray(catalog.groups) ? catalog.groups : [];
   for (const group of groups) {
@@ -103,7 +115,9 @@ function convertCatalog(catalogPath) {
         control_type: 'technical',
         is_enhancement: false,
         parent_control_id: null,
-        baselines: baselinesFor(control.id)
+        baselines: baselinesFor(control.id),
+        related_controls: relatedControls(control, byOscalId),
+        assessment_procedures: assessmentProcedures(control)
       });
 
       // Enhancements are nested one level under their base control in OSCAL.
@@ -123,7 +137,9 @@ function convertCatalog(catalogPath) {
           control_type: 'technical',
           is_enhancement: true,
           parent_control_id: baseId,
-          baselines: baselinesFor(enhancement.id)
+          baselines: baselinesFor(enhancement.id),
+          related_controls: relatedControls(enhancement, byOscalId),
+          assessment_procedures: assessmentProcedures(enhancement)
         });
       }
     }
@@ -178,6 +194,76 @@ function loadBaselines(profilePaths) {
 
 function baselinesFor(oscalId) {
   return BASELINE_INDEX.get(String(oscalId).toLowerCase()) || [];
+}
+
+// Intra-catalog relationships, from OSCAL rel="related" links. 362 of the 714
+// enhancements carry at least one (895 links in total). These are NIST's own
+// statements about which controls relate to which, and they are the only
+// non-invented source of crosswalk data for the enhancements -- everything
+// else would be inference. Emitted here so the crosswalk seeder can use them
+// without re-parsing a 10 MB catalog.
+function relatedControls(control, byOscalId) {
+  return (control.links || [])
+    .filter((l) => l.rel === 'related' && typeof l.href === 'string' && l.href.startsWith('#'))
+    .map((l) => byOscalId.get(l.href.slice(1).toLowerCase()))
+    .filter(Boolean);
+}
+
+// NIST SP 800-53A assessment data is embedded in the Rev 5.2.0 catalog rather
+// than only in the separate 800-53A publication: 1,579 assessment-objective
+// parts and 2,072 assessment-method parts across the catalog, including for
+// every enhancement. Extracting them means enhancement procedures are the real
+// NIST objectives with their real evidence lists, rather than generated
+// boilerplate.
+const METHOD_MAP = {
+  EXAMINE: { type: 'examine', method: 'document_review' },
+  INTERVIEW: { type: 'interview', method: 'personnel_interview' },
+  TEST: { type: 'test', method: 'system_test' }
+};
+
+function collectProse(part, acc) {
+  if (part.prose) acc.push(part.prose.trim());
+  for (const child of part.parts || []) collectProse(child, acc);
+  return acc;
+}
+
+function propValue(part, name) {
+  return ((part.props || []).find((p) => p.name === name) || {}).value;
+}
+
+function assessmentProcedures(control) {
+  const parts = control.parts || [];
+
+  const objectives = [];
+  for (const p of parts) {
+    if (p.name === 'assessment-objective') collectProse(p, objectives);
+  }
+  const objectiveText = objectives.join(' ').replace(/\s+/g, ' ').trim();
+
+  const procedures = [];
+  for (const p of parts) {
+    if (p.name !== 'assessment-method') continue;
+    const mapped = METHOD_MAP[propValue(p, 'method')];
+    if (!mapped) continue;
+
+    const objects = [];
+    for (const child of p.parts || []) {
+      if (child.name === 'assessment-objects') collectProse(child, objects);
+    }
+
+    procedures.push({
+      // OSCAL already labels these in 800-53A style, e.g. "AU-06(03)-Examine".
+      procedure_id: propValue(p, 'label') || `${displayId(control)}-${mapped.type}`,
+      procedure_type: mapped.type,
+      title: `${mapped.type.charAt(0).toUpperCase()}${mapped.type.slice(1)}: ${control.title}`,
+      description: objectiveText || control.title,
+      expected_evidence: objects.join('; ').replace(/\s+/g, ' ').trim() || null,
+      assessment_method: mapped.method,
+      depth: 'focused',
+      source_document: 'NIST SP 800-53A Rev 5 (embedded in the SP 800-53 OSCAL catalog)'
+    });
+  }
+  return procedures;
 }
 
 function writeModule(outPath, controls, version) {
