@@ -19,26 +19,26 @@
 --
 -- Ships in the AU control family remediation batch (catalog track).
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conname = 'assessment_procedures_control_procedure_key'
-  ) THEN
-    -- Collapse any pre-existing duplicates, oldest wins.
-    DELETE FROM assessment_procedures a
-     USING assessment_procedures b
-     WHERE a.framework_control_id = b.framework_control_id
-       AND a.procedure_id IS NOT DISTINCT FROM b.procedure_id
-       AND a.ctid > b.ctid;
+-- Collapse any pre-existing duplicates first, oldest wins, so the unique index
+-- below can be created. Keeping the oldest means any assessment_results
+-- referencing a procedure keep pointing at a row that still exists.
+DELETE FROM assessment_procedures a
+ USING assessment_procedures b
+ WHERE a.framework_control_id = b.framework_control_id
+   AND a.procedure_id IS NOT DISTINCT FROM b.procedure_id
+   AND a.ctid > b.ctid;
 
-    ALTER TABLE assessment_procedures
-      ADD CONSTRAINT assessment_procedures_control_procedure_key
-      UNIQUE (framework_control_id, procedure_id);
-  END IF;
-END$$;
+-- A unique INDEX rather than a table CONSTRAINT, deliberately. ADD CONSTRAINT
+-- creates an index of the same name behind the scenes, so guarding it with a
+-- pg_constraint lookup is not actually idempotent: the constraint can be
+-- absent while the relation name is taken, and the ALTER then fails with
+-- 'relation ... already exists'. CREATE UNIQUE INDEX IF NOT EXISTS checks the
+-- relation namespace, which is the thing that actually collides. ON CONFLICT
+-- infers from a unique index just as well as from a named constraint.
+CREATE UNIQUE INDEX IF NOT EXISTS assessment_procedures_control_procedure_key
+  ON assessment_procedures (framework_control_id, procedure_id);
 
-COMMENT ON CONSTRAINT assessment_procedures_control_procedure_key ON assessment_procedures IS
+COMMENT ON INDEX assessment_procedures_control_procedure_key IS
   'Lets the procedure seed upsert instead of delete-and-rebuild, so re-seeding the procedure catalog no longer destroys assessment_results.';
 
 SELECT 'Migration 157 completed.' AS result;
