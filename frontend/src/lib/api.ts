@@ -246,6 +246,9 @@ export const organizationAPI = {
   getControls: (orgId: string, params?: { frameworkId?: string; status?: string; control_function?: string; page?: number; limit?: number }) =>
     api.get(`/organizations/${orgId}/controls`, { params }),
 
+  setTargetBaseline: (baseline: 'low' | 'moderate' | 'high' | null) =>
+    api.put('/organizations/me/baseline', { target_baseline: baseline }),
+
   exportControlAnswers: (
     orgId: string,
     params?: { format?: 'xlsx' | 'csv'; frameworkId?: string; status?: string }

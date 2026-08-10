@@ -17,6 +17,7 @@ const { authenticate } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const rateLimit = require('express-rate-limit');
 const { log } = require('../utils/logger');
+const { BASELINE_SCOPE_PREDICATE, baselineScopeJoin } = require('../services/baselineScope');
 
 // Three layers, in this specific order: (1) a cheap per-process IP-based
 // limiter first, so unauthenticated requests are bounded before they reach
@@ -166,9 +167,11 @@ router.get('/gate', async (req, res) => {
        FROM organization_frameworks of2
        JOIN frameworks f ON f.id = of2.framework_id
        JOIN framework_controls fc ON fc.framework_id = of2.framework_id
+       ${baselineScopeJoin('$1')}
        LEFT JOIN control_implementations ci
          ON ci.control_id = fc.id AND ci.organization_id = of2.organization_id
        WHERE of2.organization_id = $1 ${frameworkFilter}
+       ${BASELINE_SCOPE_PREDICATE}
        GROUP BY of2.framework_id, f.name
        ORDER BY f.name ASC`,
       params
