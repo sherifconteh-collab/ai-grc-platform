@@ -351,12 +351,19 @@ async function analyzeIntegrationData(organizationId, integrationData, sourceSys
  * Extract common audit context from Express request
  */
 function extractAuditContext(req) {
+  // sessionId and authenticationMethod are deliberately not derived here.
+  // Neither is available on a request: the JWT payload carries only userId,
+  // the authenticate middleware's user projection selects no such columns,
+  // and express-session is not a dependency -- so the previous reads of
+  // req.user.session_id, req.sessionID and req.user.authentication_method
+  // always evaluated to undefined. Keeping them made every request-derived
+  // record appear to carry session context it could never have had.
+  // Authentication events still set authentication_method, by passing
+  // authMethod explicitly through logAuthentication().
   return {
     ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress,
     userAgent: req.headers['user-agent'],
-    requestId: req.requestId,
-    sessionId: req.user?.session_id || req.sessionID,
-    authenticationMethod: req.user?.authentication_method
+    requestId: req.requestId
   };
 }
 
@@ -391,8 +398,8 @@ async function logFromRequest(req, params) {
     ipAddress: params.ipAddress || context.ipAddress,
     userAgent: params.userAgent || context.userAgent,
     requestId: params.requestId || context.requestId,
-    sessionId: params.sessionId || context.sessionId,
-    authenticationMethod: params.authenticationMethod || context.authenticationMethod,
+    sessionId: params.sessionId,
+    authenticationMethod: params.authenticationMethod,
     actorName: params.actorName || actorName
   });
 }

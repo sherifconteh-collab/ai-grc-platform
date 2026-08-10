@@ -16,6 +16,17 @@ const auditWriteLimiter = createRateLimiter({
   max: 60
 });
 
+// Valid values for audit_logs.outcome, per the column comment set in
+// migration 048. The legacy boolean audit_logs.success is derived from this
+// rather than accepted independently: the two describe the same fact, and
+// letting a caller set them separately allowed a record asserting
+// success = true alongside outcome = 'failure'. 'partial' maps to
+// success = false -- a partially completed action is not a success, and for
+// an audit record under-claiming is the safer direction.
+const AUDIT_OUTCOMES = ['success', 'failure', 'partial'];
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 // express-rate-limit applied router-wide, ahead of authenticate, so a cheap
 // IP-based bound is in place before authenticate's own DB/JWT work runs, and
 // so static analysis (CodeQL) can trace a recognized rate-limiting
@@ -231,6 +242,20 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
       return res.status(400).json({ success: false, error: 'event_type is required (string, max 100 chars).' });
     }
 
+    const resolvedOutcome = outcome || 'success';
+    if (!AUDIT_OUTCOMES.includes(resolvedOutcome)) {
+      return res.status(400).json({
+        success: false,
+        error: `outcome must be one of: ${AUDIT_OUTCOMES.join(', ')}.`
+      });
+    }
+
+    // resource_id is a UUID column -- reject a malformed value here rather than
+    // letting the driver raise and surface as an opaque 500.
+    if (resource_id && !UUID_PATTERN.test(String(resource_id))) {
+      return res.status(400).json({ success: false, error: 'resource_id must be a UUID.' });
+    }
+
     // Parse details — accept string (JSON) or object
     let parsedDetails = {};
     if (details) {
@@ -245,8 +270,8 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
       `INSERT INTO audit_logs
        (organization_id, user_id, event_type, resource_type, resource_id, details,
         ip_address, user_agent, success, outcome, source_system, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, true, $9, $10, NOW())
-       RETURNING id, event_type, created_at`,
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, NOW())
+       RETURNING id, event_type, outcome, success, created_at`,
       [
         orgId,
         userId,
@@ -256,7 +281,8 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
         JSON.stringify(parsedDetails),
         req.ip || null,
         req.headers['user-agent'] || null,
-        outcome || 'success',
+        resolvedOutcome === 'success',
+        resolvedOutcome,
         source_system || 'mcp_agent'
       ]
     );

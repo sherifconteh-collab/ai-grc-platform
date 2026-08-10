@@ -68,7 +68,6 @@ function auditLog(eventType, options = {}) {
           ipAddress: extractIpFromRequest(req),
           userAgent: req.headers['user-agent'] || null,
           success: true,
-          sessionId: req.sessionId || null,
           requestId: req.requestId || null,
           actorName: user.username || user.email || null
         }).catch(err => {
