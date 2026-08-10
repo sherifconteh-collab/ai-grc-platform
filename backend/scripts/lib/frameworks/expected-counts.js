@@ -9,10 +9,10 @@
 
 module.exports = {
   "totalFrameworks": 33,
-  "totalControls": 977,
+  "totalControls": 1691,
   "perFramework": {
     "nist_csf_2.0": 57,
-    "nist_800_53": 300,
+    "nist_800_53": 1014,
     "iso_27001": 39,
     "soc2": 27,
     "nist_800_171": 24,
