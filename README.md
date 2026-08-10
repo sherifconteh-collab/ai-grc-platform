@@ -99,7 +99,7 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 - 🎯 Framework selection (15+ frameworks, 1,000+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
-- 📜 AU-2 compliant immutable audit logging
+- 📜 Audit logging with 20 recorded fields per event
 - 🛡️ RBAC with Admin, ISSE, Auditor, and Read-Only roles
 - 🔑 **Access Governance** — entitlement reporting with over-privileged and dormant-access flags, separation-of-duties toxic-combination rules, access review certification campaigns (AC-2 evidence on completion), a role/permission simulator, and AI-assisted import of your existing RBAC documentation
 - 🏷️ **Framework-neutral evidence types** — a 14-value vocabulary that labels evidence consistently no matter which framework you are working against
@@ -384,7 +384,7 @@ Full asset and configuration inventory:
 - **Baselines** — capture and compare configuration states
 - **Change control** — track and approve changes to managed assets
 - **Dependency maps** — visualize service and asset relationships
-- **Audit trail** — every change logged to the immutable audit log
+- **Audit trail** — every change logged to the audit log
 
 ### 📊 Data Governance
 
@@ -413,7 +413,7 @@ Full asset and configuration inventory:
 - Auditor workspace with dedicated workflows
 - Control verification (verified / not verified / requires remediation)
 - Assessment procedures and findings tracking
-- Immutable audit trail for every action
+- Audit trail for every action
 - Remediation workflows with POA&M (Plan of Action & Milestones) — items are raised automatically when a control test or assessment procedure comes back *other than satisfied*, or an audit finding is recorded at medium severity or above, with owner, dates and plan left blank for a human
 - Gated compliance claims — marking a control compliant requires a written justification and produces a POA&M in *pending auditor review* with an approval request attached
 - Auditor review queue with approve / reject / request-changes decisions, framework-specific guidance, and separation of duties enforced so a submitter cannot review their own item
@@ -778,7 +778,7 @@ controlweave/
 ### Assessment & Audit
 - `assessment_plans` — Audit and assessment tracking
 - `audit_findings` — Gap identification
-- `audit_logs` — Immutable audit log
+- `audit_logs` — Audit log. Append-only is not yet enforced at the database level in this repository; see `docs/FEDRAMP_DEPLOYMENT_GUIDE.md` section 5 (AU-9)
 
 ### Policy & Operations
 - `organization_policies` — Policy lifecycle management
@@ -882,7 +882,7 @@ controlweave/
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA
 - ✅ RBAC (Admin, ISSE, Auditor, Read-Only)
 - ✅ Next.js frontend with dashboard
-- ✅ AU-2 compliant immutable audit logging
+- ✅ Audit logging with 20 recorded fields per event
 - ✅ Auto-crosswalk engine
 
 ### Phase 2: Advanced Features ✅ (All Complete in v4.0.0)

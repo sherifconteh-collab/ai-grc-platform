@@ -54,7 +54,7 @@
 ### Evidence & Audit
 - ✅ Evidence management — file upload, URL linking, versioning, PII classification
 - ✅ Auto-evidence collection with pending review workflow
-- ✅ AU-2 compliant immutable audit log
+- ✅ Audit log with 20 recorded fields per event
 - ✅ POA&M tracking
 
 ### Risk & Compliance Workflows

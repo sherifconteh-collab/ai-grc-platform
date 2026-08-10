@@ -133,19 +133,24 @@ Enforce MFA at the application level before granting access to any FRH-IA-5(2) s
 
 ## 5. Audit Logging Mapping
 
-ControlWeaver's `audit_logs` table satisfies NIST AU-2 through AU-12 as follows:
+The `audit_logs` table provides part of the AU family. The table below states
+what the platform implements today and what the deploying organization must
+supply. Controls marked **Deployer-supplied** have no platform implementation —
+do not claim them on the strength of this table.
 
-| NIST Control | AU-2 Event Type | `audit_logs.event_type` Values |
-|-------------|-----------------|-------------------------------|
-| AU-2 | Auditable events | All events below |
-| AU-3 | Log content | `user_id`, `organization_id`, `action`, `resource_type`, `resource_id`, `ip_address`, `created_at` |
-| AU-4 | Audit log storage | Managed by `AUDIT_LOG_RETENTION_DAYS` cleanup job |
-| AU-6 | Audit review | Dashboard audit trail at `/dashboard/audit` |
-| AU-8 | Timestamps | All records use `timestamptz` (UTC) |
-| AU-9 | Audit protection | Database RLS prevents modification; FRH-AU-9(3) requires cryptographic integrity — supplement with write-once log shipping |
-| AU-10 | Non-repudiation | `user_id` + `ip_address` recorded on all state-changing actions; FRH-AU-10 requires digital signature — supplement with external signing service |
-| AU-11 | Retention | Set `AUDIT_LOG_RETENTION_DAYS=1095` (3 years) for High |
-| AU-12 | Audit generation | All route handlers emit audit events via `auditLog.js` middleware |
+| NIST Control | Status | Implementation |
+|-------------|--------|----------------|
+| AU-2 | Partial | Events are recorded to `audit_logs.event_type`. Most routes write through `services/auditService.js`, but a number of route handlers issue their own `INSERT INTO audit_logs` with a narrower column set, so field coverage is not uniform across event types. `event_type` is free-text — there is no enforced event registry. |
+| AU-3 | Partial | Recorded per event: `event_type`, `created_at`, `user_id`, `actor_name`, `organization_id`, `resource_type`, `resource_id`, `ip_address`, `user_agent`, `success`, `outcome`, `failure_reason`, `request_id`, `source_system`. **Not recorded as columns:** HTTP method and request path (captured only inside the `details` JSONB by `middleware/auditLog.js`), and before/after values. The `session_id` and `authentication_method` columns exist but are populated only by the authentication events in `auditService.logAuthentication`, not by request-derived logging. |
+| AU-4 | **Deployer-supplied** | No audit-log storage-capacity monitoring or alerting exists. Monitor table growth and provision storage externally. |
+| AU-5 | **Deployer-supplied** | No response to audit-logging failures. A failed audit write is written to the process stdout/stderr stream and the originating request still succeeds; these writes do not reach the structured logger or Sentry. Alerting on audit-pipeline failure must be supplied externally. |
+| AU-6 | Implemented | `GET /api/v1/audit/logs` with filtering by user, event type, resource, and date range; `GET /api/v1/audit/stats`; dashboard audit trail at `/dashboard/audit`. Optional SIEM forwarding via `services/siemService.js`. |
+| AU-7 | Partial | Filtering and event-type aggregation are available through the endpoints above. There is no audit-record export endpoint — auditors must pull through the API or the database. |
+| AU-8 | Partial | `audit_logs.created_at` is `TIMESTAMP` **without** time zone, set server-side by `NOW()`. Deploy the database in UTC so recorded times are unambiguous. Time synchronization (NTP) is deployer-supplied. |
+| AU-9 | **Partial — weak** | Row-level security (`FORCE`, migration `105`) provides tenant isolation only; its policy is `USING`-only and therefore does not restrict writes. There is **no append-only enforcement on `audit_logs`** in this repository — no trigger, no `REVOKE`, and no hash chain — so records are modifiable and deletable by any code path holding the application's database role. Additionally, `organization_id` is `ON DELETE CASCADE`, so deleting an organization destroys its audit history. FRH-AU-9(3) requires cryptographic integrity: supplement with write-once log shipping, and treat an external immutable copy as required rather than optional. |
+| AU-10 | Partial | `user_id`, `actor_name`, and `ip_address` are recorded on records written through `auditService`. Note `user_id` is `ON DELETE SET NULL`, so deleting a user detaches the identity from historical records (`actor_name` is retained). No digital signature is applied; FRH-AU-10 requires one — supplement with an external signing service. |
+| AU-11 | **Deployer-supplied** | No retention period is enforced for `audit_logs`. The `data_retention_policies` table lists `audit_logs` as an intended `resource_type`, but the retention scheduler acts on evidence only. Records accumulate indefinitely. |
+| AU-12 | Partial | Audit records are generated by route handlers calling `auditService`. The `middleware/auditLog.js` wrapper — the only path that records HTTP method and path — is mounted on a single router (`routes/dataSovereignty.js`) and fires only on 2xx responses, so it does not record failed operations. |
 
 Critical event types that must be logged (verify these exist in your deployment):
 
