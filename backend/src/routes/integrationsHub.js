@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { enqueueWebhookEvent } = require('../services/webhookService');
 const { enqueueJob } = require('../services/jobService');
@@ -105,11 +106,12 @@ router.post('/connectors', async (req, res) => {
       ]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'integration_connector_created', 'integration_connector', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, inserted.rows[0].id, JSON.stringify({ connector_type, name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'integration_connector_created',
+      resourceType: 'integration_connector',
+      resourceId: inserted.rows[0].id,
+      details: { connector_type, name }
+    });
 
     await emitConnectorEvent(orgId, req.user.id, 'integration.connector.created', {
       id: inserted.rows[0].id,
@@ -163,11 +165,12 @@ router.patch('/connectors/:id', async (req, res) => {
       ]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'integration_connector_updated', 'integration_connector', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ status: updated.rows[0].status, name: updated.rows[0].name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'integration_connector_updated',
+      resourceType: 'integration_connector',
+      resourceId: id,
+      details: { status: updated.rows[0].status, name: updated.rows[0].name }
+    });
 
     await emitConnectorEvent(orgId, req.user.id, 'integration.connector.updated', {
       id,
@@ -196,11 +199,12 @@ router.delete('/connectors/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Integration connector not found' });
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'integration_connector_deleted', 'integration_connector', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ connector_type: deleted.rows[0].connector_type, name: deleted.rows[0].name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'integration_connector_deleted',
+      resourceType: 'integration_connector',
+      resourceId: id,
+      details: { connector_type: deleted.rows[0].connector_type, name: deleted.rows[0].name }
+    });
 
     await emitConnectorEvent(orgId, req.user.id, 'integration.connector.deleted', { id });
 
@@ -264,11 +268,12 @@ router.post('/connectors/:id/run', async (req, res) => {
       [id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'integration_connector_run', 'integration_connector', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify(simulatedResult)]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'integration_connector_run',
+      resourceType: 'integration_connector',
+      resourceId: id,
+      details: simulatedResult
+    });
 
     await emitConnectorEvent(orgId, req.user.id, 'integration.connector.run', {
       connector_id: id,

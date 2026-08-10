@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { requireSod } = require('../middleware/sod');
@@ -346,11 +347,12 @@ router.get('/export',
       params
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_exported', 'poam', NULL, $3::jsonb, true)`,
-      [orgId, req.user.id, JSON.stringify({ format, row_count: rows.rows.length })]
-    ).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_exported',
+      resourceType: 'poam',
+      resourceId: null,
+      details: { format, row_count: rows.rows.length }
+    }).catch(() => {});
 
     const date = new Date().toISOString().slice(0, 10);
 
@@ -559,11 +561,12 @@ router.post('/:id/controls', requirePermission('controls.write'), async (req, re
       [orgId, poamItemId, controlId, notes ? String(notes) : null, req.user.id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_control_linked', 'poam', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, poamItemId, JSON.stringify({ control_id: controlId })]
-    ).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_control_linked',
+      resourceType: 'poam',
+      resourceId: poamItemId,
+      details: { control_id: controlId }
+    }).catch(() => {});
 
     // DO NOTHING returns no row when the link already existed; that is still a
     // success from the caller's point of view.
@@ -590,11 +593,12 @@ router.delete('/:id/controls/:controlId', requirePermission('controls.write'), a
       return res.status(404).json({ success: false, error: 'Link not found' });
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_control_unlinked', 'poam', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, req.params.id, JSON.stringify({ control_id: req.params.controlId })]
-    ).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_control_unlinked',
+      resourceType: 'poam',
+      resourceId: req.params.id,
+      details: { control_id: req.params.controlId }
+    }).catch(() => {});
 
     res.json({ success: true, data: { poam_item_id: req.params.id, control_id: req.params.controlId } });
   } catch (error) {
@@ -689,11 +693,12 @@ router.post('/', requirePermission('controls.write'), async (req, res) => {
       [orgId, item.id, 'POA&M item created', item.status, req.user.id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_item_created', 'poam', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, item.id, JSON.stringify({ title: item.title, source_type: item.source_type, priority: item.priority })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_item_created',
+      resourceType: 'poam',
+      resourceId: item.id,
+      details: { title: item.title, source_type: item.source_type, priority: item.priority }
+    });
 
     await emitPoamEvent(orgId, req.user.id, 'poam.item.created', {
       id: item.id,
@@ -884,11 +889,12 @@ router.post('/from-vulnerability/:vulnerabilityId', requirePermission('controls.
       [orgId, item.id, `Auto-created from vulnerability ${finding.vulnerability_id || finding.id}`, item.status, req.user.id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_item_created_from_vulnerability', 'poam', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, item.id, JSON.stringify({ vulnerability_id: finding.id, vulnerability_key: finding.vulnerability_id })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_item_created_from_vulnerability',
+      resourceType: 'poam',
+      resourceId: item.id,
+      details: { vulnerability_id: finding.id, vulnerability_key: finding.vulnerability_id }
+    });
 
     await emitPoamEvent(orgId, req.user.id, 'poam.item.created_from_vulnerability', {
       id: item.id,
@@ -992,11 +998,12 @@ router.patch('/:id', requirePermission('controls.write'), async (req, res) => {
       );
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_item_updated', 'poam', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ old_status: existing.status, new_status: updated.status, priority: updated.priority })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_item_updated',
+      resourceType: 'poam',
+      resourceId: id,
+      details: { old_status: existing.status, new_status: updated.status, priority: updated.priority }
+    });
 
     await emitPoamEvent(orgId, req.user.id, 'poam.item.updated', {
       id: updated.id,
@@ -1041,11 +1048,12 @@ router.post('/:id/updates', requirePermission('controls.write'), async (req, res
       [orgId, id, note, req.user.id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_item_note_added', 'poam', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ note })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_item_note_added',
+      resourceType: 'poam',
+      resourceId: id,
+      details: { note }
+    });
 
     await emitPoamEvent(orgId, req.user.id, 'poam.item.note_added', { id, note });
 
@@ -1142,22 +1150,18 @@ router.post('/:id/submit-for-review', requirePermission('controls.write'), async
     );
 
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_submitted_for_review', 'poam', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        poamId,
-        JSON.stringify({
-          title: poam.title,
-          control_id,
-          previous_status: poam.status,
-          framework_specific_type,
-          justification: justification.substring(0, 200)
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_submitted_for_review',
+      resourceType: 'poam',
+      resourceId: poamId,
+      details: {
+        title: poam.title,
+        control_id,
+        previous_status: poam.status,
+        framework_specific_type,
+        justification: justification.substring(0, 200)
+      }
+    });
 
     // Emit webhook event
     await emitPoamEvent(orgId, req.user.id, 'poam.submitted_for_review', {
@@ -1298,20 +1302,16 @@ router.post('/:id/review', requirePermission('audit.write'), async (req, res) =>
     );
 
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'poam_auditor_reviewed', 'poam', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        poamId,
-        JSON.stringify({
-          title: poam.title,
-          outcome,
-          comments: comments.substring(0, 200)
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'poam_auditor_reviewed',
+      resourceType: 'poam',
+      resourceId: poamId,
+      details: {
+        title: poam.title,
+        outcome,
+        comments: comments.substring(0, 200)
+      }
+    });
 
     // Emit webhook event
     await emitPoamEvent(orgId, req.user.id, 'poam.auditor_reviewed', {

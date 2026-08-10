@@ -13,6 +13,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const poamGate = require('../services/poamGateService');
 const multer = require('multer');
 const path = require('path');
@@ -459,34 +460,30 @@ router.post('/results', requirePermission('assessments.write'), async (req, res)
 
       // Audit trail for assessment result updates (best-effort; should not block save).
       try {
-        await pool.query(
-          `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-           VALUES ($1, $2, 'assessment_result_updated', 'control', $3, $4)`,
-          [
-            req.user.organization_id,
-            req.user.id,
-            procedureMeta.framework_control_id,
-            JSON.stringify({
-              source: source || 'assessments.results',
-              assessment_procedure_id: procedureMeta.assessment_procedure_id,
-              procedure_id: procedureMeta.procedure_id,
-              procedure_type: procedureMeta.procedure_type,
-              framework_code: procedureMeta.framework_code,
-              framework_name: procedureMeta.framework_name,
-              control_code: procedureMeta.control_code,
-              control_title: procedureMeta.control_title,
-              result_id: result.rows[0]?.id,
-              old_status: oldRow.status,
-              new_status: status,
-              old_risk_level: oldRow.risk_level,
-              new_risk_level: risk_level ?? oldRow.risk_level ?? null,
-              remediation_required: remediationRequiredBool,
-              remediation_deadline: remediation_deadline ?? oldRow.remediation_deadline ?? null,
-              finding: truncate(finding, 4000),
-              evidence_collected: truncate(evidence_collected, 4000)
-            })
-          ]
-        );
+        await auditService.logFromRequest(req, {
+          eventType: 'assessment_result_updated',
+          resourceType: 'control',
+          resourceId: procedureMeta.framework_control_id,
+          details: {
+            source: source || 'assessments.results',
+            assessment_procedure_id: procedureMeta.assessment_procedure_id,
+            procedure_id: procedureMeta.procedure_id,
+            procedure_type: procedureMeta.procedure_type,
+            framework_code: procedureMeta.framework_code,
+            framework_name: procedureMeta.framework_name,
+            control_code: procedureMeta.control_code,
+            control_title: procedureMeta.control_title,
+            result_id: result.rows[0]?.id,
+            old_status: oldRow.status,
+            new_status: status,
+            old_risk_level: oldRow.risk_level,
+            new_risk_level: risk_level ?? oldRow.risk_level ?? null,
+            remediation_required: remediationRequiredBool,
+            remediation_deadline: remediation_deadline ?? oldRow.remediation_deadline ?? null,
+            finding: truncate(finding, 4000),
+            evidence_collected: truncate(evidence_collected, 4000)
+          }
+        });
       } catch (auditError) {
         log('error', 'assessment_result_audit_log_update_failed', { error: auditError?.message || String(auditError) });
       }
@@ -511,33 +508,29 @@ router.post('/results', requirePermission('assessments.write'), async (req, res)
 
       // Audit trail for newly recorded assessment results (best-effort; should not block save).
       try {
-        await pool.query(
-          `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-           VALUES ($1, $2, 'assessment_result_recorded', 'control', $3, $4)`,
-          [
-            req.user.organization_id,
-            req.user.id,
-            procedureMeta.framework_control_id,
-            JSON.stringify({
-              source: source || 'assessments.results',
-              assessment_procedure_id: procedureMeta.assessment_procedure_id,
-              procedure_id: procedureMeta.procedure_id,
-              procedure_type: procedureMeta.procedure_type,
-              framework_code: procedureMeta.framework_code,
-              framework_name: procedureMeta.framework_name,
-              control_code: procedureMeta.control_code,
-              control_title: procedureMeta.control_title,
-              result_id: result.rows[0]?.id,
-              old_status: null,
-              new_status: status,
-              risk_level: risk_level || null,
-              remediation_required: remediationRequiredBool,
-              remediation_deadline: remediation_deadline || null,
-              finding: truncate(finding, 4000),
-              evidence_collected: truncate(evidence_collected, 4000)
-            })
-          ]
-        );
+        await auditService.logFromRequest(req, {
+          eventType: 'assessment_result_recorded',
+          resourceType: 'control',
+          resourceId: procedureMeta.framework_control_id,
+          details: {
+            source: source || 'assessments.results',
+            assessment_procedure_id: procedureMeta.assessment_procedure_id,
+            procedure_id: procedureMeta.procedure_id,
+            procedure_type: procedureMeta.procedure_type,
+            framework_code: procedureMeta.framework_code,
+            framework_name: procedureMeta.framework_name,
+            control_code: procedureMeta.control_code,
+            control_title: procedureMeta.control_title,
+            result_id: result.rows[0]?.id,
+            old_status: null,
+            new_status: status,
+            risk_level: risk_level || null,
+            remediation_required: remediationRequiredBool,
+            remediation_deadline: remediation_deadline || null,
+            finding: truncate(finding, 4000),
+            evidence_collected: truncate(evidence_collected, 4000)
+          }
+        });
       } catch (auditError) {
         log('error', 'assessment_result_audit_log_insert_failed', { error: auditError?.message || String(auditError) });
       }

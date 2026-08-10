@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
@@ -392,12 +393,12 @@ router.patch('/:id/status',
 
     // Log audit — resource_id references the framework_control id, matching
     // how controls.js logs control status changes (not the implementation id).
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
-      [req.user.organization_id, req.user.id, existing.rows[0].control_id,
-       JSON.stringify({ old_status: oldStatus, status, notes, withdrawn_crosswalk_credits: withdrawnCredits })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_status_changed',
+      resourceType: 'control',
+      resourceId: existing.rows[0].control_id,
+      details: { old_status: oldStatus, status, notes, withdrawn_crosswalk_credits: withdrawnCredits }
+    });
 
     // Notify org when a control reaches 'verified'
     if (status === 'verified') {
@@ -545,12 +546,12 @@ router.patch('/:id/test-result', requirePermission('assessments.write'), validat
     // Log audit — resource_id uses the framework_control id (not the
     // control_implementations id) to stay consistent with the /status route
     // and assessments/procedures.js, so all three feed the same history feed.
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, 'test_result_changed', 'control', $3, $4)`,
-      [req.user.organization_id, req.user.id, controlId,
-       JSON.stringify({ old_status: oldTestResult, status: test_result, notes: result.rows[0]?.test_notes })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'test_result_changed',
+      resourceType: 'control',
+      resourceId: controlId,
+      details: { old_status: oldTestResult, status: test_result, notes: result.rows[0]?.test_notes }
+    });
 
     let poamItem = null;
     if (isComplianceChange && poamJustification) {
