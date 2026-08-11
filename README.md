@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-10 | PR #264: security(evidence): org-scope evidence_control_links, add the guides tree, document the new endpoints -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #270: feat(audit): implement AU-5 failure response, AU-7 export, AU-11 retention -->
 
 ## 🎯 What is This?
 
@@ -1008,7 +1008,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 162 sequential, idempotent migrations
 - **API Routes**: 80+ route modules
-- **Services**: 60 service modules
+- **Services**: 61 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
