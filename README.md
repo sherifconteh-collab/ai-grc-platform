@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #265: chore(deps-dev): bump electron from 41.1.0 to 41.10.3 in /electron in the npm_and_yarn group across 1 directory -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #257: chore(backend)(deps): bump firebase-admin from 13.10.0 to 14.2.0 in /backend -->
 
 ## 🎯 What is This?
 
