@@ -7,6 +7,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { controlsAPI, implementationsAPI, usersAPI, aiAPI, assessmentsAPI, evidenceAPI, poamAPI, vulnerabilitiesAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/lib/access';
+import type { PoamItem } from '@/lib/poamTypes';
 
 interface Implementation {
   id: string;
@@ -33,6 +34,15 @@ interface StatusHistoryEntry {
 }
 
 const TEST_RESULT_EVENT_TYPES = ['test_result_changed', 'assessment_result_updated', 'assessment_result_recorded'];
+
+/** Vulnerability rows as the risk-summary panel consumes them. */
+interface ControlVulnerability {
+  id: string;
+  cve_id: string | null;
+  rule_id: string | null;
+  severity: string | null;
+  status: string | null;
+}
 
 interface EvidenceItem {
   id: string;
@@ -137,9 +147,10 @@ export default function ControlDetailPage() {
   const [procedureSavingId, setProcedureSavingId] = useState<string | null>(null);
 
   // Risk summary — POA&Ms and vulnerabilities linked to this control
-  const [controlPoams, setControlPoams] = useState<any[]>([]);
-  const [controlVulns, setControlVulns] = useState<any[]>([]);
+  const [controlPoams, setControlPoams] = useState<PoamItem[]>([]);
+  const [controlVulns, setControlVulns] = useState<ControlVulnerability[]>([]);
   const [riskLoading, setRiskLoading] = useState(false);
+  const [raisingPoam, setRaisingPoam] = useState(false);
 
   // Control-level test result (auditor verdict)
   const [testResult, setTestResult] = useState('not_assessed');
@@ -230,6 +241,28 @@ export default function ControlDetailPage() {
       setRiskLoading(false);
     }
   }, [id]);
+
+  // Raise a POA&M against this control by hand. Gaps found by a test or a
+  // finding raise one automatically; this covers everything else -- a weakness
+  // someone spotted that no automated path caught.
+  const handleRaisePoam = useCallback(async () => {
+    if (!canUpdateImplementation) return;
+    try {
+      setRaisingPoam(true);
+      const controlCode = controlData?.control_id || controlData?.control_code || 'control';
+      await poamAPI.create({
+        title: `Remediate ${controlCode}`,
+        description: `Raised from the control detail page for ${controlCode}.`,
+        source_type: 'control',
+        control_id: id,
+        status: 'open',
+        priority: 'medium',
+      });
+      await loadRiskSummary();
+    } finally {
+      setRaisingPoam(false);
+    }
+  }, [canUpdateImplementation, controlData, id, loadRiskSummary]);
 
   useEffect(() => {
     if (id) {
@@ -753,9 +786,12 @@ export default function ControlDetailPage() {
           </div>
         )}
 
-        {/* Risk & Compliance Summary — linked POA&Ms and vulnerabilities */}
-        {(controlPoams.length > 0 || controlVulns.length > 0 || riskLoading) && (
-          <div className="bg-white rounded-lg shadow-md p-6">
+        {/* Risk & Compliance Summary — linked POA&Ms and vulnerabilities.
+            Rendered unconditionally: this panel used to be hidden unless a
+            POA&M or vulnerability already existed, which meant a control with
+            no remediation showed nothing and offered no way to raise any. The
+            empty states below were unreachable code. */}
+        <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Risk & Compliance Summary</h3>
             {riskLoading ? (
               <div className="text-sm text-gray-400">Loading...</div>
@@ -765,15 +801,38 @@ export default function ControlDetailPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-semibold text-gray-700">POA&amp;Ms</h4>
-                    <Link href={`/dashboard/poam?controlId=${id}`} className="text-xs text-purple-600 hover:underline">View all →</Link>
+                    <div className="flex items-center gap-3">
+                      {canUpdateImplementation && (
+                        <button
+                          onClick={handleRaisePoam}
+                          disabled={raisingPoam}
+                          className="text-xs text-purple-600 hover:underline disabled:opacity-50"
+                        >
+                          {raisingPoam ? 'Raising...' : '+ Raise POA&M'}
+                        </button>
+                      )}
+                      <Link href={`/dashboard/poam?controlId=${id}`} className="text-xs text-purple-600 hover:underline">View all →</Link>
+                    </div>
                   </div>
                   {controlPoams.length === 0 ? (
-                    <p className="text-xs text-gray-400">No open POA&amp;Ms for this control.</p>
+                    <p className="text-xs text-gray-400">
+                      No open POA&amp;Ms for this control. One is raised automatically when a test comes back
+                      other than satisfied or a finding is recorded against this control.
+                    </p>
                   ) : (
                     <div className="space-y-2">
-                      {controlPoams.slice(0, 5).map((p: any) => (
+                      {controlPoams.slice(0, 5).map((p) => (
                         <div key={p.id} className="flex items-center justify-between text-xs bg-gray-50 rounded px-3 py-2">
-                          <span className="text-gray-800 truncate max-w-[180px]" title={p.weakness_name || p.title}>{p.weakness_name || p.title || '—'}</span>
+                          <Link
+                            href={`/dashboard/poam/${p.id}`}
+                            className="text-purple-700 hover:underline truncate max-w-[180px]"
+                            title={p.title || undefined}
+                          >
+                            {p.title || '—'}
+                            <span className="block text-gray-400 capitalize">
+                              from {String(p.source_type || 'manual').replace(/_/g, ' ')}
+                            </span>
+                          </Link>
                           <span className={`ml-2 shrink-0 px-1.5 py-0.5 rounded font-medium ${
                             p.status === 'open' ? 'bg-red-100 text-red-700' :
                             p.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
@@ -794,9 +853,9 @@ export default function ControlDetailPage() {
                     <p className="text-xs text-gray-400">No vulnerabilities linked.</p>
                   ) : (
                     <div className="space-y-2">
-                      {controlVulns.slice(0, 5).map((v: any) => (
+                      {controlVulns.slice(0, 5).map((v) => (
                         <div key={v.id} className="flex items-center justify-between text-xs bg-gray-50 rounded px-3 py-2">
-                          <span className="text-gray-800 font-mono truncate max-w-[160px]" title={v.cve_id || v.rule_id}>{v.cve_id || v.rule_id || '—'}</span>
+                          <span className="text-gray-800 font-mono truncate max-w-[160px]" title={v.cve_id || v.rule_id || undefined}>{v.cve_id || v.rule_id || '—'}</span>
                           <span className={`ml-2 shrink-0 px-1.5 py-0.5 rounded font-medium ${
                             v.severity === 'critical' ? 'bg-red-100 text-red-700' :
                             v.severity === 'high' ? 'bg-orange-100 text-orange-700' :
@@ -810,8 +869,7 @@ export default function ControlDetailPage() {
                 </div>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {/* Assessment Procedures (NIST 800-53A / SCA Testing) */}
         {assessmentProcedures.length > 0 && (

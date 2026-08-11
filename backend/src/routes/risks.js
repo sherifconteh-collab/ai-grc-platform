@@ -35,6 +35,11 @@ const VALID_STRATEGIES = ['avoid', 'mitigate', 'transfer', 'accept'];
 const VALID_TREATMENT_STATUSES = ['planned', 'in_progress', 'completed', 'cancelled', 'overdue'];
 const VALID_REVIEW_OUTCOMES = ['unchanged', 'reassessed', 'escalated', 'de_escalated', 'closed'];
 const VALID_EFFECTIVENESS = ['not_assessed', 'ineffective', 'partially_effective', 'effective'];
+
+// Why a document is evidence for a risk. The same document can support
+// different risks for different reasons, so the reason belongs on the link
+// rather than on the evidence. Mirrors the CHECK constraint in migration 149.
+const VALID_EVIDENCE_RELEVANCE = ['assessment', 'treatment', 'monitoring', 'acceptance'];
 const MAX_LIMIT = 200;
 
 function parsePaging(query) {
@@ -213,7 +218,7 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
       return res.status(404).json({ error: 'Risk not found' });
     }
 
-    const [treatments, controls, assets, objectives, reviews] = await Promise.all([
+    const [treatments, controls, assets, objectives, reviews, poams, vendors, evidence] = await Promise.all([
       pool.query(
         `SELECT * FROM risk_treatments
          WHERE risk_id = $1 AND organization_id = $2
@@ -259,8 +264,79 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
          ORDER BY rr.reviewed_at DESC
          LIMIT 50`,
         [req.params.id, orgId]
+      ),
+      // What is actually being done about this risk. The register recorded the
+      // treatment decision but had no link to the remediation work until
+      // migration 146.
+      pool.query(
+        `SELECT rpl.id, rpl.poam_item_id, rpl.notes,
+                p.title, p.status, p.priority, p.due_date,
+                p.scheduled_completion_date, p.treatment_id,
+                owner.email AS owner_email
+         FROM risk_poam_links rpl
+         JOIN poam_items p ON p.id = rpl.poam_item_id
+         LEFT JOIN users owner ON owner.id = p.owner_id
+         WHERE rpl.risk_id = $1 AND rpl.organization_id = $2
+         ORDER BY
+           CASE p.priority
+             WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4
+           END,
+           p.due_date NULLS LAST`,
+        [req.params.id, orgId]
+      ),
+      // Third parties, added by migration 148. risk_tier is the vendor's static
+      // onboarding classification and is returned alongside the link so the two
+      // can be compared -- a "low" tier vendor carrying a critical risk is
+      // exactly the disagreement worth surfacing.
+      pool.query(
+        // This repo's column is vendor_name; the sibling repo's is name.
+        // Aliased to `name` so the response shape stays identical across both.
+        `SELECT rvl.id, rvl.vendor_id, rvl.notes,
+                v.vendor_name AS name, v.vendor_type, v.risk_tier, v.review_status,
+                v.data_access_level
+         FROM risk_vendor_links rvl
+         JOIN tprm_vendors v ON v.id = rvl.vendor_id
+         WHERE rvl.risk_id = $1 AND rvl.organization_id = $2
+         ORDER BY
+           CASE v.risk_tier
+             WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4
+           END,
+           v.vendor_name`,
+        [req.params.id, orgId]
+      ),
+      // Evidence, added by migration 149. pii_classification travels with the
+      // row because a risk file is somewhere people export from, and knowing a
+      // document is 'high' before attaching it to a report matters.
+      //
+      // This repo's evidence table dates expiry with `retention_until`
+      // (migration 012), not the `expires_at` the sibling repo uses -- here
+      // `expires_at` belongs to legal_holds and would not resolve.
+      pool.query(
+        `SELECT rel.id, rel.evidence_id, rel.relevance, rel.notes,
+                e.file_name, e.description, e.evidence_type,
+                e.pii_classification, e.retention_until,
+                e.created_at AS uploaded_at
+         FROM risk_evidence_links rel
+         JOIN evidence e ON e.id = rel.evidence_id
+         WHERE rel.risk_id = $1 AND rel.organization_id = $2
+         ORDER BY
+           CASE rel.relevance
+             WHEN 'assessment' THEN 1 WHEN 'treatment' THEN 2
+             WHEN 'monitoring' THEN 3 ELSE 4
+           END,
+           e.created_at DESC`,
+        [req.params.id, orgId]
       )
     ]);
+
+    // Remediation being finished is a prompt to reassess, not a reassessment.
+    // Deliberately does not touch residual_score: migration 140 stores inherent
+    // and residual separately so an assessor can see what the controls actually
+    // did, and a score that moves on its own destroys that evidence.
+    const openPoams = poams.rows.filter(
+      (row) => !['closed', 'risk_accepted', 'auditor_approved'].includes(String(row.status))
+    );
+    const remediationComplete = poams.rows.length > 0 && openPoams.length === 0;
 
     res.json({
       success: true,
@@ -270,7 +346,15 @@ router.get('/:id', requirePermission('risks.read'), async (req, res) => {
         controls: controls.rows,
         assets: assets.rows,
         objectives: objectives.rows,
-        reviews: reviews.rows
+        reviews: reviews.rows,
+        poams: poams.rows,
+        vendors: vendors.rows,
+        evidence: evidence.rows,
+        remediation_complete: remediationComplete,
+        review_due: remediationComplete || (
+          rows[0].next_review_date !== null
+          && new Date(rows[0].next_review_date) <= new Date()
+        )
       }
     });
   } catch (error) {
@@ -782,6 +866,57 @@ const LINK_KINDS = {
              WHERE organization_id = $1 AND risk_id = $2 AND objective_id = $3`,
     bodyKey: 'objectiveId',
     eventType: 'risk.objective_linked'
+  },
+  // Migration 136 tied risks to controls (what treats them), assets (what is
+  // exposed) and objectives (what is threatened) -- but not to the remediation
+  // work itself. Added by migration 146.
+  poam: {
+    insert: `INSERT INTO risk_poam_links (organization_id, risk_id, poam_item_id, created_by)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT ON CONSTRAINT risk_poam_links_unique DO NOTHING
+             RETURNING *`,
+    exists: 'SELECT 1 FROM poam_items WHERE id = $1 AND organization_id = $2',
+    delete: `DELETE FROM risk_poam_links
+             WHERE organization_id = $1 AND risk_id = $2 AND poam_item_id = $3`,
+    bodyKey: 'poamItemId',
+    eventType: 'risk.poam_linked'
+  },
+  // Third parties were the remaining gap. tprm_vendors carries a risk_tier,
+  // but that is a static classification set at onboarding -- "this is a
+  // critical supplier" -- not a scored, reviewed risk with a likelihood, an
+  // impact and a treatment. Added by migration 148 so vendor concentration is
+  // visible to the register, and register entries are visible during a vendor
+  // review.
+  vendors: {
+    insert: `INSERT INTO risk_vendor_links (organization_id, risk_id, vendor_id, notes, created_by)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT ON CONSTRAINT risk_vendor_links_unique DO UPDATE
+               SET notes = EXCLUDED.notes
+             RETURNING *`,
+    exists: 'SELECT 1 FROM tprm_vendors WHERE id = $1 AND organization_id = $2',
+    delete: `DELETE FROM risk_vendor_links
+             WHERE organization_id = $1 AND risk_id = $2 AND vendor_id = $3`,
+    bodyKey: 'vendorId',
+    eventType: 'risk.vendor_linked'
+  },
+  // Evidence, added by migration 149 -- the last unconnected edge. Evidence
+  // could already be linked to controls (migration 009/014), so a risk's
+  // evidence was only reachable transitively: via its controls, and only when
+  // those controls happened to have evidence. "Show me this risk is under
+  // management" is a different question from "show me these controls exist",
+  // and this link answers it directly.
+  evidence: {
+    insert: `INSERT INTO risk_evidence_links
+               (organization_id, risk_id, evidence_id, relevance, notes, created_by)
+             VALUES ($1, $2, $3, COALESCE($4, 'monitoring'), $5, $6)
+             ON CONFLICT ON CONSTRAINT risk_evidence_links_unique DO UPDATE
+               SET relevance = EXCLUDED.relevance, notes = EXCLUDED.notes
+             RETURNING *`,
+    exists: 'SELECT 1 FROM evidence WHERE id = $1 AND organization_id = $2',
+    delete: `DELETE FROM risk_evidence_links
+             WHERE organization_id = $1 AND risk_id = $2 AND evidence_id = $3`,
+    bodyKey: 'evidenceId',
+    eventType: 'risk.evidence_linked'
   }
 };
 
@@ -789,9 +924,15 @@ const LINK_KINDS = {
 // not. Parameter lists are built per kind rather than padded with unreferenced
 // placeholders — PostgreSQL cannot infer a type for a bound parameter the
 // statement never mentions and rejects the whole statement.
-function linkInsertParams(kindKey, { organizationId, riskId, targetId, effectiveness, notes, userId }) {
+function linkInsertParams(kindKey, { organizationId, riskId, targetId, effectiveness, relevance, notes, userId }) {
   if (kindKey === 'controls') {
     return [organizationId, riskId, targetId, effectiveness, notes, userId];
+  }
+  if (kindKey === 'vendors') {
+    return [organizationId, riskId, targetId, notes, userId];
+  }
+  if (kindKey === 'evidence') {
+    return [organizationId, riskId, targetId, relevance, notes, userId];
   }
   return [organizationId, riskId, targetId, userId];
 }
@@ -806,9 +947,14 @@ async function handleLink(req, res, kindKey) {
     if (!isUuid(targetId)) {
       return res.status(400).json({ error: `${kind.bodyKey} must be a valid id` });
     }
-    const { effectiveness, notes } = req.body || {};
+    const { effectiveness, relevance, notes } = req.body || {};
     if (effectiveness && !VALID_EFFECTIVENESS.includes(effectiveness)) {
       return res.status(400).json({ error: `effectiveness must be one of: ${VALID_EFFECTIVENESS.join(', ')}` });
+    }
+    // Validated here as well as by the CHECK constraint, so a bad value comes
+    // back as a 400 naming the options rather than a 500 from Postgres.
+    if (relevance && !VALID_EVIDENCE_RELEVANCE.includes(relevance)) {
+      return res.status(400).json({ error: `relevance must be one of: ${VALID_EVIDENCE_RELEVANCE.join(', ')}` });
     }
     if (!(await riskInOrg(req.user.organization_id, req.params.id))) {
       return res.status(404).json({ error: 'Risk not found' });
@@ -830,6 +976,7 @@ async function handleLink(req, res, kindKey) {
       riskId: req.params.id,
       targetId,
       effectiveness: effectiveness || null,
+      relevance: relevance || null,
       notes: notes ? sanitizeText(notes) : null,
       userId: req.user.id
     }));
@@ -879,6 +1026,12 @@ router.post('/:id/assets', requirePermission('risks.write'), (req, res) => handl
 router.delete('/:id/assets/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'assets'));
 router.post('/:id/objectives', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'objectives'));
 router.delete('/:id/objectives/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'objectives'));
+router.post('/:id/poam', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'poam'));
+router.delete('/:id/poam/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'poam'));
+router.post('/:id/vendors', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'vendors'));
+router.delete('/:id/vendors/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'vendors'));
+router.post('/:id/evidence', requirePermission('risks.write'), (req, res) => handleLink(req, res, 'evidence'));
+router.delete('/:id/evidence/:targetId', requirePermission('risks.write'), (req, res) => handleUnlink(req, res, 'evidence'));
 
 // DELETE /api/v1/risks/:id
 router.delete('/:id', requirePermission('risks.write'), async (req, res) => {

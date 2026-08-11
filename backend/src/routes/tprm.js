@@ -2,9 +2,17 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 const { requireProEdition } = require('../middleware/edition');
+
+// A cheap per-process IP limiter ahead of authenticate. The org-scoped
+// createRateLimiter below is the real quota, but js/missing-rate-limiting only
+// recognizes express-rate-limit, so without this every DB-touching handler here
+// reads as unprotected to static analysis.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600 }));
 
 router.use(authenticate);
 router.use(requireProEdition('tprm')); // Edition check BEFORE tier check
@@ -110,12 +118,41 @@ router.get('/vendors/:id', requirePermission('organizations.read'), async (req, 
       [id]
     );
 
+    // Register entries arising from this vendor (migration 148). The vendor's
+    // own risk_tier is a static onboarding classification; these are scored,
+    // treated and reviewed risks. Returned here rather than behind a separate
+    // call so a vendor review sees them without knowing to ask.
+    const risks = await pool.query(
+      `SELECT r.id, r.title, r.category, r.status,
+              r.inherent_score, r.residual_score, r.next_review_date,
+              rvl.notes AS link_notes
+       FROM risk_vendor_links rvl
+       JOIN risks r ON r.id = rvl.risk_id
+       WHERE rvl.vendor_id = $1 AND rvl.organization_id = $2
+       ORDER BY COALESCE(r.residual_score, r.inherent_score) DESC NULLS LAST, r.title`,
+      [id, orgId]
+    );
+
+    const openRisks = risks.rows.filter(
+      (row) => !['closed', 'accepted'].includes(String(row.status))
+    );
+
     res.json({
       success: true,
       data: {
         ...result.rows[0],
         questionnaires: questionnaires.rows,
-        documents: documents.rows
+        documents: documents.rows,
+        risks: risks.rows,
+        // Surfaced separately because it is the number a reviewer acts on, and
+        // because it is the one that can contradict risk_tier: a vendor tiered
+        // 'low' carrying an open critical risk is exactly the disagreement
+        // worth seeing during a review.
+        open_risk_count: openRisks.length,
+        max_residual_score: openRisks.reduce(
+          (worst, row) => Math.max(worst, row.residual_score ?? row.inherent_score ?? 0),
+          0
+        ) || null
       }
     });
   } catch (error) {
@@ -163,11 +200,12 @@ router.post('/vendors', requirePermission('organizations.read'), async (req, res
       ]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1,$2,'tprm_vendor_created','tprm_vendor',$3,$4::jsonb,true)`,
-      [orgId, req.user.id, result.rows[0].id, JSON.stringify({ vendor_name, risk_tier: result.rows[0].risk_tier })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'tprm_vendor_created',
+      resourceType: 'tprm_vendor',
+      resourceId: result.rows[0].id,
+      details: { vendor_name, risk_tier: result.rows[0].risk_tier }
+    });
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -232,11 +270,12 @@ router.patch('/vendors/:id', requirePermission('organizations.read'), async (req
       ]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1,$2,'tprm_vendor_updated','tprm_vendor',$3,$4::jsonb,true)`,
-      [orgId, req.user.id, id, JSON.stringify({ vendor_name: result.rows[0].vendor_name, review_status: result.rows[0].review_status })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'tprm_vendor_updated',
+      resourceType: 'tprm_vendor',
+      resourceId: id,
+      details: { vendor_name: result.rows[0].vendor_name, review_status: result.rows[0].review_status }
+    });
 
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -259,11 +298,12 @@ router.delete('/vendors/:id', requirePermission('organizations.read'), async (re
       return res.status(404).json({ success: false, error: 'Vendor not found' });
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1,$2,'tprm_vendor_deleted','tprm_vendor',$3,$4::jsonb,true)`,
-      [orgId, req.user.id, id, JSON.stringify({ vendor_name: result.rows[0].vendor_name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'tprm_vendor_deleted',
+      resourceType: 'tprm_vendor',
+      resourceId: id,
+      details: { vendor_name: result.rows[0].vendor_name }
+    });
 
     res.json({ success: true, message: 'Vendor deleted' });
   } catch (error) {
@@ -365,11 +405,12 @@ router.post('/questionnaires', requirePermission('organizations.read'), async (r
       [orgId, vendor_id, title, description || null, due_date || null, JSON.stringify(questions), Boolean(ai_generated), req.user.id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1,$2,'tprm_questionnaire_created','tprm_questionnaire',$3,$4::jsonb,true)`,
-      [orgId, req.user.id, result.rows[0].id, JSON.stringify({ vendor_id, title })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'tprm_questionnaire_created',
+      resourceType: 'tprm_questionnaire',
+      resourceId: result.rows[0].id,
+      details: { vendor_id, title }
+    });
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
@@ -516,11 +557,12 @@ router.post('/documents', requirePermission('organizations.read'), async (req, r
       [orgId, vendor_id, document_type, document_name, expires_at || null, notes || null, req.user.id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1,$2,'tprm_document_requested','tprm_document',$3,$4::jsonb,true)`,
-      [orgId, req.user.id, result.rows[0].id, JSON.stringify({ vendor_id, document_type, document_name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'tprm_document_requested',
+      resourceType: 'tprm_document',
+      resourceId: result.rows[0].id,
+      details: { vendor_id, document_type, document_name }
+    });
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {

@@ -2,11 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { decrypt } = require('../utils/encrypt');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { enqueueWebhookEvent } = require('../services/webhookService');
+const poamGate = require('../services/poamGateService');
 const crosswalkCredits = require('../services/crosswalkCreditService');
 const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -121,18 +123,16 @@ router.put('/:id/implementation',
     );
     const previousStatus = existingResult.rows.length > 0 ? existingResult.rows[0].status : 'not_started';
 
-    // Check if this is a transition from non-compliant to compliant
-    const nonCompliantStatuses = ['not_started', 'in_progress', 'needs_review'];
-    const compliantStatuses = ['implemented', 'satisfied_via_crosswalk', 'verified'];
-    const isComplianceChange = nonCompliantStatuses.includes(previousStatus) && compliantStatuses.includes(status);
+    // Claiming a control is compliant is gated: it requires a written
+    // justification and produces a POA&M an auditor has to sign off. The rule
+    // lives in poamGateService so that PATCH /implementations/:id/status and
+    // PATCH /implementations/:id/test-result enforce exactly the same thing --
+    // they are the endpoints the dashboard actually calls, and until now they
+    // enforced nothing at all.
+    const isComplianceChange = poamGate.isComplianceTransition(previousStatus, status);
 
-    // If transitioning to compliant without POA&M justification, require it
     if (isComplianceChange && !poam_justification) {
-      return res.status(400).json({
-        success: false,
-        error: 'When marking a control as compliant, you must provide poam_justification explaining the remediation',
-        requires_poam_submission: true
-      });
+      return res.status(400).json(poamGate.justificationRequiredResponse());
     }
 
     // Upsert implementation
@@ -156,104 +156,36 @@ router.put('/:id/implementation',
     );
     const control = controlResult.rows[0];
 
-    // If transitioning to compliant, create or link POA&M
+    // If transitioning to compliant, create or advance the POA&M and file the
+    // approval request. The POA&M, its update record and the approval request
+    // are one unit of work -- an approval request pointing at a POA&M that was
+    // never written is worse than neither -- so they share a transaction.
     let poamItem = null;
     if (isComplianceChange && poam_justification) {
-      // Check if a POA&M already exists for this control
-      const existingPoamResult = await pool.query(
-        `SELECT id FROM poam_items 
-         WHERE organization_id = $1 AND control_id = $2 AND status IN ('open', 'in_progress', 'pending_review')
-         ORDER BY created_at DESC LIMIT 1`,
-        [orgId, controlId]
-      );
-
-      if (existingPoamResult.rows.length > 0) {
-        // Update existing POA&M
-        const poamId = existingPoamResult.rows[0].id;
-        const updatedPoam = await pool.query(
-          `UPDATE poam_items
-           SET status = 'pending_auditor_review',
-               remediation_plan = COALESCE(remediation_plan, $3),
-               closure_notes = $4,
-               updated_at = NOW()
-           WHERE id = $1 AND organization_id = $2
-           RETURNING *`,
-          [poamId, orgId, poam_justification, `Control ${control?.control_id} marked as ${status}`]
-        );
-        poamItem = updatedPoam.rows[0];
-
-        // Add update record
-        await pool.query(
-          `INSERT INTO poam_item_updates (
-             organization_id, poam_item_id, update_type, note, previous_status, new_status, changed_by
-           )
-           VALUES ($1, $2, 'status_change', $3, 'in_progress', 'pending_auditor_review', $4)`,
-          [orgId, poamId, `Control remediated: ${poam_justification}`, req.user.id]
-        );
-      } else {
-        // Create new POA&M
-        const newPoam = await pool.query(
-          `INSERT INTO poam_items (
-             organization_id, title, description, source_type, control_id,
-             status, priority, remediation_plan, closure_notes, created_by
-           )
-           VALUES ($1, $2, $3, 'control', $4, 'pending_auditor_review', 'medium', $5, $6, $7)
-           RETURNING *`,
-          [
-            orgId,
-            `Remediation: ${control?.control_id} - ${control?.title}`,
-            `Control transitioned from ${previousStatus} to ${status}`,
-            controlId,
-            poam_justification,
-            `Control marked as ${status}`,
-            req.user.id
-          ]
-        );
-        poamItem = newPoam.rows[0];
-
-        // Add initial update record
-        await pool.query(
-          `INSERT INTO poam_item_updates (
-             organization_id, poam_item_id, update_type, note, new_status, changed_by
-           )
-           VALUES ($1, $2, 'status_change', $3, 'pending_auditor_review', $4)`,
-          [orgId, poamItem.id, 'POA&M created for control compliance change', req.user.id]
-        );
-      }
-
-      // Create approval request
-      await pool.query(
-        `INSERT INTO poam_approval_requests (
-           organization_id, poam_item_id, control_id, previous_control_status,
-           new_control_status, justification, submitted_by, framework_specific_type,
-           framework_specific_data
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
+      poamItem = await poamGate.inTransaction((client) =>
+        poamGate.recordComplianceTransition(client, {
           orgId,
-          poamItem.id,
+          userId: req.user.id,
           controlId,
           previousStatus,
-          status,
-          poam_justification,
-          req.user.id,
-          framework_specific_type || 'standard',
-          framework_specific_data || {}
-        ]
+          newStatus: status,
+          justification: poam_justification,
+          frameworkSpecificType: framework_specific_type,
+          frameworkSpecificData: framework_specific_data
+        })
       );
 
-      // Send notification to auditors
-      await enqueueWebhookEvent({
-        organizationId: orgId,
-        eventType: 'control.compliance_change',
-        payload: {
-          control_id: controlId,
-          control_code: control?.control_id,
-          previous_status: previousStatus,
-          new_status: status,
-          poam_id: poamItem.id
-        }
-      }).catch(() => {});
+      // After COMMIT: a webhook queued inside the transaction would announce a
+      // compliance change that a rollback then erased.
+      await poamGate.notifyComplianceTransition({
+        orgId,
+        userId: req.user.id,
+        controlId,
+        controlCode: control?.control_id,
+        previousStatus,
+        newStatus: status,
+        poamItem
+      });
     }
 
     // Auto-crosswalk: if implemented, find high-similarity mappings
@@ -358,8 +290,8 @@ router.put('/:id/implementation',
 
         if (shouldPropagateEvidence) {
           const propagated = await pool.query(
-            `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-             SELECT DISTINCT ecl.evidence_id, $2::uuid, $3
+            `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+             SELECT DISTINCT ecl.evidence_id, $2::uuid, $3, e.organization_id
              FROM evidence_control_links ecl
              JOIN evidence e ON e.id = ecl.evidence_id
              WHERE ecl.control_id = $4::uuid
@@ -416,23 +348,19 @@ router.put('/:id/implementation',
     }
 
     // Log audit
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
-      [
-        orgId,
-        req.user.id,
-        controlId,
-        JSON.stringify({
-          previous_status: previousStatus,
-          new_status: status,
-          crosswalkedControls: crosswalkedControls.length,
-          withdrawnCrosswalkCredits: withdrawnCredits,
-          propagatedEvidenceLinks,
-          poam_created: !!poamItem
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_status_changed',
+      resourceType: 'control',
+      resourceId: controlId,
+      details: {
+        previous_status: previousStatus,
+        new_status: status,
+        crosswalkedControls: crosswalkedControls.length,
+        withdrawnCrosswalkCredits: withdrawnCredits,
+        propagatedEvidenceLinks,
+        poam_created: !!poamItem
+      }
+    });
 
     res.json({
       success: true,
@@ -594,8 +522,8 @@ router.post('/:id/inherit',
 
       if (shouldPropagateEvidence) {
         const propagated = await pool.query(
-          `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-           SELECT DISTINCT ecl.evidence_id, $2::uuid, $3
+          `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+           SELECT DISTINCT ecl.evidence_id, $2::uuid, $3, e.organization_id
            FROM evidence_control_links ecl
            JOIN evidence e ON e.id = ecl.evidence_id
            WHERE ecl.control_id = $4::uuid
@@ -659,22 +587,18 @@ router.post('/:id/inherit',
     }
 
     if (!dryRun) {
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-         VALUES ($1, $2, 'control_inheritance_triggered', 'control', $3, $4::jsonb, true)`,
-        [
-          orgId,
-          req.user.id,
-          sourceControlId,
-          JSON.stringify({
-            threshold: resolvedThreshold,
-            inherited_status: nextStatus,
-            processed: processed.length,
-            updated: processed.filter((p) => !p.skipped).length,
-            propagatedEvidenceLinks
-          })
-        ]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'control_inheritance_triggered',
+        resourceType: 'control',
+        resourceId: sourceControlId,
+        details: {
+          threshold: resolvedThreshold,
+          inherited_status: nextStatus,
+          processed: processed.length,
+          updated: processed.filter((p) => !p.skipped).length,
+          propagatedEvidenceLinks
+        }
+      });
 
       await enqueueWebhookEvent({
         organizationId: orgId,

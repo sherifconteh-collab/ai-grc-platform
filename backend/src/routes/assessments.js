@@ -13,6 +13,8 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
+const poamGate = require('../services/poamGateService');
 const multer = require('multer');
 const path = require('path');
 const PDFDocument = require('pdfkit');
@@ -20,6 +22,17 @@ const llm = require('../services/llmService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
 const { log } = require('../utils/logger');
+const rateLimit = require('express-rate-limit');
+
+// This router carries the entire assessment surface -- procedures, results,
+// engagements, PBC, workpapers, findings and sign-offs -- and had no rate
+// limiting of any kind, only authenticate. express-rate-limit is applied
+// router-wide ahead of authenticate so a cheap IP-based bound is in place
+// before any JWT verification or database lookup runs, matching the pattern in
+// routes/risks.js and routes/poam.js. Budget is higher than those because an
+// auditor working through an engagement legitimately makes many calls in a
+// session.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1500 }));
 
 // All routes require authentication
 router.use(authenticate);
@@ -447,34 +460,30 @@ router.post('/results', requirePermission('assessments.write'), async (req, res)
 
       // Audit trail for assessment result updates (best-effort; should not block save).
       try {
-        await pool.query(
-          `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-           VALUES ($1, $2, 'assessment_result_updated', 'control', $3, $4)`,
-          [
-            req.user.organization_id,
-            req.user.id,
-            procedureMeta.framework_control_id,
-            JSON.stringify({
-              source: source || 'assessments.results',
-              assessment_procedure_id: procedureMeta.assessment_procedure_id,
-              procedure_id: procedureMeta.procedure_id,
-              procedure_type: procedureMeta.procedure_type,
-              framework_code: procedureMeta.framework_code,
-              framework_name: procedureMeta.framework_name,
-              control_code: procedureMeta.control_code,
-              control_title: procedureMeta.control_title,
-              result_id: result.rows[0]?.id,
-              old_status: oldRow.status,
-              new_status: status,
-              old_risk_level: oldRow.risk_level,
-              new_risk_level: risk_level ?? oldRow.risk_level ?? null,
-              remediation_required: remediationRequiredBool,
-              remediation_deadline: remediation_deadline ?? oldRow.remediation_deadline ?? null,
-              finding: truncate(finding, 4000),
-              evidence_collected: truncate(evidence_collected, 4000)
-            })
-          ]
-        );
+        await auditService.logFromRequest(req, {
+          eventType: 'assessment_result_updated',
+          resourceType: 'control',
+          resourceId: procedureMeta.framework_control_id,
+          details: {
+            source: source || 'assessments.results',
+            assessment_procedure_id: procedureMeta.assessment_procedure_id,
+            procedure_id: procedureMeta.procedure_id,
+            procedure_type: procedureMeta.procedure_type,
+            framework_code: procedureMeta.framework_code,
+            framework_name: procedureMeta.framework_name,
+            control_code: procedureMeta.control_code,
+            control_title: procedureMeta.control_title,
+            result_id: result.rows[0]?.id,
+            old_status: oldRow.status,
+            new_status: status,
+            old_risk_level: oldRow.risk_level,
+            new_risk_level: risk_level ?? oldRow.risk_level ?? null,
+            remediation_required: remediationRequiredBool,
+            remediation_deadline: remediation_deadline ?? oldRow.remediation_deadline ?? null,
+            finding: truncate(finding, 4000),
+            evidence_collected: truncate(evidence_collected, 4000)
+          }
+        });
       } catch (auditError) {
         log('error', 'assessment_result_audit_log_update_failed', { error: auditError?.message || String(auditError) });
       }
@@ -499,39 +508,58 @@ router.post('/results', requirePermission('assessments.write'), async (req, res)
 
       // Audit trail for newly recorded assessment results (best-effort; should not block save).
       try {
-        await pool.query(
-          `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-           VALUES ($1, $2, 'assessment_result_recorded', 'control', $3, $4)`,
-          [
-            req.user.organization_id,
-            req.user.id,
-            procedureMeta.framework_control_id,
-            JSON.stringify({
-              source: source || 'assessments.results',
-              assessment_procedure_id: procedureMeta.assessment_procedure_id,
-              procedure_id: procedureMeta.procedure_id,
-              procedure_type: procedureMeta.procedure_type,
-              framework_code: procedureMeta.framework_code,
-              framework_name: procedureMeta.framework_name,
-              control_code: procedureMeta.control_code,
-              control_title: procedureMeta.control_title,
-              result_id: result.rows[0]?.id,
-              old_status: null,
-              new_status: status,
-              risk_level: risk_level || null,
-              remediation_required: remediationRequiredBool,
-              remediation_deadline: remediation_deadline || null,
-              finding: truncate(finding, 4000),
-              evidence_collected: truncate(evidence_collected, 4000)
-            })
-          ]
-        );
+        await auditService.logFromRequest(req, {
+          eventType: 'assessment_result_recorded',
+          resourceType: 'control',
+          resourceId: procedureMeta.framework_control_id,
+          details: {
+            source: source || 'assessments.results',
+            assessment_procedure_id: procedureMeta.assessment_procedure_id,
+            procedure_id: procedureMeta.procedure_id,
+            procedure_type: procedureMeta.procedure_type,
+            framework_code: procedureMeta.framework_code,
+            framework_name: procedureMeta.framework_name,
+            control_code: procedureMeta.control_code,
+            control_title: procedureMeta.control_title,
+            result_id: result.rows[0]?.id,
+            old_status: null,
+            new_status: status,
+            risk_level: risk_level || null,
+            remediation_required: remediationRequiredBool,
+            remediation_deadline: remediation_deadline || null,
+            finding: truncate(finding, 4000),
+            evidence_collected: truncate(evidence_collected, 4000)
+          }
+        });
       } catch (auditError) {
         log('error', 'assessment_result_audit_log_insert_failed', { error: auditError?.message || String(auditError) });
       }
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    // 'other_than_satisfied' is NIST SP 800-53A for "this control has gaps" --
+    // the canonical trigger for remediation. Raise a draft POA&M so the gap is
+    // tracked rather than recorded and forgotten. swallowErrors: the assessor's
+    // result must save even if the follow-up POA&M cannot be written.
+    let poamItem = null;
+    if (poamGate.isTestResultGap(status)) {
+      poamItem = await poamGate.inTransaction(
+        (client) => poamGate.raiseFromGap(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          source: 'procedure',
+          sourceId: procedureMeta.assessment_procedure_id,
+          controlId: procedureMeta.framework_control_id,
+          severity: risk_level,
+          title: `Remediate ${procedureMeta.control_code}: ${procedureMeta.procedure_id} other than satisfied`,
+          description: finding
+            ? `Assessment procedure ${procedureMeta.procedure_id} recorded as other than satisfied. Finding: ${truncate(finding, 4000)}`
+            : undefined
+        }),
+        { swallowErrors: true, context: 'poam_gate.raise_from_procedure' }
+      );
+    }
+
+    res.json({ success: true, data: result.rows[0], poam_item: poamItem });
   } catch (error) {
     log('error', 'record_result_error', { error: error?.message || String(error) });
     // Sanitize error message to avoid leaking database details
@@ -2818,7 +2846,32 @@ router.post('/engagements/:id/findings', requirePermission('assessments.write'),
       severity: inserted.rows[0].severity
     });
 
-    res.status(201).json({ success: true, data: inserted.rows[0] });
+    // A finding against a control is the textbook input to a POA&M, and until
+    // now recording one produced no remediation record at all. Raises at medium
+    // and above only -- low-severity observations are routinely closed in the
+    // same conversation that raises them, and auto-raising each would bury the
+    // register in noise. swallowErrors: the finding is the auditor's work
+    // product and must save regardless.
+    let poamItem = null;
+    if (control_id) {
+      poamItem = await poamGate.inTransaction(
+        (client) => poamGate.raiseFromGap(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          source: 'finding',
+          sourceId: inserted.rows[0].id,
+          controlId: control_id,
+          severity: inserted.rows[0].severity,
+          title: `Remediate finding: ${String(title).trim()}`,
+          description: recommendation
+            ? `Raised from audit finding. Recommendation: ${String(recommendation)}`
+            : `Raised from audit finding: ${String(description).trim()}`
+        }),
+        { swallowErrors: true, context: 'poam_gate.raise_from_finding' }
+      );
+    }
+
+    res.status(201).json({ success: true, data: inserted.rows[0], poam_item: poamItem });
   } catch (error) {
     log('error', 'create_engagement_finding_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to create finding' });

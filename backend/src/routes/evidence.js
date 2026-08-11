@@ -6,11 +6,13 @@ const path = require('path');
 const fs = require('fs');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { evidenceUploaded } = require('../services/realtimeEventService');
 const ragService = require('../services/orgRagService');
+const evidenceVersions = require('../services/evidenceVersionService');
 const aiSecurity = require('../utils/aiSecurity');
 const { log, serializeError } = require('../utils/logger');
 
@@ -707,6 +709,184 @@ router.post('/bulk-upload', createRateLimiter({ label: 'evidence-bulk-upload', w
   });
 });
 
+// POST /evidence/:id/versions — replace the file with a new revision. The
+// superseded file stays on disk and its hash stays in evidence_versions, so
+// integrity is demonstrable across a re-upload rather than only for whatever
+// happens to be current (issue #570).
+router.post('/:id/versions',
+  createRateLimiter({ label: 'evidence-version-upload', windowMs: 60 * 1000, max: 20 }),
+  requirePermission('evidence.write'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'A replacement file is required' });
+    }
+
+    const integrityHash = await computeFileHash(req.file.path);
+    const changeNote = typeof req.body.change_note === 'string'
+      ? req.body.change_note.slice(0, 2000)
+      : null;
+
+    const outcome = await evidenceVersions.withSnapshot(
+      {
+        evidenceId: req.params.id,
+        organizationId: req.user.organization_id,
+        actorUserId: req.user.id,
+        changeNote
+      },
+      (client) => client.query(
+        `UPDATE evidence SET
+           file_name = $1,
+           file_path = $2,
+           file_size = $3,
+           mime_type = $4,
+           integrity_hash_sha256 = $5,
+           integrity_verified_at = NOW(),
+           evidence_version = evidence_version + 1,
+           updated_at = NOW()
+         WHERE id = $6 AND organization_id = $7
+         RETURNING *`,
+        [
+          req.file.originalname, req.file.path, req.file.size,
+          req.file.mimetype, integrityHash,
+          req.params.id, req.user.organization_id
+        ]
+      )
+    );
+
+    if (outcome.notFound || outcome.result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence not found' });
+    }
+
+    // AU-2: replacing the file behind an evidence record changes what an
+    // assessor would be shown, so it belongs in the audit log.
+    await auditService.logFromRequest(req, {
+      eventType: 'evidence_version_created',
+      resourceType: 'evidence',
+      resourceId: req.params.id,
+      details: {
+        archived_version: outcome.snapshotVersion,
+        new_version: outcome.result.rows[0].evidence_version,
+        change_note: changeNote
+      }
+    }).catch((auditError) => {
+      log('error', 'evidence.version_audit_failed', { error: serializeError(auditError) });
+    });
+
+    res.status(201).json({
+      success: true,
+      data: outcome.result.rows[0],
+      archived_version: outcome.snapshotVersion
+    });
+  } catch (error) {
+    log('error', 'evidence.version_upload_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Failed to create evidence version' });
+  }
+});
+
+// GET /evidence/:id/risks — the register risks this document supports.
+//
+// The reverse of POST /risks/:id/evidence (migration 149). Evidence could
+// already be linked to controls, so a document's relationship to a risk was
+// only reachable transitively -- and only when the risk happened to have
+// controls linked and those controls happened to have this evidence. This
+// answers it directly, which is the question an auditor actually asks.
+//
+// Read-only: linking is owned by the risk, the same as every other risk link,
+// so exactly one screen writes the relationship.
+router.get('/:id/risks',
+  createRateLimiter({ label: 'evidence-risks-list', windowMs: 60 * 1000, max: 120 }),
+  requirePermission('evidence.read'), async (req, res) => {
+  try {
+    const exists = await pool.query(
+      'SELECT id FROM evidence WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
+    );
+    if (exists.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence not found' });
+    }
+
+    const result = await pool.query(
+      `SELECT rel.id, rel.risk_id, rel.relevance, rel.notes, rel.created_at AS linked_at,
+              r.title, r.category, r.status,
+              r.inherent_score, r.residual_score, r.next_review_date
+       FROM risk_evidence_links rel
+       JOIN risks r ON r.id = rel.risk_id
+       WHERE rel.evidence_id = $1 AND rel.organization_id = $2
+       ORDER BY COALESCE(r.residual_score, r.inherent_score) DESC NULLS LAST, r.title`,
+      [req.params.id, req.user.organization_id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'evidence.risks_list_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// GET /evidence/:id/versions — superseded versions, newest first. The current
+// version is the evidence row itself and is not repeated here.
+router.get('/:id/versions',
+  createRateLimiter({ label: 'evidence-versions-list', windowMs: 60 * 1000, max: 120 }),
+  requirePermission('evidence.read'), async (req, res) => {
+  try {
+    const exists = await pool.query(
+      'SELECT evidence_version FROM evidence WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
+    );
+    if (exists.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Evidence not found' });
+    }
+
+    const versions = await evidenceVersions.listVersions(req.user.organization_id, req.params.id);
+    res.json({
+      success: true,
+      data: {
+        current_version: Number(exists.rows[0].evidence_version) || 1,
+        versions
+      }
+    });
+  } catch (error) {
+    log('error', 'evidence.versions_list_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Failed to load evidence versions' });
+  }
+});
+
+// GET /evidence/:id/versions/:versionNumber/download — retrieve the file as it
+// was at a prior version. Same tight limit as the current-version download: an
+// archived version is the same PII-bearing file.
+router.get('/:id/versions/:versionNumber/download',
+  createRateLimiter({ label: 'evidence-version-download', windowMs: 60 * 1000, max: 30 }),
+  requirePermission('evidence.read'), async (req, res) => {
+  try {
+    const versionNumber = Number.parseInt(req.params.versionNumber, 10);
+    if (!Number.isInteger(versionNumber) || versionNumber < 1) {
+      return res.status(400).json({ success: false, error: 'versionNumber must be a positive integer' });
+    }
+
+    const version = await evidenceVersions.getVersion(
+      req.user.organization_id, req.params.id, versionNumber
+    );
+    if (!version) {
+      return res.status(404).json({ success: false, error: 'Evidence version not found' });
+    }
+    if (!version.file_path) {
+      return res.status(404).json({ success: false, error: 'This version has no stored file' });
+    }
+    if (!isSafeUploadPath(version.file_path)) {
+      return res.status(400).json({ success: false, error: 'Stored file path is outside allowed uploads directory' });
+    }
+    if (!uploadFileExists(version.file_path)) {
+      return res.status(404).json({ success: false, error: 'File not found on disk' });
+    }
+
+    res.setHeader('Content-Disposition', `attachment; filename="${sanitizeDownloadName(version.file_name)}"`);
+    res.setHeader('Content-Type', version.mime_type || 'application/octet-stream');
+    createUploadReadStream(version.file_path).pipe(res);
+  } catch (error) {
+    log('error', 'evidence.version_download_failed', { error: serializeError(error) });
+    res.status(500).json({ success: false, error: 'Failed to download evidence version' });
+  }
+});
+
 // GET /evidence/:id/integrity-check
 // Re-hashes the stored file on every call, so it is the most expensive read on
 // this router — limited well below the plain metadata reads.
@@ -886,21 +1066,35 @@ router.put('/:id',
 
     params.push(req.params.id, req.user.organization_id);
 
-    const result = await pool.query(
-      `UPDATE evidence SET
+    // Archive the row as it stands before overwriting it, in the same
+    // transaction as the update -- `evidence_version` used to increment while
+    // the previous version was discarded (issue #570).
+    const updateSql = `UPDATE evidence SET
          ${setClauses.join(',\n        ')}
        WHERE id = $${idx} AND organization_id = $${idx + 1}
-       RETURNING *`,
-      params
+       RETURNING *`;
+
+    const outcome = await evidenceVersions.withSnapshot(
+      {
+        evidenceId: req.params.id,
+        organizationId: req.user.organization_id,
+        actorUserId: req.user.id,
+        changeNote: typeof req.body.change_note === 'string' ? req.body.change_note.slice(0, 2000) : null
+      },
+      (client) => client.query(updateSql, params)
     );
 
-    if (result.rows.length === 0) {
+    if (outcome.notFound || outcome.result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Evidence not found' });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({
+      success: true,
+      data: outcome.result.rows[0],
+      archived_version: outcome.snapshotVersion
+    });
   } catch (error) {
-    console.error('Update evidence error:', error);
+    log('error', 'evidence.update_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to update evidence' });
   }
 });
@@ -973,7 +1167,9 @@ router.post('/:id/link',
 
     for (const cid of controlIds) {
       await pool.query(
-        'INSERT INTO evidence_control_links (evidence_id, control_id, notes) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+         SELECT $1, $2, $3, e.organization_id FROM evidence e WHERE e.id = $1
+         ON CONFLICT DO NOTHING`,
         [req.params.id, cid, notes || null]
       );
     }

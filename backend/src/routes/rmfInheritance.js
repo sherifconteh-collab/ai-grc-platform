@@ -17,6 +17,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const rateLimit = require('express-rate-limit');
 const { log } = require('../utils/logger');
+const { csvEscape } = require('../utils/csv');
 const { buildSystemSecurityPlan } = require('../services/oscalService');
 
 // Three layers, in this specific order: (1) a cheap per-process IP-based
@@ -124,10 +125,8 @@ async function fetchOrgPackage(req, res, queryable = pool) {
   return result.rows[0];
 }
 
-function csvEscape(val) {
-  const str = val === null || val === undefined ? '' : String(val);
-  return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-}
+// csvEscape now lives in utils/csv.js so routes/poam.js's export uses exactly
+// the same escaping rather than a second near-identical copy.
 
 /** One CRM row per (inherited control x product). */
 function buildCrmRows(links) {

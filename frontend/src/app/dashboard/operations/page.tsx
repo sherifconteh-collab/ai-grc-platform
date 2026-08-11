@@ -306,6 +306,12 @@ export default function OperationsCenterPage() {
                   onChange={e => setPoamFilter(e.target.value)}
                   className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
+                <Link
+                  href="/dashboard/poam"
+                  className="px-3 py-1.5 text-sm border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50"
+                >
+                  Full register
+                </Link>
                 <button
                   onClick={() => setShowCreatePoam(true)}
                   className="px-4 py-1.5 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
@@ -334,7 +340,14 @@ export default function OperationsCenterPage() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredPoams.map(poam => (
                       <tr key={poam.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">{poam.title}</td>
+                        <td className="px-4 py-3 max-w-xs truncate">
+                          <Link
+                            href={`/dashboard/poam/${poam.id}`}
+                            className="font-medium text-purple-700 hover:text-purple-900 hover:underline"
+                          >
+                            {poam.title}
+                          </Link>
+                        </td>
                         <td className="px-4 py-3">
                           <StatusBadge value={poam.priority || 'medium'} colorMap={{ high: 'bg-red-100 text-red-800', medium: 'bg-yellow-100 text-yellow-800', low: 'bg-blue-100 text-blue-800', critical: 'bg-red-100 text-red-800' }} />
                         </td>

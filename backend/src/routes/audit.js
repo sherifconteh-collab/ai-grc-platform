@@ -9,12 +9,25 @@ const dynamicFieldsService = require('../services/dynamicAuditFieldsService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { decodeCursor, nextCursorFrom } = require('../utils/keysetPagination');
 const rateLimit = require('express-rate-limit');
+const auditService = require('../services/auditService');
+const { log, serializeError } = require('../utils/logger');
 
 const auditWriteLimiter = createRateLimiter({
   label: 'audit-log-write',
   windowMs: 60 * 1000,
   max: 60
 });
+
+// Valid values for audit_logs.outcome, per the column comment set in
+// migration 048. The legacy boolean audit_logs.success is derived from this
+// rather than accepted independently: the two describe the same fact, and
+// letting a caller set them separately allowed a record asserting
+// success = true alongside outcome = 'failure'. 'partial' maps to
+// success = false -- a partially completed action is not a success, and for
+// an audit record under-claiming is the safer direction.
+const AUDIT_OUTCOMES = ['success', 'failure', 'partial'];
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // express-rate-limit applied router-wide, ahead of authenticate, so a cheap
 // IP-based bound is in place before authenticate's own DB/JWT work runs, and
@@ -25,6 +38,48 @@ const auditWriteLimiter = createRateLimiter({
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 router.use(authenticate);
+
+// Shared filter builder for the audit read paths. GET /logs and GET /export
+// must agree on what a given filter set selects -- an export that quietly
+// returns a different population than the screen the auditor was looking at
+// is worse than no export. Appends to `params` and returns the next
+// placeholder index; every value is parameterized.
+function buildAuditFilterClause(query, params, startIdx) {
+  const { userId, eventType, resourceType, resourceId, startDate, endDate,
+    findingKey, vulnerabilityId, source, outcome } = query;
+  let clause = '';
+  let idx = startIdx;
+  const add = (sql, value) => {
+    clause += ` AND ${sql.replace('$$', `$${idx}`)}`;
+    params.push(value);
+    idx++;
+  };
+
+  if (userId) add('al.user_id = $$', userId);
+  if (eventType) add('al.event_type = $$', eventType);
+  if (resourceType) add('al.resource_type = $$', String(resourceType));
+  if (resourceId) add('al.resource_id::text = $$', String(resourceId));
+  if (startDate) add('al.created_at >= $$', startDate);
+  if (endDate) add('al.created_at <= $$', endDate);
+  if (findingKey) add("al.details->>'finding_key' = $$", String(findingKey));
+  if (vulnerabilityId) add("al.details->>'vulnerability_id' = $$", String(vulnerabilityId));
+  if (source) add("al.details->>'source' = $$", String(source));
+  // Not offered by GET /logs before this change: an assessor reviewing AU-6
+  // findings almost always wants the failures on their own.
+  if (outcome) add('al.outcome = $$', String(outcome));
+
+  return { clause, nextIdx: idx };
+}
+
+// RFC 4180 escaping. A leading =, +, - or @ is prefixed with a single quote so
+// spreadsheet software does not evaluate an audit value as a formula.
+function csvCell(value) {
+  if (value === null || value === undefined) return '';
+  let s = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  if (/^[=+\-@]/.test(s)) s = `'${s}`;
+  if (/[",\r\n]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
 
 // GET /audit/logs
 router.get('/logs', requirePermission('audit.read'), async (req, res) => {
@@ -66,51 +121,9 @@ router.get('/logs', requirePermission('audit.read'), async (req, res) => {
     const params = [orgId];
     let idx = 2;
 
-    if (userId) {
-      query += ` AND al.user_id = $${idx}`;
-      params.push(userId);
-      idx++;
-    }
-    if (eventType) {
-      query += ` AND al.event_type = $${idx}`;
-      params.push(eventType);
-      idx++;
-    }
-    if (resourceType) {
-      query += ` AND al.resource_type = $${idx}`;
-      params.push(String(resourceType));
-      idx++;
-    }
-    if (resourceId) {
-      query += ` AND al.resource_id::text = $${idx}`;
-      params.push(String(resourceId));
-      idx++;
-    }
-    if (startDate) {
-      query += ` AND al.created_at >= $${idx}`;
-      params.push(startDate);
-      idx++;
-    }
-    if (endDate) {
-      query += ` AND al.created_at <= $${idx}`;
-      params.push(endDate);
-      idx++;
-    }
-    if (findingKey) {
-      query += ` AND al.details->>'finding_key' = $${idx}`;
-      params.push(String(findingKey));
-      idx++;
-    }
-    if (vulnerabilityId) {
-      query += ` AND al.details->>'vulnerability_id' = $${idx}`;
-      params.push(String(vulnerabilityId));
-      idx++;
-    }
-    if (source) {
-      query += ` AND al.details->>'source' = $${idx}`;
-      params.push(String(source));
-      idx++;
-    }
+    const filters = buildAuditFilterClause(req.query, params, idx);
+    query += filters.clause;
+    idx = filters.nextIdx;
 
     if (keyset) {
       query += ` AND (al.created_at, al.id) < ($${idx}, $${idx + 1})`;
@@ -231,6 +244,20 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
       return res.status(400).json({ success: false, error: 'event_type is required (string, max 100 chars).' });
     }
 
+    const resolvedOutcome = outcome || 'success';
+    if (!AUDIT_OUTCOMES.includes(resolvedOutcome)) {
+      return res.status(400).json({
+        success: false,
+        error: `outcome must be one of: ${AUDIT_OUTCOMES.join(', ')}.`
+      });
+    }
+
+    // resource_id is a UUID column -- reject a malformed value here rather than
+    // letting the driver raise and surface as an opaque 500.
+    if (resource_id && !UUID_PATTERN.test(String(resource_id))) {
+      return res.status(400).json({ success: false, error: 'resource_id must be a UUID.' });
+    }
+
     // Parse details — accept string (JSON) or object
     let parsedDetails = {};
     if (details) {
@@ -241,30 +268,125 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
       }
     }
 
-    const result = await pool.query(
-      `INSERT INTO audit_logs
-       (organization_id, user_id, event_type, resource_type, resource_id, details,
-        ip_address, user_agent, success, outcome, source_system, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, true, $9, $10, NOW())
-       RETURNING id, event_type, created_at`,
-      [
-        orgId,
-        userId,
-        event_type,
-        resource_type || null,
-        resource_id || null,
-        JSON.stringify(parsedDetails),
-        req.ip || null,
-        req.headers['user-agent'] || null,
-        outcome || 'success',
-        source_system || 'mcp_agent'
-      ]
-    );
+    const result = await auditService.logFromRequest(req, {
+      eventType: event_type,
+      resourceType: resource_type || null,
+      resourceId: resource_id || null,
+      details: parsedDetails,
+      success: resolvedOutcome === 'success',
+      sourceSystem: source_system || 'mcp_agent'
+    });
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Audit log create error:', error);
     res.status(500).json({ success: false, error: 'Failed to create audit log entry' });
+  }
+});
+
+// GET /audit/export — AU-7 (Audit Record Reduction and Report Generation)
+//
+// Auditors previously had no way to take audit records out of the platform;
+// the only options were paging the API by hand or going to the database.
+// Accepts the same filters as GET /logs and streams the result so a
+// multi-year export does not have to be held in memory. Rows are written in
+// keyset batches rather than one unbounded query for the same reason.
+router.get('/export', requirePermission('audit.read'), async (req, res) => {
+  const format = String(req.query.format || 'csv').toLowerCase();
+  if (!['csv', 'json'].includes(format)) {
+    return res.status(400).json({ success: false, error: "format must be 'csv' or 'json'." });
+  }
+
+  const COLUMNS = [
+    'id', 'created_at', 'event_type', 'outcome', 'success', 'failure_reason',
+    'actor_name', 'user_email', 'user_id', 'organization_id',
+    'resource_type', 'resource_id', 'ip_address', 'user_agent',
+    'request_id', 'source_system', 'authentication_method', 'sso_provider',
+    'siem_forwarded', 'details'
+  ];
+  const BATCH = 1000;
+
+  try {
+    const orgId = req.user.organization_id;
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="audit-log-${stamp}.${format}"`);
+
+    if (format === 'csv') {
+      res.write(COLUMNS.join(',') + '\n');
+    } else {
+      res.write('[');
+    }
+
+    let lastCreatedAt = null;
+    let lastId = null;
+    let wrote = 0;
+
+    for (;;) {
+      const params = [orgId];
+      let idx = 2;
+      let sql = `
+        SELECT al.id, al.created_at, al.event_type, al.outcome, al.success,
+               al.failure_reason, al.actor_name, al.user_id, al.organization_id,
+               al.resource_type, al.resource_id, al.ip_address, al.user_agent,
+               al.request_id, al.source_system, al.authentication_method,
+               al.sso_provider, al.siem_forwarded, al.details,
+               u.email as user_email
+        FROM audit_logs al
+        LEFT JOIN users u ON u.id = al.user_id
+        WHERE al.organization_id = $1
+      `;
+      const filters = buildAuditFilterClause(req.query, params, idx);
+      sql += filters.clause;
+      idx = filters.nextIdx;
+
+      if (lastCreatedAt !== null) {
+        sql += ` AND (al.created_at, al.id) > ($${idx}, $${idx + 1})`;
+        params.push(lastCreatedAt, lastId);
+        idx += 2;
+      }
+
+      sql += ` ORDER BY al.created_at ASC, al.id ASC LIMIT ${BATCH}`;
+
+      const { rows } = await pool.query(sql, params);
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        // Stored encrypted; decrypt for the export the same way GET /logs does.
+        row.user_email = row.user_email ? decrypt(row.user_email) : null;
+        if (format === 'csv') {
+          res.write(COLUMNS.map((c) => csvCell(row[c])).join(',') + '\n');
+        } else {
+          res.write((wrote === 0 ? '' : ',') + JSON.stringify(row));
+        }
+        wrote++;
+      }
+
+      lastCreatedAt = rows[rows.length - 1].created_at;
+      lastId = rows[rows.length - 1].id;
+      if (rows.length < BATCH) break;
+    }
+
+    if (format === 'json') res.write(']');
+    res.end();
+
+    // The export itself is an auditable read of the audit trail (AU-6/AU-9).
+    auditService.logFromRequest(req, {
+      eventType: 'audit.exported',
+      resourceType: 'audit_log',
+      details: { format, row_count: wrote, filters: req.query }
+    }).catch((err) => log('error', 'audit.write_failed',
+      { eventType: 'audit.exported', error: serializeError(err) }));
+  } catch (error) {
+    log('error', 'audit.export_failed', { error: serializeError(error) });
+    // Headers are already sent once streaming has begun, so the only honest
+    // signal left is to break the stream rather than end it cleanly and hand
+    // the auditor a silently truncated file.
+    if (res.headersSent) {
+      res.destroy(error);
+      return;
+    }
+    res.status(500).json({ success: false, error: 'Failed to export audit log' });
   }
 });
 

@@ -107,6 +107,11 @@ jobs:
           [ "$FAILED" -eq 0 ] && echo "No new duplicate migration numbers"
           exit $FAILED
 
+      - name: Check for migration schema drift
+        run: |
+          cd backend
+          npm run check:migration-drift
+
       - name: Frontend - typecheck, API types, and production build
         run: |
           cd frontend

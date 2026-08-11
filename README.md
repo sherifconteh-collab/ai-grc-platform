@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v4.6.1-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v4.8.0-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -53,11 +53,11 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-01 | PR #250: feat(registers): risk register, incidents, obligations, objectives, indicators and departments -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #257: chore(backend)(deps): bump firebase-admin from 13.10.0 to 14.2.0 in /backend -->
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 15+ frameworks with 1,000+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 34 frameworks with 1,800+ controls. Built to be:
 
 - **Multi-Framework**: 30+ major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
@@ -96,10 +96,10 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
 - 📊 Compliance dashboard with real-time metrics and custom dashboard builder
-- 🎯 Framework selection (15+ frameworks, 1,000+ controls)
+- 🎯 Framework selection (34 frameworks, 1,800+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
-- 📜 AU-2 compliant immutable audit logging
+- 📜 Audit logging with 20 recorded fields per event
 - 🛡️ RBAC with Admin, ISSE, Auditor, and Read-Only roles
 - 🔑 **Access Governance** — entitlement reporting with over-privileged and dormant-access flags, separation-of-duties toxic-combination rules, access review certification campaigns (AC-2 evidence on completion), a role/permission simulator, and AI-assisted import of your existing RBAC documentation
 - 🏷️ **Framework-neutral evidence types** — a 14-value vocabulary that labels evidence consistently no matter which framework you are working against
@@ -227,11 +227,11 @@ Add `REDIS_URL=redis://localhost:6379` to `backend/.env` to enable distributed r
 
 Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and exception reporting.
 
-## 📚 Supported Frameworks (35+)
+## 📚 Supported Frameworks (34)
 
 ### Core Security & Compliance
 - **NIST CSF 2.0** — Cybersecurity Framework 2.0 (106 controls across 6 functions)
-- **NIST SP 800-53 Rev 5** — Security and Privacy Controls (300 base controls across all 20 families, priority derived from Low/Moderate/High baseline membership)
+- **NIST SP 800-53 Rev 5** — Security and Privacy Controls (1,014 items across all 20 families: 300 base controls plus all 714 non-withdrawn enhancements, with NIST SP 800-53B Low/Moderate/High baseline membership recorded per control)
 - **NIST SP 800-171 Rev 3** — Protecting Controlled Unclassified Information (110 requirements)
 - **NIST Privacy Framework 1.0** — Privacy risk management across the enterprise
 - **NIST SP 800-207** — Zero Trust Architecture reference model and implementation guide
@@ -284,8 +284,10 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 - **CIS Controls v8** (`cis_controls_v8`) — 18 Implementation Groups with crosswalk mappings to NIST 800-53 Rev 5 and NIST CSF 2.0
 - **FedRAMP High Baseline** (`fedramp_high`) — 25 High-only additions (AC, AU, IA, SC, SI, SA, CP, IR, PE, PS, RA, PL families) with crosswalk to NIST 800-53 Rev 5
 
+### Added since
+- **PCI DSS v4.0** (`pci_dss_v4`) — 61 controls across the 12 requirement domains
+
 ### Roadmap (not yet seeded)
-- PCI DSS 4.0
 - COBIT 2019
 
 ## 💡 Key Features
@@ -370,7 +372,7 @@ Full RMF lifecycle management without leaving the platform:
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
-- Track compliance across 15+ frameworks simultaneously
+- Track compliance across 34 frameworks simultaneously
 - **Cross-framework control mapping (Crosswalks)** — 80+ mappings showing control overlaps
 - Unified risk register with inherent/residual scoring, treatments and named acceptance
 - Gap analysis across standards
@@ -384,7 +386,7 @@ Full asset and configuration inventory:
 - **Baselines** — capture and compare configuration states
 - **Change control** — track and approve changes to managed assets
 - **Dependency maps** — visualize service and asset relationships
-- **Audit trail** — every change logged to the immutable audit log
+- **Audit trail** — every change logged to the audit log
 
 ### 📊 Data Governance
 
@@ -403,7 +405,8 @@ Full asset and configuration inventory:
 
 ### 📎 Evidence Management
 - Upload evidence as files (PDF, DOCX, XLSX, images) or link external URLs
-- Automatic versioning of all evidence items
+- Real version history — every superseded version keeps its own file, hash and PII classification, so a prior version can be retrieved, integrity stays demonstrable across a file replacement, and a reclassification does not destroy the record of what the evidence was classified as while it was being relied on
+- Integrity verification — recompute a file's hash and compare it against the one recorded at upload, showing both so a mismatch can be reported precisely
 - PII data labeling and classification
 - Bulk upload via CSV with field mapping UI
 - Auto-evidence collection and pending review workflow
@@ -412,8 +415,12 @@ Full asset and configuration inventory:
 - Auditor workspace with dedicated workflows
 - Control verification (verified / not verified / requires remediation)
 - Assessment procedures and findings tracking
-- Immutable audit trail for every action
-- Remediation workflows with POA&M (Plan of Action & Milestones)
+- Audit trail for every action
+- Remediation workflows with POA&M (Plan of Action & Milestones) — items are raised automatically when a control test or assessment procedure comes back *other than satisfied*, or an audit finding is recorded at medium severity or above, with owner, dates and plan left blank for a human
+- Gated compliance claims — marking a control compliant requires a written justification and produces a POA&M in *pending auditor review* with an approval request attached
+- Auditor review queue with approve / reject / request-changes decisions, framework-specific guidance, and separation of duties enforced so a submitter cannot review their own item
+- Discrete milestones, resources required, and slippage measured against the originally scheduled completion date
+- POA&M CSV and PDF export for federal and regulatory reporting
 
 ### 📊 Dashboards & Reporting
 - Executive compliance dashboard with real-time metrics
@@ -684,7 +691,7 @@ controlweave/
 │   │   ├── config/          # Database, Redis, and security configuration
 │   │   └── utils/           # Logging, encryption, TOTP, AI security, password
 │   │                        #   policy, Redis cache, Sentry integration
-│   ├── migrations/          # Database migrations (115)
+│   ├── migrations/          # Database migrations (162)
 │   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
@@ -711,13 +718,13 @@ controlweave/
 ### Core Tables
 - `organizations` — Multi-tenant support
 - `users` — Authentication and profiles with AES-256-GCM PII encryption and HMAC-SHA-384 email hashing
-- `frameworks` — Framework catalog (15+ frameworks)
+- `frameworks` — Framework catalog (34 frameworks)
 - `framework_controls` — Individual controls/requirements
 - `control_implementations` — Org-specific implementation status
 
 ### AI-Specific Tables
 - `assets` (category `AI Agent`) — AI system inventory and classification
-- `asset_control_mappings` — AI-to-control mappings
+- `asset_control_mappings` — Which controls apply to an asset, and whether that asset satisfies them. Not AI-specific despite living in this section: it covers every CMDB asset, and the compliance status is the asset's own, so a control implemented org-wide can still be non-compliant on one host
 - `ai_decision_log` — AI feature decisions with `structured JSONB` for validated output
 - `ai_usage_log` — Per-org AI usage tracking
 
@@ -736,6 +743,19 @@ controlweave/
 - `risk_treatments` — Treatment actions with target residual score, so treatment effectiveness can be measured after completion
 - `risk_reviews` — Periodic review history; snapshots the assessment as it stood at review time
 - `risk_control_links` / `risk_asset_links` / `risk_objective_links` — What treats the risk, what is exposed, what is threatened
+- `risk_poam_links` — What is being *done* about the risk. Many-to-many, because one remediation routinely addresses several risks
+- `risk_vendor_links` — Which third party the risk arises from. `tprm_vendors.risk_tier` is a static onboarding classification, not a scored and reviewed risk, so vendor concentration needs its own edge into the register
+- `risk_evidence_links` — What proves the risk is under management, carrying a `relevance` (assessment / treatment / monitoring / acceptance). Going via the risk's controls only answers transitively, and only when those controls happen to carry the document
+
+### Remediation (POA&M)
+- `poam_items` — Plan of Action & Milestones, with `resources_required` and `scheduled_completion_date` held separately from `due_date` so slippage against the original commitment stays visible
+- `poam_milestones` — Discrete milestones with their own target dates and completion state; a federal POA&M is a list of these, not one overall date
+- `poam_control_links` — Many-to-many POA&M ↔ control, so one remediation can span several controls across different frameworks
+- `poam_item_updates` — Progress notes and status changes, newest first
+- `poam_approval_requests` — The auditor review trail: what was claimed, by whom, the justification, and the decision
+
+### Evidence Versioning
+- `evidence_versions` — An immutable snapshot of an evidence row as it stood *before* each update, taken in the same transaction. Keeps the superseded file, its hash and its PII classification, so a prior version is retrievable and a reclassification is recoverable
 
 ### Incidents
 - `incidents` — NIST SP 800-61 lifecycle with per-phase timestamps (dwell time, time to contain) and the regulatory notification clock
@@ -760,7 +780,7 @@ controlweave/
 ### Assessment & Audit
 - `assessment_plans` — Audit and assessment tracking
 - `audit_findings` — Gap identification
-- `audit_logs` — Immutable audit log
+- `audit_logs` — Append-only audit log (database-level trigger denies `UPDATE`/`DELETE`) with a per-organization SHA-384 hash chain for tamper evidence; see `docs/FEDRAMP_DEPLOYMENT_GUIDE.md` section 5 (AU-9)
 
 ### Policy & Operations
 - `organization_policies` — Policy lifecycle management
@@ -780,7 +800,7 @@ controlweave/
 ## 🎯 Use Cases
 
 ### For Compliance Officers
-- Track compliance across 15+ frameworks simultaneously
+- Track compliance across 34 frameworks simultaneously
 - Leverage auto-crosswalk to reduce compliance burden by 40-60%
 - Use AI Copilot with RAG for grounded gap analysis and compliance forecasting
 - Generate audit-ready reports and documentation
@@ -796,6 +816,7 @@ controlweave/
 ### For Risk Managers
 - Maintain enterprise risk register
 - Map risks to controls across frameworks
+- See what is actually being done about a risk — POA&M items link to the risks they burn down, and can be raised straight from one
 - Prioritize vulnerabilities with live CISA KEV and NVD intelligence
 - Track risk treatment effectiveness
 - Use AI-powered risk scoring and remediation suggestions
@@ -857,13 +878,13 @@ controlweave/
 
 ### Phase 1: Foundation ✅
 - ✅ Complete PostgreSQL schema (140+ tables)
-- ✅ 15+ framework seed data (1,000+ controls)
+- ✅ 34 framework seed data (1,800+ controls)
 - ✅ Cross-framework crosswalk mappings (80+)
 - ✅ REST API with full CRUD operations
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA
 - ✅ RBAC (Admin, ISSE, Auditor, Read-Only)
 - ✅ Next.js frontend with dashboard
-- ✅ AU-2 compliant immutable audit logging
+- ✅ Audit logging with 20 recorded fields per event
 - ✅ Auto-crosswalk engine
 
 ### Phase 2: Advanced Features ✅ (All Complete in v4.0.0)
@@ -979,17 +1000,17 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 ## 📈 Stats
 
-- **Frameworks**: 37+ supported (including CIS Controls v8 and FedRAMP High added in v4.2.0)
-- **Controls**: 1,000+ controls in database
+- **Frameworks**: 34 supported (including CIS Controls v8 and FedRAMP High added in v4.2.0)
+- **Controls**: 1,800+ controls in database
 - **Crosswalks**: 280+ cross-framework mappings (203 new mappings added in v4.2.0)
 - **Connector Templates**: 15 in the Integrations Hub (AWS Security Hub, Qualys VMDR, ServiceNow added in v4.2.0)
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
-- **Tables**: 190+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
-- **Migrations**: 115 sequential, idempotent migrations
+- **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
+- **Migrations**: 162 sequential, idempotent migrations
 - **API Routes**: 80+ route modules
-- **Services**: 58 service modules
+- **Services**: 62 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)

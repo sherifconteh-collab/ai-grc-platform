@@ -44,6 +44,8 @@ const _reminderMod = safeRequire('./services/reminderService');
 const startReminderScheduler = _reminderMod ? _reminderMod.startReminderScheduler : null;
 const _reportSchedulerMod = safeRequire('./services/reportScheduler');
 const startReportScheduler = _reportSchedulerMod ? _reportSchedulerMod.startReportScheduler : null;
+const _retentionSchedulerMod = safeRequire('./services/retentionScheduler');
+const startRetentionScheduler = _retentionSchedulerMod ? _retentionSchedulerMod.startRetentionScheduler : null;
 const { SECURITY_CONFIG } = require('./config/security');
 const { validateEdition, getEditionInfo, attachEditionInfo } = require('./middleware/edition');
 const { getRedisAdapterStatus } = require('./services/websocketService');
@@ -373,6 +375,7 @@ const vulnerabilitiesRoutes = safeRequire('./routes/vulnerabilities');
 const sbomRoutes = safeRequire('./routes/sbom');
 const dynamicConfigRoutes = require('./routes/dynamicConfig');
 const poamRoutes = require('./routes/poam');
+const poamMilestonesRoutes = require('./routes/poamMilestones');
 const exceptionsRoutes = require('./routes/exceptions');
 const controlHealthRoutes = require('./routes/controlHealth');
 const dashboardBuilderRoutes = require('./routes/dashboardBuilder');
@@ -473,7 +476,10 @@ if (splunkRoutes) app.use('/api/v1/integrations', splunkRoutes);
 if (vulnerabilitiesRoutes) app.use('/api/v1/vulnerabilities', vulnerabilitiesRoutes);
 if (sbomRoutes) app.use('/api/v1/sbom', sbomRoutes);
 app.use('/api/v1/config', dynamicConfigRoutes);
+// Milestones mount on the same base path; poamMilestones.js declares only
+// /:id/milestones routes, so ordering between the two does not collide.
 app.use('/api/v1/poam', poamRoutes);
+app.use('/api/v1/poam', poamMilestonesRoutes);
 app.use('/api/v1/exceptions', exceptionsRoutes);
 app.use('/api/v1/control-health', controlHealthRoutes);
 app.use('/api/v1/dashboard-builder', dashboardBuilderRoutes);
@@ -861,6 +867,7 @@ async function ensureLicenseFromDb() {
 // procedures) are intentionally deferred until after the server is listening.
 let stopReminders = () => {};
 let stopReportScheduler = () => {};
+let stopRetentionScheduler = () => {};
 const HOST = process.env.HOST || '0.0.0.0';
 
 ensureLicenseFromDb()
@@ -886,6 +893,7 @@ ensureLicenseFromDb()
       if (databaseConfigured) {
         stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
         stopReportScheduler = startReportScheduler ? startReportScheduler() : () => {};
+        stopRetentionScheduler = startRetentionScheduler ? startRetentionScheduler() : () => {};
 
         // Start scheduled database backups if enabled.
         // In PM2 cluster mode pm_id is set per-worker (0-indexed); only worker 0
@@ -921,6 +929,7 @@ ensureLicenseFromDb()
       log('warn', 'server.shutdown.requested', { signal });
       stopReminders();
       stopReportScheduler();
+      stopRetentionScheduler();
       const _bs = safeRequire('./services/backupScheduler');
       if (_bs) _bs.stop();
       server.close(() => {

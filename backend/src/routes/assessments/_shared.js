@@ -13,6 +13,7 @@
 const multer = require('multer');
 const path = require('path');
 const pool = require('../../config/database');
+const auditService = require('../../services/auditService');
 const { log } = require('../../utils/logger');
 
 const VALID_ENGAGEMENT_TYPES = ['internal_audit', 'external_audit', 'readiness', 'assessment'];
@@ -354,11 +355,12 @@ function buildValidationChecklist(signoffRows = []) {
 
 async function logAuditEvent(req, eventType, resourceType, resourceId, details = {}) {
   try {
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [req.user.organization_id, req.user.id, eventType, resourceType, resourceId || null, details]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: eventType,
+      resourceType: resourceType,
+      resourceId: resourceId || null,
+      details: details
+    });
   } catch (error) {
     // Audit logging should not block business operations.
   }

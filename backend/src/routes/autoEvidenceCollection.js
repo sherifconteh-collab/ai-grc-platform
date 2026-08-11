@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { validateBody, isUuid } = require('../middleware/validate');
@@ -237,8 +238,9 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
       const validControlIds = validRows.rows.map((row) => row.id);
       if (validControlIds.length > 0) {
         await pool.query(
-          `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-           SELECT $1, unnest($2::uuid[]), $3
+          `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+           SELECT $1, unnest($2::uuid[]), $3, e.organization_id
+           FROM evidence e WHERE e.id = $1
            ON CONFLICT DO NOTHING`,
           [evidenceRecord.id, validControlIds, `Auto-linked by rule "${rule.name}"`]
         );
@@ -313,8 +315,9 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
     const validControlIds = validRows.rows.map((row) => row.id);
     if (validControlIds.length > 0) {
       await pool.query(
-        `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-         SELECT $1, unnest($2::uuid[]), $3
+        `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+         SELECT $1, unnest($2::uuid[]), $3, e.organization_id
+         FROM evidence e WHERE e.id = $1
          ON CONFLICT DO NOTHING`,
         [evidenceRecord.id, validControlIds, `Auto-linked by rule "${rule.name}"`]
       );
@@ -402,11 +405,12 @@ router.post(
         ]
       );
 
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-         VALUES ($1, $2, 'auto_evidence_rule_created', 'evidence_collection_rule', $3, $4::jsonb, true)`,
-        [orgId, req.user.id, ins.rows[0].id, JSON.stringify({ name: ins.rows[0].name, source_type, schedule })]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'auto_evidence_rule_created',
+        resourceType: 'evidence_collection_rule',
+        resourceId: ins.rows[0].id,
+        details: { name: ins.rows[0].name, source_type, schedule }
+      });
 
       res.status(201).json({ success: true, data: ins.rows[0] });
     } catch (error) {
@@ -535,11 +539,12 @@ router.delete('/rules/:id', createRateLimiter({ label: 'auto-evidence-delete', w
       return res.status(404).json({ success: false, error: 'Evidence collection rule not found' });
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'auto_evidence_rule_deleted', 'evidence_collection_rule', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ name: deleted.rows[0].name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'auto_evidence_rule_deleted',
+      resourceType: 'evidence_collection_rule',
+      resourceId: id,
+      details: { name: deleted.rows[0].name }
+    });
 
     res.json({ success: true, message: 'Evidence collection rule deleted' });
   } catch (error) {
@@ -599,14 +604,12 @@ router.post(
         [id, result.evidence_id, nextRunAt]
       );
 
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-         VALUES ($1, $2, 'auto_evidence_collected', 'evidence_collection_rule', $3, $4::jsonb, true)`,
-        [
-          orgId, req.user.id, id,
-          JSON.stringify({ rule_name: rule.name, evidence_id: result.evidence_id, result_count: result.result_count })
-        ]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'auto_evidence_collected',
+        resourceType: 'evidence_collection_rule',
+        resourceId: id,
+        details: { rule_name: rule.name, evidence_id: result.evidence_id, result_count: result.result_count }
+      });
 
       res.json({
         success: true,

@@ -5,7 +5,7 @@ const { authenticate, requireTier, requirePermission } = require('../middleware/
 const { requireProEdition } = require('../middleware/edition');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const vendorSecurityService = require('../services/vendorSecurityService');
-const pool = require('../config/database');
+const auditService = require('../services/auditService');
 
 // Rate limiter for vendor security endpoints
 const vendorSecurityRateLimiter = createRateLimiter({
@@ -86,15 +86,16 @@ router.post('/scores', requirePermission('organizations.write'), async (req, res
     const score = await vendorSecurityService.upsertVendorScore(orgId, scoreData);
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'vendor_score_added', 'vendor_score', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, score.id, JSON.stringify({
+    await auditService.logFromRequest(req, {
+      eventType: 'vendor_score_added',
+      resourceType: 'vendor_score',
+      resourceId: score.id,
+      details: {
         vendor_name: score.vendor_name,
         score_provider: score.score_provider,
         score_value: score.score_value
-      })]
-    );
+      }
+    });
     
     res.status(201).json({ success: true, data: score });
   } catch (error) {
@@ -141,26 +142,29 @@ router.post('/scores/:id/refresh', requirePermission('organizations.write'), asy
     );
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'vendor_score_refreshed', 'vendor_score', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, score.id, JSON.stringify({
+    await auditService.logFromRequest(req, {
+      eventType: 'vendor_score_refreshed',
+      resourceType: 'vendor_score',
+      resourceId: score.id,
+      details: {
         vendor_name: score.vendor_name,
         score_value: score.score_value,
         score_trend: score.score_trend
-      })]
-    );
+      }
+    });
     
     res.json({ success: true, data: score });
   } catch (error) {
     console.error('Refresh vendor score error:', error);
     
     // Log failed audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'vendor_score_refresh_failed', 'vendor_score', $3, $4::jsonb, false)`,
-      [orgId, req.user.id, req.params.id, JSON.stringify({ error: error.message })]
-    ).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'vendor_score_refresh_failed',
+      resourceType: 'vendor_score',
+      resourceId: req.params.id,
+      details: { error: error.message },
+      success: false
+    }).catch(() => {});
     
     res.status(500).json({ success: false, error: 'Failed to refresh vendor score' });
   }
@@ -188,15 +192,16 @@ router.post('/monitor', requirePermission('organizations.write'), async (req, re
     );
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'vendor_monitoring_started', 'vendor_score', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, score.id, JSON.stringify({
+    await auditService.logFromRequest(req, {
+      eventType: 'vendor_monitoring_started',
+      resourceType: 'vendor_score',
+      resourceId: score.id,
+      details: {
         vendor_name: score.vendor_name,
         vendor_domain: vendor_domain,
         score_provider: score_provider
-      })]
-    );
+      }
+    });
     
     res.status(201).json({ success: true, data: score });
   } catch (error) {
@@ -218,11 +223,12 @@ router.delete('/scores/:id', requirePermission('organizations.write'), async (re
     }
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'vendor_score_deleted', 'vendor_score', $3, '{}'::jsonb, true)`,
-      [orgId, req.user.id, scoreId]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'vendor_score_deleted',
+      resourceType: 'vendor_score',
+      resourceId: scoreId,
+      details: '{}'
+    });
     
     res.json({ success: true, message: 'Vendor score deleted successfully' });
   } catch (error) {

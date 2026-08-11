@@ -300,11 +300,38 @@ export default function ControlsPage() {
   const loadControls = useCallback(async () => {
     if (!user?.organizationId) return;
     try {
-      const response = await organizationAPI.getControls(user.organizationId);
-      const payload = response.data?.data;
-      const rawControls = Array.isArray(payload)
-        ? payload
-        : payload?.controls || payload?.rows || [];
+      // Page through until the server's reported total is reached. This page
+      // groups the whole catalog by family, so it does want everything -- but
+      // it previously asked for everything with no pagination and the backend
+      // answered with a silent LIMIT 2000 and no total, so once the catalog
+      // outgrew that cap the tail of the list would simply vanish with no
+      // error. The backend now always reports `total`, and this loop uses it.
+      const PAGE_SIZE = 500;
+      const rawControls: any[] = [];
+      let page = 1;
+      let total = Infinity;
+
+      while (rawControls.length < total) {
+        const response = await organizationAPI.getControls(user.organizationId, {
+          page,
+          limit: PAGE_SIZE,
+        });
+        const body = response.data;
+        const payload = body?.data;
+        const batch = Array.isArray(payload)
+          ? payload
+          : payload?.controls || payload?.rows || [];
+
+        rawControls.push(...batch);
+
+        const reportedTotal = body?.pagination?.total;
+        total = typeof reportedTotal === 'number' ? reportedTotal : rawControls.length;
+
+        // Guard against a server that reports a total it will not serve, so a
+        // mismatch degrades to a short list rather than an infinite loop.
+        if (batch.length === 0) break;
+        page += 1;
+      }
 
       const mappedControls: Control[] = rawControls.map((control: any) => ({
         id: control.id,
@@ -429,10 +456,29 @@ export default function ControlsPage() {
   // Identify parent controls and their sub-controls (enhancements)
   // e.g. AC-2 is parent; AC-2(1), AC-2(2) are enhancements
   // Use unfiltered controls so enhancements always show even when filters are active
-  const getSubControls = (parentControlId: string): Control[] => {
-    const prefix = parentControlId + '(';
-    return controls.filter(c => c.controlId.startsWith(prefix));
-  };
+  // Indexed once per controls change instead of scanning the whole catalog for
+  // every rendered row. The previous form was called inside the row map, so it
+  // cost O(rows x catalog) on every render -- and every keystroke in the search
+  // box triggers one. At ~1,160 controls that was already ~1.3M string
+  // comparisons per render; the 800-53 enhancement import roughly triples the
+  // catalog, which would have made it ~4x worse.
+  const subControlsByParent = useMemo(() => {
+    const index = new Map<string, Control[]>();
+    for (const control of controls) {
+      const open = control.controlId.indexOf('(');
+      if (open <= 0) continue;
+      const parent = control.controlId.slice(0, open);
+      const bucket = index.get(parent);
+      if (bucket) bucket.push(control);
+      else index.set(parent, [control]);
+    }
+    return index;
+  }, [controls]);
+
+  const getSubControls = useCallback(
+    (parentControlId: string): Control[] => subControlsByParent.get(parentControlId) ?? [],
+    [subControlsByParent]
+  );
 
   const isSubControl = (controlId: string): boolean => /\(\d+\)$/.test(controlId);
 

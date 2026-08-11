@@ -180,11 +180,21 @@ async function fetchControlRows(orgId, specificControlId = null) {
          AND ce.control_id = fc.id
      ) excstats ON true
      WHERE ofw.organization_id = $1
-     ${whereSpecific}`,
+     ${whereSpecific}
+     ORDER BY fc.control_id
+     LIMIT ${CONTROL_HEALTH_MAX_ROWS}`,
     params
   );
   return result.rows;
 }
+
+// This query runs five LEFT JOIN LATERAL subqueries per control and fires on
+// every controls-page mount, so it is the most expensive catalog query in the
+// codebase. It had no LIMIT at all: cost scaled linearly with the catalog, and
+// the 800-53 enhancement import roughly triples that. Bounded here, with an
+// explicit ORDER BY so the bound is deterministic rather than whatever the
+// planner happened to return first.
+const CONTROL_HEALTH_MAX_ROWS = 5000;
 
 // GET /api/v1/control-health
 router.get('/', requirePermission('controls.read'), async (req, res) => {

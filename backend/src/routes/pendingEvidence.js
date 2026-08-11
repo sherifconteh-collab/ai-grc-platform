@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { createHash, randomBytes } = require('crypto');
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { isUuid } = require('../middleware/validate');
@@ -411,8 +412,8 @@ router.post(
         );
         for (const row of validRows.rows) {
           await pool.query(
-            `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-             VALUES ($1, $2, $3)
+            `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+             SELECT $1, $2, $3, e.organization_id FROM evidence e WHERE e.id = $1
              ON CONFLICT DO NOTHING`,
             [evidenceRecord.id, row.id, `AI-suggested mapping (approved by user)`]
           );
@@ -428,11 +429,12 @@ router.post(
         [pendingId, req.user.id, req.body.notes || null, evidenceRecord.id]
       );
 
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-         VALUES ($1, $2, 'pending_evidence_approved', 'pending_evidence', $3, $4::jsonb, true)`,
-        [orgId, req.user.id, pendingId, JSON.stringify({ evidence_id: evidenceRecord.id, title: pe.ai_title })]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'pending_evidence_approved',
+        resourceType: 'pending_evidence',
+        resourceId: pendingId,
+        details: { evidence_id: evidenceRecord.id, title: pe.ai_title }
+      });
 
       res.json({
         success: true,
@@ -478,11 +480,12 @@ router.post(
         [pendingId, req.user.id, req.body.notes || null]
       );
 
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-         VALUES ($1, $2, 'pending_evidence_rejected', 'pending_evidence', $3, $4::jsonb, true)`,
-        [orgId, req.user.id, pendingId, JSON.stringify({ title: existing.rows[0].ai_title })]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'pending_evidence_rejected',
+        resourceType: 'pending_evidence',
+        resourceId: pendingId,
+        details: { title: existing.rows[0].ai_title }
+      });
 
       res.json({ success: true, message: 'Pending evidence rejected.' });
     } catch (error) {

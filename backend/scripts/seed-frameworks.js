@@ -3,7 +3,7 @@ require('dotenv').config();
 const { Pool } = require('pg');
 const frameworks = require('./lib/frameworks/index');
 const { verifyExpectedCounts } = require('./lib/frameworks/verifyCounts');
-const { insertFramework, insertControl } = require('./lib/frameworkControlUpsert');
+const { insertFramework, insertControl, linkControlHierarchyAndBaselines } = require('./lib/frameworkControlUpsert');
 const COVERAGE_STATUS = require('./lib/frameworks/coverageStatus');
 
 const pool = process.env.DATABASE_URL
@@ -36,12 +36,17 @@ async function seed() {
     for (const fw of frameworks) {
       const frameworkId = await insertFramework(client, fw);
 
+      const controlIdToUuid = new Map();
       for (const ctrl of fw.controls) {
-        await insertControl(client, frameworkId, ctrl);
+        const id = await insertControl(client, frameworkId, ctrl);
+        controlIdToUuid.set(ctrl.control_id, id);
         totalControls++;
       }
+      await linkControlHierarchyAndBaselines(client, fw.controls, controlIdToUuid, fw.code);
 
-      console.log(`  ${fw.code}: ${fw.controls.length} controls (${fw.tier_required} tier)`);
+      const enhCount = fw.controls.filter((c) => c.is_enhancement).length;
+      console.log(`  ${fw.code}: ${fw.controls.length} controls`
+        + (enhCount ? ` (${fw.controls.length - enhCount} base + ${enhCount} enhancements)` : ''));
     }
 
     // Re-apply the canonical coverage_status classification (see

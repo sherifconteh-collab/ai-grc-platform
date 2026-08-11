@@ -8,6 +8,7 @@ const iso_27001 = require('./iso_27001');
 const soc2 = require('./soc2');
 const nist_800_171 = require('./nist_800_171');
 const cmmc_2_0 = require('./cmmc_2.0');
+const pci_dss_v4 = require('./pci_dss_v4');
 const nist_privacy = require('./nist_privacy');
 const fiscam = require('./fiscam');
 const nist_ai_rmf = require('./nist_ai_rmf');
@@ -43,6 +44,7 @@ module.exports = [
   soc2,
   nist_800_171,
   cmmc_2_0,
+  pci_dss_v4,
   nist_privacy,
   fiscam,
   nist_ai_rmf,
