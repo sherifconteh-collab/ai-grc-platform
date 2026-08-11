@@ -1,327 +1,11349 @@
-module.exports = {
-    code: 'nist_800_53', name: 'NIST SP 800-53 Rev 5', version: 'Rev 5.2.0',
-    category: 'Cybersecurity', tier_required: 'community',
-    description: 'Security and privacy controls for information systems. All 20 control families at full base-control coverage (Wave 1, issue #217) sourced from the official NIST OSCAL/CPRT catalog. Controls mapped to NIST 800-160 system lifecycle stages.',
-    controls: [
-      // Access Control
-      { control_id: 'AC-1', title: 'Access Control Policy and Procedures', description: 'Develop, document, and disseminate an access control policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'AC-2', title: 'Account Management', description: 'Define and manage information system accounts including establishing, activating, modifying, and disabling.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-3', title: 'Access Enforcement', description: 'Enforce approved authorizations for logical access to information and system resources.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-4', title: 'Information Flow Enforcement', description: 'Enforce approved authorizations for controlling information flows within and between systems.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-5', title: 'Separation of Duties', description: 'Identify and document duties of individuals requiring separation and define system access authorizations.', priority: '2', control_type: 'organizational' },
-      { control_id: 'AC-6', title: 'Least Privilege', description: 'Employ the principle of least privilege allowing only authorized accesses for users and processes.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-7', title: 'Unsuccessful Logon Attempts', description: 'Enforce a limit of consecutive invalid logon attempts by a user and take defined actions upon exceeding.', priority: '2', control_type: 'technical' },
-      { control_id: 'AC-8', title: 'System Use Notification', description: 'Display an approved system use notification message before granting access to the system.', priority: '3', control_type: 'technical' },
-      { control_id: 'AC-9', title: 'Previous Logon Notification', description: 'Notify the user, upon successful logon to the system, of the date and time of the last logon.', priority: '3', control_type: 'technical' },
-      { control_id: 'AC-10', title: 'Concurrent Session Control', description: 'Limit the number of concurrent sessions for each [account and/or account types] to [number].', priority: '3', control_type: 'technical' },
-      { control_id: 'AC-11', title: 'Device Lock', description: 'Prevent further access by initiating a session lock after a defined period of inactivity.', priority: '2', control_type: 'technical' },
-      { control_id: 'AC-12', title: 'Session Termination', description: 'Automatically terminate a user session after [conditions or trigger events].', priority: '2', control_type: 'technical' },
-      { control_id: 'AC-14', title: 'Permitted Actions Without Identification or Authentication', description: 'Identify [user actions] that can be performed on the system without identification or authentication consistent with organizational mission and business functions.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-16', title: 'Security and Privacy Attributes', description: 'Provide the means to associate [organization-defined types of security and privacy attributes] with [organization-defined security and privacy attribute values] for information in storage, in process, and/or in transmission.', priority: '3', control_type: 'technical' },
-      { control_id: 'AC-17', title: 'Remote Access', description: 'Establish and document usage restrictions and implementation guidance for remote access.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-18', title: 'Wireless Access', description: 'Establish configuration requirements, connection requirements, and implementation guidance for each type of wireless access.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-19', title: 'Access Control for Mobile Devices', description: 'Establish configuration requirements, connection requirements, and implementation guidance for organization-controlled mobile devices, to include when such devices are outside of controlled areas.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-20', title: 'Use of External Systems', description: '[Establish terms and conditions /identify controls asserted ] , consistent with the trust relationships established with other organizations owning, operating, and/or maintaining external systems, allowing authorized individuals to access the system from external systems.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-21', title: 'Information Sharing', description: 'Enable authorized users to determine whether access authorizations assigned to a sharing partner match the information’s access and use restrictions for [information-sharing circumstances].', priority: '2', control_type: 'technical' },
-      { control_id: 'AC-22', title: 'Publicly Accessible Content', description: 'Designate individuals authorized to make information publicly accessible.', priority: '1', control_type: 'technical' },
-      { control_id: 'AC-23', title: 'Data Mining Protection', description: 'Employ [techniques] for [data storage objects] to detect and protect against unauthorized data mining.', priority: '3', control_type: 'technical' },
-      { control_id: 'AC-24', title: 'Access Control Decisions', description: '[Establish procedures/implement mechanisms] to ensure [access control decisions] are applied to each access request prior to access enforcement.', priority: '3', control_type: 'technical' },
-      { control_id: 'AC-25', title: 'Reference Monitor', description: 'Implement a reference monitor for [access control policies] that is tamperproof, always invoked, and small enough to be subject to analysis and testing, the completeness of which can be assured.', priority: '3', control_type: 'technical' },
-      // Awareness and Training
-      { control_id: 'AT-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a security awareness and training policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'AT-2', title: 'Literacy Training and Awareness', description: 'Provide basic security literacy training to system users as part of initial and ongoing awareness.', priority: '2', control_type: 'organizational' },
-      { control_id: 'AT-3', title: 'Role-Based Training', description: 'Provide role-based security training to personnel with assigned security roles and responsibilities.', priority: '2', control_type: 'organizational' },
-      { control_id: 'AT-4', title: 'Training Records', description: 'Document and monitor information security and privacy training activities, including security and privacy awareness training and specific role-based security and privacy training.', priority: '1', control_type: 'organizational' },
-      { control_id: 'AT-6', title: 'Training Feedback', description: 'Provide feedback on organizational training results to the following personnel [frequency]: [personnel].', priority: '3', control_type: 'organizational' },
-      // Audit and Accountability
-      { control_id: 'AU-1', title: 'Audit and Accountability Policy', description: 'Develop, document, and disseminate an audit and accountability policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'AU-2', title: 'Event Logging', description: 'Identify events that the system is capable of auditing in support of the audit function.', priority: '1', control_type: 'technical' },
-      { control_id: 'AU-3', title: 'Content of Audit Records', description: 'Ensure that audit records contain sufficient information to establish what events occurred.', priority: '1', control_type: 'technical' },
-      { control_id: 'AU-4', title: 'Audit Log Storage Capacity', description: 'Allocate audit log storage capacity to accommodate [audit log retention requirements].', priority: '1', control_type: 'technical' },
-      { control_id: 'AU-5', title: 'Response to Audit Logging Process Failures', description: 'Alert [personnel or roles] within [time period] in the event of an audit logging process failure.', priority: '1', control_type: 'technical' },
-      { control_id: 'AU-6', title: 'Audit Record Review and Reporting', description: 'Review and analyze information system audit records for indications of inappropriate activity.', priority: '1', control_type: 'organizational' },
-      { control_id: 'AU-7', title: 'Audit Record Reduction and Report Generation', description: 'Provide and implement an audit record reduction and report generation capability that supports on-demand audit record review, analysis, and reporting requirements and after-the-fact investigations of incidents.', priority: '2', control_type: 'technical' },
-      { control_id: 'AU-8', title: 'Time Stamps', description: 'Use internal system clocks to generate time stamps for audit records.', priority: '2', control_type: 'technical' },
-      { control_id: 'AU-9', title: 'Protection of Audit Information', description: 'Protect audit information and audit logging tools from unauthorized access and modification.', priority: '1', control_type: 'technical' },
-      { control_id: 'AU-10', title: 'Non-repudiation', description: 'Provide irrefutable evidence that an individual (or process acting on behalf of an individual) has performed [actions].', priority: '3', control_type: 'technical' },
-      { control_id: 'AU-11', title: 'Audit Record Retention', description: 'Retain audit records for [time period] to provide support for after-the-fact investigations of incidents and to meet regulatory and organizational information retention requirements.', priority: '1', control_type: 'technical' },
-      { control_id: 'AU-12', title: 'Audit Record Generation', description: 'Provide audit record generation capability for auditable events at all system components.', priority: '1', control_type: 'technical' },
-      { control_id: 'AU-13', title: 'Monitoring for Information Disclosure', description: 'Monitor [open-source information and/or information sites] [frequency] for evidence of unauthorized disclosure of organizational information.', priority: '3', control_type: 'technical' },
-      { control_id: 'AU-14', title: 'Session Audit', description: 'Provide and implement the capability for [users or roles] to [record/view/hear/log] the content of a user session under [circumstances].', priority: '3', control_type: 'technical' },
-      { control_id: 'AU-16', title: 'Cross-organizational Audit Logging', description: 'Employ [methods] for coordinating [audit information] among external organizations when audit information is transmitted across organizational boundaries.', priority: '3', control_type: 'technical' },
-      // Assessment, Authorization, and Monitoring
-      { control_id: 'CA-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate an assessment, authorization, and monitoring policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'CA-2', title: 'Control Assessments', description: 'Develop a control assessment plan; assess the controls in the system and its environment of operation at a defined frequency.', control_type: 'administrative', priority: '1' },
-      { control_id: 'CA-3', title: 'Information Exchange', description: 'Approve and manage the exchange of information between the system and other systems using interconnection security agreements.', control_type: 'administrative', priority: '2' },
-      { control_id: 'CA-5', title: 'Plan of Action and Milestones', description: 'Develop a plan of action and milestones (POA&M) for the system to document planned remediation actions.', control_type: 'administrative', priority: '1' },
-      { control_id: 'CA-6', title: 'Authorization', description: 'Assign a senior official as the authorizing official; ensure the authorizing official authorizes the system before commencing operations.', control_type: 'administrative', priority: '1' },
-      { control_id: 'CA-7', title: 'Continuous Monitoring', description: 'Develop a system-level continuous monitoring strategy and implement a continuous monitoring program.', control_type: 'administrative', priority: '1' },
-      { control_id: 'CA-8', title: 'Penetration Testing', description: 'Conduct penetration testing at a defined frequency on the system and its environment.', control_type: 'technical', priority: '2' },
-      { control_id: 'CA-9', title: 'Internal System Connections', description: 'Authorize internal connections of system components; document for each internal connection, the interface characteristics, security requirements, and the nature of the information communicated.', control_type: 'administrative', priority: '2' },
-      // Configuration Management
-      { control_id: 'CM-1', title: 'Configuration Management Policy', description: 'Develop, document, and disseminate a configuration management policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'CM-2', title: 'Baseline Configuration', description: 'Develop, document, and maintain a current baseline configuration of the information system.', priority: '1', control_type: 'technical' },
-      { control_id: 'CM-3', title: 'Configuration Change Control', description: 'Determine and document types of changes to the system that are configuration-controlled.', priority: '1', control_type: 'organizational' },
-      { control_id: 'CM-4', title: 'Impact Analyses', description: 'Analyze changes to the system to determine potential security and privacy impacts prior to change implementation.', priority: '1', control_type: 'technical' },
-      { control_id: 'CM-5', title: 'Access Restrictions for Change', description: 'Define, document, approve, and enforce physical and logical access restrictions associated with changes to the system.', priority: '1', control_type: 'technical' },
-      { control_id: 'CM-6', title: 'Configuration Settings', description: 'Establish and document configuration settings for system components using security configuration checklists.', priority: '1', control_type: 'technical' },
-      { control_id: 'CM-7', title: 'Least Functionality', description: 'Configure the system to provide only mission-essential capabilities and restrict the use of functions and services.', priority: '2', control_type: 'technical' },
-      { control_id: 'CM-8', title: 'System Component Inventory', description: 'Develop and document an inventory of system components that is consistent with system boundaries.', priority: '1', control_type: 'technical' },
-      { control_id: 'CM-9', title: 'Configuration Management Plan', description: 'Develop, document, and implement a configuration management plan for the system that addresses roles, responsibilities, and configuration management processes and procedures.', priority: '2', control_type: 'technical' },
-      { control_id: 'CM-10', title: 'Software Usage Restrictions', description: 'Use software and associated documentation in accordance with contract agreements and copyright laws.', priority: '1', control_type: 'technical' },
-      { control_id: 'CM-11', title: 'User-installed Software', description: 'Establish [policies] governing the installation of software by users.', priority: '1', control_type: 'technical' },
-      { control_id: 'CM-12', title: 'Information Location', description: 'Identify and document the location of [information] and the specific system components on which the information is processed and stored.', priority: '2', control_type: 'technical' },
-      { control_id: 'CM-13', title: 'Data Action Mapping', description: 'Develop and document a map of system data actions.', priority: '3', control_type: 'technical' },
-      { control_id: 'CM-14', title: 'Signed Components', description: 'Prevent the installation of [organization-defined software and firmware components] without verification that the component has been digitally signed using a certificate that is recognized and approved by the organization.', priority: '3', control_type: 'technical' },
-      // Contingency Planning
-      { control_id: 'CP-1', title: 'Contingency Planning Policy', description: 'Develop, document, and disseminate a contingency planning policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'CP-2', title: 'Contingency Plan', description: 'Develop a contingency plan that identifies essential missions, functions, and recovery objectives.', priority: '1', control_type: 'organizational' },
-      { control_id: 'CP-3', title: 'Contingency Training', description: 'Provide contingency training to system users consistent with assigned roles and responsibilities within [time period] of assuming a contingency role or responsibility.', priority: '1', control_type: 'operational' },
-      { control_id: 'CP-4', title: 'Contingency Plan Testing', description: 'Test the contingency plan using defined tests to determine the plan effectiveness and readiness.', priority: '2', control_type: 'organizational' },
-      { control_id: 'CP-6', title: 'Alternate Storage Site', description: 'Establish an alternate storage site, including necessary agreements to permit the storage and retrieval of system backup information.', priority: '2', control_type: 'operational' },
-      { control_id: 'CP-7', title: 'Alternate Processing Site', description: 'Establish an alternate processing site, including necessary agreements to permit the transfer and resumption of [system operations] for essential mission and business functions within [time period] when the primary processing capabilities are unavailable.', priority: '2', control_type: 'operational' },
-      { control_id: 'CP-8', title: 'Telecommunications Services', description: 'Establish alternate telecommunications services, including necessary agreements to permit the resumption of [system operations] for essential mission and business functions within [time period] when the primary telecommunications capabilities are unavailable at either the primary or alternate processing or storage sites.', priority: '2', control_type: 'operational' },
-      { control_id: 'CP-9', title: 'System Backup', description: 'Conduct backups of user-level, system-level, and security-related information at defined frequency.', priority: '1', control_type: 'technical' },
-      { control_id: 'CP-10', title: 'System Recovery and Reconstitution', description: 'Provide for the recovery and reconstitution of the system to a known state after a disruption.', priority: '1', control_type: 'technical' },
-      { control_id: 'CP-11', title: 'Alternate Communications Protocols', description: 'Provide the capability to employ [alternative communications protocols] in support of maintaining continuity of operations.', priority: '3', control_type: 'operational' },
-      { control_id: 'CP-12', title: 'Safe Mode', description: 'When [conditions] are detected, enter a safe mode of operation with [restrictions].', priority: '3', control_type: 'operational' },
-      { control_id: 'CP-13', title: 'Alternative Security Mechanisms', description: 'Employ [alternative or supplemental security mechanisms] for satisfying [security functions] when the primary means of implementing the security function is unavailable or compromised.', priority: '3', control_type: 'operational' },
-      // Identification and Authentication
-      { control_id: 'IA-1', title: 'Identification and Authentication Policy', description: 'Develop, document, and disseminate an identification and authentication policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'IA-2', title: 'Identification and Authentication (Org Users)', description: 'Uniquely identify and authenticate organizational users or processes acting on behalf of users.', priority: '1', control_type: 'technical' },
-      { control_id: 'IA-3', title: 'Device Identification and Authentication', description: 'Uniquely identify and authenticate [devices and/or types of devices] before establishing a [local/remote/network] connection.', priority: '2', control_type: 'technical' },
-      { control_id: 'IA-4', title: 'Identifier Management', description: 'Manage information system identifiers by receiving authorization and issuing individual identifiers.', priority: '1', control_type: 'technical' },
-      { control_id: 'IA-5', title: 'Authenticator Management', description: 'Manage system authenticators by verifying identity, establishing initial content, and ensuring security.', priority: '1', control_type: 'technical' },
-      { control_id: 'IA-6', title: 'Authentication Feedback', description: 'Obscure feedback of authentication information during the authentication process to protect the information from possible exploitation and use by unauthorized individuals.', priority: '1', control_type: 'technical' },
-      { control_id: 'IA-7', title: 'Cryptographic Module Authentication', description: 'Implement mechanisms for authentication to a cryptographic module that meet the requirements of applicable laws, executive orders, directives, policies, regulations, standards, and guidelines for such authentication.', priority: '1', control_type: 'technical' },
-      { control_id: 'IA-8', title: 'Identification and Authentication (Non-Org Users)', description: 'Uniquely identify and authenticate non-organizational users or processes acting on their behalf.', priority: '2', control_type: 'technical' },
-      { control_id: 'IA-9', title: 'Service Identification and Authentication', description: 'Uniquely identify and authenticate [system services and applications] before establishing communications with devices, users, or other services or applications.', priority: '3', control_type: 'technical' },
-      { control_id: 'IA-10', title: 'Adaptive Authentication', description: 'Require individuals accessing the system to employ [supplemental authentication techniques or mechanisms] under specific [circumstances or situations].', priority: '3', control_type: 'technical' },
-      { control_id: 'IA-11', title: 'Re-authentication', description: 'Require users to re-authenticate when [circumstances or situations].', priority: '1', control_type: 'technical' },
-      { control_id: 'IA-12', title: 'Identity Proofing', description: 'Identity proof users that require accounts for logical access to systems based on appropriate identity assurance level requirements as specified in applicable standards and guidelines.', priority: '2', control_type: 'technical' },
-      { control_id: 'IA-13', title: 'Identity Providers and Authorization Servers', description: 'Employ identity providers and authorization servers to manage user, device, and non-person entity (NPE) identities, attributes, and access rights supporting authentication and authorization decisions in accordance with [policy] using [mechanisms].', priority: '3', control_type: 'technical' },
-      // Incident Response
-      { control_id: 'IR-1', title: 'Incident Response Policy', description: 'Develop, document, and disseminate an incident response policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'IR-2', title: 'Incident Response Training', description: 'Provide incident response training to system users consistent with assigned roles.', priority: '2', control_type: 'organizational' },
-      { control_id: 'IR-3', title: 'Incident Response Testing', description: 'Test the effectiveness of the incident response capability for the system [frequency] using the following tests: [tests].', priority: '2', control_type: 'organizational' },
-      { control_id: 'IR-4', title: 'Incident Handling', description: 'Implement incident handling capability for incidents including preparation, detection, analysis, and recovery.', priority: '1', control_type: 'organizational' },
-      { control_id: 'IR-5', title: 'Incident Monitoring', description: 'Track and document information system security incidents on an ongoing basis.', priority: '1', control_type: 'technical' },
-      { control_id: 'IR-6', title: 'Incident Reporting', description: 'Require personnel to report suspected security incidents to the organizational incident response capability.', priority: '1', control_type: 'organizational' },
-      { control_id: 'IR-7', title: 'Incident Response Assistance', description: 'Provide an incident response support resource, integral to the organizational incident response capability, that offers advice and assistance to users of the system for the handling and reporting of incidents.', priority: '1', control_type: 'organizational' },
-      { control_id: 'IR-8', title: 'Incident Response Plan', description: 'Develop an incident response plan that provides a roadmap for incident response capability.', priority: '1', control_type: 'organizational' },
-      { control_id: 'IR-9', title: 'Information Spillage Response', description: 'Respond to information spills by assigning [personnel or roles] with responsibility for responding to information spills.', priority: '3', control_type: 'organizational' },
-      // Maintenance
-      { control_id: 'MA-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a system maintenance policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'MA-2', title: 'Controlled Maintenance', description: 'Schedule, document, and review records of maintenance, repair, and replacement on system components.', control_type: 'operational', priority: '1' },
-      { control_id: 'MA-3', title: 'Maintenance Tools', description: 'Approve, control, and monitor the use of system maintenance tools.', control_type: 'operational', priority: '2' },
-      { control_id: 'MA-4', title: 'Nonlocal Maintenance', description: 'Approve and monitor nonlocal maintenance and diagnostic activities; allow the use of nonlocal maintenance only as consistent with organizational policy.', control_type: 'operational', priority: '2' },
-      { control_id: 'MA-5', title: 'Maintenance Personnel', description: 'Establish a process for maintenance personnel authorization and maintain a list of authorized maintenance organizations or personnel.', control_type: 'operational', priority: '2' },
-      { control_id: 'MA-6', title: 'Timely Maintenance', description: 'Obtain maintenance support and spare parts for system components within a defined time period of failure.', control_type: 'operational', priority: '2' },
-      { control_id: 'MA-7', title: 'Field Maintenance', description: 'Restrict or prohibit field maintenance on [systems or system components] to [trusted maintenance facilities].', priority: '3', control_type: 'operational' },
-      // Media Protection
-      { control_id: 'MP-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a media protection policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'MP-2', title: 'Media Access', description: 'Restrict access to digital and non-digital media to authorized individuals using defined controls.', control_type: 'operational', priority: '1' },
-      { control_id: 'MP-3', title: 'Media Marking', description: 'Mark system media indicating the distribution limitations, handling caveats, and applicable security markings.', control_type: 'operational', priority: '2' },
-      { control_id: 'MP-4', title: 'Media Storage', description: 'Physically control and securely store digital and non-digital media within controlled areas.', control_type: 'operational', priority: '2' },
-      { control_id: 'MP-5', title: 'Media Transport', description: 'Protect and control digital and non-digital media during transport outside of controlled areas.', control_type: 'operational', priority: '2' },
-      { control_id: 'MP-6', title: 'Media Sanitization', description: 'Sanitize system media prior to disposal, release out of organizational control, or release for reuse.', control_type: 'operational', priority: '1' },
-      { control_id: 'MP-7', title: 'Media Use', description: 'Restrict the use of types of digital media on systems or system components using organizational security safeguards.', control_type: 'operational', priority: '2' },
-      { control_id: 'MP-8', title: 'Media Downgrading', description: 'Establish [system media downgrading process] that includes employing downgrading mechanisms with strength and integrity commensurate with the security category or classification of the information.', priority: '3', control_type: 'operational' },
-      // Physical and Environmental Protection
-      { control_id: 'PE-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a physical and environmental protection policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PE-2', title: 'Physical Access Authorizations', description: 'Develop, approve, and maintain a list of individuals with authorized access to the facility; issue authorization credentials for facility access.', control_type: 'operational', priority: '1' },
-      { control_id: 'PE-3', title: 'Physical Access Control', description: 'Enforce physical access authorizations at entry/exit points to the facility; maintain physical access audit logs; control access to areas officially designated as publicly accessible.', control_type: 'operational', priority: '1' },
-      { control_id: 'PE-4', title: 'Access Control for Transmission', description: 'Control physical access to system distribution and transmission lines within organizational facilities.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-5', title: 'Access Control for Output Devices', description: 'Control physical access to output from system output devices to prevent unauthorized individuals from obtaining the output.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-6', title: 'Monitoring Physical Access', description: 'Monitor physical access to the facility where the system resides to detect and respond to physical security incidents.', control_type: 'operational', priority: '1' },
-      { control_id: 'PE-8', title: 'Visitor Access Records', description: 'Maintain visitor access records that include name, organization, date/time of access, and escort requirements.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-9', title: 'Power Equipment and Cabling', description: 'Protect power equipment and power cabling for the system from damage and destruction.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-10', title: 'Emergency Shutoff', description: 'Provide the capability of shutting off power to the system or individual system components in emergency situations.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-11', title: 'Emergency Power', description: 'Provide an uninterruptible power supply to facilitate an orderly shutdown of the system in the event of a primary power source loss.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-12', title: 'Emergency Lighting', description: 'Employ and maintain automatic emergency lighting that activates in the event of a power outage or disruption.', control_type: 'operational', priority: '3' },
-      { control_id: 'PE-13', title: 'Fire Protection', description: 'Employ and maintain fire detection and suppression systems that are supported by an independent energy source.', control_type: 'operational', priority: '1' },
-      { control_id: 'PE-14', title: 'Environmental Controls', description: 'Maintain temperature and humidity levels within the facility where the system resides at acceptable levels; monitor environmental conditions at a defined frequency.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-15', title: 'Water Damage Protection', description: 'Protect the system from damage resulting from water leakage by providing master shutoff or isolation valves.', control_type: 'operational', priority: '3' },
-      { control_id: 'PE-16', title: 'Delivery and Removal', description: 'Authorize and control the entry and exit of system components from the facility; maintain records of the items.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-17', title: 'Alternate Work Site', description: 'Determine and document the alternate work sites allowed for use; employ security controls at alternate work sites.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-18', title: 'Location of System Components', description: 'Position system components within the facility to minimize potential damage from physical and environmental hazards and to minimize the opportunity for unauthorized access.', control_type: 'operational', priority: '2' },
-      { control_id: 'PE-19', title: 'Information Leakage', description: 'Protect the system from information leakage due to electromagnetic signals emanations.', priority: '3', control_type: 'physical' },
-      { control_id: 'PE-20', title: 'Asset Monitoring and Tracking', description: 'Employ [asset location technologies] to track and monitor the location and movement of [assets] within [controlled areas].', priority: '3', control_type: 'physical' },
-      { control_id: 'PE-21', title: 'Electromagnetic Pulse Protection', description: 'Employ [protective measures] against electromagnetic pulse damage for [system and system components].', priority: '3', control_type: 'physical' },
-      { control_id: 'PE-22', title: 'Component Marking', description: 'Mark [system hardware components] indicating the impact level or classification level of the information permitted to be processed, stored, or transmitted by the hardware component.', priority: '3', control_type: 'physical' },
-      { control_id: 'PE-23', title: 'Facility Location', description: 'Plan the location or site of the facility where the system resides considering physical and environmental hazards.', priority: '3', control_type: 'physical' },
-      // Planning
-      { control_id: 'PL-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a planning policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PL-2', title: 'System Security and Privacy Plans', description: 'Develop security and privacy plans that describe the controls in place or planned; distribute plans to authorized personnel; review the plans at a defined frequency.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PL-4', title: 'Rules of Behavior', description: 'Establish and provide to individuals requiring access to the system, the rules that describe their responsibilities and expected behavior.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PL-7', title: 'Concept of Operations', description: 'Develop a concept of operations for the system describing how the organization intends to operate the system from the perspective of information security and privacy.', control_type: 'administrative', priority: '3' },
-      { control_id: 'PL-8', title: 'Security and Privacy Architectures', description: 'Develop security and privacy architectures for the system that describe the philosophy, requirements, and approach to be taken to protect information.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PL-9', title: 'Central Management', description: 'Centrally manage [controls and related processes].', priority: '3', control_type: 'organizational' },
-      { control_id: 'PL-10', title: 'Baseline Selection', description: 'Select a control baseline for the system.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PL-11', title: 'Baseline Tailoring', description: 'Tailor the selected control baseline by applying specified tailoring actions.', control_type: 'administrative', priority: '1' },
-      // Program Management
-      { control_id: 'PM-1', title: 'Information Security Program Plan', description: 'Develop and disseminate an organization-wide information security program plan.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-2', title: 'Information Security Program Leadership Role', description: 'Appoint a senior information security officer with the mission and resources to coordinate, develop, implement, and maintain an organization-wide information security program.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-3', title: 'Information Security and Privacy Resources', description: 'Include the resources needed to implement the information security and privacy programs in capital planning and investment requests.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PM-4', title: 'Plan of Action and Milestones Process', description: 'Implement a process to ensure that plans of action and milestones for the information security, privacy, and supply chain risk management programs are maintained and documented.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-5', title: 'System Inventory', description: 'Develop and maintain an inventory of organizational systems.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-6', title: 'Measures of Performance', description: 'Develop, monitor, and report on the results of information security and privacy measures of performance.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PM-7', title: 'Enterprise Architecture', description: 'Develop and maintain an enterprise architecture with consideration for information security, privacy, and the resulting risk to organizational operations and assets.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PM-8', title: 'Critical Infrastructure Plan', description: 'Address information security and privacy issues in the development, documentation, and updating of a critical infrastructure and key resources protection plan.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-9', title: 'Risk Management Strategy', description: 'Develop a comprehensive strategy to manage risk to organizational operations, assets, individuals, other organizations, and the Nation.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-10', title: 'Authorization Process', description: 'Manage the security and privacy state of organizational systems through authorization processes.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-11', title: 'Mission and Business Process Definition', description: 'Define organizational mission and business processes with consideration for information security and privacy and the resulting risk to organizational operations.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PM-12', title: 'Insider Threat Program', description: 'Implement an insider threat program that includes a cross-discipline insider threat incident handling team.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-13', title: 'Security and Privacy Workforce', description: 'Establish a security and privacy workforce development and improvement program.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PM-14', title: 'Testing, Training, and Monitoring', description: 'Implement a process for ensuring that organizational plans for conducting security and privacy testing, training, and monitoring activities are developed and maintained.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-15', title: 'Security and Privacy Groups and Associations', description: 'Establish and institutionalize contact with selected groups and associations within the security and privacy communities.', control_type: 'administrative', priority: '3' },
-      { control_id: 'PM-16', title: 'Threat Awareness Program', description: 'Implement a threat awareness program that includes a cross-organization information-sharing capability.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PM-17', title: 'Protecting Controlled Unclassified Information on External Systems', description: 'Establish policy and procedures to ensure that requirements for the protection of controlled unclassified information that is processed, stored or transmitted on external systems, are implemented in accordance with applicable laws, executive orders, directives, policies, regulations, and standards.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-18', title: 'Privacy Program Plan', description: 'Develop and disseminate an organization-wide privacy program plan that provides an overview of the agency’s privacy program, includes a description of the structure of the privacy program and the resources dedicated to the privacy program.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-19', title: 'Privacy Program Leadership Role', description: 'Appoint a senior agency official for privacy with the authority, mission, accountability, and resources to coordinate, develop, and implement, applicable privacy requirements and manage privacy risks through the organization-wide privacy program.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-20', title: 'Dissemination of Privacy Program Information', description: 'Maintain a central resource webpage on the organization’s principal public website that serves as a central source of information about the organization’s privacy program and that ensures that the public has access to information about organizational privacy activities and can communicate with its senior agency official for privacy.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-21', title: 'Accounting of Disclosures', description: 'Develop and maintain an accurate accounting of disclosures of personally identifiable information, including date, nature, and purpose of each disclosure.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-22', title: 'Personally Identifiable Information Quality Management', description: 'Develop and document organization-wide policies and procedures f reviewing for the accuracy, relevance, timeliness, and completeness of personally identifiable information across the information life cycle.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-23', title: 'Data Governance Body', description: 'Establish a Data Governance Body consisting of [roles] with [responsibilities].', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-24', title: 'Data Integrity Board', description: 'Establish a Data Integrity Board to review proposals to conduct or participate in a matching program.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-25', title: 'Minimization of Personally Identifiable Information Used in Testing, Training, and Research', description: 'Develop, document, and implement policies and procedures that address the use of personally identifiable information for internal testing, training, and research.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-26', title: 'Complaint Management', description: 'Implement a process for receiving and responding to complaints, concerns, or questions from individuals about the organizational security and privacy practices that includes mechanisms that are easy to use and readily accessible by the public.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-27', title: 'Privacy Reporting', description: 'Develop [privacy reports] and disseminate to [oversight bodies] to demonstrate accountability with statutory, regulatory, and policy privacy mandates.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-28', title: 'Risk Framing', description: 'Identify and document assumptions affecting risk assessments, risk responses, and risk monitoring.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-29', title: 'Risk Management Program Leadership Roles', description: 'Appoint a Senior Accountable Official for Risk Management to align organizational information security and privacy management processes with strategic, operational, and budgetary planning processes.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-30', title: 'Supply Chain Risk Management Strategy', description: 'Develop an organization-wide strategy for managing supply chain risks associated with the development, acquisition, maintenance, and disposal of systems, system components, and system services.', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-31', title: 'Continuous Monitoring Strategy', description: 'Develop an organization-wide continuous monitoring strategy and implement continuous monitoring programs that include establishing the following organization-wide metrics to be monitored: [metrics].', priority: '3', control_type: 'organizational' },
-      { control_id: 'PM-32', title: 'Purposing', description: 'Analyze [systems or system components] supporting mission essential services or functions to ensure that the information resources are being used consistent with their intended purpose.', priority: '3', control_type: 'organizational' },
-      // Personnel Security
-      { control_id: 'PS-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a personnel security policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PS-2', title: 'Position Risk Designation', description: 'Assign a risk designation to all organizational positions; establish screening criteria for individuals filling those positions; review and update position risk designations at a defined frequency.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PS-3', title: 'Personnel Screening', description: 'Screen individuals prior to authorizing access to the system; rescreen individuals at a defined frequency.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PS-4', title: 'Personnel Termination', description: 'Upon termination of individual employment: disable system access within a defined time period; terminate/revoke any authenticators/credentials; conduct exit interviews; retrieve all organizational information system-related property.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PS-5', title: 'Personnel Transfer', description: 'Review and confirm ongoing operational need for current logical and physical access authorizations when individuals are reassigned or transferred to other positions.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PS-6', title: 'Access Agreements', description: 'Develop and document access agreements for organizational systems; review and update the access agreements at a defined frequency.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PS-7', title: 'External Personnel Security', description: 'Establish personnel security requirements for external providers; require external providers to comply with personnel security policies and procedures.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PS-8', title: 'Personnel Sanctions', description: 'Employ a formal sanctions process for individuals failing to comply with established information security and privacy policies and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PS-9', title: 'Position Descriptions', description: 'Incorporate security and privacy role responsibilities in organizational position descriptions.', control_type: 'administrative', priority: '2' },
-      // PII Processing and Transparency
-      { control_id: 'PT-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a personally identifiable information processing and transparency policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PT-2', title: 'Authority to Process Personally Identifiable Information', description: 'Determine and document the legal authority that permits the collection, use, maintenance, and sharing of personally identifiable information.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PT-3', title: 'Personally Identifiable Information Processing Purposes', description: 'Identify and document the purpose(s) for processing personally identifiable information.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PT-4', title: 'Consent', description: 'Implement tools or mechanisms for individuals to consent to the processing of their personally identifiable information prior to collection.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PT-5', title: 'Privacy Notice', description: 'Provide notice to individuals about the processing of personally identifiable information.', control_type: 'administrative', priority: '1' },
-      { control_id: 'PT-6', title: 'System of Records Notice', description: 'For systems that process information in a system of records, publish system of records notices in the Federal Register.', control_type: 'administrative', priority: '2' },
-      { control_id: 'PT-7', title: 'Specific Categories of Personally Identifiable Information', description: 'Apply processing conditions for specific categories of PII (Social Security numbers, etc.).', control_type: 'administrative', priority: '1' },
-      { control_id: 'PT-8', title: 'Computer Matching Requirements', description: 'When a system or organization is involved in a matching program, adhere to applicable computer matching regulations.', control_type: 'administrative', priority: '3' },
-      // Risk Assessment
-      { control_id: 'RA-1', title: 'Risk Assessment Policy', description: 'Develop, document, and disseminate a risk assessment policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'RA-2', title: 'Security Categorization', description: 'Categorize the information system and document the results in the security plan.', priority: '1', control_type: 'strategic' },
-      { control_id: 'RA-3', title: 'Risk Assessment', description: 'Conduct assessments of risk including likelihood and magnitude of harm from unauthorized access.', priority: '1', control_type: 'strategic' },
-      { control_id: 'RA-5', title: 'Vulnerability Monitoring and Scanning', description: 'Monitor and scan for vulnerabilities in the system and hosted applications at defined frequency.', priority: '1', control_type: 'technical' },
-      { control_id: 'RA-6', title: 'Technical Surveillance Countermeasures Survey', description: 'Employ a technical surveillance countermeasures survey at [locations] [frequency /when events or indicators ].', priority: '3', control_type: 'technical' },
-      { control_id: 'RA-7', title: 'Risk Response', description: 'Respond to findings from security and privacy assessments, monitoring, and audits in accordance with organizational risk tolerance.', priority: '1', control_type: 'technical' },
-      { control_id: 'RA-8', title: 'Privacy Impact Assessments', description: 'Conduct privacy impact assessments for systems, programs, or other activities before developing or procuring information technology that processes personally identifiable information.', priority: '3', control_type: 'technical' },
-      { control_id: 'RA-9', title: 'Criticality Analysis', description: 'Identify critical system components and functions by performing a criticality analysis for [systems, system components, or system services] at [decision points in the system development life cycle].', priority: '2', control_type: 'technical' },
-      { control_id: 'RA-10', title: 'Threat Hunting', description: 'Establish and maintain a cyber threat hunting capability to search for indicators of compromise in organizational systems.', priority: '3', control_type: 'technical' },
-      // System and Services Acquisition
-      { control_id: 'SA-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a system and services acquisition policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SA-2', title: 'Allocation of Resources', description: 'Determine the high-level information security and privacy requirements for the system; include the resources needed to protect the system as a discrete line item.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SA-3', title: 'System Development Life Cycle', description: 'Acquire, develop, and manage the system using an SDLC that incorporates information security and privacy considerations.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SA-4', title: 'Acquisition Process', description: 'Include security and privacy functional requirements, strength requirements, assurance requirements, documentation requirements, and acceptance criteria in system acquisition contracts.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SA-5', title: 'System Documentation', description: 'Obtain or develop administrator documentation and user documentation for the system that describes secure configuration, installation, and operation.', control_type: 'administrative', priority: '2' },
-      { control_id: 'SA-8', title: 'Security and Privacy Engineering Principles', description: 'Apply systems security and privacy engineering principles in the specification, design, development, implementation, and modification of the system.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SA-9', title: 'External System Services', description: 'Require that providers of external system services comply with organizational security and privacy requirements; define and document organizational oversight and user roles and responsibilities.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SA-10', title: 'Developer Configuration Management', description: 'Require the developer of the system to perform configuration management during system design, development, implementation, and operation.', control_type: 'administrative', priority: '2' },
-      { control_id: 'SA-11', title: 'Developer Testing and Evaluation', description: 'Require the developer of the system to create a security and privacy assessment plan; perform testing/evaluation at a defined depth and coverage; produce evidence of the execution of the plan.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SA-15', title: 'Development Process, Standards, and Tools', description: 'Require the developer of the system to follow a documented development process that explicitly addresses security and privacy requirements.', control_type: 'administrative', priority: '2' },
-      { control_id: 'SA-16', title: 'Developer-provided Training', description: 'Require the developer of the system, system component, or system service to provide the following training on the correct use and operation of the implemented security and privacy functions, controls, and/or mechanisms: [training].', priority: '3', control_type: 'operational' },
-      { control_id: 'SA-17', title: 'Developer Security and Privacy Architecture and Design', description: 'Require the developer of the system to produce a design specification and security and privacy architecture.', control_type: 'administrative', priority: '2' },
-      { control_id: 'SA-20', title: 'Customized Development of Critical Components', description: 'Reimplement or custom develop the following critical system components: [critical system].', priority: '3', control_type: 'operational' },
-      { control_id: 'SA-21', title: 'Developer Screening', description: 'Require that the developer of [system, systems component, or system service] has appropriate access authorizations as determined by assigned [official government duties].', priority: '3', control_type: 'operational' },
-      { control_id: 'SA-22', title: 'Unsupported System Components', description: 'Replace system components when support for the components is no longer available from the developer, vendor, or manufacturer.', control_type: 'operational', priority: '1' },
-      { control_id: 'SA-23', title: 'Specialization', description: 'Employ [design modification/augmentation/reconfiguration] on [systems or system components] supporting mission essential services or functions to increase the trustworthiness in those systems or components.', priority: '3', control_type: 'operational' },
-      { control_id: 'SA-24', title: 'Design For Cyber Resiliency', description: 'Design organizational systems, system components, or system services to achieve cyber resiliency by defining the following cyber resiliency goals: [cyber resiliency goals].', priority: '3', control_type: 'operational' },
-      // System and Communications Protection
-      { control_id: 'SC-1', title: 'System and Communications Protection Policy', description: 'Develop, document, and disseminate a system and communications protection policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'SC-2', title: 'Separation of System and User Functionality', description: 'Separate user functionality, including user interface services, from system management functionality.', priority: '2', control_type: 'technical' },
-      { control_id: 'SC-3', title: 'Security Function Isolation', description: 'Isolate security functions from nonsecurity functions.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-4', title: 'Information in Shared System Resources', description: 'Prevent unauthorized and unintended information transfer via shared system resources.', priority: '2', control_type: 'technical' },
-      { control_id: 'SC-5', title: 'Denial-of-service Protection', description: '[Protect against/limit] the effects of the following types of denial-of-service events: [types of denial-of-service events].', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-6', title: 'Resource Availability', description: 'Protect the availability of resources by allocating [resources] by [priority/quota/controls ].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-7', title: 'Boundary Protection', description: 'Monitor and control communications at external and key internal boundaries of the system.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-8', title: 'Transmission Confidentiality and Integrity', description: 'Protect the confidentiality and integrity of transmitted information.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-10', title: 'Network Disconnect', description: 'Terminate the network connection associated with a communications session at the end of the session or after [time period] of inactivity.', priority: '2', control_type: 'technical' },
-      { control_id: 'SC-11', title: 'Trusted Path', description: 'Provide a [physically/logically] isolated trusted communications path for communications between the user and the trusted components of the system.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-12', title: 'Cryptographic Key Management', description: 'Establish and manage cryptographic keys used within the system.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-13', title: 'Cryptographic Protection', description: 'Implement cryptographic mechanisms to prevent unauthorized disclosure and modification of information.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-15', title: 'Collaborative Computing Devices and Applications', description: 'Prohibit remote activation of collaborative computing devices and applications with the following exceptions: [exceptions where remote activation is to be allowed].', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-16', title: 'Transmission of Security and Privacy Attributes', description: 'Associate [organization-defined security and privacy attributes] with information exchanged between systems and between system components.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-17', title: 'Public Key Infrastructure Certificates', description: 'Issue public key certificates under an [certificate policy] or obtain public key certificates from an approved service provider.', priority: '2', control_type: 'technical' },
-      { control_id: 'SC-18', title: 'Mobile Code', description: 'Define acceptable and unacceptable mobile code and mobile code technologies.', priority: '2', control_type: 'technical' },
-      { control_id: 'SC-20', title: 'Secure Name/Address Resolution Service (Authoritative Source)', description: 'Provide additional data origin authentication and integrity verification artifacts along with the authoritative name resolution data the system returns in response to external name/address resolution queries.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-21', title: 'Secure Name/Address Resolution Service (Recursive or Caching Resolver)', description: 'Request and perform data origin authentication and data integrity verification on the name/address resolution responses the system receives from authoritative sources.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-22', title: 'Architecture and Provisioning for Name/Address Resolution Service', description: 'Ensure the systems that collectively provide name/address resolution service for an organization are fault-tolerant and implement internal and external role separation.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-23', title: 'Session Authenticity', description: 'Protect the authenticity of communications sessions.', priority: '2', control_type: 'technical' },
-      { control_id: 'SC-24', title: 'Fail in Known State', description: 'Fail to a [known system state] for the following failures on the indicated components while preserving [system state information] in failure: [types of system failures on system components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-25', title: 'Thin Nodes', description: 'Employ minimal functionality and information storage on the following system components: [system components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-26', title: 'Decoys', description: 'Include components within organizational systems specifically designed to be the target of malicious attacks for detecting, deflecting, and analyzing such attacks.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-27', title: 'Platform-independent Applications', description: 'Include within organizational systems the following platform independent applications: [platform-independent applications].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-28', title: 'Protection of Information at Rest', description: 'Protect the [confidentiality/integrity] of the following information at rest: [information at rest].', priority: '2', control_type: 'technical' },
-      { control_id: 'SC-29', title: 'Heterogeneity', description: 'Employ a diverse set of information technologies for the following system components in the implementation of the system: [system components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-30', title: 'Concealment and Misdirection', description: 'Employ the following concealment and misdirection techniques for [systems] at [time periods] to confuse and mislead adversaries: [concealment and misdirection techniques].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-31', title: 'Covert Channel Analysis', description: 'Perform a covert channel analysis to identify those aspects of communications within the system that are potential avenues for covert [storage/timing] channels.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-32', title: 'System Partitioning', description: 'Partition the system into [system components] residing in separate [physical/logical] domains or environments based on [circumstances for the physical or logical separation of components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-34', title: 'Non-modifiable Executable Programs', description: 'For [system components] , load and execute the operating environment from hardware-enforced, read-only media.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-35', title: 'External Malicious Code Identification', description: 'Include system components that proactively seek to identify network-based malicious code or malicious websites.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-36', title: 'Distributed Processing and Storage', description: 'Distribute the following processing and storage components across multiple [physical locations/logical domains]: [organization-defined processing and storage components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-37', title: 'Out-of-band Channels', description: 'Employ the following out-of-band channels for the physical delivery or electronic transmission of [information, system components, or devices] to [individuals or systems]: [out-of-band channels].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-38', title: 'Operations Security', description: 'Employ the following operations security controls to protect key organizational information throughout the system development life cycle: [operations security controls].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-39', title: 'Process Isolation', description: 'Maintain a separate execution domain for each executing system process.', priority: '1', control_type: 'technical' },
-      { control_id: 'SC-40', title: 'Wireless Link Protection', description: 'Protect external and internal [organization-defined wireless links] from the following signal parameter attacks: [organization-defined types of signal parameter attacks or references to sources for such attacks].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-41', title: 'Port and I/O Device Access', description: '[Physically/logically] disable or remove [connection ports or input/output devices] on the following systems or system components: [systems or system components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-42', title: 'Sensor Capability and Data', description: 'Prohibit [the use of devices possessing environmental sensing capabilities in facilities, areas, or systems /the remote activation of environmental sensing capabilities on organizational systems or system components with the following exceptions: exceptions where remote activation of sensors is allowed ].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-43', title: 'Usage Restrictions', description: 'Establish usage restrictions and implementation guidelines for the following system components: [components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-44', title: 'Detonation Chambers', description: 'Employ a detonation chamber capability within [system, system component, or location].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-45', title: 'System Time Synchronization', description: 'Synchronize system clocks within and between systems and system components.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-46', title: 'Cross Domain Policy Enforcement', description: 'Implement a policy enforcement mechanism [physically/logically] between the physical and/or network interfaces for the connecting security domains.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-47', title: 'Alternate Communications Paths', description: 'Establish [alternate communication paths] for system operations organizational command and control.', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-48', title: 'Sensor Relocation', description: 'Relocate [sensors and monitoring capabilities] to [locations] under the following conditions or circumstances: [conditions or circumstances].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-49', title: 'Hardware-enforced Separation and Policy Enforcement', description: 'Implement hardware-enforced separation and policy enforcement mechanisms between [security domains].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-50', title: 'Software-enforced Separation and Policy Enforcement', description: 'Implement software-enforced separation and policy enforcement mechanisms between [security domains].', priority: '3', control_type: 'technical' },
-      { control_id: 'SC-51', title: 'Hardware-based Protection', description: 'Employ hardware-based, write-protect for [system firmware components].', priority: '3', control_type: 'technical' },
-      // System and Information Integrity
-      { control_id: 'SI-1', title: 'System and Information Integrity Policy', description: 'Develop, document, and disseminate a system and information integrity policy and procedures.', priority: '1', control_type: 'policy' },
-      { control_id: 'SI-2', title: 'Flaw Remediation', description: 'Identify, report, and correct information system flaws in a timely manner.', priority: '1', control_type: 'technical' },
-      { control_id: 'SI-3', title: 'Malicious Code Protection', description: 'Implement malicious code protection mechanisms at system entry and exit points.', priority: '1', control_type: 'technical' },
-      { control_id: 'SI-4', title: 'System Monitoring', description: 'Monitor the system to detect attacks, unauthorized connections, and indicators of compromise.', priority: '1', control_type: 'technical' },
-      { control_id: 'SI-5', title: 'Security Alerts and Advisories', description: 'Receive information system security alerts and advisories and disseminate to appropriate personnel.', priority: '2', control_type: 'organizational' },
-      { control_id: 'SI-6', title: 'Security and Privacy Function Verification', description: 'Verify the correct operation of [organization-defined security and privacy functions].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-7', title: 'Software, Firmware, and Information Integrity', description: 'Employ integrity verification tools to detect unauthorized changes to the following software, firmware, and information: [organization-defined software, firmware, and information].', priority: '2', control_type: 'technical' },
-      { control_id: 'SI-8', title: 'Spam Protection', description: 'Employ spam protection mechanisms at system entry and exit points to detect and act on unsolicited messages.', priority: '2', control_type: 'technical' },
-      { control_id: 'SI-10', title: 'Information Input Validation', description: 'Check the validity of the following information inputs: [information inputs].', priority: '2', control_type: 'technical' },
-      { control_id: 'SI-11', title: 'Error Handling', description: 'Generate error messages that provide information necessary for corrective actions without revealing information that could be exploited.', priority: '2', control_type: 'technical' },
-      { control_id: 'SI-12', title: 'Information Management and Retention', description: 'Manage and retain information within the system and information output from the system in accordance with applicable laws, executive orders, directives, regulations, policies, standards, guidelines and operational requirements.', priority: '1', control_type: 'technical' },
-      { control_id: 'SI-13', title: 'Predictable Failure Prevention', description: 'Determine mean time to failure (MTTF) for the following system components in specific environments of operation: [system components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-14', title: 'Non-persistence', description: 'Implement non-persistent [system components and services] that are initiated in a known state and terminated [upon end of session of use/frequency ].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-15', title: 'Information Output Filtering', description: 'Validate information output from the following software programs and/or applications to ensure that the information is consistent with the expected content: [software programs and/or applications].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-16', title: 'Memory Protection', description: 'Implement the following controls to protect the system memory from unauthorized code execution: [controls].', priority: '2', control_type: 'technical' },
-      { control_id: 'SI-17', title: 'Fail-safe Procedures', description: 'Implement the indicated fail-safe procedures when the indicated failures occur: [organization-defined list of failure conditions and associated fail-safe procedures].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-18', title: 'Personally Identifiable Information Quality Operations', description: 'Check the accuracy, relevance, timeliness, and completeness of personally identifiable information across the information life cycle [organization-defined frequency].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-19', title: 'De-identification', description: 'Remove the following elements of personally identifiable information from datasets: [elements].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-20', title: 'Tainting', description: 'Embed data or capabilities in the following systems or system components to determine if organizational data has been exfiltrated or improperly removed from the organization: [systems or system components].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-21', title: 'Information Refresh', description: 'Refresh [information] at [frequencies] or generate the information on demand and delete the information when no longer needed.', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-22', title: 'Information Diversity', description: 'Identify the following alternative sources of information for [essential functions and services]: [alternative information sources].', priority: '3', control_type: 'technical' },
-      { control_id: 'SI-23', title: 'Information Fragmentation', description: 'Based on [circumstances] fragment the following information: [information].', priority: '3', control_type: 'technical' },
-      // Supply Chain Risk Management
-      { control_id: 'SR-1', title: 'Policy and Procedures', description: 'Develop, document, and disseminate a supply chain risk management policy and procedures.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SR-2', title: 'Supply Chain Risk Management Plan', description: 'Develop a plan for managing supply chain risks associated with the development, acquisition, maintenance, and disposal of systems.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SR-3', title: 'Supply Chain Controls and Processes', description: 'Establish and apply a process for identifying and addressing weaknesses or deficiencies in the supply chain elements and processes.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SR-4', title: 'Provenance', description: 'Document, monitor, and maintain valid provenance of the following systems, system components, and associated data: [systems, system components, and associated data].', priority: '3', control_type: 'operational' },
-      { control_id: 'SR-5', title: 'Acquisition Strategies, Tools, and Methods', description: 'Employ acquisition strategies, contract tools, and procurement methods to protect against, identify, and mitigate supply chain risks.', control_type: 'administrative', priority: '2' },
-      { control_id: 'SR-6', title: 'Supplier Assessments and Reviews', description: 'Assess and review the supply chain-related risks associated with suppliers or contractors at a defined frequency.', control_type: 'administrative', priority: '1' },
-      { control_id: 'SR-7', title: 'Supply Chain Operations Security', description: 'Employ the following Operations Security (OPSEC) controls to protect supply chain-related information for the system, system component, or system service: [OPSEC controls].', priority: '3', control_type: 'operational' },
-      { control_id: 'SR-8', title: 'Notification Agreements', description: 'Establish agreements and procedures with entities involved in the supply chain to notify the organization of supply chain compromises.', control_type: 'administrative', priority: '2' },
-      { control_id: 'SR-9', title: 'Tamper Resistance and Detection', description: 'Implement a tamper protection program for the system, system component, or system service.', priority: '3', control_type: 'operational' },
-      { control_id: 'SR-10', title: 'Inspection of Systems or Components', description: 'Inspect systems or system components at a defined frequency to detect tampering.', control_type: 'operational', priority: '2' },
-      { control_id: 'SR-11', title: 'Component Authenticity', description: 'Develop and implement anti-counterfeit policy and procedures; use anti-counterfeit mechanisms to detect counterfeit system components.', control_type: 'operational', priority: '2' },
-      { control_id: 'SR-12', title: 'Component Disposal', description: 'Dispose of system components using approved disposal techniques and methods.', control_type: 'operational', priority: '2' },
+// Auto-generated by scripts/import-oscal-80053.js from the official NIST
+// OSCAL SP 800-53 Rev 5.2.0 catalog (public domain, US government work).
+// Do not hand-edit -- re-run the importer against an updated catalog instead.
+// Source: https://github.com/usnistgov/oscal-content
+//   nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json
+// Withdrawn controls excluded. Base controls AND control enhancements are
+// included: enhancements are nested under their base control in OSCAL and are
+// marked here with is_enhancement plus parent_control_id.
+// Baseline membership comes from the NIST SP 800-53B LOW/MODERATE/HIGH profiles.
+
+const controls = [
+  {
+    "control_id": "AC-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] access control policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the access control policy and the associated access controls; b. Designate an [official] to manage the development, documentation, and dissemination of the access control policy and procedures; and c. Review and update the current access control: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
     ]
+  },
+  {
+    "control_id": "AC-2",
+    "title": "Account Management",
+    "description": "a. Define and document the types of accounts allowed and specifically prohibited for use within the system; b. Assign account managers; c. Require [prerequisites and criteria] for group and role membership; d. Specify: 1. Authorized users of the system; 2. Group and role membership; and 3. Access authorizations (i.e., privileges) and [attributes (as required)] for each account; e. Require approvals by [personnel or roles] for requests to create accounts; f. Create, enable, modify, disable, and remove accounts in accordance with [policy, procedures, prerequisites, and criteria]; g. Monitor the use of accounts; h. Notify account managers and [personnel or roles] within: 1. [time period] when accounts are no longer required; 2. [time period] when users are terminated or transferred; and 3. [time period] when system usage or need-to-know changes for an individual; i. Authorize access to the system based on: 1. A valid access authorization; 2. Intended system usage; and 3. [attributes (as required)]; j. Review accounts for compliance with account management requirements [frequency]; k. Establish and implement a process for changing shared or group account authenticators (if deployed) when individuals are removed from the group; and l. Align account management processes with personnel termination and transfer processes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(1)",
+    "title": "Automated System Account Management",
+    "description": "Support the management of system accounts using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(2)",
+    "title": "Automated Temporary and Emergency Account Management",
+    "description": "Automatically [remove | disable] temporary and emergency accounts after [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(3)",
+    "title": "Disable Accounts",
+    "description": "Disable accounts within [time period] when the accounts:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(4)",
+    "title": "Automated Audit Actions",
+    "description": "Automatically audit account creation, modification, enabling, disabling, and removal actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(5)",
+    "title": "Inactivity Logout",
+    "description": "Require that users log out when [time period of expected inactivity or description of when to log out].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(6)",
+    "title": "Dynamic Privilege Management",
+    "description": "Implement [dynamic privilege management capabilities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-2(7)",
+    "title": "Privileged User Accounts",
+    "description": "(a) Establish and administer privileged user accounts in accordance with [a role-based access scheme | an attribute-based access scheme]; (b) Monitor privileged role or attribute assignments; (c) Monitor changes to roles or attributes; and (d) Revoke access when privileged role or attribute assignments are no longer appropriate.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-2(8)",
+    "title": "Dynamic Account Management",
+    "description": "Create, activate, manage, and deactivate [system accounts] dynamically.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-2(9)",
+    "title": "Restrictions on Use of Shared and Group Accounts",
+    "description": "Only permit the use of shared and group accounts that meet [conditions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-2(11)",
+    "title": "Usage Conditions",
+    "description": "Enforce [circumstances and/or usage conditions] for [system accounts].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(12)",
+    "title": "Account Monitoring for Atypical Usage",
+    "description": "(a) Monitor system accounts for [atypical usage] ; and (b) Report atypical usage of system accounts to [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-2(13)",
+    "title": "Disable Accounts for High-risk Individuals",
+    "description": "Disable accounts of individuals within [time period] of discovery of [significant risks].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-3",
+    "title": "Access Enforcement",
+    "description": "Enforce approved authorizations for logical access to information and system resources in accordance with applicable access control policies.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-3(2)",
+    "title": "Dual Authorization",
+    "description": "Enforce dual authorization for [privileged commands and/or other actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(3)",
+    "title": "Mandatory Access Control",
+    "description": "Enforce [organization-defined mandatory access control policy] over the set of covered subjects and objects specified in the policy, and where the policy:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(4)",
+    "title": "Discretionary Access Control",
+    "description": "Enforce [organization-defined discretionary access control policy] over the set of covered subjects and objects specified in the policy, and where the policy specifies that a subject that has been granted access to information can do one or more of the following:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(5)",
+    "title": "Security-relevant Information",
+    "description": "Prevent access to [security-relevant information] except during secure, non-operable system states.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(7)",
+    "title": "Role-based Access Control",
+    "description": "Enforce a role-based access control policy over defined subjects and objects and control access based upon [organization-defined roles and users authorized to assume such roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(8)",
+    "title": "Revocation of Access Authorizations",
+    "description": "Enforce the revocation of access authorizations resulting from changes to the security attributes of subjects and objects based on [rules].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(9)",
+    "title": "Controlled Release",
+    "description": "Release information outside of the system only if:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(10)",
+    "title": "Audited Override of Access Control Mechanisms",
+    "description": "Employ an audited override of automated access control mechanisms under [conditions] by [roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(11)",
+    "title": "Restrict Access to Specific Information Types",
+    "description": "Restrict access to data repositories containing [information types].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(12)",
+    "title": "Assert and Enforce Application Access",
+    "description": "(a) Require applications to assert, as part of the installation process, the access needed to the following system applications and functions: [system applications and functions]; (b) Provide an enforcement mechanism to prevent unauthorized access; and (c) Approve access changes after initial installation of the application.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(13)",
+    "title": "Attribute-based Access Control",
+    "description": "Enforce attribute-based access control policy over defined subjects and objects and control access based upon [attributes].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(14)",
+    "title": "Individual Access",
+    "description": "Provide [mechanisms] to enable individuals to have access to the following elements of their personally identifiable information: [elements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-3(15)",
+    "title": "Discretionary and Mandatory Access Control",
+    "description": "(a) Enforce [organization-defined mandatory access control policy] over the set of covered subjects and objects specified in the policy; and (b) Enforce [organization-defined discretionary access control policy] over the set of covered subjects and objects specified in the policy.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4",
+    "title": "Information Flow Enforcement",
+    "description": "Enforce approved authorizations for controlling the flow of information within the system and between connected systems based on [information flow control policies].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-4(1)",
+    "title": "Object Security and Privacy Attributes",
+    "description": "Use [organization-defined security and privacy attributes] associated with [organization-defined information, source, and destination objects] to enforce [information flow control policies] as a basis for flow control decisions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(2)",
+    "title": "Processing Domains",
+    "description": "Use protected processing domains to enforce [information flow control policies] as a basis for flow control decisions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(3)",
+    "title": "Dynamic Information Flow Control",
+    "description": "Enforce [information flow control policies].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(4)",
+    "title": "Flow Control of Encrypted Information",
+    "description": "Prevent encrypted information from bypassing [information flow control mechanisms] by [decrypting the information | blocking the flow of the encrypted information | terminating communications sessions attempting to pass encrypted information | [organization-defined procedure or method]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-4(5)",
+    "title": "Embedded Data Types",
+    "description": "Enforce [limitations] on embedding data types within other data types.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(6)",
+    "title": "Metadata",
+    "description": "Enforce information flow control based on [metadata].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(7)",
+    "title": "One-way Flow Mechanisms",
+    "description": "Enforce one-way information flows through hardware-based flow control mechanisms.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(8)",
+    "title": "Security and Privacy Policy Filters",
+    "description": "(a) Enforce information flow control using [organization-defined security or privacy policy filters] as a basis for flow control decisions for [organization-defined information flows] ; and (b) [block | strip | modify | quarantine] data after a filter processing failure in accordance with [organization-defined security or privacy policy].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(9)",
+    "title": "Human Reviews",
+    "description": "Enforce the use of human reviews for [information flows] under the following conditions: [conditions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(10)",
+    "title": "Enable and Disable Security or Privacy Policy Filters",
+    "description": "Provide the capability for privileged administrators to enable and disable [organization-defined security or privacy policy filters] under the following conditions: [organization-defined conditions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(11)",
+    "title": "Configuration of Security or Privacy Policy Filters",
+    "description": "Provide the capability for privileged administrators to configure [organization-defined security or privacy policy filters] to support different security or privacy policies.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(12)",
+    "title": "Data Type Identifiers",
+    "description": "When transferring information between different security domains, use [data type identifiers] to validate data essential for information flow decisions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(13)",
+    "title": "Decomposition into Policy-relevant Subcomponents",
+    "description": "When transferring information between different security domains, decompose information into [policy-relevant subcomponents] for submission to policy enforcement mechanisms.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(14)",
+    "title": "Security or Privacy Policy Filter Constraints",
+    "description": "When transferring information between different security domains, implement [organization-defined security or privacy policy filters] requiring fully enumerated formats that restrict data structure and content.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(15)",
+    "title": "Detection of Unsanctioned Information",
+    "description": "When transferring information between different security domains, examine the information for the presence of [unsanctioned information] and prohibit the transfer of such information in accordance with the [organization-defined security or privacy policy].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(17)",
+    "title": "Domain Authentication",
+    "description": "Uniquely identify and authenticate source and destination points by [organization, system, application, service, individual] for information transfer.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(19)",
+    "title": "Validation of Metadata",
+    "description": "When transferring information between different security domains, implement [organization-defined security or privacy policy filters] on metadata.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(20)",
+    "title": "Approved Solutions",
+    "description": "Employ [solutions in approved configurations] to control the flow of [information] across security domains.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(21)",
+    "title": "Physical or Logical Separation of Information Flows",
+    "description": "Separate information flows logically or physically using [organization-defined mechanisms and/or techniques] to accomplish [required separations].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(22)",
+    "title": "Access Only",
+    "description": "Provide access from a single device to computing platforms, applications, or data residing in multiple different security domains, while preventing information flow between the different security domains.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(23)",
+    "title": "Modify Non-releasable Information",
+    "description": "When transferring information between different security domains, modify non-releasable information by implementing [modification action].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(24)",
+    "title": "Internal Normalized Format",
+    "description": "When transferring information between different security domains, parse incoming data into an internal normalized format and regenerate the data to be consistent with its intended specification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(25)",
+    "title": "Data Sanitization",
+    "description": "When transferring information between different security domains, sanitize data to minimize [delivery of malicious content, command and control of malicious code, malicious code augmentation, and steganography-encoded data | spillage of sensitive information] in accordance with [policy].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(26)",
+    "title": "Audit Filtering Actions",
+    "description": "When transferring information between different security domains, record and audit content filtering actions and results for the information being filtered.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(27)",
+    "title": "Redundant/Independent Filtering Mechanisms",
+    "description": "When transferring information between different security domains, implement content filtering solutions that provide redundant and independent filtering mechanisms for each data type.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(28)",
+    "title": "Linear Filter Pipelines",
+    "description": "When transferring information between different security domains, implement a linear content filter pipeline that is enforced with discretionary and mandatory access controls.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(29)",
+    "title": "Filter Orchestration Engines",
+    "description": "When transferring information between different security domains, employ content filter orchestration engines to ensure that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(30)",
+    "title": "Filter Mechanisms Using Multiple Processes",
+    "description": "When transferring information between different security domains, implement content filtering mechanisms using multiple processes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(31)",
+    "title": "Failed Content Transfer Prevention",
+    "description": "When transferring information between different security domains, prevent the transfer of failed content to the receiving domain.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-4(32)",
+    "title": "Process Requirements for Information Transfer",
+    "description": "When transferring information between different security domains, the process that transfers information between filter pipelines:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-5",
+    "title": "Separation of Duties",
+    "description": "a. Identify and document [duties of individuals] ; and b. Define system access authorizations to support separation of duties.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6",
+    "title": "Least Privilege",
+    "description": "Employ the principle of least privilege, allowing only authorized accesses for users (or processes acting on behalf of users) that are necessary to accomplish assigned organizational tasks.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6(1)",
+    "title": "Authorize Access to Security Functions",
+    "description": "Authorize access for [individuals and roles] to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6(2)",
+    "title": "Non-privileged Access for Nonsecurity Functions",
+    "description": "Require that users of system accounts (or roles) with access to [security functions or security-relevant information] use non-privileged accounts or roles, when accessing nonsecurity functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6(3)",
+    "title": "Network Access to Privileged Commands",
+    "description": "Authorize network access to [privileged commands] only for [compelling operational needs] and document the rationale for such access in the security plan for the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6(4)",
+    "title": "Separate Processing Domains",
+    "description": "Provide separate processing domains to enable finer-grained allocation of user privileges.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-6(5)",
+    "title": "Privileged Accounts",
+    "description": "Restrict privileged accounts on the system to [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6(6)",
+    "title": "Privileged Access by Non-organizational Users",
+    "description": "Prohibit privileged access to the system by non-organizational users.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-6(7)",
+    "title": "Review of User Privileges",
+    "description": "(a) Review [frequency] the privileges assigned to [roles and classes] to validate the need for such privileges; and (b) Reassign or remove privileges, if necessary, to correctly reflect organizational mission and business needs.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6(8)",
+    "title": "Privilege Levels for Code Execution",
+    "description": "Prevent the following software from executing at higher privilege levels than users executing the software: [software].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-6(9)",
+    "title": "Log Use of Privileged Functions",
+    "description": "Log the execution of privileged functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-6(10)",
+    "title": "Prohibit Non-privileged Users from Executing Privileged Functions",
+    "description": "Prevent non-privileged users from executing privileged functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-7",
+    "title": "Unsuccessful Logon Attempts",
+    "description": "a. Enforce a limit of [number] consecutive invalid logon attempts by a user during a [time period] ; and b. Automatically [lock the account or node for [time period] | lock the account or node until released by an administrator | delay next logon prompt per [delay algorithm] | notify system administrator | take other [action]] when the maximum number of unsuccessful attempts is exceeded.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-7(2)",
+    "title": "Purge or Wipe Mobile Device",
+    "description": "Purge or wipe information from [mobile devices] based on [purging or wiping requirements and techniques] after [number] consecutive, unsuccessful device logon attempts.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-7(3)",
+    "title": "Biometric Attempt Limiting",
+    "description": "Limit the number of unsuccessful biometric logon attempts to [number].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-7(4)",
+    "title": "Use of Alternate Authentication Factor",
+    "description": "(a) Allow the use of [authentication factors] that are different from the primary authentication factors after the number of organization-defined consecutive invalid logon attempts have been exceeded; and (b) Enforce a limit of [number] consecutive invalid logon attempts through use of the alternative factors by a user during a [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-8",
+    "title": "System Use Notification",
+    "description": "a. Display [system use notification] to users before granting access to the system that provides privacy and security notices consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines and state that: 1. Users are accessing a U.S. Government system; 2. System usage may be monitored, recorded, and subject to audit; 3. Unauthorized use of the system is prohibited and subject to criminal and civil penalties; and 4. Use of the system indicates consent to monitoring and recording; b. Retain the notification message or banner on the screen until users acknowledge the usage conditions and take explicit actions to log on to or further access the system; and c. For publicly accessible systems: 1. Display system use information [conditions] , before granting further access to the publicly accessible system; 2. Display references, if any, to monitoring, recording, or auditing that are consistent with privacy accommodations for such systems that generally prohibit those activities; and 3. Include a description of the authorized uses of the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-9",
+    "title": "Previous Logon Notification",
+    "description": "Notify the user, upon successful logon to the system, of the date and time of the last logon.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AC-9(1)",
+    "title": "Unsuccessful Logons",
+    "description": "Notify the user, upon successful logon, of the number of unsuccessful logon attempts since the last successful logon.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-9(2)",
+    "title": "Successful and Unsuccessful Logons",
+    "description": "Notify the user, upon successful logon, of the number of [successful logons | unsuccessful logon attempts | both] during [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-9(3)",
+    "title": "Notification of Account Changes",
+    "description": "Notify the user, upon successful logon, of changes to [security-related characteristics or parameters] during [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-9(4)",
+    "title": "Additional Logon Information",
+    "description": "Notify the user, upon successful logon, of the following additional information: [additional information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-10",
+    "title": "Concurrent Session Control",
+    "description": "Limit the number of concurrent sessions for each [account and/or account types] to [number].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-11",
+    "title": "Device Lock",
+    "description": "a. Prevent further access to the system by [initiating a device lock after [time period] of inactivity | requiring the user to initiate a device lock before leaving the system unattended] ; and b. Retain the device lock until the user reestablishes access using established identification and authentication procedures.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-11(1)",
+    "title": "Pattern-hiding Displays",
+    "description": "Conceal, via the device lock, information previously visible on the display with a publicly viewable image.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-11",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-12",
+    "title": "Session Termination",
+    "description": "Automatically terminate a user session after [conditions or trigger events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-12(1)",
+    "title": "User-initiated Logouts",
+    "description": "Provide a logout capability for user-initiated communications sessions whenever authentication is used to gain access to [information resources].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-12",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-12(2)",
+    "title": "Termination Message",
+    "description": "Display an explicit logout message to users indicating the termination of authenticated communications sessions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-12",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-12(3)",
+    "title": "Timeout Warning Message",
+    "description": "Display an explicit message to users indicating that the session will end in [time].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-12",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-14",
+    "title": "Permitted Actions Without Identification or Authentication",
+    "description": "a. Identify [user actions] that can be performed on the system without identification or authentication consistent with organizational mission and business functions; and b. Document and provide supporting rationale in the security plan for the system, user actions not requiring identification or authentication.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-16",
+    "title": "Security and Privacy Attributes",
+    "description": "a. Provide the means to associate [organization-defined types of security and privacy attributes] with [organization-defined security and privacy attribute values] for information in storage, in process, and/or in transmission; b. Ensure that the attribute associations are made and retained with the information; c. Establish the following permitted security and privacy attributes from the attributes defined in [AC-16a](#ac-16_smt.a) for [organization-defined systems]: [organization-defined security and privacy attributes]; d. Determine the following permitted attribute values or ranges for each of the established attributes: [attribute values or ranges]; e. Audit changes to attributes; and f. Review [organization-defined security and privacy attributes] for applicability [organization-defined frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(1)",
+    "title": "Dynamic Attribute Association",
+    "description": "Dynamically associate security and privacy attributes with [organization-defined subjects and objects] in accordance with the following security and privacy policies as information is created and combined: [organization-defined security and privacy policies].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(2)",
+    "title": "Attribute Value Changes by Authorized Individuals",
+    "description": "Provide authorized individuals (or processes acting on behalf of individuals) the capability to define or change the value of associated security and privacy attributes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(3)",
+    "title": "Maintenance of Attribute Associations by System",
+    "description": "Maintain the association and integrity of [organization-defined security and privacy attributes] to [organization-defined subjects and objects].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(4)",
+    "title": "Association of Attributes by Authorized Individuals",
+    "description": "Provide the capability to associate [organization-defined security and privacy attributes] with [organization-defined subjects and objects] by authorized individuals (or processes acting on behalf of individuals).",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(5)",
+    "title": "Attribute Displays on Objects to Be Output",
+    "description": "Display security and privacy attributes in human-readable form on each object that the system transmits to output devices to identify [instructions] using [naming conventions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(6)",
+    "title": "Maintenance of Attribute Association",
+    "description": "Require personnel to associate and maintain the association of [organization-defined security and privacy attributes] with [organization-defined subjects and objects] in accordance with [organization-defined security and privacy policies].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(7)",
+    "title": "Consistent Attribute Interpretation",
+    "description": "Provide a consistent interpretation of security and privacy attributes transmitted between distributed system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(8)",
+    "title": "Association Techniques and Technologies",
+    "description": "Implement [organization-defined techniques and technologies] in associating security and privacy attributes to information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(9)",
+    "title": "Attribute Reassignment — Regrading Mechanisms",
+    "description": "Change security and privacy attributes associated with information only via regrading mechanisms validated using [organization-defined techniques or procedures].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-16(10)",
+    "title": "Attribute Configuration by Authorized Individuals",
+    "description": "Provide authorized individuals the capability to define or change the type and value of security and privacy attributes available for association with subjects and objects.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-17",
+    "title": "Remote Access",
+    "description": "a. Establish and document usage restrictions, configuration/connection requirements, and implementation guidance for each type of remote access allowed; and b. Authorize each type of remote access to the system prior to allowing such connections.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-17(1)",
+    "title": "Monitoring and Control",
+    "description": "Employ automated mechanisms to monitor and control remote access methods.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-17",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-17(2)",
+    "title": "Protection of Confidentiality and Integrity Using Encryption",
+    "description": "Implement cryptographic mechanisms to protect the confidentiality and integrity of remote access sessions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-17",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-17(3)",
+    "title": "Managed Access Control Points",
+    "description": "Route remote accesses through authorized and managed network access control points.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-17",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-17(4)",
+    "title": "Privileged Commands and Access",
+    "description": "(a) Authorize the execution of privileged commands and access to security-relevant information via remote access only in a format that provides assessable evidence and for the following needs: [organization-defined needs] ; and (b) Document the rationale for remote access in the security plan for the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-17",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-17(6)",
+    "title": "Protection of Mechanism Information",
+    "description": "Protect information about remote access mechanisms from unauthorized use and disclosure.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-17",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-17(9)",
+    "title": "Disconnect or Disable Access",
+    "description": "Provide the capability to disconnect or disable remote access to the system within [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-17",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-17(10)",
+    "title": "Authenticate Remote Commands",
+    "description": "Implement [mechanisms] to authenticate [remote commands].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-17",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-18",
+    "title": "Wireless Access",
+    "description": "a. Establish configuration requirements, connection requirements, and implementation guidance for each type of wireless access; and b. Authorize each type of wireless access to the system prior to allowing such connections.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-18(1)",
+    "title": "Authentication and Encryption",
+    "description": "Protect wireless access to the system using authentication of [users | devices] and encryption.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-18",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-18(3)",
+    "title": "Disable Wireless Networking",
+    "description": "Disable, when not intended for use, wireless networking capabilities embedded within system components prior to issuance and deployment.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-18",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-18(4)",
+    "title": "Restrict Configurations by Users",
+    "description": "Identify and explicitly authorize users allowed to independently configure wireless networking capabilities.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-18",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-18(5)",
+    "title": "Antennas and Transmission Power Levels",
+    "description": "Select radio antennas and calibrate transmission power levels to reduce the probability that signals from wireless access points can be received outside of organization-controlled boundaries.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-18",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-19",
+    "title": "Access Control for Mobile Devices",
+    "description": "a. Establish configuration requirements, connection requirements, and implementation guidance for organization-controlled mobile devices, to include when such devices are outside of controlled areas; and b. Authorize the connection of mobile devices to organizational systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-19(4)",
+    "title": "Restrictions for Classified Information",
+    "description": "(a) Prohibit the use of unclassified mobile devices in facilities containing systems processing, storing, or transmitting classified information unless specifically permitted by the authorizing official; and (b) Enforce the following restrictions on individuals permitted by the authorizing official to use unclassified mobile devices in facilities containing systems processing, storing, or transmitting classified information: (1) Connection of unclassified mobile devices to classified systems is prohibited; (2) Connection of unclassified mobile devices to unclassified systems requires approval from the authorizing official; (3) Use of internal or external modems or wireless interfaces within the unclassified mobile devices is prohibited; and (4) Unclassified mobile devices and the information stored on those devices are subject to random reviews and inspections by [security officials] , and if classified information is found, the incident handling policy is followed. (c) Restrict the connection of classified mobile devices to classified systems in accordance with [security policies].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-19",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-19(5)",
+    "title": "Full Device or Container-based Encryption",
+    "description": "Employ [full-device encryption | container-based encryption] to protect the confidentiality and integrity of information on [mobile devices].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-19",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-20",
+    "title": "Use of External Systems",
+    "description": "a. [establish [terms and conditions] | identify [controls asserted]] , consistent with the trust relationships established with other organizations owning, operating, and/or maintaining external systems, allowing authorized individuals to: 1. Access the system from external systems; and 2. Process, store, or transmit organization-controlled information using external systems; or b. Prohibit the use of [prohibited types of external systems].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-20(1)",
+    "title": "Limits on Authorized Use",
+    "description": "Permit authorized individuals to use an external system to access the system or to process, store, or transmit organization-controlled information only after:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-20",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-20(2)",
+    "title": "Portable Storage Devices — Restricted Use",
+    "description": "Restrict the use of organization-controlled portable storage devices by authorized individuals on external systems using [restrictions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-20",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-20(3)",
+    "title": "Non-organizationally Owned Systems — Restricted Use",
+    "description": "Restrict the use of non-organizationally owned systems or system components to process, store, or transmit organizational information using [restrictions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-20",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-20(4)",
+    "title": "Network Accessible Storage Devices — Prohibited Use",
+    "description": "Prohibit the use of [network-accessible storage devices] in external systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-20",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-20(5)",
+    "title": "Portable Storage Devices — Prohibited Use",
+    "description": "Prohibit the use of organization-controlled portable storage devices by authorized individuals on external systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-20",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-21",
+    "title": "Information Sharing",
+    "description": "a. Enable authorized users to determine whether access authorizations assigned to a sharing partner match the information’s access and use restrictions for [information-sharing circumstances] ; and b. Employ [automated mechanisms] to assist users in making information sharing and collaboration decisions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-21(1)",
+    "title": "Automated Decision Support",
+    "description": "Employ [automated mechanisms] to enforce information-sharing decisions by authorized users based on access authorizations of sharing partners and access restrictions on information to be shared.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-21",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-21(2)",
+    "title": "Information Search and Retrieval",
+    "description": "Implement information search and retrieval services that enforce [information-sharing restrictions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-21",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-22",
+    "title": "Publicly Accessible Content",
+    "description": "a. Designate individuals authorized to make information publicly accessible; b. Train authorized individuals to ensure that publicly accessible information does not contain nonpublic information; c. Review the proposed content of information prior to posting onto the publicly accessible system to ensure that nonpublic information is not included; and d. Review the content on the publicly accessible system for nonpublic information [frequency] and remove such information, if discovered.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AC-23",
+    "title": "Data Mining Protection",
+    "description": "Employ [techniques] for [data storage objects] to detect and protect against unauthorized data mining.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AC-24",
+    "title": "Access Control Decisions",
+    "description": "[establish procedures | implement mechanisms] to ensure [access control decisions] are applied to each access request prior to access enforcement.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AC-24(1)",
+    "title": "Transmit Access Authorization Information",
+    "description": "Transmit [access authorization information] using [controls] to [systems] that enforce access control decisions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-24",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-24(2)",
+    "title": "No User or Process Identity",
+    "description": "Enforce access control decisions based on [organization-defined security or privacy attributes] that do not include the identity of the user or process acting on behalf of the user.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AC-24",
+    "baselines": []
+  },
+  {
+    "control_id": "AC-25",
+    "title": "Reference Monitor",
+    "description": "Implement a reference monitor for [access control policies] that is tamperproof, always invoked, and small enough to be subject to analysis and testing, the completeness of which can be assured.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AT-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] awareness and training policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the awareness and training policy and the associated awareness and training controls; b. Designate an [official] to manage the development, documentation, and dissemination of the awareness and training policy and procedures; and c. Review and update the current awareness and training: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AT-2",
+    "title": "Literacy Training and Awareness",
+    "description": "a. Provide security and privacy literacy training to system users (including managers, senior executives, and contractors): 1. As part of initial training for new users and [organization-defined frequency] thereafter; and 2. When required by system changes or following [organization-defined events]; b. Employ the following techniques to increase the security and privacy awareness of system users [awareness techniques]; c. Update literacy training and awareness content [frequency] and following [events] ; and d. Incorporate lessons learned from internal or external security incidents or breaches into literacy training and awareness techniques.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AT-2(1)",
+    "title": "Practical Exercises",
+    "description": "Provide practical exercises in literacy training that simulate events and incidents.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-2(2)",
+    "title": "Insider Threat",
+    "description": "Provide literacy training on recognizing and reporting potential indicators of insider threat.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-2",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AT-2(3)",
+    "title": "Social Engineering and Mining",
+    "description": "Provide literacy training on recognizing and reporting potential and actual instances of social engineering and social mining.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AT-2(4)",
+    "title": "Suspicious Communications and Anomalous System Behavior",
+    "description": "Provide literacy training on recognizing suspicious communications and anomalous behavior in organizational systems using [indicators of malicious code].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-2(5)",
+    "title": "Advanced Persistent Threat",
+    "description": "Provide literacy training on the advanced persistent threat.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-2(6)",
+    "title": "Cyber Threat Environment",
+    "description": "(a) Provide literacy training on the cyber threat environment; and (b) Reflect current cyber threat information in system operations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-2",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-3",
+    "title": "Role-based Training",
+    "description": "a. Provide role-based security and privacy training to personnel with the following roles and responsibilities: [organization-defined roles and responsibilities]: 1. Before authorizing access to the system, information, or performing assigned duties, and [frequency] thereafter; and 2. When required by system changes; b. Update role-based training content [frequency] and following [events] ; and c. Incorporate lessons learned from internal or external security incidents or breaches into role-based training.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AT-3(1)",
+    "title": "Environmental Controls",
+    "description": "Provide [personnel or roles] with initial and [frequency] training in the employment and operation of environmental controls.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-3(2)",
+    "title": "Physical Security Controls",
+    "description": "Provide [personnel or roles] with initial and [frequency] training in the employment and operation of physical security controls.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-3(3)",
+    "title": "Practical Exercises",
+    "description": "Provide practical exercises in security and privacy training that reinforce training objectives.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-3(5)",
+    "title": "Processing Personally Identifiable Information",
+    "description": "Provide [personnel or roles] with initial and [frequency] training in the employment and operation of personally identifiable information processing and transparency controls.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AT-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AT-4",
+    "title": "Training Records",
+    "description": "a. Document and monitor information security and privacy training activities, including security and privacy awareness training and specific role-based security and privacy training; and b. Retain individual training records for [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AT-6",
+    "title": "Training Feedback",
+    "description": "Provide feedback on organizational training results to the following personnel [frequency]: [personnel].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AU-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] audit and accountability policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the audit and accountability policy and the associated audit and accountability controls; b. Designate an [official] to manage the development, documentation, and dissemination of the audit and accountability policy and procedures; and c. Review and update the current audit and accountability: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-2",
+    "title": "Event Logging",
+    "description": "a. Identify the types of events that the system is capable of logging in support of the audit function: [event types]; b. Coordinate the event logging function with other organizational entities requiring audit-related information to guide and inform the selection criteria for events to be logged; c. Specify the following event types for logging within the system: [organization-defined event types (subset of the event types defined in [AU-2a.](#au-2_smt.a)) along with the frequency of (or situation requiring) logging for each identified event type]; d. Provide a rationale for why the event types selected for logging are deemed to be adequate to support after-the-fact investigations of incidents; and e. Review and update the event types selected for logging [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-3",
+    "title": "Content of Audit Records",
+    "description": "Ensure that audit records contain information that establishes the following:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-3(1)",
+    "title": "Additional Audit Information",
+    "description": "Generate audit records containing the following additional information: [additional information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-3",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-3(3)",
+    "title": "Limit Personally Identifiable Information Elements",
+    "description": "Limit personally identifiable information contained in audit records to the following elements identified in the privacy risk assessment: [elements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-3",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-4",
+    "title": "Audit Log Storage Capacity",
+    "description": "Allocate audit log storage capacity to accommodate [audit log retention requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-4(1)",
+    "title": "Transfer to Alternate Storage",
+    "description": "Transfer audit logs [frequency] to a different system, system component, or media other than the system or system component conducting the logging.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-4",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-5",
+    "title": "Response to Audit Logging Process Failures",
+    "description": "a. Alert [personnel or roles] within [time period] in the event of an audit logging process failure; and b. Take the following additional actions: [additional actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-5(1)",
+    "title": "Storage Capacity Warning",
+    "description": "Provide a warning to [personnel, roles, and/or locations] within [time period] when allocated audit log storage volume reaches [percentage] of repository maximum audit log storage capacity.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-5",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-5(2)",
+    "title": "Real-time Alerts",
+    "description": "Provide an alert within [real-time period] to [personnel, roles, and/or locations] when the following audit failure events occur: [audit logging failure events requiring real-time alerts].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-5",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-5(3)",
+    "title": "Configurable Traffic Volume Thresholds",
+    "description": "Enforce configurable network communications traffic volume thresholds reflecting limits on audit log storage capacity and [reject | delay] network traffic above those thresholds.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-5",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-5(4)",
+    "title": "Shutdown on Failure",
+    "description": "Invoke a [full system shutdown | partial system shutdown | degraded operational mode with limited mission or business functionality available] in the event of [audit logging failures] , unless an alternate audit logging capability exists.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-5",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-5(5)",
+    "title": "Alternate Audit Logging Capability",
+    "description": "Provide an alternate audit logging capability in the event of a failure in primary audit logging capability that implements [alternate audit logging functionality].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-5",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-6",
+    "title": "Audit Record Review, Analysis, and Reporting",
+    "description": "a. Review and analyze system audit records [frequency] for indications of [inappropriate or unusual activity] and the potential impact of the inappropriate or unusual activity; b. Report findings to [personnel or roles] ; and c. Adjust the level of audit record review, analysis, and reporting within the system when there is a change in risk based on law enforcement information, intelligence information, or other credible sources of information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-6(1)",
+    "title": "Automated Process Integration",
+    "description": "Integrate audit record review, analysis, and reporting processes using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-6(3)",
+    "title": "Correlate Audit Record Repositories",
+    "description": "Analyze and correlate audit records across different repositories to gain organization-wide situational awareness.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-6(4)",
+    "title": "Central Review and Analysis",
+    "description": "Provide and implement the capability to centrally review and analyze audit records from multiple components within the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-6(5)",
+    "title": "Integrated Analysis of Audit Records",
+    "description": "Integrate analysis of audit records with analysis of [vulnerability scanning information | performance data | system monitoring information | [data/information collected from other sources]] to further enhance the ability to identify inappropriate or unusual activity.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-6(6)",
+    "title": "Correlation with Physical Monitoring",
+    "description": "Correlate information from audit records with information obtained from monitoring physical access to further enhance the ability to identify suspicious, inappropriate, unusual, or malevolent activity.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-6(7)",
+    "title": "Permitted Actions",
+    "description": "Specify the permitted actions for each [system process | role | user] associated with the review, analysis, and reporting of audit record information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-6(8)",
+    "title": "Full Text Analysis of Privileged Commands",
+    "description": "Perform a full text analysis of logged privileged commands in a physically distinct component or subsystem of the system, or other system that is dedicated to that analysis.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-6(9)",
+    "title": "Correlation with Information from Nontechnical Sources",
+    "description": "Correlate information from nontechnical sources with audit record information to enhance organization-wide situational awareness.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-6",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-7",
+    "title": "Audit Record Reduction and Report Generation",
+    "description": "Provide and implement an audit record reduction and report generation capability that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-7(1)",
+    "title": "Automatic Processing",
+    "description": "Provide and implement the capability to process, sort, and search audit records for events of interest based on the following content: [fields within audit records].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-8",
+    "title": "Time Stamps",
+    "description": "a. Use internal system clocks to generate time stamps for audit records; and b. Record time stamps for audit records that meet [granularity of time measurement] and that use Coordinated Universal Time, have a fixed local time offset from Coordinated Universal Time, or that include the local time offset as part of the time stamp.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-9",
+    "title": "Protection of Audit Information",
+    "description": "a. Protect audit information and audit logging tools from unauthorized access, modification, and deletion; and b. Alert [personnel or roles] upon detection of unauthorized access, modification, or deletion of audit information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-9(1)",
+    "title": "Hardware Write-once Media",
+    "description": "Write audit trails to hardware-enforced, write-once media.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-9(2)",
+    "title": "Store on Separate Physical Systems or Components",
+    "description": "Store audit records [frequency] in a repository that is part of a physically different system or system component than the system or component being audited.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-9",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-9(3)",
+    "title": "Cryptographic Protection",
+    "description": "Implement cryptographic mechanisms to protect the integrity of audit information and audit tools.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-9",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-9(4)",
+    "title": "Access by Subset of Privileged Users",
+    "description": "Authorize access to management of audit logging functionality to only [subset of privileged users or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-9",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-9(5)",
+    "title": "Dual Authorization",
+    "description": "Enforce dual authorization for [movement | deletion] of [audit information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-9(6)",
+    "title": "Read-only Access",
+    "description": "Authorize read-only access to audit information to [subset of privileged users or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-9(7)",
+    "title": "Store on Component with Different Operating System",
+    "description": "Store audit information on a component running a different operating system than the system or component being audited.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-9",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-10",
+    "title": "Non-repudiation",
+    "description": "Provide irrefutable evidence that an individual (or process acting on behalf of an individual) has performed [actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-10(1)",
+    "title": "Association of Identities",
+    "description": "(a) Bind the identity of the information producer with the information to [strength of binding] ; and (b) Provide the means for authorized individuals to determine the identity of the producer of the information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-10",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-10(2)",
+    "title": "Validate Binding of Information Producer Identity",
+    "description": "(a) Validate the binding of the information producer identity to the information at [frequency] ; and (b) Perform [actions] in the event of a validation error.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-10",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-10(3)",
+    "title": "Chain of Custody",
+    "description": "Maintain reviewer or releaser credentials within the established chain of custody for information reviewed or released.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-10",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-10(4)",
+    "title": "Validate Binding of Information Reviewer Identity",
+    "description": "(a) Validate the binding of the information reviewer identity to the information at the transfer or release points prior to release or transfer between [security domains] ; and (b) Perform [actions] in the event of a validation error.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-10",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-11",
+    "title": "Audit Record Retention",
+    "description": "Retain audit records for [time period] to provide support for after-the-fact investigations of incidents and to meet regulatory and organizational information retention requirements.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-11(1)",
+    "title": "Long-term Retrieval Capability",
+    "description": "Employ [measures] to ensure that long-term audit records generated by the system can be retrieved.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-11",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-12",
+    "title": "Audit Record Generation",
+    "description": "a. Provide audit record generation capability for the event types the system is capable of auditing as defined in [AU-2a](#au-2_smt.a) on [system components]; b. Allow [personnel or roles] to select the event types that are to be logged by specific components of the system; and c. Generate audit records for the event types defined in [AU-2c](#au-2_smt.c) that include the audit record content defined in [AU-3](#au-3).",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-12(1)",
+    "title": "System-wide and Time-correlated Audit Trail",
+    "description": "Compile audit records from [system components] into a system-wide (logical or physical) audit trail that is time-correlated to within [level of tolerance].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-12",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-12(2)",
+    "title": "Standardized Formats",
+    "description": "Produce a system-wide (logical or physical) audit trail composed of audit records in a standardized format.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-12",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-12(3)",
+    "title": "Changes by Authorized Individuals",
+    "description": "Provide and implement the capability for [individuals or roles] to change the logging to be performed on [system components] based on [selectable event criteria] within [time thresholds].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-12",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "AU-12(4)",
+    "title": "Query Parameter Audits of Personally Identifiable Information",
+    "description": "Provide and implement the capability for auditing the parameters of user query events for data sets containing personally identifiable information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-12",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-13",
+    "title": "Monitoring for Information Disclosure",
+    "description": "a. Monitor [open-source information and/or information sites] [frequency] for evidence of unauthorized disclosure of organizational information; and b. If an information disclosure is discovered: 1. Notify [personnel or roles] ; and 2. Take the following additional actions: [additional actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AU-13(1)",
+    "title": "Use of Automated Tools",
+    "description": "Monitor open-source information and information sites using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-13",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-13(2)",
+    "title": "Review of Monitored Sites",
+    "description": "Review the list of open-source information sites being monitored [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-13",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-13(3)",
+    "title": "Unauthorized Replication of Information",
+    "description": "Employ discovery techniques, processes, and tools to determine if external entities are replicating organizational information in an unauthorized manner.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-13",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-14",
+    "title": "Session Audit",
+    "description": "a. Provide and implement the capability for [users or roles] to [record | view | hear | log] the content of a user session under [circumstances] ; and b. Develop, integrate, and use session auditing activities in consultation with legal counsel and in accordance with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AU-14(1)",
+    "title": "System Start-up",
+    "description": "Initiate session audits automatically at system start-up.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-14",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-14(3)",
+    "title": "Remote Viewing and Listening",
+    "description": "Provide and implement the capability for authorized users to remotely view and hear content related to an established user session in real time.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-14",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-16",
+    "title": "Cross-organizational Audit Logging",
+    "description": "Employ [methods] for coordinating [audit information] among external organizations when audit information is transmitted across organizational boundaries.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "AU-16(1)",
+    "title": "Identity Preservation",
+    "description": "Preserve the identity of individuals in cross-organizational audit trails.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-16(2)",
+    "title": "Sharing of Audit Information",
+    "description": "Provide cross-organizational audit information to [organizations] based on [cross-organizational sharing agreements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-16",
+    "baselines": []
+  },
+  {
+    "control_id": "AU-16(3)",
+    "title": "Disassociability",
+    "description": "Implement [measures] to disassociate individuals from audit information transmitted across organizational boundaries.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "AU-16",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] assessment, authorization, and monitoring policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the assessment, authorization, and monitoring policy and the associated assessment, authorization, and monitoring controls; b. Designate an [official] to manage the development, documentation, and dissemination of the assessment, authorization, and monitoring policy and procedures; and c. Review and update the current assessment, authorization, and monitoring: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-2",
+    "title": "Control Assessments",
+    "description": "a. Select the appropriate assessor or assessment team for the type of assessment to be conducted; b. Develop a control assessment plan that describes the scope of the assessment including: 1. Controls and control enhancements under assessment; 2. Assessment procedures to be used to determine control effectiveness; and 3. Assessment environment, assessment team, and assessment roles and responsibilities; c. Ensure the control assessment plan is reviewed and approved by the authorizing official or designated representative prior to conducting the assessment; d. Assess the controls in the system and its environment of operation [assessment frequency] to determine the extent to which the controls are implemented correctly, operating as intended, and producing the desired outcome with respect to meeting established security and privacy requirements; e. Produce a control assessment report that document the results of the assessment; and f. Provide the results of the control assessment to [individuals or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-2(1)",
+    "title": "Independent Assessors",
+    "description": "Employ independent assessors or assessment teams to conduct control assessments.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-2(2)",
+    "title": "Specialized Assessments",
+    "description": "Include as part of control assessments, [specialized assessment frequency], [announced | unannounced], [in-depth monitoring | security instrumentation | automated security test cases | vulnerability scanning | malicious user testing | insider threat assessment | performance and load testing | data leakage or data loss assessment | [other forms of assessment]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-2(3)",
+    "title": "Leveraging Results from External Organizations",
+    "description": "Leverage the results of control assessments performed by [external organization(s)] on [system] when the assessment meets [requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-2",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-3",
+    "title": "Information Exchange",
+    "description": "a. Approve and manage the exchange of information between the system and other systems using [interconnection security agreements | information exchange security agreements | memoranda of understanding or agreement | service level agreements | user agreements | non-disclosure agreements | [type of agreement]]; b. Document, as part of each exchange agreement, the interface characteristics, security and privacy requirements, controls, and responsibilities for each system, and the impact level of the information communicated; and c. Review and update the agreements [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-3(6)",
+    "title": "Transfer Authorizations",
+    "description": "Verify that individuals or systems transferring data between interconnecting systems have the requisite authorizations (i.e., write permissions or privileges) prior to accepting such data.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-3",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-3(7)",
+    "title": "Transitive Information Exchanges",
+    "description": "(a) Identify transitive (downstream) information exchanges with other systems through the systems identified in [CA-3a](#ca-3_smt.a) ; and (b) Take measures to ensure that transitive (downstream) information exchanges cease when the controls on identified transitive (downstream) systems cannot be verified or validated.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-5",
+    "title": "Plan of Action and Milestones",
+    "description": "a. Develop a plan of action and milestones for the system to document the planned remediation actions of the organization to correct weaknesses or deficiencies noted during the assessment of the controls and to reduce or eliminate known vulnerabilities in the system; and b. Update existing plan of action and milestones [frequency] based on the findings from control assessments, independent audits or reviews, and continuous monitoring activities.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-5(1)",
+    "title": "Automation Support for Accuracy and Currency",
+    "description": "Ensure the accuracy, currency, and availability of the plan of action and milestones for the system using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-6",
+    "title": "Authorization",
+    "description": "a. Assign a senior official as the authorizing official for the system; b. Assign a senior official as the authorizing official for common controls available for inheritance by organizational systems; c. Ensure that the authorizing official for the system, before commencing operations: 1. Accepts the use of common controls inherited by the system; and 2. Authorizes the system to operate; d. Ensure that the authorizing official for common controls authorizes the use of those controls for inheritance by organizational systems; e. Update the authorizations [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-6(1)",
+    "title": "Joint Authorization — Intra-organization",
+    "description": "Employ a joint authorization process for the system that includes multiple authorizing officials from the same organization conducting the authorization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-6",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-6(2)",
+    "title": "Joint Authorization — Inter-organization",
+    "description": "Employ a joint authorization process for the system that includes multiple authorizing officials with at least one authorizing official from an organization external to the organization conducting the authorization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-6",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-7",
+    "title": "Continuous Monitoring",
+    "description": "Develop a system-level continuous monitoring strategy and implement continuous monitoring in accordance with the organization-level continuous monitoring strategy that includes:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-7(1)",
+    "title": "Independent Assessment",
+    "description": "Employ independent assessors or assessment teams to monitor the controls in the system on an ongoing basis.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-7(3)",
+    "title": "Trend Analyses",
+    "description": "Employ trend analyses to determine if control implementations, the frequency of continuous monitoring activities, and the types of activities used in the continuous monitoring process need to be modified based on empirical data.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-7(4)",
+    "title": "Risk Monitoring",
+    "description": "Ensure risk monitoring is an integral part of the continuous monitoring strategy that includes the following:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-7",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-7(5)",
+    "title": "Consistency Analysis",
+    "description": "Employ the following actions to validate that policies are established and implemented controls are operating in a consistent manner: [organization-defined actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-7(6)",
+    "title": "Automation Support for Monitoring",
+    "description": "Ensure the accuracy, currency, and availability of monitoring results for the system using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-8",
+    "title": "Penetration Testing",
+    "description": "Conduct penetration testing [frequency] on [system(s) or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-8(1)",
+    "title": "Independent Penetration Testing Agent or Team",
+    "description": "Employ an independent penetration testing agent or team to perform penetration testing on the system or system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-8",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-8(2)",
+    "title": "Red Team Exercises",
+    "description": "Employ the following red-team exercises to simulate attempts by adversaries to compromise organizational systems in accordance with applicable rules of engagement: [red team exercises].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-8(3)",
+    "title": "Facility Penetration Testing",
+    "description": "Employ a penetration testing process that includes [frequency] [announced | unannounced] attempts to bypass or circumvent controls associated with physical access points to the facility.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "CA-9",
+    "title": "Internal System Connections",
+    "description": "a. Authorize internal connections of [system components] to the system; b. Document, for each internal connection, the interface characteristics, security and privacy requirements, and the nature of the information communicated; c. Terminate internal system connections after [conditions] ; and d. Review [frequency] the continued need for each internal connection.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CA-9(1)",
+    "title": "Compliance Checks",
+    "description": "Perform security and privacy compliance checks on constituent system components prior to the establishment of the internal connection.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] configuration management policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the configuration management policy and the associated configuration management controls; b. Designate an [official] to manage the development, documentation, and dissemination of the configuration management policy and procedures; and c. Review and update the current configuration management: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-2",
+    "title": "Baseline Configuration",
+    "description": "a. Develop, document, and maintain under configuration control, a current baseline configuration of the system; and b. Review and update the baseline configuration of the system: 1. [frequency]; 2. When required due to [circumstances] ; and 3. When system components are installed or upgraded.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-2(2)",
+    "title": "Automation Support for Accuracy and Currency",
+    "description": "Maintain the currency, completeness, accuracy, and availability of the baseline configuration of the system using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-2(3)",
+    "title": "Retention of Previous Configurations",
+    "description": "Retain [number] of previous versions of baseline configurations of the system to support rollback.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-2(6)",
+    "title": "Development and Test Environments",
+    "description": "Maintain a baseline configuration for system development and test environments that is managed separately from the operational baseline configuration.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-2",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-2(7)",
+    "title": "Configure Systems and Components for High-risk Areas",
+    "description": "(a) Issue [systems or system components] with [configurations] to individuals traveling to locations that the organization deems to be of significant risk; and (b) Apply the following controls to the systems or components when the individuals return from travel: [controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-3",
+    "title": "Configuration Change Control",
+    "description": "a. Determine and document the types of changes to the system that are configuration-controlled; b. Review proposed configuration-controlled changes to the system and approve or disapprove such changes with explicit consideration for security and privacy impact analyses; c. Document configuration change decisions associated with the system; d. Implement approved configuration-controlled changes to the system; e. Retain records of configuration-controlled changes to the system for [time period]; f. Monitor and review activities associated with configuration-controlled changes to the system; and g. Coordinate and provide oversight for configuration change control activities through [configuration change control element] that convenes [[frequency] | when [configuration change conditions]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-3(1)",
+    "title": "Automated Documentation, Notification, and Prohibition of Changes",
+    "description": "Use [automated mechanisms] to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-3(2)",
+    "title": "Testing, Validation, and Documentation of Changes",
+    "description": "Test, validate, and document changes to the system before finalizing the implementation of the changes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-3(3)",
+    "title": "Automated Change Implementation",
+    "description": "Implement changes to the current system baseline and deploy the updated baseline across the installed base using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-3(4)",
+    "title": "Security and Privacy Representatives",
+    "description": "Require [organization-defined security and privacy representatives] to be members of the [configuration change control element].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-3(5)",
+    "title": "Automated Security Response",
+    "description": "Implement the following security responses automatically if baseline configurations are changed in an unauthorized manner: [security responses].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-3(6)",
+    "title": "Cryptography Management",
+    "description": "Ensure that cryptographic mechanisms used to provide the following controls are under configuration management: [controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-3(7)",
+    "title": "Review System Changes",
+    "description": "Review changes to the system [frequency] or when [circumstances] to determine whether unauthorized changes have occurred.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-3(8)",
+    "title": "Prevent or Restrict Configuration Changes",
+    "description": "Prevent or restrict changes to the configuration of the system under the following circumstances: [circumstances].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-3",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-4",
+    "title": "Impact Analyses",
+    "description": "Analyze changes to the system to determine potential security and privacy impacts prior to change implementation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-4(1)",
+    "title": "Separate Test Environments",
+    "description": "Analyze changes to the system in a separate test environment before implementation in an operational environment, looking for security and privacy impacts due to flaws, weaknesses, incompatibility, or intentional malice.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-4(2)",
+    "title": "Verification of Controls",
+    "description": "After system changes, verify that the impacted controls are implemented correctly, operating as intended, and producing the desired outcome with regard to meeting the security and privacy requirements for the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-5",
+    "title": "Access Restrictions for Change",
+    "description": "Define, document, approve, and enforce physical and logical access restrictions associated with changes to the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-5(1)",
+    "title": "Automated Access Enforcement and Audit Records",
+    "description": "(a) Enforce access restrictions using [automated mechanisms] ; and (b) Automatically generate audit records of the enforcement actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-5",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-5(4)",
+    "title": "Dual Authorization",
+    "description": "Enforce dual authorization for implementing changes to [organization-defined system components and system-level information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-5",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-5(5)",
+    "title": "Privilege Limitation for Production and Operation",
+    "description": "(a) Limit privileges to change system components and system-related information within a production or operational environment; and (b) Review and reevaluate privileges [organization-defined frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-5",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-5(6)",
+    "title": "Limit Library Privileges",
+    "description": "Limit privileges to change software resident within software libraries.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-5",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-6",
+    "title": "Configuration Settings",
+    "description": "a. Establish and document configuration settings for components employed within the system that reflect the most restrictive mode consistent with operational requirements using [common secure configurations]; b. Implement the configuration settings; c. Identify, document, and approve any deviations from established configuration settings for [system components] based on [operational requirements] ; and d. Monitor and control changes to the configuration settings in accordance with organizational policies and procedures.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-6(1)",
+    "title": "Automated Management, Application, and Verification",
+    "description": "Manage, apply, and verify configuration settings for [system components] using [organization-defined automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-6(2)",
+    "title": "Respond to Unauthorized Changes",
+    "description": "Take the following actions in response to unauthorized changes to [configuration settings]: [actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-7",
+    "title": "Least Functionality",
+    "description": "a. Configure the system to provide only [mission-essential capabilities] ; and b. Prohibit or restrict the use of the following functions, ports, protocols, software, and/or services: [organization-defined prohibited or restricted functions, system ports, protocols, software, and/or services].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-7(1)",
+    "title": "Periodic Review",
+    "description": "(a) Review the system [frequency] to identify unnecessary and/or nonsecure functions, ports, protocols, software, and services; and (b) Disable or remove [organization-defined functions, ports, protocols, software, and services within the system deemed to be unnecessary and/or nonsecure].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-7(2)",
+    "title": "Prevent Program Execution",
+    "description": "Prevent program execution in accordance with [[policies, rules of behavior, and/or access agreements regarding software program usage and restrictions] | rules authorizing the terms and conditions of software program usage].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-7(3)",
+    "title": "Registration Compliance",
+    "description": "Ensure compliance with [registration requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-7(4)",
+    "title": "Unauthorized Software — Deny-by-exception",
+    "description": "(a) Identify [software programs]; (b) Employ an allow-all, deny-by-exception policy to prohibit the execution of unauthorized software programs on the system; and (c) Review and update the list of unauthorized software programs [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-7(5)",
+    "title": "Authorized Software — Allow-by-exception",
+    "description": "(a) Identify [software programs]; (b) Employ a deny-all, permit-by-exception policy to allow the execution of authorized software programs on the system; and (c) Review and update the list of authorized software programs [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-7(6)",
+    "title": "Confined Environments with Limited Privileges",
+    "description": "Require that the following user-installed software execute in a confined physical or virtual machine environment with limited privileges: [user-installed software].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-7(7)",
+    "title": "Code Execution in Protected Environments",
+    "description": "Allow execution of binary or machine-executable code only in confined physical or virtual machine environments and with the explicit approval of [personnel or roles] when such code is:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-7(8)",
+    "title": "Binary or Machine Executable Code",
+    "description": "(a) Prohibit the use of binary or machine-executable code from sources with limited or no warranty or without the provision of source code; and (b) Allow exceptions only for compelling mission or operational requirements and with the approval of the authorizing official.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-7(9)",
+    "title": "Prohibiting The Use of Unauthorized Hardware",
+    "description": "(a) Identify [hardware components]; (b) Prohibit the use or connection of unauthorized hardware components; (c) Review and update the list of authorized hardware components [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-8",
+    "title": "System Component Inventory",
+    "description": "a. Develop and document an inventory of system components that: 1. Accurately reflects the system; 2. Includes all components within the system; 3. Does not include duplicate accounting of components or components assigned to any other system; 4. Is at the level of granularity deemed necessary for tracking and reporting; and 5. Includes the following information to achieve system component accountability: [information] ; and b. Review and update the system component inventory [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-8(1)",
+    "title": "Updates During Installation and Removal",
+    "description": "Update the inventory of system components as part of component installations, removals, and system updates.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-8(2)",
+    "title": "Automated Maintenance",
+    "description": "Maintain the currency, completeness, accuracy, and availability of the inventory of system components using [organization-defined automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-8(3)",
+    "title": "Automated Unauthorized Component Detection",
+    "description": "(a) Detect the presence of unauthorized hardware, software, and firmware components within the system using [organization-defined automated mechanisms] [frequency] ; and (b) Take the following actions when unauthorized components are detected: [disable network access by unauthorized components | isolate unauthorized components | notify [personnel or roles]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-8(4)",
+    "title": "Accountability Information",
+    "description": "Include in the system component inventory information, a means for identifying by [name | position | role] , individuals responsible and accountable for administering those components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-8(6)",
+    "title": "Assessed Configurations and Approved Deviations",
+    "description": "Include assessed component configurations and any approved deviations to current deployed configurations in the system component inventory.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-8(7)",
+    "title": "Centralized Repository",
+    "description": "Provide a centralized repository for the inventory of system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-8(8)",
+    "title": "Automated Location Tracking",
+    "description": "Support the tracking of system components by geographic location using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-8(9)",
+    "title": "Assignment of Components to Systems",
+    "description": "(a) Assign system components to a system; and (b) Receive an acknowledgement from [personnel or roles] of this assignment.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-8",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-9",
+    "title": "Configuration Management Plan",
+    "description": "Develop, document, and implement a configuration management plan for the system that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-9(1)",
+    "title": "Assignment of Responsibility",
+    "description": "Assign responsibility for developing the configuration management process to organizational personnel that are not directly involved in system development.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-9",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-10",
+    "title": "Software Usage Restrictions",
+    "description": "a. Use software and associated documentation in accordance with contract agreements and copyright laws; b. Track the use of software and associated documentation protected by quantity licenses to control copying and distribution; and c. Control and document the use of peer-to-peer file sharing technology to ensure that this capability is not used for the unauthorized distribution, display, performance, or reproduction of copyrighted work.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-10(1)",
+    "title": "Open-source Software",
+    "description": "Establish the following restrictions on the use of open-source software: [restrictions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-10",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-11",
+    "title": "User-installed Software",
+    "description": "a. Establish [policies] governing the installation of software by users; b. Enforce software installation policies through the following methods: [methods] ; and c. Monitor policy compliance [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-11(2)",
+    "title": "Software Installation with Privileged Status",
+    "description": "Allow user installation of software only with explicit privileged status.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-11",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-11(3)",
+    "title": "Automated Enforcement and Monitoring",
+    "description": "Enforce and monitor compliance with software installation policies using [organization-defined automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-11",
+    "baselines": []
+  },
+  {
+    "control_id": "CM-12",
+    "title": "Information Location",
+    "description": "a. Identify and document the location of [information] and the specific system components on which the information is processed and stored; b. Identify and document the users who have access to the system and system components where the information is processed and stored; and c. Document changes to the location (i.e., system or system components) where the information is processed and stored.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-12(1)",
+    "title": "Automated Tools to Support Information Location",
+    "description": "Use automated tools to identify [information by information type] on [system components] to ensure controls are in place to protect organizational information and individual privacy.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CM-12",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CM-13",
+    "title": "Data Action Mapping",
+    "description": "Develop and document a map of system data actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "CM-14",
+    "title": "Signed Components",
+    "description": "Prevent the installation of [organization-defined software and firmware components] without verification that the component has been digitally signed using a certificate that is recognized and approved by the organization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "CP-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] contingency planning policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the contingency planning policy and the associated contingency planning controls; b. Designate an [official] to manage the development, documentation, and dissemination of the contingency planning policy and procedures; and c. Review and update the current contingency planning: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-2",
+    "title": "Contingency Plan",
+    "description": "a. Develop a contingency plan for the system that: 1. Identifies essential mission and business functions and associated contingency requirements; 2. Provides recovery objectives, restoration priorities, and metrics; 3. Addresses contingency roles, responsibilities, assigned individuals with contact information; 4. Addresses maintaining essential mission and business functions despite a system disruption, compromise, or failure; 5. Addresses eventual, full system restoration without deterioration of the controls originally planned and implemented; 6. Addresses the sharing of contingency information; and 7. Is reviewed and approved by [organization-defined personnel or roles]; b. Distribute copies of the contingency plan to [organization-defined key contingency personnel (identified by name and/or by role) and organizational elements]; c. Coordinate contingency planning activities with incident handling activities; d. Review the contingency plan for the system [frequency]; e. Update the contingency plan to address changes to the organization, system, or environment of operation and problems encountered during contingency plan implementation, execution, or testing; f. Communicate contingency plan changes to [organization-defined key contingency personnel (identified by name and/or by role) and organizational elements]; g. Incorporate lessons learned from contingency plan testing, training, or actual contingency activities into contingency testing and training; and h. Protect the contingency plan from unauthorized disclosure and modification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-2(1)",
+    "title": "Coordinate with Related Plans",
+    "description": "Coordinate contingency plan development with organizational elements responsible for related plans.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-2(2)",
+    "title": "Capacity Planning",
+    "description": "Conduct capacity planning so that necessary capacity for information processing, telecommunications, and environmental support exists during contingency operations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-2(3)",
+    "title": "Resume Mission and Business Functions",
+    "description": "Plan for the resumption of [all | essential] mission and business functions within [time period] of contingency plan activation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-2(5)",
+    "title": "Continue Mission and Business Functions",
+    "description": "Plan for the continuance of [all | essential] mission and business functions with minimal or no loss of operational continuity and sustains that continuity until full system restoration at primary processing and/or storage sites.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-2(6)",
+    "title": "Alternate Processing and Storage Sites",
+    "description": "Plan for the transfer of [all | essential] mission and business functions to alternate processing and/or storage sites with minimal or no loss of operational continuity and sustain that continuity through system restoration to primary processing and/or storage sites.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-2",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-2(7)",
+    "title": "Coordinate with External Service Providers",
+    "description": "Coordinate the contingency plan with the contingency plans of external service providers to ensure that contingency requirements can be satisfied.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-2",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-2(8)",
+    "title": "Identify Critical Assets",
+    "description": "Identify critical system assets supporting [all | essential] mission and business functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-3",
+    "title": "Contingency Training",
+    "description": "a. Provide contingency training to system users consistent with assigned roles and responsibilities: 1. Within [time period] of assuming a contingency role or responsibility; 2. When required by system changes; and 3. [frequency] thereafter; and b. Review and update contingency training content [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-3(1)",
+    "title": "Simulated Events",
+    "description": "Incorporate simulated events into contingency training to facilitate effective response by personnel in crisis situations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-3",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-3(2)",
+    "title": "Mechanisms Used in Training Environments",
+    "description": "Employ mechanisms used in operations to provide a more thorough and realistic contingency training environment.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-3",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-4",
+    "title": "Contingency Plan Testing",
+    "description": "a. Test the contingency plan for the system [frequency] using the following tests to determine the effectiveness of the plan and the readiness to execute the plan: [organization-defined tests]. b. Review the contingency plan test results; and c. Initiate corrective actions, if needed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-4(1)",
+    "title": "Coordinate with Related Plans",
+    "description": "Coordinate contingency plan testing with organizational elements responsible for related plans.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-4(2)",
+    "title": "Alternate Processing Site",
+    "description": "Test the contingency plan at the alternate processing site:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-4(3)",
+    "title": "Automated Testing",
+    "description": "Test the contingency plan using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-4",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-4(4)",
+    "title": "Full Recovery and Reconstitution",
+    "description": "Include a full recovery and reconstitution of the system to a known state as part of contingency plan testing.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-4",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-4(5)",
+    "title": "Self-challenge",
+    "description": "Employ [mechanisms] to [system or system component] to disrupt and adversely affect the system or system component.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-4",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-6",
+    "title": "Alternate Storage Site",
+    "description": "a. Establish an alternate storage site, including necessary agreements to permit the storage and retrieval of system backup information; and b. Ensure that the alternate storage site provides controls equivalent to that of the primary site.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-6(1)",
+    "title": "Separation from Primary Site",
+    "description": "Identify an alternate storage site that is sufficiently separated from the primary storage site to reduce susceptibility to the same threats.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-6(2)",
+    "title": "Recovery Time and Recovery Point Objectives",
+    "description": "Configure the alternate storage site to facilitate recovery operations in accordance with recovery time and recovery point objectives.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-6(3)",
+    "title": "Accessibility",
+    "description": "Identify potential accessibility problems to the alternate storage site in the event of an area-wide disruption or disaster and outline explicit mitigation actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-7",
+    "title": "Alternate Processing Site",
+    "description": "a. Establish an alternate processing site, including necessary agreements to permit the transfer and resumption of [system operations] for essential mission and business functions within [time period] when the primary processing capabilities are unavailable; b. Make available at the alternate processing site, the equipment and supplies required to transfer and resume operations or put contracts in place to support delivery to the site within the organization-defined time period for transfer and resumption; and c. Provide controls at the alternate processing site that are equivalent to those at the primary site.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-7(1)",
+    "title": "Separation from Primary Site",
+    "description": "Identify an alternate processing site that is sufficiently separated from the primary processing site to reduce susceptibility to the same threats.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-7(2)",
+    "title": "Accessibility",
+    "description": "Identify potential accessibility problems to alternate processing sites in the event of an area-wide disruption or disaster and outlines explicit mitigation actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-7(3)",
+    "title": "Priority of Service",
+    "description": "Develop alternate processing site agreements that contain priority-of-service provisions in accordance with availability requirements (including recovery time objectives).",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-7(4)",
+    "title": "Preparation for Use",
+    "description": "Prepare the alternate processing site so that the site can serve as the operational site supporting essential mission and business functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-7",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-7(6)",
+    "title": "Inability to Return to Primary Site",
+    "description": "Plan and prepare for circumstances that preclude returning to the primary processing site.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-7",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-8",
+    "title": "Telecommunications Services",
+    "description": "Establish alternate telecommunications services, including necessary agreements to permit the resumption of [system operations] for essential mission and business functions within [time period] when the primary telecommunications capabilities are unavailable at either the primary or alternate processing or storage sites.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-8(1)",
+    "title": "Priority of Service Provisions",
+    "description": "(a) Develop primary and alternate telecommunications service agreements that contain priority-of-service provisions in accordance with availability requirements (including recovery time objectives); and (b) Request Telecommunications Service Priority for all telecommunications services used for national security emergency preparedness if the primary and/or alternate telecommunications services are provided by a common carrier.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-8",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-8(2)",
+    "title": "Single Points of Failure",
+    "description": "Obtain alternate telecommunications services to reduce the likelihood of sharing a single point of failure with primary telecommunications services.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-8",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-8(3)",
+    "title": "Separation of Primary and Alternate Providers",
+    "description": "Obtain alternate telecommunications services from providers that are separated from primary service providers to reduce susceptibility to the same threats.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-8",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-8(4)",
+    "title": "Provider Contingency Plan",
+    "description": "(a) Require primary and alternate telecommunications service providers to have contingency plans; (b) Review provider contingency plans to ensure that the plans meet organizational contingency requirements; and (c) Obtain evidence of contingency testing and training by providers [organization-defined frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-8",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-8(5)",
+    "title": "Alternate Telecommunication Service Testing",
+    "description": "Test alternate telecommunication services [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-8",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-9",
+    "title": "System Backup",
+    "description": "a. Conduct backups of user-level information contained in [system components] [frequency]; b. Conduct backups of system-level information contained in the system [frequency]; c. Conduct backups of system documentation, including security- and privacy-related documentation [frequency] ; and d. Protect the confidentiality, integrity, and availability of backup information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-9(1)",
+    "title": "Testing for Reliability and Integrity",
+    "description": "Test backup information [organization-defined frequency] to verify media reliability and information integrity.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-9",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-9(2)",
+    "title": "Test Restoration Using Sampling",
+    "description": "Use a sample of backup information in the restoration of selected system functions as part of contingency plan testing.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-9",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-9(3)",
+    "title": "Separate Storage for Critical Information",
+    "description": "Store backup copies of [critical system software and other security-related information] in a separate facility or in a fire rated container that is not collocated with the operational system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-9",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-9(5)",
+    "title": "Transfer to Alternate Storage Site",
+    "description": "Transfer system backup information to the alternate storage site [organization-defined time period and transfer rate consistent with the recovery time and recovery point objectives].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-9",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-9(6)",
+    "title": "Redundant Secondary System",
+    "description": "Conduct system backup by maintaining a redundant secondary system that is not collocated with the primary system and that can be activated without loss of information or disruption to operations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-9",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-9(7)",
+    "title": "Dual Authorization for Deletion or Destruction",
+    "description": "Enforce dual authorization for the deletion or destruction of [backup information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-9",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-9(8)",
+    "title": "Cryptographic Protection",
+    "description": "Implement cryptographic mechanisms to prevent unauthorized disclosure and modification of [backup information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-9",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-10",
+    "title": "System Recovery and Reconstitution",
+    "description": "Provide for the recovery and reconstitution of the system to a known state within [organization-defined time period consistent with recovery time and recovery point objectives] after a disruption, compromise, or failure.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-10(2)",
+    "title": "Transaction Recovery",
+    "description": "Implement transaction recovery for systems that are transaction-based.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-10",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-10(4)",
+    "title": "Restore Within Time Period",
+    "description": "Provide the capability to restore system components within [restoration time periods] from configuration-controlled and integrity-protected information representing a known, operational state for the components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-10",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "CP-10(6)",
+    "title": "Component Protection",
+    "description": "Protect system components used for recovery and reconstitution.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "CP-10",
+    "baselines": []
+  },
+  {
+    "control_id": "CP-11",
+    "title": "Alternate Communications Protocols",
+    "description": "Provide the capability to employ [alternative communications protocols] in support of maintaining continuity of operations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "CP-12",
+    "title": "Safe Mode",
+    "description": "When [conditions] are detected, enter a safe mode of operation with [restrictions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "CP-13",
+    "title": "Alternative Security Mechanisms",
+    "description": "Employ [alternative or supplemental security mechanisms] for satisfying [security functions] when the primary means of implementing the security function is unavailable or compromised.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "IA-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] identification and authentication policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the identification and authentication policy and the associated identification and authentication controls; b. Designate an [official] to manage the development, documentation, and dissemination of the identification and authentication policy and procedures; and c. Review and update the current identification and authentication: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-2",
+    "title": "Identification and Authentication (Organizational Users)",
+    "description": "Uniquely identify and authenticate organizational users and associate that unique identification with processes acting on behalf of those users.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-2(1)",
+    "title": "Multi-factor Authentication to Privileged Accounts",
+    "description": "Implement multi-factor authentication for access to privileged accounts.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-2(2)",
+    "title": "Multi-factor Authentication to Non-privileged Accounts",
+    "description": "Implement multi-factor authentication for access to non-privileged accounts.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-2(5)",
+    "title": "Individual Authentication with Group Authentication",
+    "description": "When shared accounts or authenticators are employed, require users to be individually authenticated before granting access to the shared accounts or resources.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-2(6)",
+    "title": "Access to Accounts —separate Device",
+    "description": "Implement multi-factor authentication for [local | network | remote] access to [privileged accounts | non-privileged accounts] such that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-2(8)",
+    "title": "Access to Accounts — Replay Resistant",
+    "description": "Implement replay-resistant authentication mechanisms for access to [privileged accounts | non-privileged accounts].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-2(10)",
+    "title": "Single Sign-on",
+    "description": "Provide a single sign-on capability for [system accounts and services].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-2(12)",
+    "title": "Acceptance of PIV Credentials",
+    "description": "Accept and electronically verify Personal Identity Verification-compliant credentials.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-2(13)",
+    "title": "Out-of-band Authentication",
+    "description": "Implement the following out-of-band authentication mechanisms under [conditions]: [out-of-band authentication].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-2",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-3",
+    "title": "Device Identification and Authentication",
+    "description": "Uniquely identify and authenticate [devices and/or types of devices] before establishing a [local | remote | network] connection.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-3(1)",
+    "title": "Cryptographic Bidirectional Authentication",
+    "description": "Authenticate [devices and/or types of devices] before establishing [local | remote | network] connection using bidirectional authentication that is cryptographically based.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-3(3)",
+    "title": "Dynamic Address Allocation",
+    "description": "(a) Where addresses are allocated dynamically, standardize dynamic address allocation lease information and the lease duration assigned to devices in accordance with [organization-defined lease information and lease duration] ; and (b) Audit lease information when assigned to a device.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-3(4)",
+    "title": "Device Attestation",
+    "description": "Handle device identification and authentication based on attestation by [configuration management process].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-4",
+    "title": "Identifier Management",
+    "description": "Manage system identifiers by:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-4(1)",
+    "title": "Prohibit Account Identifiers as Public Identifiers",
+    "description": "Prohibit the use of system account identifiers that are the same as public identifiers for individual accounts.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-4(4)",
+    "title": "Identify User Status",
+    "description": "Manage individual identifiers by uniquely identifying each individual as [characteristics].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-4(5)",
+    "title": "Dynamic Management",
+    "description": "Manage individual identifiers dynamically in accordance with [dynamic identifier policy].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-4(6)",
+    "title": "Cross-organization Management",
+    "description": "Coordinate with the following external organizations for cross-organization management of identifiers: [external organizations].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-4(8)",
+    "title": "Pairwise Pseudonymous Identifiers",
+    "description": "Generate pairwise pseudonymous identifiers.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-4(9)",
+    "title": "Attribute Maintenance and Protection",
+    "description": "Maintain the attributes for each uniquely identified individual, device, or service in [protected central storage].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5",
+    "title": "Authenticator Management",
+    "description": "Manage system authenticators by:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-5(1)",
+    "title": "Password-based Authentication",
+    "description": "For password-based authentication:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-5(2)",
+    "title": "Public Key-based Authentication",
+    "description": "(a) For public key-based authentication: (1) Enforce authorized access to the corresponding private key; and (2) Map the authenticated identity to the account of the individual or group; and (b) When public key infrastructure (PKI) is used: (1) Validate certificates by constructing and verifying a certification path to an accepted trust anchor, including checking certificate status information; and (2) Implement a local cache of revocation data to support path discovery and validation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-5(5)",
+    "title": "Change Authenticators Prior to Delivery",
+    "description": "Require developers and installers of system components to provide unique authenticators or change default authenticators prior to delivery and installation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(6)",
+    "title": "Protection of Authenticators",
+    "description": "Protect authenticators commensurate with the security category of the information to which use of the authenticator permits access.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-5(7)",
+    "title": "No Embedded Unencrypted Static Authenticators",
+    "description": "Ensure that unencrypted static authenticators are not embedded in applications or other forms of static storage.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(8)",
+    "title": "Multiple System Accounts",
+    "description": "Implement [security controls] to manage the risk of compromise due to individuals having accounts on multiple systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(9)",
+    "title": "Federated Credential Management",
+    "description": "Use the following external organizations to federate credentials: [external organizations].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(10)",
+    "title": "Dynamic Credential Binding",
+    "description": "Bind identities and authenticators dynamically using the following rules: [binding rules].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(12)",
+    "title": "Biometric Authentication Performance",
+    "description": "For biometric-based authentication, employ mechanisms that satisfy the following biometric quality requirements [biometric quality requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(13)",
+    "title": "Expiration of Cached Authenticators",
+    "description": "Prohibit the use of cached authenticators after [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(14)",
+    "title": "Managing Content of PKI Trust Stores",
+    "description": "For PKI-based authentication, employ an organization-wide methodology for managing the content of PKI trust stores installed across all platforms, including networks, operating systems, browsers, and applications.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(15)",
+    "title": "GSA-approved Products and Services",
+    "description": "Use only General Services Administration-approved products and services for identity, credential, and access management.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(16)",
+    "title": "In-person or Trusted External Party Authenticator Issuance",
+    "description": "Require that the issuance of [types of and/or specific authenticators] be conducted [in person | by a trusted external party] before [registration authority] with authorization by [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(17)",
+    "title": "Presentation Attack Detection for Biometric Authenticators",
+    "description": "Employ presentation attack detection mechanisms for biometric-based authentication.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-5(18)",
+    "title": "Password Managers",
+    "description": "(a) Employ [password managers] to generate and manage passwords; and (b) Protect the passwords using [controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-6",
+    "title": "Authentication Feedback",
+    "description": "Obscure feedback of authentication information during the authentication process to protect the information from possible exploitation and use by unauthorized individuals.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-7",
+    "title": "Cryptographic Module Authentication",
+    "description": "Implement mechanisms for authentication to a cryptographic module that meet the requirements of applicable laws, executive orders, directives, policies, regulations, standards, and guidelines for such authentication.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-8",
+    "title": "Identification and Authentication (Non-organizational Users)",
+    "description": "Uniquely identify and authenticate non-organizational users or processes acting on behalf of non-organizational users.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-8(1)",
+    "title": "Acceptance of PIV Credentials from Other Agencies",
+    "description": "Accept and electronically verify Personal Identity Verification-compliant credentials from other federal agencies.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-8",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-8(2)",
+    "title": "Acceptance of External Authenticators",
+    "description": "(a) Accept only external authenticators that are NIST-compliant; and (b) Document and maintain a list of accepted external authenticators.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-8",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-8(4)",
+    "title": "Use of Defined Profiles",
+    "description": "Conform to the following profiles for identity management [identity management profiles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-8",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-8(5)",
+    "title": "Acceptance of PIV-I Credentials",
+    "description": "Accept and verify federated or PKI credentials that meet [policy].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-8(6)",
+    "title": "Disassociability",
+    "description": "Implement the following measures to disassociate user attributes or identifier assertion relationships among individuals, credential service providers, and relying parties: [measures].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-9",
+    "title": "Service Identification and Authentication",
+    "description": "Uniquely identify and authenticate [system services and applications] before establishing communications with devices, users, or other services or applications.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "IA-10",
+    "title": "Adaptive Authentication",
+    "description": "Require individuals accessing the system to employ [supplemental authentication techniques or mechanisms] under specific [circumstances or situations].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "IA-11",
+    "title": "Re-authentication",
+    "description": "Require users to re-authenticate when [circumstances or situations].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-12",
+    "title": "Identity Proofing",
+    "description": "a. Identity proof users that require accounts for logical access to systems based on appropriate identity assurance level requirements as specified in applicable standards and guidelines; b. Resolve user identities to a unique individual; and c. Collect, validate, and verify identity evidence.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-12(1)",
+    "title": "Supervisor Authorization",
+    "description": "Require that the registration process to receive an account for logical access includes supervisor or sponsor authorization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-12",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-12(2)",
+    "title": "Identity Evidence",
+    "description": "Require evidence of individual identification be presented to the registration authority.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-12",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-12(3)",
+    "title": "Identity Evidence Validation and Verification",
+    "description": "Require that the presented identity evidence be validated and verified through [methods of validation and verification].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-12",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-12(4)",
+    "title": "In-person Validation and Verification",
+    "description": "Require that the validation and verification of identity evidence be conducted in person before a designated registration authority.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-12",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-12(5)",
+    "title": "Address Confirmation",
+    "description": "Require that a [registration code | notice of proofing] be delivered through an out-of-band channel to verify the users address (physical or digital) of record.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-12",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IA-12(6)",
+    "title": "Accept Externally-proofed Identities",
+    "description": "Accept externally-proofed identities at [identity assurance level].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-12",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-13",
+    "title": "Identity Providers and Authorization Servers",
+    "description": "Employ identity providers and authorization servers to manage user, device, and non-person entity (NPE) identities, attributes, and access rights supporting authentication and authorization decisions in accordance with [policy] using [mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "IA-13(1)",
+    "title": "Protection of Cryptographic Keys",
+    "description": "Cryptographic keys that protect access tokens are generated, managed, and protected from disclosure and misuse.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-13",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-13(2)",
+    "title": "Verification of Identity Assertions and Access Tokens",
+    "description": "The source and integrity of identity assertions and access tokens are verified before granting access to system and information resources.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-13",
+    "baselines": []
+  },
+  {
+    "control_id": "IA-13(3)",
+    "title": "Token Management",
+    "description": "In accordance with [ia-13_odp.01], assertions and access tokens are:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IA-13",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] incident response policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the incident response policy and the associated incident response controls; b. Designate an [official] to manage the development, documentation, and dissemination of the incident response policy and procedures; and c. Review and update the current incident response: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-2",
+    "title": "Incident Response Training",
+    "description": "a. Provide incident response training to system users consistent with assigned roles and responsibilities: 1. Within [time period] of assuming an incident response role or responsibility or acquiring system access; 2. When required by system changes; and 3. [frequency] thereafter; and b. Review and update incident response training content [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-2(1)",
+    "title": "Simulated Events",
+    "description": "Incorporate simulated events into incident response training to facilitate the required response by personnel in crisis situations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-2(2)",
+    "title": "Automated Training Environments",
+    "description": "Provide an incident response training environment using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-2(3)",
+    "title": "Breach",
+    "description": "Provide incident response training on how to identify and respond to a breach, including the organization’s process for reporting a breach.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-2",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-3",
+    "title": "Incident Response Testing",
+    "description": "Test the effectiveness of the incident response capability for the system [frequency] using the following tests: [tests].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-3(1)",
+    "title": "Automated Testing",
+    "description": "Test the incident response capability using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-3",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-3(2)",
+    "title": "Coordination with Related Plans",
+    "description": "Coordinate incident response testing with organizational elements responsible for related plans.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-3",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-3(3)",
+    "title": "Continuous Improvement",
+    "description": "Use qualitative and quantitative data from testing to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-3",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4",
+    "title": "Incident Handling",
+    "description": "a. Implement an incident handling capability for incidents that is consistent with the incident response plan and includes preparation, detection and analysis, containment, eradication, and recovery; b. Coordinate incident handling activities with contingency planning activities; c. Incorporate lessons learned from ongoing incident handling activities into incident response procedures, training, and testing, and implement the resulting changes accordingly; and d. Ensure the rigor, intensity, scope, and results of incident handling activities are comparable and predictable across the organization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-4(1)",
+    "title": "Automated Incident Handling Processes",
+    "description": "Support the incident handling process using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-4(2)",
+    "title": "Dynamic Reconfiguration",
+    "description": "Include the following types of dynamic reconfiguration for [system components] as part of the incident response capability: [types of dynamic reconfiguration].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(3)",
+    "title": "Continuity of Operations",
+    "description": "Identify [classes of incidents] and take the following actions in response to those incidents to ensure continuation of organizational mission and business functions: [actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(4)",
+    "title": "Information Correlation",
+    "description": "Correlate incident information and individual incident responses to achieve an organization-wide perspective on incident awareness and response.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-4(5)",
+    "title": "Automatic Disabling of System",
+    "description": "Implement a configurable capability to automatically disable the system if [security violations] are detected.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(6)",
+    "title": "Insider Threats",
+    "description": "Implement an incident handling capability for incidents involving insider threats.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(7)",
+    "title": "Insider Threats — Intra-organization Coordination",
+    "description": "Coordinate an incident handling capability for insider threats that includes the following organizational entities [entities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(8)",
+    "title": "Correlation with External Organizations",
+    "description": "Coordinate with [external organizations] to correlate and share [incident information] to achieve a cross-organization perspective on incident awareness and more effective incident responses.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(9)",
+    "title": "Dynamic Response Capability",
+    "description": "Employ [dynamic response capabilities] to respond to incidents.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(10)",
+    "title": "Supply Chain Coordination",
+    "description": "Coordinate incident handling activities involving supply chain events with other organizations involved in the supply chain.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(11)",
+    "title": "Integrated Incident Response Team",
+    "description": "Establish and maintain an integrated incident response team that can be deployed to any location identified by the organization in [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-4(12)",
+    "title": "Malicious Code and Forensic Analysis",
+    "description": "Analyze malicious code and/or other residual artifacts remaining in the system after the incident.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(13)",
+    "title": "Behavior Analysis",
+    "description": "Analyze anomalous or suspected adversarial behavior in or related to [environments or resources].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(14)",
+    "title": "Security Operations Center",
+    "description": "Establish and maintain a security operations center.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-4(15)",
+    "title": "Public Relations and Reputation Repair",
+    "description": "(a) Manage public relations associated with an incident; and (b) Employ measures to repair the reputation of the organization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-5",
+    "title": "Incident Monitoring",
+    "description": "Track and document incidents.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-5(1)",
+    "title": "Automated Tracking, Data Collection, and Analysis",
+    "description": "Track incidents and collect and analyze incident information using [organization-defined automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-5",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-6",
+    "title": "Incident Reporting",
+    "description": "a. Require personnel to report suspected incidents to the organizational incident response capability within [time period] ; and b. Report incident information to [authorities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-6(1)",
+    "title": "Automated Reporting",
+    "description": "Report incidents using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-6(2)",
+    "title": "Vulnerabilities Related to Incidents",
+    "description": "Report system vulnerabilities associated with reported incidents to [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-6",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-6(3)",
+    "title": "Supply Chain Coordination",
+    "description": "Provide incident information to the provider of the product or service and other organizations involved in the supply chain or supply chain governance for systems or system components related to the incident.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-7",
+    "title": "Incident Response Assistance",
+    "description": "Provide an incident response support resource, integral to the organizational incident response capability, that offers advice and assistance to users of the system for the handling and reporting of incidents.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-7(1)",
+    "title": "Automation Support for Availability of Information and Support",
+    "description": "Increase the availability of incident response information and support using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-7(2)",
+    "title": "Coordination with External Providers",
+    "description": "(a) Establish a direct, cooperative relationship between its incident response capability and external providers of system protection capability; and (b) Identify organizational incident response team members to the external providers.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-7",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-8",
+    "title": "Incident Response Plan",
+    "description": "a. Develop an incident response plan that: 1. Provides the organization with a roadmap for implementing its incident response capability; 2. Describes the structure and organization of the incident response capability; 3. Provides a high-level approach for how the incident response capability fits into the overall organization; 4. Meets the unique requirements of the organization, which relate to mission, size, structure, and functions; 5. Defines reportable incidents; 6. Provides metrics for measuring the incident response capability within the organization; 7. Defines the resources and management support needed to effectively maintain and mature an incident response capability; 8. Addresses the sharing of incident information; 9. Is reviewed and approved by [personnel or roles] [frequency] ; and 10. Explicitly designates responsibility for incident response to [entities, personnel, or roles]. b. Distribute copies of the incident response plan to [incident response personnel]; c. Update the incident response plan to address system and organizational changes or problems encountered during plan implementation, execution, or testing; d. Communicate incident response plan changes to [organization-defined incident response personnel (identified by name and/or by role) and organizational elements] ; and e. Protect the incident response plan from unauthorized disclosure and modification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "IR-8(1)",
+    "title": "Breaches",
+    "description": "Include the following in the Incident Response Plan for breaches involving personally identifiable information:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-8",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-9",
+    "title": "Information Spillage Response",
+    "description": "Respond to information spills by:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "IR-9(2)",
+    "title": "Training",
+    "description": "Provide information spillage response training [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-9",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-9(3)",
+    "title": "Post-spill Operations",
+    "description": "Implement the following procedures to ensure that organizational personnel impacted by information spills can continue to carry out assigned tasks while contaminated systems are undergoing corrective actions: [procedures].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-9",
+    "baselines": []
+  },
+  {
+    "control_id": "IR-9(4)",
+    "title": "Exposure to Unauthorized Personnel",
+    "description": "Employ the following controls for personnel exposed to information not within assigned access authorizations: [controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "IR-9",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] maintenance policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the maintenance policy and the associated maintenance controls; b. Designate an [official] to manage the development, documentation, and dissemination of the maintenance policy and procedures; and c. Review and update the current maintenance: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-2",
+    "title": "Controlled Maintenance",
+    "description": "a. Schedule, document, and review records of maintenance, repair, and replacement on system components in accordance with manufacturer or vendor specifications and/or organizational requirements; b. Approve and monitor all maintenance activities, whether performed on site or remotely and whether the system or system components are serviced on site or removed to another location; c. Require that [personnel or roles] explicitly approve the removal of the system or system components from organizational facilities for off-site maintenance, repair, or replacement; d. Sanitize equipment to remove the following information from associated media prior to removal from organizational facilities for off-site maintenance, repair, or replacement: [information]; e. Check all potentially impacted controls to verify that the controls are still functioning properly following maintenance, repair, or replacement actions; and f. Include the following information in organizational maintenance records: [information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-2(2)",
+    "title": "Automated Maintenance Activities",
+    "description": "(a) Schedule, conduct, and document maintenance, repair, and replacement actions for the system using [organization-defined automated mechanisms] ; and (b) Produce up-to date, accurate, and complete records of all maintenance, repair, and replacement actions requested, scheduled, in process, and completed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-2",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-3",
+    "title": "Maintenance Tools",
+    "description": "a. Approve, control, and monitor the use of system maintenance tools; and b. Review previously approved system maintenance tools [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-3(1)",
+    "title": "Inspect Tools",
+    "description": "Inspect the maintenance tools used by maintenance personnel for improper or unauthorized modifications.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-3",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-3(2)",
+    "title": "Inspect Media",
+    "description": "Check media containing diagnostic and test programs for malicious code before the media are used in the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-3",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-3(3)",
+    "title": "Prevent Unauthorized Removal",
+    "description": "Prevent the removal of maintenance equipment containing organizational information by:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-3",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-3(4)",
+    "title": "Restricted Tool Use",
+    "description": "Restrict the use of maintenance tools to authorized personnel only.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-3(5)",
+    "title": "Execution with Privilege",
+    "description": "Monitor the use of maintenance tools that execute with increased privilege.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-3(6)",
+    "title": "Software Updates and Patches",
+    "description": "Inspect maintenance tools to ensure the latest software updates and patches are installed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-4",
+    "title": "Nonlocal Maintenance",
+    "description": "a. Approve and monitor nonlocal maintenance and diagnostic activities; b. Allow the use of nonlocal maintenance and diagnostic tools only as consistent with organizational policy and documented in the security plan for the system; c. Employ strong authentication in the establishment of nonlocal maintenance and diagnostic sessions; d. Maintain records for nonlocal maintenance and diagnostic activities; and e. Terminate session and network connections when nonlocal maintenance is completed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-4(1)",
+    "title": "Logging and Review",
+    "description": "(a) Log [organization-defined audit events] for nonlocal maintenance and diagnostic sessions; and (b) Review the audit records of the maintenance and diagnostic sessions to detect anomalous behavior.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-4(3)",
+    "title": "Comparable Security and Sanitization",
+    "description": "(a) Require that nonlocal maintenance and diagnostic services be performed from a system that implements a security capability comparable to the capability implemented on the system being serviced; or (b) Remove the component to be serviced from the system prior to nonlocal maintenance or diagnostic services; sanitize the component (for organizational information); and after the service is performed, inspect and sanitize the component (for potentially malicious software) before reconnecting the component to the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-4(4)",
+    "title": "Authentication and Separation of Maintenance Sessions",
+    "description": "Protect nonlocal maintenance sessions by:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-4(5)",
+    "title": "Approvals and Notifications",
+    "description": "(a) Require the approval of each nonlocal maintenance session by [personnel or roles] ; and (b) Notify the following personnel or roles of the date and time of planned nonlocal maintenance: [personnel and roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-4(6)",
+    "title": "Cryptographic Protection",
+    "description": "Implement the following cryptographic mechanisms to protect the integrity and confidentiality of nonlocal maintenance and diagnostic communications: [cryptographic mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-4(7)",
+    "title": "Disconnect Verification",
+    "description": "Verify session and network connection termination after the completion of nonlocal maintenance and diagnostic sessions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-5",
+    "title": "Maintenance Personnel",
+    "description": "a. Establish a process for maintenance personnel authorization and maintain a list of authorized maintenance organizations or personnel; b. Verify that non-escorted personnel performing maintenance on the system possess the required access authorizations; and c. Designate organizational personnel with required access authorizations and technical competence to supervise the maintenance activities of personnel who do not possess the required access authorizations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-5(1)",
+    "title": "Individuals Without Appropriate Access",
+    "description": "(a) Implement procedures for the use of maintenance personnel that lack appropriate security clearances or are not U.S. citizens, that include the following requirements: (1) Maintenance personnel who do not have needed access authorizations, clearances, or formal access approvals are escorted and supervised during the performance of maintenance and diagnostic activities on the system by approved organizational personnel who are fully cleared, have appropriate access authorizations, and are technically qualified; and (2) Prior to initiating maintenance or diagnostic activities by personnel who do not have needed access authorizations, clearances or formal access approvals, all volatile information storage components within the system are sanitized and all nonvolatile storage media are removed or physically disconnected from the system and secured; and (b) Develop and implement [alternate controls] in the event a system component cannot be sanitized, removed, or disconnected from the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-5",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-5(2)",
+    "title": "Security Clearances for Classified Systems",
+    "description": "Verify that personnel performing maintenance and diagnostic activities on a system processing, storing, or transmitting classified information possess security clearances and formal access approvals for at least the highest classification level and for compartments of information on the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-5(3)",
+    "title": "Citizenship Requirements for Classified Systems",
+    "description": "Verify that personnel performing maintenance and diagnostic activities on a system processing, storing, or transmitting classified information are U.S. citizens.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-5(4)",
+    "title": "Foreign Nationals",
+    "description": "Ensure that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-5(5)",
+    "title": "Non-system Maintenance",
+    "description": "Ensure that non-escorted personnel performing maintenance activities not directly associated with the system but in the physical proximity of the system, have required access authorizations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-6",
+    "title": "Timely Maintenance",
+    "description": "Obtain maintenance support and/or spare parts for [system components] within [time period] of failure.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MA-6(1)",
+    "title": "Preventive Maintenance",
+    "description": "Perform preventive maintenance on [system components] at [time intervals].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-6",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-6(2)",
+    "title": "Predictive Maintenance",
+    "description": "Perform predictive maintenance on [system components] at [time intervals].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-6",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-6(3)",
+    "title": "Automated Support for Predictive Maintenance",
+    "description": "Transfer predictive maintenance data to a maintenance management system using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MA-6",
+    "baselines": []
+  },
+  {
+    "control_id": "MA-7",
+    "title": "Field Maintenance",
+    "description": "Restrict or prohibit field maintenance on [systems or system components] to [trusted maintenance facilities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "MP-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] media protection policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the media protection policy and the associated media protection controls; b. Designate an [official] to manage the development, documentation, and dissemination of the media protection policy and procedures; and c. Review and update the current media protection: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-2",
+    "title": "Media Access",
+    "description": "Restrict access to [organization-defined types of digital and/or non-digital media] to [organization-defined personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-3",
+    "title": "Media Marking",
+    "description": "a. Mark system media indicating the distribution limitations, handling caveats, and applicable security markings (if any) of the information; and b. Exempt [types of media exempted from marking] from marking if the media remain within [controlled areas].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-4",
+    "title": "Media Storage",
+    "description": "a. Physically control and securely store [organization-defined types of digital and/or non-digital media] within [organization-defined controlled areas] ; and b. Protect system media types defined in MP-4a until the media are destroyed or sanitized using approved equipment, techniques, and procedures.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-4(2)",
+    "title": "Automated Restricted Access",
+    "description": "Restrict access to media storage areas and log access attempts and access granted using [organization-defined automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-4",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-5",
+    "title": "Media Transport",
+    "description": "a. Protect and control [types of system media] during transport outside of controlled areas using [organization-defined controls]; b. Maintain accountability for system media during transport outside of controlled areas; c. Document activities associated with the transport of system media; and d. Restrict the activities associated with the transport of system media to authorized personnel.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-5(3)",
+    "title": "Custodians",
+    "description": "Employ an identified custodian during transport of system media outside of controlled areas.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-5",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-6",
+    "title": "Media Sanitization",
+    "description": "a. Sanitize [organization-defined system media] prior to disposal, release out of organizational control, or release for reuse using [organization-defined sanitization techniques and procedures] ; and b. Employ sanitization mechanisms with the strength and integrity commensurate with the security category or classification of the information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-6(1)",
+    "title": "Review, Approve, Track, Document, and Verify",
+    "description": "Review, approve, track, document, and verify media sanitization and disposal actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-6(2)",
+    "title": "Equipment Testing",
+    "description": "Test sanitization equipment and procedures [organization-defined frequency] to ensure that the intended sanitization is being achieved.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-6(3)",
+    "title": "Nondestructive Techniques",
+    "description": "Apply nondestructive sanitization techniques to portable storage devices prior to connecting such devices to the system under the following circumstances: [circumstances].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-6(7)",
+    "title": "Dual Authorization",
+    "description": "Enforce dual authorization for the sanitization of [system media].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-6",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-6(8)",
+    "title": "Remote Purging or Wiping of Information",
+    "description": "Provide the capability to purge or wipe information from [systems or system components] [remotely | under [conditions]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-6",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-7",
+    "title": "Media Use",
+    "description": "a. [restrict | prohibit] the use of [types of system media] on [systems or system components] using [controls] ; and b. Prohibit the use of portable storage devices in organizational systems when such devices have no identifiable owner.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "MP-7(2)",
+    "title": "Prohibit Use of Sanitization-resistant Media",
+    "description": "Prohibit the use of sanitization-resistant media in organizational systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-7",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-8",
+    "title": "Media Downgrading",
+    "description": "a. Establish [system media downgrading process] that includes employing downgrading mechanisms with strength and integrity commensurate with the security category or classification of the information; b. Verify that the system media downgrading process is commensurate with the security category and/or classification level of the information to be removed and the access authorizations of the potential recipients of the downgraded information; c. Identify [system media requiring downgrading] ; and d. Downgrade the identified system media using the established process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "MP-8(1)",
+    "title": "Documentation of Process",
+    "description": "Document system media downgrading actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-8",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-8(2)",
+    "title": "Equipment Testing",
+    "description": "Test downgrading equipment and procedures [organization-defined frequency] to ensure that downgrading actions are being achieved.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-8",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-8(3)",
+    "title": "Controlled Unclassified Information",
+    "description": "Downgrade system media containing controlled unclassified information prior to public release.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-8",
+    "baselines": []
+  },
+  {
+    "control_id": "MP-8(4)",
+    "title": "Classified Information",
+    "description": "Downgrade system media containing classified information prior to release to individuals without required access authorizations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "MP-8",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] physical and environmental protection policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the physical and environmental protection policy and the associated physical and environmental protection controls; b. Designate an [official] to manage the development, documentation, and dissemination of the physical and environmental protection policy and procedures; and c. Review and update the current physical and environmental protection: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-2",
+    "title": "Physical Access Authorizations",
+    "description": "a. Develop, approve, and maintain a list of individuals with authorized access to the facility where the system resides; b. Issue authorization credentials for facility access; c. Review the access list detailing authorized facility access by individuals [frequency] ; and d. Remove individuals from the facility access list when access is no longer required.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-2(1)",
+    "title": "Access by Position or Role",
+    "description": "Authorize physical access to the facility where the system resides based on position or role.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-2",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-2(2)",
+    "title": "Two Forms of Identification",
+    "description": "Require two forms of identification from the following forms of identification for visitor access to the facility where the system resides: [list of acceptable forms of identification].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-2",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-2(3)",
+    "title": "Restrict Unescorted Access",
+    "description": "Restrict unescorted access to the facility where the system resides to personnel with [security clearances for all information contained within the system | formal access authorizations for all information contained within the system | need for access to all information contained within the system | [physical access authorizations]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-2",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-3",
+    "title": "Physical Access Control",
+    "description": "a. Enforce physical access authorizations at [entry and exit points] by: 1. Verifying individual access authorizations before granting access to the facility; and 2. Controlling ingress and egress to the facility using [[systems or devices] | guards]; b. Maintain physical access audit logs for [entry or exit points]; c. Control access to areas within the facility designated as publicly accessible by implementing the following controls: [physical access controls]; d. Escort visitors and control visitor activity [circumstances]; e. Secure keys, combinations, and other physical access devices; f. Inventory [physical access devices] every [frequency] ; and g. Change combinations and keys [organization-defined frequency] and/or when keys are lost, combinations are compromised, or when individuals possessing the keys or combinations are transferred or terminated.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-3(1)",
+    "title": "System Access",
+    "description": "Enforce physical access authorizations to the system in addition to the physical access controls for the facility at [physical spaces].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-3",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-3(2)",
+    "title": "Facility and Systems",
+    "description": "Perform security checks [frequency] at the physical perimeter of the facility or system for exfiltration of information or removal of system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-3(3)",
+    "title": "Continuous Guards",
+    "description": "Employ guards to control [physical access points] to the facility where the system resides 24 hours per day, 7 days per week.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-3(4)",
+    "title": "Lockable Casings",
+    "description": "Use lockable physical casings to protect [system components] from unauthorized physical access.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-3(5)",
+    "title": "Tamper Protection",
+    "description": "Employ [anti-tamper technologies] to [detect | prevent] physical tampering or alteration of [hardware components] within the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-3(7)",
+    "title": "Physical Barriers",
+    "description": "Limit access using physical barriers.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-3(8)",
+    "title": "Access Control Vestibules",
+    "description": "Employ access control vestibules at [locations].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-4",
+    "title": "Access Control for Transmission",
+    "description": "Control physical access to [system distribution and transmission lines] within organizational facilities using [security controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-5",
+    "title": "Access Control for Output Devices",
+    "description": "Control physical access to output from [output devices] to prevent unauthorized individuals from obtaining the output.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-5(2)",
+    "title": "Link to Individual Identity",
+    "description": "Link individual identity to receipt of output from output devices.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-5",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-6",
+    "title": "Monitoring Physical Access",
+    "description": "a. Monitor physical access to the facility where the system resides to detect and respond to physical security incidents; b. Review physical access logs [frequency] and upon occurrence of [events] ; and c. Coordinate results of reviews and investigations with the organizational incident response capability.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-6(1)",
+    "title": "Intrusion Alarms and Surveillance Equipment",
+    "description": "Monitor physical access to the facility where the system resides using physical intrusion alarms and surveillance equipment.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-6",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-6(2)",
+    "title": "Automated Intrusion Recognition and Responses",
+    "description": "Recognize [classes or types of intrusions] and initiate [response actions] using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-6",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-6(3)",
+    "title": "Video Surveillance",
+    "description": "(a) Employ video surveillance of [operational areas]; (b) Review video recordings [frequency] ; and (c) Retain video recordings for [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-6",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-6(4)",
+    "title": "Monitoring Physical Access to Systems",
+    "description": "Monitor physical access to the system in addition to the physical access monitoring of the facility at [physical spaces].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-6",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-8",
+    "title": "Visitor Access Records",
+    "description": "a. Maintain visitor access records to the facility where the system resides for [time period]; b. Review visitor access records [frequency] ; and c. Report anomalies in visitor access records to [personnel].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-8(1)",
+    "title": "Automated Records Maintenance and Review",
+    "description": "Maintain and review visitor access records using [organization-defined automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-8",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-8(3)",
+    "title": "Limit Personally Identifiable Information Elements",
+    "description": "Limit personally identifiable information contained in visitor access records to the following elements identified in the privacy risk assessment: [elements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-8",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-9",
+    "title": "Power Equipment and Cabling",
+    "description": "Protect power equipment and power cabling for the system from damage and destruction.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-9(1)",
+    "title": "Redundant Cabling",
+    "description": "Employ redundant power cabling paths that are physically separated by [distance].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-9",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-9(2)",
+    "title": "Automatic Voltage Controls",
+    "description": "Employ automatic voltage controls for [critical system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-9",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-10",
+    "title": "Emergency Shutoff",
+    "description": "a. Provide the capability of shutting off power to [system or individual system components] in emergency situations; b. Place emergency shutoff switches or devices in [location] to facilitate access for authorized personnel; and c. Protect emergency power shutoff capability from unauthorized activation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-11",
+    "title": "Emergency Power",
+    "description": "Provide an uninterruptible power supply to facilitate [an orderly shutdown of the system | transition of the system to long-term alternate power] in the event of a primary power source loss.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-11(1)",
+    "title": "Alternate Power Supply — Minimal Operational Capability",
+    "description": "Provide an alternate power supply for the system that is activated [manually | automatically] and that can maintain minimally required operational capability in the event of an extended loss of the primary power source.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-11",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-11(2)",
+    "title": "Alternate Power Supply — Self-contained",
+    "description": "Provide an alternate power supply for the system that is activated [manually | automatically] and that is:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-11",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-12",
+    "title": "Emergency Lighting",
+    "description": "Employ and maintain automatic emergency lighting for the system that activates in the event of a power outage or disruption and that covers emergency exits and evacuation routes within the facility.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-12(1)",
+    "title": "Essential Mission and Business Functions",
+    "description": "Provide emergency lighting for all areas within the facility supporting essential mission and business functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-12",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-13",
+    "title": "Fire Protection",
+    "description": "Employ and maintain fire detection and suppression systems that are supported by an independent energy source.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-13(1)",
+    "title": "Detection Systems — Automatic Activation and Notification",
+    "description": "Employ fire detection systems that activate automatically and notify [personnel or roles] and [emergency responders] in the event of a fire.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-13",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-13(2)",
+    "title": "Suppression Systems — Automatic Activation and Notification",
+    "description": "(a) Employ fire suppression systems that activate automatically and notify [personnel or roles] and [emergency responders] ; and (b) Employ an automatic fire suppression capability when the facility is not staffed on a continuous basis.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-13",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-13(4)",
+    "title": "Inspections",
+    "description": "Ensure that the facility undergoes [frequency] fire protection inspections by authorized and qualified inspectors and identified deficiencies are resolved within [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-13",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-14",
+    "title": "Environmental Controls",
+    "description": "a. Maintain [temperature | humidity | pressure | radiation | [environmental control]] levels within the facility where the system resides at [acceptable levels] ; and b. Monitor environmental control levels [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-14(1)",
+    "title": "Automatic Controls",
+    "description": "Employ the following automatic environmental controls in the facility to prevent fluctuations potentially harmful to the system: [automatic environmental controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-14",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-14(2)",
+    "title": "Monitoring with Alarms and Notifications",
+    "description": "Employ environmental control monitoring that provides an alarm or notification of changes potentially harmful to personnel or equipment to [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-14",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-15",
+    "title": "Water Damage Protection",
+    "description": "Protect the system from damage resulting from water leakage by providing master shutoff or isolation valves that are accessible, working properly, and known to key personnel.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-15(1)",
+    "title": "Automation Support",
+    "description": "Detect the presence of water near the system and alert [personnel or roles] using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-15",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-16",
+    "title": "Delivery and Removal",
+    "description": "a. Authorize and control [organization-defined types of system components] entering and exiting the facility; and b. Maintain records of the system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-17",
+    "title": "Alternate Work Site",
+    "description": "a. Determine and document the [alternate work sites] allowed for use by employees; b. Employ the following controls at alternate work sites: [controls]; c. Assess the effectiveness of controls at alternate work sites; and d. Provide a means for employees to communicate with information security and privacy personnel in case of incidents.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-18",
+    "title": "Location of System Components",
+    "description": "Position system components within the facility to minimize potential damage from [physical and environmental hazards] and to minimize the opportunity for unauthorized access.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PE-19",
+    "title": "Information Leakage",
+    "description": "Protect the system from information leakage due to electromagnetic signals emanations.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PE-19(1)",
+    "title": "National Emissions Policies and Procedures",
+    "description": "Protect system components, associated data communications, and networks in accordance with national Emissions Security policies and procedures based on the security category or classification of the information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PE-19",
+    "baselines": []
+  },
+  {
+    "control_id": "PE-20",
+    "title": "Asset Monitoring and Tracking",
+    "description": "Employ [asset location technologies] to track and monitor the location and movement of [assets] within [controlled areas].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PE-21",
+    "title": "Electromagnetic Pulse Protection",
+    "description": "Employ [protective measures] against electromagnetic pulse damage for [system and system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PE-22",
+    "title": "Component Marking",
+    "description": "Mark [system hardware components] indicating the impact level or classification level of the information permitted to be processed, stored, or transmitted by the hardware component.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PE-23",
+    "title": "Facility Location",
+    "description": "a. Plan the location or site of the facility where the system resides considering physical and environmental hazards; and b. For existing facilities, consider the physical and environmental hazards in the organizational risk management strategy.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PL-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] planning policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the planning policy and the associated planning controls; b. Designate an [official] to manage the development, documentation, and dissemination of the planning policy and procedures; and c. Review and update the current planning: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PL-2",
+    "title": "System Security and Privacy Plans",
+    "description": "a. Develop security and privacy plans for the system that: 1. Are consistent with the organization’s enterprise architecture; 2. Explicitly define the constituent system components; 3. Describe the operational context of the system in terms of mission and business processes; 4. Identify the individuals that fulfill system roles and responsibilities; 5. Identify the information types processed, stored, and transmitted by the system; 6. Provide the security categorization of the system, including supporting rationale; 7. Describe any specific threats to the system that are of concern to the organization; 8. Provide the results of a privacy risk assessment for systems processing personally identifiable information; 9. Describe the operational environment for the system and any dependencies on or connections to other systems or system components; 10. Provide an overview of the security and privacy requirements for the system; 11. Identify any relevant control baselines or overlays, if applicable; 12. Describe the controls in place or planned for meeting the security and privacy requirements, including a rationale for any tailoring decisions; 13. Include risk determinations for security and privacy architecture and design decisions; 14. Include security- and privacy-related activities affecting the system that require planning and coordination with [individuals or groups] ; and 15. Are reviewed and approved by the authorizing official or designated representative prior to plan implementation. b. Distribute copies of the plans and communicate subsequent changes to the plans to [personnel or roles]; c. Review the plans [frequency]; d. Update the plans to address changes to the system and environment of operation or problems identified during plan implementation or control assessments; and e. Protect the plans from unauthorized disclosure and modification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PL-4",
+    "title": "Rules of Behavior",
+    "description": "a. Establish and provide to individuals requiring access to the system, the rules that describe their responsibilities and expected behavior for information and system usage, security, and privacy; b. Receive a documented acknowledgment from such individuals, indicating that they have read, understand, and agree to abide by the rules of behavior, before authorizing access to information and the system; c. Review and update the rules of behavior [frequency] ; and d. Require individuals who have acknowledged a previous version of the rules of behavior to read and re-acknowledge [[frequency] | when the rules are revised or updated].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PL-4(1)",
+    "title": "Social Media and External Site/Application Usage Restrictions",
+    "description": "Include in the rules of behavior, restrictions on:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PL-4",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PL-7",
+    "title": "Concept of Operations",
+    "description": "a. Develop a Concept of Operations (CONOPS) for the system describing how the organization intends to operate the system from the perspective of information security and privacy; and b. Review and update the CONOPS [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PL-8",
+    "title": "Security and Privacy Architectures",
+    "description": "a. Develop security and privacy architectures for the system that: 1. Describe the requirements and approach to be taken for protecting the confidentiality, integrity, and availability of organizational information; 2. Describe the requirements and approach to be taken for processing personally identifiable information to minimize privacy risk to individuals; 3. Describe how the architectures are integrated into and support the enterprise architecture; and 4. Describe any assumptions about, and dependencies on, external systems and services; b. Review and update the architectures [frequency] to reflect changes in the enterprise architecture; and c. Reflect planned architecture changes in security and privacy plans, Concept of Operations (CONOPS), criticality analysis, organizational procedures, and procurements and acquisitions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PL-8(1)",
+    "title": "Defense in Depth",
+    "description": "Design the security and privacy architectures for the system using a defense-in-depth approach that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PL-8",
+    "baselines": []
+  },
+  {
+    "control_id": "PL-8(2)",
+    "title": "Supplier Diversity",
+    "description": "Require that [controls] allocated to [locations and architectural layers] are obtained from different suppliers.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PL-8",
+    "baselines": []
+  },
+  {
+    "control_id": "PL-9",
+    "title": "Central Management",
+    "description": "Centrally manage [controls and related processes].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PL-10",
+    "title": "Baseline Selection",
+    "description": "Select a control baseline for the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PL-11",
+    "title": "Baseline Tailoring",
+    "description": "Tailor the selected control baseline by applying specified tailoring actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PM-1",
+    "title": "Information Security Program Plan",
+    "description": "a. Develop and disseminate an organization-wide information security program plan that: 1. Provides an overview of the requirements for the security program and a description of the security program management controls and common controls in place or planned for meeting those requirements; 2. Includes the identification and assignment of roles, responsibilities, management commitment, coordination among organizational entities, and compliance; 3. Reflects the coordination among organizational entities responsible for information security; and 4. Is approved by a senior official with responsibility and accountability for the risk being incurred to organizational operations (including mission, functions, image, and reputation), organizational assets, individuals, other organizations, and the Nation; b. Review and update the organization-wide information security program plan [frequency] and following [events] ; and c. Protect the information security program plan from unauthorized disclosure and modification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-2",
+    "title": "Information Security Program Leadership Role",
+    "description": "Appoint a senior agency information security officer with the mission and resources to coordinate, develop, implement, and maintain an organization-wide information security program.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-3",
+    "title": "Information Security and Privacy Resources",
+    "description": "a. Include the resources needed to implement the information security and privacy programs in capital planning and investment requests and document all exceptions to this requirement; b. Prepare documentation required for addressing information security and privacy programs in capital planning and investment requests in accordance with applicable laws, executive orders, directives, policies, regulations, standards; and c. Make available for expenditure, the planned information security and privacy resources.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-4",
+    "title": "Plan of Action and Milestones Process",
+    "description": "a. Implement a process to ensure that plans of action and milestones for the information security, privacy, and supply chain risk management programs and associated organizational systems: 1. Are developed and maintained; 2. Document the remedial information security, privacy, and supply chain risk management actions to adequately respond to risk to organizational operations and assets, individuals, other organizations, and the Nation; and 3. Are reported in accordance with established reporting requirements. b. Review plans of action and milestones for consistency with the organizational risk management strategy and organization-wide priorities for risk response actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-5",
+    "title": "System Inventory",
+    "description": "Develop and update [frequency] an inventory of organizational systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-5(1)",
+    "title": "Inventory of Personally Identifiable Information",
+    "description": "Establish, maintain, and update [frequency] an inventory of all systems, applications, and projects that process personally identifiable information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PM-5",
+    "baselines": []
+  },
+  {
+    "control_id": "PM-6",
+    "title": "Measures of Performance",
+    "description": "Develop, monitor, and report on the results of information security and privacy measures of performance.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-7",
+    "title": "Enterprise Architecture",
+    "description": "Develop and maintain an enterprise architecture with consideration for information security, privacy, and the resulting risk to organizational operations and assets, individuals, other organizations, and the Nation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-7(1)",
+    "title": "Offloading",
+    "description": "Offload [non-essential functions or services] to other systems, system components, or an external provider.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PM-7",
+    "baselines": []
+  },
+  {
+    "control_id": "PM-8",
+    "title": "Critical Infrastructure Plan",
+    "description": "Address information security and privacy issues in the development, documentation, and updating of a critical infrastructure and key resources protection plan.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-9",
+    "title": "Risk Management Strategy",
+    "description": "a. Develops a comprehensive strategy to manage: 1. Security risk to organizational operations and assets, individuals, other organizations, and the Nation associated with the operation and use of organizational systems; and 2. Privacy risk to individuals resulting from the authorized processing of personally identifiable information; b. Implement the risk management strategy consistently across the organization; and c. Review and update the risk management strategy [frequency] or as required, to address organizational changes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-10",
+    "title": "Authorization Process",
+    "description": "a. Manage the security and privacy state of organizational systems and the environments in which those systems operate through authorization processes; b. Designate individuals to fulfill specific roles and responsibilities within the organizational risk management process; and c. Integrate the authorization processes into an organization-wide risk management program.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-11",
+    "title": "Mission and Business Process Definition",
+    "description": "a. Define organizational mission and business processes with consideration for information security and privacy and the resulting risk to organizational operations, organizational assets, individuals, other organizations, and the Nation; and b. Determine information protection and personally identifiable information processing needs arising from the defined mission and business processes; and c. Review and revise the mission and business processes [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-12",
+    "title": "Insider Threat Program",
+    "description": "Implement an insider threat program that includes a cross-discipline insider threat incident handling team.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-13",
+    "title": "Security and Privacy Workforce",
+    "description": "Establish a security and privacy workforce development and improvement program.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-14",
+    "title": "Testing, Training, and Monitoring",
+    "description": "a. Implement a process for ensuring that organizational plans for conducting security and privacy testing, training, and monitoring activities associated with organizational systems: 1. Are developed and maintained; and 2. Continue to be executed; and b. Review testing, training, and monitoring plans for consistency with the organizational risk management strategy and organization-wide priorities for risk response actions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-15",
+    "title": "Security and Privacy Groups and Associations",
+    "description": "Establish and institutionalize contact with selected groups and associations within the security and privacy communities:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-16",
+    "title": "Threat Awareness Program",
+    "description": "Implement a threat awareness program that includes a cross-organization information-sharing capability for threat intelligence.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-16(1)",
+    "title": "Automated Means for Sharing Threat Intelligence",
+    "description": "Employ automated mechanisms to maximize the effectiveness of sharing threat intelligence information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PM-16",
+    "baselines": []
+  },
+  {
+    "control_id": "PM-17",
+    "title": "Protecting Controlled Unclassified Information on External Systems",
+    "description": "a. Establish policy and procedures to ensure that requirements for the protection of controlled unclassified information that is processed, stored or transmitted on external systems, are implemented in accordance with applicable laws, executive orders, directives, policies, regulations, and standards; and b. Review and update the policy and procedures [organization-defined frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-18",
+    "title": "Privacy Program Plan",
+    "description": "a. Develop and disseminate an organization-wide privacy program plan that provides an overview of the agency’s privacy program, and: 1. Includes a description of the structure of the privacy program and the resources dedicated to the privacy program; 2. Provides an overview of the requirements for the privacy program and a description of the privacy program management controls and common controls in place or planned for meeting those requirements; 3. Includes the role of the senior agency official for privacy and the identification and assignment of roles of other privacy officials and staff and their responsibilities; 4. Describes management commitment, compliance, and the strategic goals and objectives of the privacy program; 5. Reflects coordination among organizational entities responsible for the different aspects of privacy; and 6. Is approved by a senior official with responsibility and accountability for the privacy risk being incurred to organizational operations (including mission, functions, image, and reputation), organizational assets, individuals, other organizations, and the Nation; and b. Update the plan [frequency] and to address changes in federal privacy laws and policy and organizational changes and problems identified during plan implementation or privacy control assessments.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-19",
+    "title": "Privacy Program Leadership Role",
+    "description": "Appoint a senior agency official for privacy with the authority, mission, accountability, and resources to coordinate, develop, and implement, applicable privacy requirements and manage privacy risks through the organization-wide privacy program.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-20",
+    "title": "Dissemination of Privacy Program Information",
+    "description": "Maintain a central resource webpage on the organization’s principal public website that serves as a central source of information about the organization’s privacy program and that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-20(1)",
+    "title": "Privacy Policies on Websites, Applications, and Digital Services",
+    "description": "Develop and post privacy policies on all external-facing websites, mobile applications, and other digital services, that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PM-20",
+    "baselines": []
+  },
+  {
+    "control_id": "PM-21",
+    "title": "Accounting of Disclosures",
+    "description": "a. Develop and maintain an accurate accounting of disclosures of personally identifiable information, including: 1. Date, nature, and purpose of each disclosure; and 2. Name and address, or other contact information of the individual or organization to which the disclosure was made; b. Retain the accounting of disclosures for the length of the time the personally identifiable information is maintained or five years after the disclosure is made, whichever is longer; and c. Make the accounting of disclosures available to the individual to whom the personally identifiable information relates upon request.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-22",
+    "title": "Personally Identifiable Information Quality Management",
+    "description": "Develop and document organization-wide policies and procedures for:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-23",
+    "title": "Data Governance Body",
+    "description": "Establish a Data Governance Body consisting of [roles] with [responsibilities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-24",
+    "title": "Data Integrity Board",
+    "description": "Establish a Data Integrity Board to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-25",
+    "title": "Minimization of Personally Identifiable Information Used in Testing, Training, and Research",
+    "description": "a. Develop, document, and implement policies and procedures that address the use of personally identifiable information for internal testing, training, and research; b. Limit or minimize the amount of personally identifiable information used for internal testing, training, and research purposes; c. Authorize the use of personally identifiable information when such information is required for internal testing, training, and research; and d. Review and update policies and procedures [organization-defined frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-26",
+    "title": "Complaint Management",
+    "description": "Implement a process for receiving and responding to complaints, concerns, or questions from individuals about the organizational security and privacy practices that includes:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-27",
+    "title": "Privacy Reporting",
+    "description": "a. Develop [privacy reports] and disseminate to: 1. [oversight bodies] to demonstrate accountability with statutory, regulatory, and policy privacy mandates; and 2. [officials] and other personnel with responsibility for monitoring privacy program compliance; and b. Review and update privacy reports [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-28",
+    "title": "Risk Framing",
+    "description": "a. Identify and document: 1. Assumptions affecting risk assessments, risk responses, and risk monitoring; 2. Constraints affecting risk assessments, risk responses, and risk monitoring; 3. Priorities and trade-offs considered by the organization for managing risk; and 4. Organizational risk tolerance; b. Distribute the results of risk framing activities to [personnel] ; and c. Review and update risk framing considerations [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-29",
+    "title": "Risk Management Program Leadership Roles",
+    "description": "a. Appoint a Senior Accountable Official for Risk Management to align organizational information security and privacy management processes with strategic, operational, and budgetary planning processes; and b. Establish a Risk Executive (function) to view and analyze risk from an organization-wide perspective and ensure management of risk is consistent across the organization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-30",
+    "title": "Supply Chain Risk Management Strategy",
+    "description": "a. Develop an organization-wide strategy for managing supply chain risks associated with the development, acquisition, maintenance, and disposal of systems, system components, and system services; b. Implement the supply chain risk management strategy consistently across the organization; and c. Review and update the supply chain risk management strategy on [frequency] or as required, to address organizational changes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-30(1)",
+    "title": "Suppliers of Critical or Mission-essential Items",
+    "description": "Identify, prioritize, and assess suppliers of critical or mission-essential technologies, products, and services.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PM-30",
+    "baselines": []
+  },
+  {
+    "control_id": "PM-31",
+    "title": "Continuous Monitoring Strategy",
+    "description": "Develop an organization-wide continuous monitoring strategy and implement continuous monitoring programs that include:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PM-32",
+    "title": "Purposing",
+    "description": "Analyze [systems or system components] supporting mission essential services or functions to ensure that the information resources are being used consistent with their intended purpose.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PS-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] personnel security policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the personnel security policy and the associated personnel security controls; b. Designate an [official] to manage the development, documentation, and dissemination of the personnel security policy and procedures; and c. Review and update the current personnel security: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-2",
+    "title": "Position Risk Designation",
+    "description": "a. Assign a risk designation to all organizational positions; b. Establish screening criteria for individuals filling those positions; and c. Review and update position risk designations [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-3",
+    "title": "Personnel Screening",
+    "description": "a. Screen individuals prior to authorizing access to the system; and b. Rescreen individuals in accordance with [organization-defined conditions requiring rescreening and, where rescreening is so indicated, the frequency of rescreening].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-3(1)",
+    "title": "Classified Information",
+    "description": "Verify that individuals accessing a system processing, storing, or transmitting classified information are cleared and indoctrinated to the highest classification level of the information to which they have access on the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PS-3(2)",
+    "title": "Formal Indoctrination",
+    "description": "Verify that individuals accessing a system processing, storing, or transmitting types of classified information that require formal indoctrination, are formally indoctrinated for all the relevant types of information to which they have access on the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PS-3(3)",
+    "title": "Information Requiring Special Protective Measures",
+    "description": "Verify that individuals accessing a system processing, storing, or transmitting information requiring special protection:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PS-3(4)",
+    "title": "Citizenship Requirements",
+    "description": "Verify that individuals accessing a system processing, storing, or transmitting [information types] meet [citizenship requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PS-4",
+    "title": "Personnel Termination",
+    "description": "Upon termination of individual employment:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-4(1)",
+    "title": "Post-employment Requirements",
+    "description": "(a) Notify terminated individuals of applicable, legally binding post-employment requirements for the protection of organizational information; and (b) Require terminated individuals to sign an acknowledgment of post-employment requirements as part of the organizational termination process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-4",
+    "baselines": []
+  },
+  {
+    "control_id": "PS-4(2)",
+    "title": "Automated Actions",
+    "description": "Use [automated mechanisms] to [notify [personnel or roles] of individual termination actions | disable access to system resources].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-5",
+    "title": "Personnel Transfer",
+    "description": "a. Review and confirm ongoing operational need for current logical and physical access authorizations to systems and facilities when individuals are reassigned or transferred to other positions within the organization; b. Initiate [transfer or reassignment actions] within [time period following the formal transfer action]; c. Modify access authorization as needed to correspond with any changes in operational need due to reassignment or transfer; and d. Notify [personnel or roles] within [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-6",
+    "title": "Access Agreements",
+    "description": "a. Develop and document access agreements for organizational systems; b. Review and update the access agreements [frequency] ; and c. Verify that individuals requiring access to organizational information and systems: 1. Sign appropriate access agreements prior to being granted access; and 2. Re-sign access agreements to maintain access to organizational systems when access agreements have been updated or [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-6(2)",
+    "title": "Classified Information Requiring Special Protection",
+    "description": "Verify that access to classified information requiring special protection is granted only to individuals who:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-6",
+    "baselines": []
+  },
+  {
+    "control_id": "PS-6(3)",
+    "title": "Post-employment Requirements",
+    "description": "(a) Notify individuals of applicable, legally binding post-employment requirements for protection of organizational information; and (b) Require individuals to sign an acknowledgment of these requirements, if applicable, as part of granting initial access to covered information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PS-6",
+    "baselines": []
+  },
+  {
+    "control_id": "PS-7",
+    "title": "External Personnel Security",
+    "description": "a. Establish personnel security requirements, including security roles and responsibilities for external providers; b. Require external providers to comply with personnel security policies and procedures established by the organization; c. Document personnel security requirements; d. Require external providers to notify [personnel or roles] of any personnel transfers or terminations of external personnel who possess organizational credentials and/or badges, or who have system privileges within [time period] ; and e. Monitor provider compliance with personnel security requirements.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-8",
+    "title": "Personnel Sanctions",
+    "description": "a. Employ a formal sanctions process for individuals failing to comply with established information security and privacy policies and procedures; and b. Notify [personnel or roles] within [time period] when a formal employee sanctions process is initiated, identifying the individual sanctioned and the reason for the sanction.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PS-9",
+    "title": "Position Descriptions",
+    "description": "Incorporate security and privacy roles and responsibilities into organizational position descriptions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "PT-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] personally identifiable information processing and transparency policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the personally identifiable information processing and transparency policy and the associated personally identifiable information processing and transparency controls; b. Designate an [official] to manage the development, documentation, and dissemination of the personally identifiable information processing and transparency policy and procedures; and c. Review and update the current personally identifiable information processing and transparency: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PT-2",
+    "title": "Authority to Process Personally Identifiable Information",
+    "description": "a. Determine and document the [authority] that permits the [processing] of personally identifiable information; and b. Restrict the [processing] of personally identifiable information to only that which is authorized.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PT-2(1)",
+    "title": "Data Tagging",
+    "description": "Attach data tags containing [authorized processing] to [elements of personally identifiable information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-2",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-2(2)",
+    "title": "Automation",
+    "description": "Manage enforcement of the authorized processing of personally identifiable information using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-2",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-3",
+    "title": "Personally Identifiable Information Processing Purposes",
+    "description": "a. Identify and document the [purpose(s)] for processing personally identifiable information; b. Describe the purpose(s) in the public privacy notices and policies of the organization; c. Restrict the [processing] of personally identifiable information to only that which is compatible with the identified purpose(s); and d. Monitor changes in processing personally identifiable information and implement [mechanisms] to ensure that any changes are made in accordance with [requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PT-3(1)",
+    "title": "Data Tagging",
+    "description": "Attach data tags containing the following purposes to [elements of personally identifiable information]: [processing purposes].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-3(2)",
+    "title": "Automation",
+    "description": "Track processing purposes of personally identifiable information using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-3",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-4",
+    "title": "Consent",
+    "description": "Implement [tools or mechanisms] for individuals to consent to the processing of their personally identifiable information prior to its collection that facilitate individuals’ informed decision-making.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PT-4(1)",
+    "title": "Tailored Consent",
+    "description": "Provide [mechanisms] to allow individuals to tailor processing permissions to selected elements of personally identifiable information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-4",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-4(2)",
+    "title": "Just-in-time Consent",
+    "description": "Present [consent mechanisms] to individuals at [frequency] and in conjunction with [personally identifiable information processing].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-4",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-4(3)",
+    "title": "Revocation",
+    "description": "Implement [tools or mechanisms] for individuals to revoke consent to the processing of their personally identifiable information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-4",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-5",
+    "title": "Privacy Notice",
+    "description": "Provide notice to individuals about the processing of personally identifiable information that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PT-5(1)",
+    "title": "Just-in-time Notice",
+    "description": "Present notice of personally identifiable information processing to individuals at a time and location where the individual provides personally identifiable information or in conjunction with a data action, or [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-5",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-5(2)",
+    "title": "Privacy Act Statements",
+    "description": "Include Privacy Act statements on forms that collect information that will be maintained in a Privacy Act system of records, or provide Privacy Act statements on separate forms that can be retained by individuals.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-5",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-6",
+    "title": "System of Records Notice",
+    "description": "For systems that process information that will be maintained in a Privacy Act system of records:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PT-6(1)",
+    "title": "Routine Uses",
+    "description": "Review all routine uses published in the system of records notice at [frequency] to ensure continued accuracy, and to ensure that routine uses continue to be compatible with the purpose for which the information was collected.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-6",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-6(2)",
+    "title": "Exemption Rules",
+    "description": "Review all Privacy Act exemptions claimed for the system of records at [frequency] to ensure they remain appropriate and necessary in accordance with law, that they have been promulgated as regulations, and that they are accurately described in the system of records notice.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-6",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-7",
+    "title": "Specific Categories of Personally Identifiable Information",
+    "description": "Apply [processing conditions] for specific categories of personally identifiable information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "PT-7(1)",
+    "title": "Social Security Numbers",
+    "description": "When a system processes Social Security numbers:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-7",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-7(2)",
+    "title": "First Amendment Information",
+    "description": "Prohibit the processing of information describing how any individual exercises rights guaranteed by the First Amendment unless expressly authorized by statute or by the individual or unless pertinent to and within the scope of an authorized law enforcement activity.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "PT-7",
+    "baselines": []
+  },
+  {
+    "control_id": "PT-8",
+    "title": "Computer Matching Requirements",
+    "description": "When a system or organization processes information for the purpose of conducting a matching program:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "RA-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] risk assessment policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the risk assessment policy and the associated risk assessment controls; b. Designate an [official] to manage the development, documentation, and dissemination of the risk assessment policy and procedures; and c. Review and update the current risk assessment: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-2",
+    "title": "Security Categorization",
+    "description": "a. Categorize the system and information it processes, stores, and transmits; b. Document the security categorization results, including supporting rationale, in the security plan for the system; and c. Verify that the authorizing official or authorizing official designated representative reviews and approves the security categorization decision.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-2(1)",
+    "title": "Impact-level Prioritization",
+    "description": "Conduct an impact-level prioritization of organizational systems to obtain additional granularity on system impact levels.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-2",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-3",
+    "title": "Risk Assessment",
+    "description": "a. Conduct a risk assessment, including: 1. Identifying threats to and vulnerabilities in the system; 2. Determining the likelihood and magnitude of harm from unauthorized access, use, disclosure, disruption, modification, or destruction of the system, the information it processes, stores, or transmits, and any related information; and 3. Determining the likelihood and impact of adverse effects on individuals arising from the processing of personally identifiable information; b. Integrate risk assessment results and risk management decisions from the organization and mission or business process perspectives with system-level risk assessments; c. Document risk assessment results in [security and privacy plans | risk assessment report | [document]]; d. Review risk assessment results [frequency]; e. Disseminate risk assessment results to [personnel or roles] ; and f. Update the risk assessment [frequency] or when there are significant changes to the system, its environment of operation, or other conditions that may impact the security or privacy state of the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-3(1)",
+    "title": "Supply Chain Risk Assessment",
+    "description": "(a) Assess supply chain risks associated with [systems, system components, and system services] ; and (b) Update the supply chain risk assessment [frequency] , when there are significant changes to the relevant supply chain, or when changes to the system, environments of operation, or other conditions may necessitate a change in the supply chain.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-3",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-3(2)",
+    "title": "Use of All-source Intelligence",
+    "description": "Use all-source intelligence to assist in the analysis of risk.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-3(3)",
+    "title": "Dynamic Threat Awareness",
+    "description": "Determine the current cyber threat environment on an ongoing basis using [means].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-3(4)",
+    "title": "Predictive Cyber Analytics",
+    "description": "Employ the following advanced automation and analytics capabilities to predict and identify risks to [systems or system components]: [organization-defined advanced automation and analytics capabilities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-5",
+    "title": "Vulnerability Monitoring and Scanning",
+    "description": "a. Monitor and scan for vulnerabilities in the system and hosted applications [organization-defined frequency and/or randomly in accordance with organization-defined process] and when new vulnerabilities potentially affecting the system are identified and reported; b. Employ vulnerability monitoring tools and techniques that facilitate interoperability among tools and automate parts of the vulnerability management process by using standards for: 1. Enumerating platforms, software flaws, and improper configurations; 2. Formatting checklists and test procedures; and 3. Measuring vulnerability impact; c. Analyze vulnerability scan reports and results from vulnerability monitoring; d. Remediate legitimate vulnerabilities [response times] in accordance with an organizational assessment of risk; e. Share information obtained from the vulnerability monitoring process and control assessments with [personnel or roles] to help eliminate similar vulnerabilities in other systems; and f. Employ vulnerability monitoring tools that include the capability to readily update the vulnerabilities to be scanned.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-5(2)",
+    "title": "Update Vulnerabilities to Be Scanned",
+    "description": "Update the system vulnerabilities to be scanned [[frequency] | prior to a new scan | when new vulnerabilities are identified and reported].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-5(3)",
+    "title": "Breadth and Depth of Coverage",
+    "description": "Define the breadth and depth of vulnerability scanning coverage.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-5(4)",
+    "title": "Discoverable Information",
+    "description": "Determine information about the system that is discoverable and take [corrective actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-5(5)",
+    "title": "Privileged Access",
+    "description": "Implement privileged access authorization to [system components] for [vulnerability scanning activities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-5(6)",
+    "title": "Automated Trend Analyses",
+    "description": "Compare the results of multiple vulnerability scans using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-5(8)",
+    "title": "Review Historic Audit Logs",
+    "description": "Review historic audit logs to determine if a vulnerability identified in a [system] has been previously exploited within an [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-5(10)",
+    "title": "Correlate Scanning Information",
+    "description": "Correlate the output from vulnerability scanning tools to determine the presence of multi-vulnerability and multi-hop attack vectors.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": []
+  },
+  {
+    "control_id": "RA-5(11)",
+    "title": "Public Disclosure Program",
+    "description": "Establish a public reporting channel for receiving reports of vulnerabilities in organizational systems and system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "RA-5",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-6",
+    "title": "Technical Surveillance Countermeasures Survey",
+    "description": "Employ a technical surveillance countermeasures survey at [locations] [[frequency] | when [events or indicators]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "RA-7",
+    "title": "Risk Response",
+    "description": "Respond to findings from security and privacy assessments, monitoring, and audits in accordance with organizational risk tolerance.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-8",
+    "title": "Privacy Impact Assessments",
+    "description": "Conduct privacy impact assessments for systems, programs, or other activities before:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "RA-9",
+    "title": "Criticality Analysis",
+    "description": "Identify critical system components and functions by performing a criticality analysis for [systems, system components, or system services] at [decision points in the system development life cycle].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "RA-10",
+    "title": "Threat Hunting",
+    "description": "a. Establish and maintain a cyber threat hunting capability to: 1. Search for indicators of compromise in organizational systems; and 2. Detect, track, and disrupt threats that evade existing controls; and b. Employ the threat hunting capability [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SA-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] system and services acquisition policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the system and services acquisition policy and the associated system and services acquisition controls; b. Designate an [official] to manage the development, documentation, and dissemination of the system and services acquisition policy and procedures; and c. Review and update the current system and services acquisition: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-2",
+    "title": "Allocation of Resources",
+    "description": "a. Determine the high-level information security and privacy requirements for the system or system service in mission and business process planning; b. Determine, document, and allocate the resources required to protect the system or system service as part of the organizational capital planning and investment control process; and c. Establish a discrete line item for information security and privacy in organizational programming and budgeting documentation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-3",
+    "title": "System Development Life Cycle",
+    "description": "a. Acquire, develop, and manage the system using [system-development life cycle] that incorporates information security and privacy considerations; b. Define and document information security and privacy roles and responsibilities throughout the system development life cycle; c. Identify individuals having information security and privacy roles and responsibilities; and d. Integrate the organizational information security and privacy risk management process into system development life cycle activities.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-3(1)",
+    "title": "Manage Preproduction Environment",
+    "description": "Protect system preproduction environments commensurate with risk throughout the system development life cycle for the system, system component, or system service.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-3(2)",
+    "title": "Use of Live or Operational Data",
+    "description": "(a) Approve, document, and control the use of live data in preproduction environments for the system, system component, or system service; and (b) Protect preproduction environments for the system, system component, or system service at the same impact or classification level as any live data in use within the preproduction environments.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-3(3)",
+    "title": "Technology Refresh",
+    "description": "Plan for and implement a technology refresh schedule for the system throughout the system development life cycle.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-4",
+    "title": "Acquisition Process",
+    "description": "Include the following requirements, descriptions, and criteria, explicitly or by reference, using [standardized contract language | [contract language]] in the acquisition contract for the system, system component, or system service:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-4(1)",
+    "title": "Functional Properties of Controls",
+    "description": "Require the developer of the system, system component, or system service to provide a description of the functional properties of the controls to be implemented.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-4(2)",
+    "title": "Design and Implementation Information for Controls",
+    "description": "Require the developer of the system, system component, or system service to provide design and implementation information for the controls that includes: [security-relevant external system interfaces | high-level design | low-level design | source code or hardware schematics | [design and implementation information]] at [level of detail].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-4(3)",
+    "title": "Development Methods, Techniques, and Practices",
+    "description": "Require the developer of the system, system component, or system service to demonstrate the use of a system development life cycle process that includes:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-4(5)",
+    "title": "System, Component, and Service Configurations",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-4(6)",
+    "title": "Use of Information Assurance Products",
+    "description": "(a) Employ only government off-the-shelf or commercial off-the-shelf information assurance and information assurance-enabled information technology products that compose an NSA-approved solution to protect classified information when the networks used to transmit the information are at a lower classification level than the information being transmitted; and (b) Ensure that these products have been evaluated and/or validated by NSA or in accordance with NSA-approved procedures.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-4(7)",
+    "title": "NIAP-approved Protection Profiles ",
+    "description": "(a) Limit the use of commercially provided information assurance and information assurance-enabled information technology products to those products that have been successfully evaluated against a National Information Assurance partnership (NIAP)-approved Protection Profile for a specific technology type, if such a profile exists; and (b) Require, if no NIAP-approved Protection Profile exists for a specific technology type but a commercially provided information technology product relies on cryptographic functionality to enforce its security policy, that the cryptographic module is FIPS-validated or NSA-approved.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-4(8)",
+    "title": "Continuous Monitoring Plan for Controls",
+    "description": "Require the developer of the system, system component, or system service to produce a plan for continuous monitoring of control effectiveness that is consistent with the continuous monitoring program of the organization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-4(9)",
+    "title": "Functions, Ports, Protocols, and Services in Use",
+    "description": "Require the developer of the system, system component, or system service to identify the functions, ports, protocols, and services intended for organizational use.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-4(10)",
+    "title": "Use of Approved PIV Products",
+    "description": "Employ only information technology products on the FIPS 201-approved products list for Personal Identity Verification (PIV) capability implemented within organizational systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-4(11)",
+    "title": "System of Records",
+    "description": "Include [Privacy Act requirements] in the acquisition contract for the operation of a system of records on behalf of an organization to accomplish an organizational mission or function.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-4(12)",
+    "title": "Data Ownership",
+    "description": "(a) Include organizational data ownership requirements in the acquisition contract; and (b) Require all data to be removed from the contractor’s system and returned to the organization within [time frame].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-5",
+    "title": "System Documentation",
+    "description": "a. Obtain or develop administrator documentation for the system, system component, or system service that describes: 1. Secure configuration, installation, and operation of the system, component, or service; 2. Effective use and maintenance of security and privacy functions and mechanisms; and 3. Known vulnerabilities regarding configuration and use of administrative or privileged functions; b. Obtain or develop user documentation for the system, system component, or system service that describes: 1. User-accessible security and privacy functions and mechanisms and how to effectively use those functions and mechanisms; 2. Methods for user interaction, which enables individuals to use the system, component, or service in a more secure manner and protect individual privacy; and 3. User responsibilities in maintaining the security of the system, component, or service and privacy of individuals; c. Document attempts to obtain system, system component, or system service documentation when such documentation is either unavailable or nonexistent and take [actions] in response; and d. Distribute documentation to [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-8",
+    "title": "Security and Privacy Engineering Principles",
+    "description": "Apply the following systems security and privacy engineering principles in the specification, design, development, implementation, and modification of the system and system components: [organization-defined systems security and privacy engineering principles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-8(1)",
+    "title": "Clear Abstractions",
+    "description": "Implement the security design principle of clear abstractions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(2)",
+    "title": "Least Common Mechanism",
+    "description": "Implement the security design principle of least common mechanism in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(3)",
+    "title": "Modularity and Layering",
+    "description": "Implement the security design principles of modularity and layering in [organization-defined systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(4)",
+    "title": "Partially Ordered Dependencies",
+    "description": "Implement the security design principle of partially ordered dependencies in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(5)",
+    "title": "Efficiently Mediated Access",
+    "description": "Implement the security design principle of efficiently mediated access in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(6)",
+    "title": "Minimized Sharing",
+    "description": "Implement the security design principle of minimized sharing in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(7)",
+    "title": "Reduced Complexity",
+    "description": "Implement the security design principle of reduced complexity in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(8)",
+    "title": "Secure Evolvability",
+    "description": "Implement the security design principle of secure evolvability in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(9)",
+    "title": "Trusted Components",
+    "description": "Implement the security design principle of trusted components in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(10)",
+    "title": "Hierarchical Trust",
+    "description": "Implement the security design principle of hierarchical trust in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(11)",
+    "title": "Inverse Modification Threshold",
+    "description": "Implement the security design principle of inverse modification threshold in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(12)",
+    "title": "Hierarchical Protection",
+    "description": "Implement the security design principle of hierarchical protection in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(13)",
+    "title": "Minimized Security Elements",
+    "description": "Implement the security design principle of minimized security elements in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(14)",
+    "title": "Least Privilege",
+    "description": "Implement the security design principle of least privilege in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(15)",
+    "title": "Predicate Permission",
+    "description": "Implement the security design principle of predicate permission in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(16)",
+    "title": "Self-reliant Trustworthiness",
+    "description": "Implement the security design principle of self-reliant trustworthiness in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(17)",
+    "title": "Secure Distributed Composition",
+    "description": "Implement the security design principle of secure distributed composition in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(18)",
+    "title": "Trusted Communications Channels",
+    "description": "Implement the security design principle of trusted communications channels in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(19)",
+    "title": "Continuous Protection",
+    "description": "Implement the security design principle of continuous protection in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(20)",
+    "title": "Secure Metadata Management",
+    "description": "Implement the security design principle of secure metadata management in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(21)",
+    "title": "Self-analysis",
+    "description": "Implement the security design principle of self-analysis in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(22)",
+    "title": "Accountability and Traceability",
+    "description": "Implement the security design principle of accountability and traceability in [organization-defined systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(23)",
+    "title": "Secure Defaults",
+    "description": "Implement the security design principle of secure defaults in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(24)",
+    "title": "Secure Failure and Recovery",
+    "description": "Implement the security design principle of secure failure and recovery in [organization-defined systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(25)",
+    "title": "Economic Security",
+    "description": "Implement the security design principle of economic security in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(26)",
+    "title": "Performance Security",
+    "description": "Implement the security design principle of performance security in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(27)",
+    "title": "Human Factored Security",
+    "description": "Implement the security design principle of human factored security in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(28)",
+    "title": "Acceptable Security",
+    "description": "Implement the security design principle of acceptable security in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(29)",
+    "title": "Repeatable and Documented Procedures",
+    "description": "Implement the security design principle of repeatable and documented procedures in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(30)",
+    "title": "Procedural Rigor",
+    "description": "Implement the security design principle of procedural rigor in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(31)",
+    "title": "Secure System Modification",
+    "description": "Implement the security design principle of secure system modification in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(32)",
+    "title": "Sufficient Documentation",
+    "description": "Implement the security design principle of sufficient documentation in [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-8(33)",
+    "title": "Minimization",
+    "description": "Implement the privacy principle of minimization using [processes].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-9",
+    "title": "External System Services",
+    "description": "a. Require that providers of external system services comply with organizational security and privacy requirements and employ the following controls: [controls]; b. Define and document organizational oversight and user roles and responsibilities with regard to external system services; and c. Employ the following processes, methods, and techniques to monitor control compliance by external service providers on an ongoing basis: [processes, methods, and techniques].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-9(1)",
+    "title": "Risk Assessments and Organizational Approvals",
+    "description": "(a) Conduct an organizational assessment of risk prior to the acquisition or outsourcing of information security services; and (b) Verify that the acquisition or outsourcing of dedicated information security services is approved by [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-9(2)",
+    "title": "Identification of Functions, Ports, Protocols, and Services",
+    "description": "Require providers of the following external system services to identify the functions, ports, protocols, and other services required for the use of such services: [external system services].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-9(3)",
+    "title": "Establish and Maintain Trust Relationship with Providers",
+    "description": "Establish, document, and maintain trust relationships with external service providers based on the following requirements, properties, factors, or conditions: [organization-defined security and privacy requirements, properties, factors, or conditions defining acceptable trust relationships].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-9(4)",
+    "title": "Consistent Interests of Consumers and Providers",
+    "description": "Take the following actions to verify that the interests of [external service providers] are consistent with and reflect organizational interests: [actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-9(5)",
+    "title": "Processing, Storage, and Service Location",
+    "description": "Restrict the location of [information processing | information or data | system services] to [locations] based on [requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-9(6)",
+    "title": "Organization-controlled Cryptographic Keys",
+    "description": "Maintain exclusive control of cryptographic keys for encrypted material stored or transmitted through an external system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-9(7)",
+    "title": "Organization-controlled Integrity Checking",
+    "description": "Provide the capability to check the integrity of information while it resides in the external system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-9(8)",
+    "title": "Processing and Storage Location — U.S. Jurisdiction",
+    "description": "Restrict the geographic location of information processing and data storage to facilities located within in the legal jurisdictional boundary of the United States.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-9",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-10",
+    "title": "Developer Configuration Management",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-10(1)",
+    "title": "Software and Firmware Integrity Verification",
+    "description": "Require the developer of the system, system component, or system service to enable integrity verification of software and firmware components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-10(2)",
+    "title": "Alternative Configuration Management Processes",
+    "description": "Provide an alternate configuration management process using organizational personnel in the absence of a dedicated developer configuration management team.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-10(3)",
+    "title": "Hardware Integrity Verification",
+    "description": "Require the developer of the system, system component, or system service to enable integrity verification of hardware components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-10(4)",
+    "title": "Trusted Generation",
+    "description": "Require the developer of the system, system component, or system service to employ tools for comparing newly generated versions of security-relevant hardware descriptions, source code, and object code with previous versions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-10(5)",
+    "title": "Mapping Integrity for Version Control",
+    "description": "Require the developer of the system, system component, or system service to maintain the integrity of the mapping between the master build data describing the current version of security-relevant hardware, software, and firmware and the on-site master copy of the data for the current version.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-10(6)",
+    "title": "Trusted Distribution",
+    "description": "Require the developer of the system, system component, or system service to execute procedures for ensuring that security-relevant hardware, software, and firmware updates distributed to the organization are exactly as specified by the master copies.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-10(7)",
+    "title": "Security and Privacy Representatives",
+    "description": "Require [organization-defined security and privacy representatives] to be included in the [organization-defined configuration change management and control process].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11",
+    "title": "Developer Testing and Evaluation",
+    "description": "Require the developer of the system, system component, or system service, at all post-design stages of the system development life cycle, to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-11(1)",
+    "title": "Static Code Analysis",
+    "description": "Require the developer of the system, system component, or system service to employ static code analysis tools to identify common flaws and document the results of the analysis.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(2)",
+    "title": "Threat Modeling and Vulnerability Analyses",
+    "description": "Require the developer of the system, system component, or system service to perform threat modeling and vulnerability analyses during development and the subsequent testing and evaluation of the system, component, or service that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(3)",
+    "title": "Independent Verification of Assessment Plans and Evidence",
+    "description": "(a) Require an independent agent satisfying [independence criteria] to verify the correct implementation of the developer security and privacy assessment plans and the evidence produced during testing and evaluation; and (b) Verify that the independent agent is provided with sufficient information to complete the verification process or granted the authority to obtain such information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(4)",
+    "title": "Manual Code Reviews",
+    "description": "Require the developer of the system, system component, or system service to perform a manual code review of [specific code] using the following processes, procedures, and/or techniques: [processes, procedures, and/or techniques].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(5)",
+    "title": "Penetration Testing",
+    "description": "Require the developer of the system, system component, or system service to perform penetration testing:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(6)",
+    "title": "Attack Surface Reviews",
+    "description": "Require the developer of the system, system component, or system service to perform attack surface reviews.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(7)",
+    "title": "Verify Scope of Testing and Evaluation",
+    "description": "Require the developer of the system, system component, or system service to verify that the scope of testing and evaluation provides complete coverage of the required controls at the following level of rigor: [organization-defined breadth and depth of testing and evaluation].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(8)",
+    "title": "Dynamic Code Analysis",
+    "description": "Require the developer of the system, system component, or system service to employ dynamic code analysis tools to identify common flaws and document the results of the analysis.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-11(9)",
+    "title": "Interactive Application Security Testing",
+    "description": "Require the developer of the system, system component, or system service to employ interactive application security testing tools to identify flaws and document the results.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15",
+    "title": "Development Process, Standards, and Tools",
+    "description": "a. Require the developer of the system, system component, or system service to follow a documented development process that: 1. Explicitly addresses security and privacy requirements; 2. Identifies the standards and tools used in the development process; 3. Documents the specific tool options and tool configurations used in the development process; and 4. Documents, manages, and ensures the integrity of changes to the process and/or tools used in development; and b. Review the development process, standards, tools, tool options, and tool configurations [frequency] to determine if the process, standards, tools, tool options and tool configurations selected and employed can satisfy the following security and privacy requirements: [organization-defined security and privacy requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-15(1)",
+    "title": "Quality Metrics",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(2)",
+    "title": "Security and Privacy Tracking Tools",
+    "description": "Require the developer of the system, system component, or system service to select and employ security and privacy tracking tools for use during the development process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(3)",
+    "title": "Criticality Analysis",
+    "description": "Require the developer of the system, system component, or system service to perform a criticality analysis:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-15(5)",
+    "title": "Attack Surface Reduction",
+    "description": "Require the developer of the system, system component, or system service to reduce attack surfaces to [thresholds].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(6)",
+    "title": "Continuous Improvement",
+    "description": "Require the developer of the system, system component, or system service to implement an explicit process to continuously improve the development process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(7)",
+    "title": "Automated Vulnerability Analysis",
+    "description": "Require the developer of the system, system component, or system service [frequency] to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(8)",
+    "title": "Reuse of Threat and Vulnerability Information",
+    "description": "Require the developer of the system, system component, or system service to use threat modeling and vulnerability analyses from similar systems, components, or services to inform the current development process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(10)",
+    "title": "Incident Response Plan",
+    "description": "Require the developer of the system, system component, or system service to provide, implement, and test an incident response plan.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(11)",
+    "title": "Archive System or Component",
+    "description": "Require the developer of the system or system component to archive the system or component to be released or delivered together with the corresponding evidence supporting the final security and privacy review.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(12)",
+    "title": "Minimize Personally Identifiable Information",
+    "description": "Require the developer of the system or system component to minimize the use of personally identifiable information in development and test environments.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-15(13)",
+    "title": "Logging Syntax",
+    "description": "Require the developer of the system or system component to minimize the use of personally identifiable information in development and test environments.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-16",
+    "title": "Developer-provided Training",
+    "description": "Require the developer of the system, system component, or system service to provide the following training on the correct use and operation of the implemented security and privacy functions, controls, and/or mechanisms: [training].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-17",
+    "title": "Developer Security and Privacy Architecture and Design",
+    "description": "Require the developer of the system, system component, or system service to produce a design specification and security and privacy architecture that:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-17(1)",
+    "title": "Formal Policy Model",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(2)",
+    "title": "Security-relevant Components",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(3)",
+    "title": "Formal Correspondence",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(4)",
+    "title": "Informal Correspondence",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(5)",
+    "title": "Conceptually Simple Design",
+    "description": "Require the developer of the system, system component, or system service to:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(6)",
+    "title": "Structure for Testing",
+    "description": "Require the developer of the system, system component, or system service to structure security-relevant hardware, software, and firmware to facilitate testing.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(7)",
+    "title": "Structure for Least Privilege",
+    "description": "Require the developer of the system, system component, or system service to structure security-relevant hardware, software, and firmware to facilitate controlling access with least privilege.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(8)",
+    "title": "Orchestration",
+    "description": "Design [critical systems] with coordinated behavior to implement the following capabilities: [capabilities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-17(9)",
+    "title": "Design Diversity",
+    "description": "Use different designs for [critical systems] to satisfy a common set of requirements or to provide equivalent functionality.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SA-17",
+    "baselines": []
+  },
+  {
+    "control_id": "SA-20",
+    "title": "Customized Development of Critical Components",
+    "description": "Reimplement or custom develop the following critical system components: [critical system].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SA-21",
+    "title": "Developer Screening",
+    "description": "Require that the developer of [system, systems component, or system service]:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-22",
+    "title": "Unsupported System Components",
+    "description": "a. Replace system components when support for the components is no longer available from the developer, vendor, or manufacturer; or b. Provide the following options for alternative sources for continued support for unsupported components [in-house support | [support from external providers]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SA-23",
+    "title": "Specialization",
+    "description": "Employ [design modification | augmentation | reconfiguration] on [systems or system components] supporting mission essential services or functions to increase the trustworthiness in those systems or components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SA-24",
+    "title": "Design For Cyber Resiliency",
+    "description": "a. Design organizational systems, system components, or system services to achieve cyber resiliency by: 1. Defining the following cyber resiliency goals: [cyber resiliency goals]. 2. Defining the following cyber resiliency objectives: [cyber resiliency objectives]. 3. Defining the following cyber resiliency techniques: [cyber resiliency techniques]. 4. Defining the following cyber resiliency implementation approaches: [cyber resiliency implementation approaches]. 5. Defining the following cyber resiliency design principles: [cyber resiliency design principles]. b. Implement the selected cyber resiliency goals, objectives, techniques, implementation approaches, and design principles as part of an organizational risk management process or systems security engineering process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business-process-level | system-level] system and communications protection policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the system and communications protection policy and the associated system and communications protection controls; b. Designate an [official] to manage the development, documentation, and dissemination of the system and communications protection policy and procedures; and c. Review and update the current system and communications protection: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-2",
+    "title": "Separation of System and User Functionality",
+    "description": "Separate user functionality, including user interface services, from system management functionality.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-2(1)",
+    "title": "Interfaces for Non-privileged Users",
+    "description": "Prevent the presentation of system management functionality at interfaces to non-privileged users.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-2",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-2(2)",
+    "title": "Disassociability",
+    "description": "Store state information from applications and software separately.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-2",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-3",
+    "title": "Security Function Isolation",
+    "description": "Isolate security functions from nonsecurity functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-3(1)",
+    "title": "Hardware Separation",
+    "description": "Employ hardware separation mechanisms to implement security function isolation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-3(2)",
+    "title": "Access and Flow Control Functions",
+    "description": "Isolate security functions enforcing access and information flow control from nonsecurity functions and from other security functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-3(3)",
+    "title": "Minimize Nonsecurity Functionality",
+    "description": "Minimize the number of nonsecurity functions included within the isolation boundary containing security functions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-3(4)",
+    "title": "Module Coupling and Cohesiveness",
+    "description": "Implement security functions as largely independent modules that maximize internal cohesiveness within modules and minimize coupling between modules.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-3(5)",
+    "title": "Layered Structures",
+    "description": "Implement security functions as a layered structure minimizing interactions between layers of the design and avoiding any dependence by lower layers on the functionality or correctness of higher layers.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-4",
+    "title": "Information in Shared System Resources",
+    "description": "Prevent unauthorized and unintended information transfer via shared system resources.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-4(2)",
+    "title": "Multilevel or Periods Processing",
+    "description": "Prevent unauthorized information transfer via shared resources in accordance with [procedures] when system processing explicitly switches between different information classification levels or security categories.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-5",
+    "title": "Denial-of-service Protection",
+    "description": "a. [protect against | limit] the effects of the following types of denial-of-service events: [types of denial-of-service events] ; and b. Employ the following controls to achieve the denial-of-service objective: [controls by type of denial-of-service event].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-5(1)",
+    "title": "Restrict Ability to Attack Other Systems",
+    "description": "Restrict the ability of individuals to launch the following denial-of-service attacks against other systems: [denial-of-service attacks].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-5",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-5(2)",
+    "title": "Capacity, Bandwidth, and Redundancy",
+    "description": "Manage capacity, bandwidth, or other redundancy to limit the effects of information flooding denial-of-service attacks.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-5",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-5(3)",
+    "title": "Detection and Monitoring",
+    "description": "(a) Employ the following monitoring tools to detect indicators of denial-of-service attacks against, or launched from, the system: [monitoring tools] ; and (b) Monitor the following system resources to determine if sufficient resources exist to prevent effective denial-of-service attacks: [system resources].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-5",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-6",
+    "title": "Resource Availability",
+    "description": "Protect the availability of resources by allocating [resources] by [priority | quota | [controls]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7",
+    "title": "Boundary Protection",
+    "description": "a. Monitor and control communications at the external managed interfaces to the system and at key internal managed interfaces within the system; b. Implement subnetworks for publicly accessible system components that are [physically | logically] separated from internal organizational networks; and c. Connect to external networks or systems only through managed interfaces consisting of boundary protection devices arranged in accordance with an organizational security and privacy architecture.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(3)",
+    "title": "Access Points",
+    "description": "Limit the number of external network connections to the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(4)",
+    "title": "External Telecommunications Services",
+    "description": "(a) Implement a managed interface for each external telecommunication service; (b) Establish a traffic flow policy for each managed interface; (c) Protect the confidentiality and integrity of the information being transmitted across each interface; (d) Document each exception to the traffic flow policy with a supporting mission or business need and duration of that need; (e) Review exceptions to the traffic flow policy [frequency] and remove exceptions that are no longer supported by an explicit mission or business need; (f) Prevent unauthorized exchange of control plane traffic with external networks; (g) Publish information to enable remote networks to detect unauthorized control plane traffic from internal networks; and (h) Filter unauthorized control plane traffic from external networks.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(5)",
+    "title": "Deny by Default — Allow by Exception",
+    "description": "Deny network communications traffic by default and allow network communications traffic by exception [at managed interfaces | for [systems]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(7)",
+    "title": "Split Tunneling for Remote Devices",
+    "description": "Prevent split tunneling for remote devices connecting to organizational systems unless the split tunnel is securely provisioned using [safeguards].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(8)",
+    "title": "Route Traffic to Authenticated Proxy Servers",
+    "description": "Route [internal communications traffic] to [external networks] through authenticated proxy servers at managed interfaces.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(9)",
+    "title": "Restrict Threatening Outgoing Communications Traffic",
+    "description": "(a) Detect and deny outgoing communications traffic posing a threat to external systems; and (b) Audit the identity of internal users associated with denied communications.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(10)",
+    "title": "Prevent Exfiltration",
+    "description": "(a) Prevent the exfiltration of information; and (b) Conduct exfiltration tests [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(11)",
+    "title": "Restrict Incoming Communications Traffic",
+    "description": "Only allow incoming communications from [authorized sources] to be routed to [authorized destinations].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(12)",
+    "title": "Host-based Protection",
+    "description": "Implement [host-based boundary protection mechanisms] at [system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(13)",
+    "title": "Isolation of Security Tools, Mechanisms, and Support Components",
+    "description": "Isolate [information security tools, mechanisms, and support components] from other internal system components by implementing physically separate subnetworks with managed interfaces to other components of the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(14)",
+    "title": "Protect Against Unauthorized Physical Connections",
+    "description": "Protect against unauthorized physical connections at [managed interfaces].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(15)",
+    "title": "Networked Privileged Accesses",
+    "description": "Route networked, privileged accesses through a dedicated, managed interface for purposes of access control and auditing.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(16)",
+    "title": "Prevent Discovery of System Components",
+    "description": "Prevent the discovery of specific system components that represent a managed interface.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(17)",
+    "title": "Automated Enforcement of Protocol Formats",
+    "description": "Enforce adherence to protocol formats.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(18)",
+    "title": "Fail Secure",
+    "description": "Prevent systems from entering unsecure states in the event of an operational failure of a boundary protection device.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(19)",
+    "title": "Block Communication from Non-organizationally Configured Hosts",
+    "description": "Block inbound and outbound communications traffic between [communication clients] that are independently configured by end users and external service providers.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(20)",
+    "title": "Dynamic Isolation and Segregation",
+    "description": "Provide the capability to dynamically isolate [system components] from other system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(21)",
+    "title": "Isolation of System Components",
+    "description": "Employ boundary protection mechanisms to isolate [system components] supporting [missions and/or business functions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-7(22)",
+    "title": "Separate Subnets for Connecting to Different Security Domains",
+    "description": "Implement separate network addresses to connect to systems in different security domains.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(23)",
+    "title": "Disable Sender Feedback on Protocol Validation Failure",
+    "description": "Disable feedback to senders on protocol format validation failure.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(24)",
+    "title": "Personally Identifiable Information",
+    "description": "For systems that process personally identifiable information:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(25)",
+    "title": "Unclassified National Security System Connections",
+    "description": "Prohibit the direct connection of [unclassified national security system] to an external network without the use of [boundary protection device].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(26)",
+    "title": "Classified National Security System Connections",
+    "description": "Prohibit the direct connection of a classified national security system to an external network without the use of [boundary protection device].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(27)",
+    "title": "Unclassified Non-national Security System Connections",
+    "description": "Prohibit the direct connection of [unclassified, non-national security system] to an external network without the use of [boundary protection device].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(28)",
+    "title": "Connections to Public Networks",
+    "description": "Prohibit the direct connection of [system] to a public network.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-7(29)",
+    "title": "Separate Subnets to Isolate Functions",
+    "description": "Implement [physically | logically] separate subnetworks to isolate the following critical system components and functions: [critical system components and functions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-8",
+    "title": "Transmission Confidentiality and Integrity",
+    "description": "Protect the [confidentiality | integrity] of transmitted information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-8(1)",
+    "title": "Cryptographic Protection",
+    "description": "Implement cryptographic mechanisms to [prevent unauthorized disclosure of information | detect changes to information] during transmission.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-8",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-8(2)",
+    "title": "Pre- and Post-transmission Handling",
+    "description": "Maintain the [confidentiality | integrity] of information during preparation for transmission and during reception.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-8(3)",
+    "title": "Cryptographic Protection for Message Externals",
+    "description": "Implement cryptographic mechanisms to protect message externals unless otherwise protected by [alternative physical controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-8(4)",
+    "title": "Conceal or Randomize Communications",
+    "description": "Implement cryptographic mechanisms to conceal or randomize communication patterns unless otherwise protected by [alternative physical controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-8(5)",
+    "title": "Protected Distribution System",
+    "description": "Implement [protected distribution system] to [prevent unauthorized disclosure of information | detect changes to information] during transmission.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-10",
+    "title": "Network Disconnect",
+    "description": "Terminate the network connection associated with a communications session at the end of the session or after [time period] of inactivity.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-11",
+    "title": "Trusted Path",
+    "description": "a. Provide a [physically | logically] isolated trusted communications path for communications between the user and the trusted components of the system; and b. Permit users to invoke the trusted communications path for communications between the user and the following security functions of the system, including at a minimum, authentication and re-authentication: [security functions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-11(1)",
+    "title": "Irrefutable Communications Path",
+    "description": "(a) Provide a trusted communications path that is irrefutably distinguishable from other communications paths; and (b) Initiate the trusted communications path for communications between the [security functions] of the system and the user.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-12",
+    "title": "Cryptographic Key Establishment and Management",
+    "description": "Establish and manage cryptographic keys when cryptography is employed within the system in accordance with the following key management requirements: [requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-12(1)",
+    "title": "Availability",
+    "description": "Maintain availability of information in the event of the loss of cryptographic keys by users.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-12",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-12(2)",
+    "title": "Symmetric Keys",
+    "description": "Produce, control, and distribute symmetric cryptographic keys using [NIST FIPS-validated | NSA-approved] key management technology and processes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-12",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-12(3)",
+    "title": "Asymmetric Keys",
+    "description": "Produce, control, and distribute asymmetric cryptographic keys using [NSA-approved key management technology and processes | prepositioned keying material | DoD-approved or DoD-issued Medium Assurance PKI certificates | DoD-approved or DoD-issued Medium Hardware Assurance PKI certificates and hardware security tokens that protect the user’s private key | certificates issued in accordance with organization-defined requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-12",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-12(6)",
+    "title": "Physical Control of Keys",
+    "description": "Maintain physical control of cryptographic keys when stored information is encrypted by external service providers.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-12",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-13",
+    "title": "Cryptographic Protection",
+    "description": "a. Determine the [cryptographic uses] ; and b. Implement the following types of cryptography required for each specified cryptographic use: [types of cryptography].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-15",
+    "title": "Collaborative Computing Devices and Applications",
+    "description": "a. Prohibit remote activation of collaborative computing devices and applications with the following exceptions: [exceptions where remote activation is to be allowed] ; and b. Provide an explicit indication of use to users physically present at the devices.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-15(1)",
+    "title": "Physical or Logical Disconnect",
+    "description": "Provide [physical | logical] disconnect of collaborative computing devices in a manner that supports ease of use.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-15(3)",
+    "title": "Disabling and Removal in Secure Work Areas",
+    "description": "Disable or remove collaborative computing devices and applications from [systems or system components] in [secure work areas].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-15(4)",
+    "title": "Explicitly Indicate Current Participants",
+    "description": "Provide an explicit indication of current participants in [online meetings and teleconferences].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-15",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-16",
+    "title": "Transmission of Security and Privacy Attributes",
+    "description": "Associate [organization-defined security and privacy attributes] with information exchanged between systems and between system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-16(1)",
+    "title": "Integrity Verification",
+    "description": "Verify the integrity of transmitted security and privacy attributes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-16(2)",
+    "title": "Anti-spoofing Mechanisms",
+    "description": "Implement anti-spoofing mechanisms to prevent adversaries from falsifying the security attributes indicating the successful application of the security process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-16(3)",
+    "title": "Cryptographic Binding",
+    "description": "Implement [mechanisms or techniques] to bind security and privacy attributes to transmitted information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-16",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-17",
+    "title": "Public Key Infrastructure Certificates",
+    "description": "a. Issue public key certificates under an [certificate policy] or obtain public key certificates from an approved service provider; and b. Include only approved trust anchors in trust stores or certificate stores managed by the organization.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-18",
+    "title": "Mobile Code",
+    "description": "a. Define acceptable and unacceptable mobile code and mobile code technologies; and b. Authorize, monitor, and control the use of mobile code within the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-18(1)",
+    "title": "Identify Unacceptable Code and Take Corrective Actions",
+    "description": "Identify [unacceptable mobile code] and take [corrective actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-18(2)",
+    "title": "Acquisition, Development, and Use",
+    "description": "Verify that the acquisition, development, and use of mobile code to be deployed in the system meets [mobile code requirements].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-18(3)",
+    "title": "Prevent Downloading and Execution",
+    "description": "Prevent the download and execution of [unacceptable mobile code].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-18(4)",
+    "title": "Prevent Automatic Execution",
+    "description": "Prevent the automatic execution of mobile code in [software applications] and enforce [actions] prior to executing the code.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-18(5)",
+    "title": "Allow Execution Only in Confined Environments",
+    "description": "Allow execution of permitted mobile code only in confined virtual machine environments.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-20",
+    "title": "Secure Name/Address Resolution Service (Authoritative Source)",
+    "description": "a. Provide additional data origin authentication and integrity verification artifacts along with the authoritative name resolution data the system returns in response to external name/address resolution queries; and b. Provide the means to indicate the security status of child zones and (if the child supports secure resolution services) to enable verification of a chain of trust among parent and child domains, when operating as part of a distributed, hierarchical namespace.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-20(2)",
+    "title": "Data Origin and Integrity",
+    "description": "Provide data origin and integrity protection artifacts for internal name/address resolution queries.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-20",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-21",
+    "title": "Secure Name/Address Resolution Service (Recursive or Caching Resolver)",
+    "description": "Request and perform data origin authentication and data integrity verification on the name/address resolution responses the system receives from authoritative sources.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-22",
+    "title": "Architecture and Provisioning for Name/Address Resolution Service",
+    "description": "Ensure the systems that collectively provide name/address resolution service for an organization are fault-tolerant and implement internal and external role separation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-23",
+    "title": "Session Authenticity",
+    "description": "Protect the authenticity of communications sessions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-23(1)",
+    "title": "Invalidate Session Identifiers at Logout",
+    "description": "Invalidate session identifiers upon user logout or other session termination.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-23",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-23(3)",
+    "title": "Unique System-generated Session Identifiers",
+    "description": "Generate a unique session identifier for each session with [randomness requirements] and recognize only session identifiers that are system-generated.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-23",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-23(5)",
+    "title": "Allowed Certificate Authorities",
+    "description": "Only allow the use of [certificated authorities] for verification of the establishment of protected sessions.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-23",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-24",
+    "title": "Fail in Known State",
+    "description": "Fail to a [known system state] for the following failures on the indicated components while preserving [system state information] in failure: [types of system failures on system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-25",
+    "title": "Thin Nodes",
+    "description": "Employ minimal functionality and information storage on the following system components: [system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-26",
+    "title": "Decoys",
+    "description": "Include components within organizational systems specifically designed to be the target of malicious attacks for detecting, deflecting, and analyzing such attacks.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-27",
+    "title": "Platform-independent Applications",
+    "description": "Include within organizational systems the following platform independent applications: [platform-independent applications].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-28",
+    "title": "Protection of Information at Rest",
+    "description": "Protect the [confidentiality | integrity] of the following information at rest: [information at rest].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-28(1)",
+    "title": "Cryptographic Protection",
+    "description": "Implement cryptographic mechanisms to prevent unauthorized disclosure and modification of the following information at rest on [system components or media]: [information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-28",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-28(2)",
+    "title": "Offline Storage",
+    "description": "Remove the following information from online storage and store offline in a secure location: [information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-28",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-28(3)",
+    "title": "Cryptographic Keys",
+    "description": "Provide protected storage for cryptographic keys [[safeguards] | hardware-protected key store].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-28",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-29",
+    "title": "Heterogeneity",
+    "description": "Employ a diverse set of information technologies for the following system components in the implementation of the system: [system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-29(1)",
+    "title": "Virtualization Techniques",
+    "description": "Employ virtualization techniques to support the deployment of a diversity of operating systems and applications that are changed [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-29",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-30",
+    "title": "Concealment and Misdirection",
+    "description": "Employ the following concealment and misdirection techniques for [systems] at [time periods] to confuse and mislead adversaries: [concealment and misdirection techniques].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-30(2)",
+    "title": "Randomness",
+    "description": "Employ [techniques] to introduce randomness into organizational operations and assets.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-30",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-30(3)",
+    "title": "Change Processing and Storage Locations",
+    "description": "Change the location of [processing and/or storage] [[time frequency] | random time intervals]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-30",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-30(4)",
+    "title": "Misleading Information",
+    "description": "Employ realistic, but misleading information in [system components] about its security state or posture.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-30",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-30(5)",
+    "title": "Concealment of System Components",
+    "description": "Employ the following techniques to hide or conceal [system components]: [techniques].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-30",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-31",
+    "title": "Covert Channel Analysis",
+    "description": "a. Perform a covert channel analysis to identify those aspects of communications within the system that are potential avenues for covert [storage | timing] channels; and b. Estimate the maximum bandwidth of those channels.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-31(1)",
+    "title": "Test Covert Channels for Exploitability",
+    "description": "Test a subset of the identified covert channels to determine the channels that are exploitable.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-31",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-31(2)",
+    "title": "Maximum Bandwidth",
+    "description": "Reduce the maximum bandwidth for identified covert [storage | timing] channels to [values].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-31",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-31(3)",
+    "title": "Measure Bandwidth in Operational Environments",
+    "description": "Measure the bandwidth of [subset of identified covert channels] in the operational environment of the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-31",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-32",
+    "title": "System Partitioning",
+    "description": "Partition the system into [system components] residing in separate [physical | logical] domains or environments based on [circumstances for the physical or logical separation of components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-32(1)",
+    "title": "Separate Physical Domains for Privileged Functions",
+    "description": "Partition privileged functions into separate physical domains.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-32",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-34",
+    "title": "Non-modifiable Executable Programs",
+    "description": "For [system components] , load and execute:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-34(1)",
+    "title": "No Writable Storage",
+    "description": "Employ [system components] with no writeable storage that is persistent across component restart or power on/off.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-34",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-34(2)",
+    "title": "Integrity Protection on Read-only Media",
+    "description": "Protect the integrity of information prior to storage on read-only media and control the media after such information has been recorded onto the media.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-34",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-35",
+    "title": "External Malicious Code Identification",
+    "description": "Include system components that proactively seek to identify network-based malicious code or malicious websites.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-36",
+    "title": "Distributed Processing and Storage",
+    "description": "Distribute the following processing and storage components across multiple [physical locations | logical domains]: [organization-defined processing and storage components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-36(1)",
+    "title": "Polling Techniques",
+    "description": "(a) Employ polling techniques to identify potential faults, errors, or compromises to the following processing and storage components: [distributed processing and storage components] ; and (b) Take the following actions in response to identified faults, errors, or compromises: [actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-36",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-36(2)",
+    "title": "Synchronization",
+    "description": "Synchronize the following duplicate systems or system components: [duplicate systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-36",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-37",
+    "title": "Out-of-band Channels",
+    "description": "Employ the following out-of-band channels for the physical delivery or electronic transmission of [information, system components, or devices] to [individuals or systems]: [out-of-band channels].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-37(1)",
+    "title": "Ensure Delivery and Transmission",
+    "description": "Employ [controls] to ensure that only [individuals or systems] receive the following information, system components, or devices: [information, system components, or devices].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-37",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-38",
+    "title": "Operations Security",
+    "description": "Employ the following operations security controls to protect key organizational information throughout the system development life cycle: [operations security controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-39",
+    "title": "Process Isolation",
+    "description": "Maintain a separate execution domain for each executing system process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SC-39(1)",
+    "title": "Hardware Separation",
+    "description": "Implement hardware separation mechanisms to facilitate process isolation.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-39",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-39(2)",
+    "title": "Separate Execution Domain Per Thread",
+    "description": "Maintain a separate execution domain for each thread in [multi-threaded processing].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-39",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-40",
+    "title": "Wireless Link Protection",
+    "description": "Protect external and internal [organization-defined wireless links] from the following signal parameter attacks: [organization-defined types of signal parameter attacks or references to sources for such attacks].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-40(1)",
+    "title": "Electromagnetic Interference",
+    "description": "Implement cryptographic mechanisms that achieve [level of protection] against the effects of intentional electromagnetic interference.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-40",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-40(2)",
+    "title": "Reduce Detection Potential",
+    "description": "Implement cryptographic mechanisms to reduce the detection potential of wireless links to [level of reduction].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-40",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-40(3)",
+    "title": "Imitative or Manipulative Communications Deception",
+    "description": "Implement cryptographic mechanisms to identify and reject wireless transmissions that are deliberate attempts to achieve imitative or manipulative communications deception based on signal parameters.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-40",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-40(4)",
+    "title": "Signal Parameter Identification",
+    "description": "Implement cryptographic mechanisms to prevent the identification of [wireless transmitters] by using the transmitter signal parameters.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-40",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-41",
+    "title": "Port and I/O Device Access",
+    "description": "[physically | logically] disable or remove [connection ports or input/output devices] on the following systems or system components: [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-42",
+    "title": "Sensor Capability and Data",
+    "description": "a. Prohibit [the use of devices possessing [environmental sensing capabilities] in [facilities, areas, or systems] | the remote activation of environmental sensing capabilities on organizational systems or system components with the following exceptions: [exceptions where remote activation of sensors is allowed]] ; and b. Provide an explicit indication of sensor use to [group of users].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-42(1)",
+    "title": "Reporting to Authorized Individuals or Roles",
+    "description": "Verify that the system is configured so that data or information collected by the [sensors] is only reported to authorized individuals or roles.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-42",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-42(2)",
+    "title": "Authorized Use",
+    "description": "Employ the following measures so that data or information collected by [sc-42.01_odp] is only used for authorized purposes: [measures].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-42",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-42(4)",
+    "title": "Notice of Collection",
+    "description": "Employ the following measures to facilitate an individual’s awareness that personally identifiable information is being collected by [sensors]: [measures].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-42",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-42(5)",
+    "title": "Collection Minimization",
+    "description": "Employ [sensors] that are configured to minimize the collection of information about individuals that is not needed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-42",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-43",
+    "title": "Usage Restrictions",
+    "description": "a. Establish usage restrictions and implementation guidelines for the following system components: [components] ; and b. Authorize, monitor, and control the use of such components within the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-44",
+    "title": "Detonation Chambers",
+    "description": "Employ a detonation chamber capability within [system, system component, or location].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-45",
+    "title": "System Time Synchronization",
+    "description": "Synchronize system clocks within and between systems and system components.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-45(1)",
+    "title": "Synchronization with Authoritative Time Source",
+    "description": "(a) Compare the internal system clocks [frequency] with [authoritative time source] ; and (b) Synchronize the internal system clocks to the authoritative time source when the time difference is greater than [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-45",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-45(2)",
+    "title": "Secondary Authoritative Time Source",
+    "description": "(a) Identify a secondary authoritative time source that is in a different geographic region than the primary authoritative time source; and (b) Synchronize the internal system clocks to the secondary authoritative time source if the primary authoritative time source is unavailable.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-45",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-46",
+    "title": "Cross Domain Policy Enforcement",
+    "description": "Implement a policy enforcement mechanism [physically | logically] between the physical and/or network interfaces for the connecting security domains.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-47",
+    "title": "Alternate Communications Paths",
+    "description": "Establish [alternate communication paths] for system operations organizational command and control.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-48",
+    "title": "Sensor Relocation",
+    "description": "Relocate [sensors and monitoring capabilities] to [locations] under the following conditions or circumstances: [conditions or circumstances].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-48(1)",
+    "title": "Dynamic Relocation of Sensors or Monitoring Capabilities",
+    "description": "Dynamically relocate [sensors and monitoring capabilities] to [locations] under the following conditions or circumstances: [conditions or circumstances].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SC-48",
+    "baselines": []
+  },
+  {
+    "control_id": "SC-49",
+    "title": "Hardware-enforced Separation and Policy Enforcement",
+    "description": "Implement hardware-enforced separation and policy enforcement mechanisms between [security domains].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-50",
+    "title": "Software-enforced Separation and Policy Enforcement",
+    "description": "Implement software-enforced separation and policy enforcement mechanisms between [security domains].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SC-51",
+    "title": "Hardware-based Protection",
+    "description": "a. Employ hardware-based, write-protect for [system firmware components] ; and b. Implement specific procedures for [authorized individuals] to manually disable hardware write-protect for firmware modifications and re-enable the write-protect prior to returning to operational mode.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] system and information integrity policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the system and information integrity policy and the associated system and information integrity controls; b. Designate an [official] to manage the development, documentation, and dissemination of the system and information integrity policy and procedures; and c. Review and update the current system and information integrity: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-2",
+    "title": "Flaw Remediation",
+    "description": "a. Identify, report, and correct system flaws; b. Test software and firmware updates related to flaw remediation for effectiveness and potential side effects before installation; c. Install security-relevant software and firmware updates within [time period] of the release of the updates; and d. Incorporate flaw remediation into the organizational configuration management process.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-2(2)",
+    "title": "Automated Flaw Remediation Status",
+    "description": "Determine if system components have applicable security-relevant software and firmware updates installed using [automated mechanisms] [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-2",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-2(3)",
+    "title": "Time to Remediate Flaws and Benchmarks for Corrective Actions",
+    "description": "(a) Measure the time between flaw identification and flaw remediation; and (b) Establish the following benchmarks for taking corrective actions: [benchmarks].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-2",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-2(4)",
+    "title": "Automated Patch Management Tools",
+    "description": "Employ automated patch management tools to facilitate flaw remediation to the following system components: [components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-2",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-2(5)",
+    "title": "Automatic Software and Firmware Updates",
+    "description": "Install [security-relevant software and firmware updates] automatically to [system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-2",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-2(6)",
+    "title": "Removal of Previous Versions of Software and Firmware",
+    "description": "Remove previous versions of [software and firmware components] after updated versions have been installed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-2",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-2(7)",
+    "title": "Root Cause Analysis",
+    "description": "a. Conduct root cause analysis to identify underlying causes of issues or failures. b. Develop actions to address the root cause of the issue or failure. c. Implement the actions and monitor the implementation for effectiveness.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-2",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-3",
+    "title": "Malicious Code Protection",
+    "description": "a. Implement [signature-based | non-signature-based] malicious code protection mechanisms at system entry and exit points to detect and eradicate malicious code; b. Automatically update malicious code protection mechanisms as new releases are available in accordance with organizational configuration management policy and procedures; c. Configure malicious code protection mechanisms to: 1. Perform periodic scans of the system [frequency] and real-time scans of files from external sources at [endpoint | network entry and exit points] as the files are downloaded, opened, or executed in accordance with organizational policy; and 2. [block malicious code | quarantine malicious code | take [action]] ; and send alert to [personnel or roles] in response to malicious code detection; and d. Address the receipt of false positives during malicious code detection and eradication and the resulting potential impact on the availability of the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-3(4)",
+    "title": "Updates Only by Privileged Users",
+    "description": "Update malicious code protection mechanisms only when directed by a privileged user.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-3(6)",
+    "title": "Testing and Verification",
+    "description": "(a) Test malicious code protection mechanisms [frequency] by introducing known benign code into the system; and (b) Verify that the detection of the code and the associated incident reporting occur.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-3(8)",
+    "title": "Detect Unauthorized Commands",
+    "description": "(a) Detect the following unauthorized operating system commands through the kernel application programming interface on [system hardware components]: [unauthorized operating system commands] ; and (b) [issue a warning | audit the command execution | prevent the execution of the command].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-3(10)",
+    "title": "Malicious Code Analysis",
+    "description": "(a) Employ the following tools and techniques to analyze the characteristics and behavior of malicious code: [tools and techniques] ; and (b) Incorporate the results from malicious code analysis into organizational incident response and flaw remediation processes.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4",
+    "title": "System Monitoring",
+    "description": "a. Monitor the system to detect: 1. Attacks and indicators of potential attacks in accordance with the following monitoring objectives: [monitoring objectives] ; and 2. Unauthorized local, network, and remote connections; b. Identify unauthorized use of the system through the following techniques and methods: [techniques and methods]; c. Invoke internal monitoring capabilities or deploy monitoring devices: 1. Strategically within the system to collect organization-determined essential information; and 2. At ad hoc locations within the system to track specific types of transactions of interest to the organization; d. Analyze detected events and anomalies; e. Adjust the level of system monitoring activity when there is a change in risk to organizational operations and assets, individuals, other organizations, or the Nation; f. Obtain legal opinion regarding system monitoring activities; and g. Provide [system monitoring information] to [personnel or roles] [as needed | [frequency]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(1)",
+    "title": "System-wide Intrusion Detection System",
+    "description": "Connect and configure individual intrusion detection tools into a system-wide intrusion detection system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(2)",
+    "title": "Automated Tools and Mechanisms for Real-time Analysis",
+    "description": "Employ automated tools and mechanisms to support near real-time analysis of events.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(3)",
+    "title": "Automated Tool and Mechanism Integration",
+    "description": "Employ automated tools and mechanisms to integrate intrusion detection tools and mechanisms into access control and flow control mechanisms.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(4)",
+    "title": "Inbound and Outbound Communications Traffic",
+    "description": "(a) Determine criteria for unusual or unauthorized activities or conditions for inbound and outbound communications traffic; (b) Monitor inbound and outbound communications traffic [organization-defined frequency] for [organization-defined unusual or unauthorized activities or conditions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(5)",
+    "title": "System-generated Alerts",
+    "description": "Alert [personnel or roles] when the following system-generated indications of compromise or potential compromise occur: [compromise indicators].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(7)",
+    "title": "Automated Response to Suspicious Events",
+    "description": "(a) Notify [incident response personnel] of detected suspicious events; and (b) Take the following actions upon detection: [least-disruptive actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(9)",
+    "title": "Testing of Monitoring Tools and Mechanisms",
+    "description": "Test intrusion-monitoring tools and mechanisms [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(10)",
+    "title": "Visibility of Encrypted Communications",
+    "description": "Make provisions so that [encrypted communications traffic] is visible to [system monitoring tools and mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(11)",
+    "title": "Analyze Communications Traffic Anomalies",
+    "description": "Analyze outbound communications traffic at the external interfaces to the system and selected [interior points] to discover anomalies.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(12)",
+    "title": "Automated Organization-generated Alerts",
+    "description": "Alert [personnel or roles] using [automated mechanisms] when the following indications of inappropriate or unusual activities with security or privacy implications occur: [activities that trigger alerts].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(13)",
+    "title": "Analyze Traffic and Event Patterns",
+    "description": "(a) Analyze communications traffic and event patterns for the system; (b) Develop profiles representing common traffic and event patterns; and (c) Use the traffic and event profiles in tuning system-monitoring devices.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(14)",
+    "title": "Wireless Intrusion Detection",
+    "description": "Employ a wireless intrusion detection system to identify rogue wireless devices and to detect attack attempts and potential compromises or breaches to the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(15)",
+    "title": "Wireless to Wireline Communications",
+    "description": "Employ an intrusion detection system to monitor wireless communications traffic as the traffic passes from wireless to wireline networks.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(16)",
+    "title": "Correlate Monitoring Information",
+    "description": "Correlate information from monitoring tools and mechanisms employed throughout the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(17)",
+    "title": "Integrated Situational Awareness",
+    "description": "Correlate information from monitoring physical, cyber, and supply chain activities to achieve integrated, organization-wide situational awareness.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(18)",
+    "title": "Analyze Traffic and Covert Exfiltration",
+    "description": "Analyze outbound communications traffic at external interfaces to the system and at the following interior points to detect covert exfiltration of information: [interior points].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(19)",
+    "title": "Risk for Individuals",
+    "description": "Implement [additional monitoring] of individuals who have been identified by [sources] as posing an increased level of risk.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(20)",
+    "title": "Privileged Users",
+    "description": "Implement the following additional monitoring of privileged users: [additional monitoring].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(21)",
+    "title": "Probationary Periods",
+    "description": "Implement the following additional monitoring of individuals during [probationary period]: [additional monitoring].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(22)",
+    "title": "Unauthorized Network Services",
+    "description": "(a) Detect network services that have not been authorized or approved by [authorization or approval processes] ; and (b) [audit | alert [personnel or roles]] when detected.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-4(23)",
+    "title": "Host-based Devices",
+    "description": "Implement the following host-based monitoring mechanisms at [system components]: [host-based monitoring mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(24)",
+    "title": "Indicators of Compromise",
+    "description": "Discover, collect, and distribute to [personnel or roles] , indicators of compromise provided by [sources].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-4(25)",
+    "title": "Optimize Network Traffic Analysis",
+    "description": "Provide visibility into network traffic at external and key internal system interfaces to optimize the effectiveness of monitoring devices.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-5",
+    "title": "Security Alerts, Advisories, and Directives",
+    "description": "a. Receive system security alerts, advisories, and directives from [external organizations] on an ongoing basis; b. Generate internal security alerts, advisories, and directives as deemed necessary; c. Disseminate security alerts, advisories, and directives to: [[personnel or roles] | [elements] | [external organizations]] ; and d. Implement security directives in accordance with established time frames, or notify the issuing organization of the degree of noncompliance.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-5(1)",
+    "title": "Automated Alerts and Advisories",
+    "description": "Broadcast security alert and advisory information throughout the organization using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-5",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-6",
+    "title": "Security and Privacy Function Verification",
+    "description": "a. Verify the correct operation of [organization-defined security and privacy functions]; b. Perform the verification of the functions specified in SI-6a [[system transitional states] | upon command by user with appropriate privilege | [frequency]]; c. Alert [personnel or roles] to failed security and privacy verification tests; and d. [shut the system down | restart the system | [alternative action(s)]] when anomalies are discovered.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-6(2)",
+    "title": "Automation Support for Distributed Testing",
+    "description": "Implement automated mechanisms to support the management of distributed security and privacy function testing.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-6",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-6(3)",
+    "title": "Report Verification Results",
+    "description": "Report the results of security and privacy function verification to [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-6",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7",
+    "title": "Software, Firmware, and Information Integrity",
+    "description": "a. Employ integrity verification tools to detect unauthorized changes to the following software, firmware, and information: [organization-defined software, firmware, and information] ; and b. Take the following actions when unauthorized changes to the software, firmware, and information are detected: [organization-defined actions].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-7(1)",
+    "title": "Integrity Checks",
+    "description": "Perform an integrity check of [organization-defined software, firmware, and information] [at startup | at [organization-defined transitional states or security-relevant events] | [organization-defined frequency]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-7(2)",
+    "title": "Automated Notifications of Integrity Violations",
+    "description": "Employ automated tools that provide notification to [personnel or roles] upon discovering discrepancies during integrity verification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-7(3)",
+    "title": "Centrally Managed Integrity Tools",
+    "description": "Employ centrally managed integrity verification tools.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7(5)",
+    "title": "Automated Response to Integrity Violations",
+    "description": "Automatically [shut down the system | restart the system | implement [controls]] when integrity violations are discovered.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-7(6)",
+    "title": "Cryptographic Protection",
+    "description": "Implement cryptographic mechanisms to detect unauthorized changes to software, firmware, and information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7(7)",
+    "title": "Integration of Detection and Response",
+    "description": "Incorporate the detection of the following unauthorized changes into the organizational incident response capability: [changes].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-7(8)",
+    "title": "Auditing Capability for Significant Events",
+    "description": "Upon detection of a potential integrity violation, provide the capability to audit the event and initiate the following actions: [generate an audit record | alert current user | alert [personnel or roles] | [other actions]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7(9)",
+    "title": "Verify Boot Process",
+    "description": "Verify the integrity of the boot process of the following system components: [system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7(10)",
+    "title": "Protection of Boot Firmware",
+    "description": "Implement the following mechanisms to protect the integrity of boot firmware in [system components]: [mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7(12)",
+    "title": "Integrity Verification",
+    "description": "Require that the integrity of the following user-installed software be verified prior to execution: [user-installed software].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7(15)",
+    "title": "Code Authentication",
+    "description": "Implement cryptographic mechanisms to authenticate the following software or firmware components prior to installation: [software or firmware components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-7(16)",
+    "title": "Time Limit on Process Execution Without Supervision",
+    "description": "Prohibit processes from executing without supervision for more than [time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-7(17)",
+    "title": "Runtime Application Self-protection",
+    "description": "Implement [controls] for application self-protection at runtime.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-7",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-8",
+    "title": "Spam Protection",
+    "description": "a. Employ spam protection mechanisms at system entry and exit points to detect and act on unsolicited messages; and b. Update spam protection mechanisms when new releases are available in accordance with organizational configuration management policy and procedures.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-8(2)",
+    "title": "Automatic Updates",
+    "description": "Automatically update spam protection mechanisms [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-8",
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-8(3)",
+    "title": "Continuous Learning Capability",
+    "description": "Implement spam protection mechanisms with a learning capability to more effectively identify legitimate communications traffic.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-8",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-10",
+    "title": "Information Input Validation",
+    "description": "Check the validity of the following information inputs: [information inputs].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-10(1)",
+    "title": "Manual Override Capability",
+    "description": "(a) Provide a manual override capability for input validation of the following information inputs: [si-10_odp]; (b) Restrict the use of the manual override capability to only [authorized individuals] ; and (c) Audit the use of the manual override capability.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-10(2)",
+    "title": "Review and Resolve Errors",
+    "description": "Review and resolve input validation errors within [organization-defined time period].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-10(3)",
+    "title": "Predictable Behavior",
+    "description": "Verify that the system behaves in a predictable and documented manner when invalid inputs are received.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-10(4)",
+    "title": "Timing Interactions",
+    "description": "Account for timing interactions among system components in determining appropriate responses for invalid inputs.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-10(5)",
+    "title": "Restrict Inputs to Trusted Sources and Approved Formats",
+    "description": "Restrict the use of information inputs to [trusted sources] and/or [formats].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-10(6)",
+    "title": "Injection Prevention",
+    "description": "Prevent untrusted data injections.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-10",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-11",
+    "title": "Error Handling",
+    "description": "a. Generate error messages that provide information necessary for corrective actions without revealing information that could be exploited; and b. Reveal error messages only to [personnel or roles].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-12",
+    "title": "Information Management and Retention",
+    "description": "Manage and retain information within the system and information output from the system in accordance with applicable laws, executive orders, directives, regulations, policies, standards, guidelines and operational requirements.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-12(1)",
+    "title": "Limit Personally Identifiable Information Elements",
+    "description": "Limit personally identifiable information being processed in the information life cycle to the following elements of personally identifiable information: [elements of personally identifiable information].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-12",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-12(2)",
+    "title": "Minimize Personally Identifiable Information in Testing, Training, and Research",
+    "description": "Use the following techniques to minimize the use of personally identifiable information for research, testing, or training: [organization-defined techniques].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-12",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-12(3)",
+    "title": "Information Disposal",
+    "description": "Use the following techniques to dispose of, destroy, or erase information following the retention period: [organization-defined techniques].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-12",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-13",
+    "title": "Predictable Failure Prevention",
+    "description": "a. Determine mean time to failure (MTTF) for the following system components in specific environments of operation: [system components] ; and b. Provide substitute system components and a means to exchange active and standby components in accordance with the following criteria: [mean time to failure (MTTF) substitution criteria].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-13(1)",
+    "title": "Transferring Component Responsibilities",
+    "description": "Take system components out of service by transferring component responsibilities to substitute components no later than [fraction or percentage] of mean time to failure.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-13",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-13(3)",
+    "title": "Manual Transfer Between Components",
+    "description": "Manually initiate transfers between active and standby system components when the use of the active component reaches [percentage] of the mean time to failure.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-13",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-13(4)",
+    "title": "Standby Component Installation and Notification",
+    "description": "If system component failures are detected:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-13",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-13(5)",
+    "title": "Failover Capability",
+    "description": "Provide [real-time | near real-time] [failover capability] for the system.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-13",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-14",
+    "title": "Non-persistence",
+    "description": "Implement non-persistent [system components and services] that are initiated in a known state and terminated [upon end of session of use | [frequency]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-14(1)",
+    "title": "Refresh from Trusted Sources",
+    "description": "Obtain software and data employed during system component and service refreshes from the following trusted sources: [trusted sources].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-14",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-14(2)",
+    "title": "Non-persistent Information",
+    "description": "(a) [refresh [information] [frequency] | generate [information] on demand] ; and (b) Delete information when no longer needed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-14",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-14(3)",
+    "title": "Non-persistent Connectivity",
+    "description": "Establish connections to the system on demand and terminate connections after [completion of a request | a period of non-use].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-14",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-15",
+    "title": "Information Output Filtering",
+    "description": "Validate information output from the following software programs and/or applications to ensure that the information is consistent with the expected content: [software programs and/or applications].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-16",
+    "title": "Memory Protection",
+    "description": "Implement the following controls to protect the system memory from unauthorized code execution: [controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SI-17",
+    "title": "Fail-safe Procedures",
+    "description": "Implement the indicated fail-safe procedures when the indicated failures occur: [organization-defined list of failure conditions and associated fail-safe procedures].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-18",
+    "title": "Personally Identifiable Information Quality Operations",
+    "description": "a. Check the accuracy, relevance, timeliness, and completeness of personally identifiable information across the information life cycle [organization-defined frequency] ; and b. Correct or delete inaccurate or outdated personally identifiable information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-18(1)",
+    "title": "Automation Support",
+    "description": "Correct or delete personally identifiable information that is inaccurate or outdated, incorrectly determined regarding impact, or incorrectly de-identified using [automated mechanisms].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-18(2)",
+    "title": "Data Tags",
+    "description": "Employ data tags to automate the correction or deletion of personally identifiable information across the information life cycle within organizational systems.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-18(3)",
+    "title": "Collection",
+    "description": "Collect personally identifiable information directly from the individual.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-18(4)",
+    "title": "Individual Requests",
+    "description": "Correct or delete personally identifiable information upon request by individuals or their designated representatives.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-18(5)",
+    "title": "Notice of Correction or Deletion",
+    "description": "Notify [recipients] and individuals that the personally identifiable information has been corrected or deleted.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-18",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19",
+    "title": "De-identification",
+    "description": "a. Remove the following elements of personally identifiable information from datasets: [elements] ; and b. Evaluate [frequency] for effectiveness of de-identification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(1)",
+    "title": "Collection",
+    "description": "De-identify the dataset upon collection by not collecting personally identifiable information.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(2)",
+    "title": "Archiving",
+    "description": "Prohibit archiving of personally identifiable information elements if those elements in a dataset will not be needed after the dataset is archived.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(3)",
+    "title": "Release",
+    "description": "Remove personally identifiable information elements from a dataset prior to its release if those elements in the dataset do not need to be part of the data release.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(4)",
+    "title": "Removal, Masking, Encryption, Hashing, or Replacement of Direct Identifiers",
+    "description": "Remove, mask, encrypt, hash, or replace direct identifiers in a dataset.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(5)",
+    "title": "Statistical Disclosure Control",
+    "description": "Manipulate numerical data, contingency tables, and statistical findings so that no individual or organization is identifiable in the results of the analysis.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(6)",
+    "title": "Differential Privacy",
+    "description": "Prevent disclosure of personally identifiable information by adding non-deterministic noise to the results of mathematical operations before the results are reported.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(7)",
+    "title": "Validated Algorithms and Software",
+    "description": "Perform de-identification using validated algorithms and software that is validated to implement the algorithms.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-19(8)",
+    "title": "Motivated Intruder",
+    "description": "Perform a motivated intruder test on the de-identified dataset to determine if the identified data remains or if the de-identified data can be re-identified.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SI-19",
+    "baselines": []
+  },
+  {
+    "control_id": "SI-20",
+    "title": "Tainting",
+    "description": "Embed data or capabilities in the following systems or system components to determine if organizational data has been exfiltrated or improperly removed from the organization: [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-21",
+    "title": "Information Refresh",
+    "description": "Refresh [information] at [frequencies] or generate the information on demand and delete the information when no longer needed.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-22",
+    "title": "Information Diversity",
+    "description": "a. Identify the following alternative sources of information for [essential functions and services]: [alternative information sources] ; and b. Use an alternative information source for the execution of essential functions or services on [systems or system components] when the primary source of information is corrupted or unavailable.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SI-23",
+    "title": "Information Fragmentation",
+    "description": "Based on [circumstances]:",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SR-1",
+    "title": "Policy and Procedures",
+    "description": "a. Develop, document, and disseminate to [organization-defined personnel or roles]: 1. [organization-level | mission/business process-level | system-level] supply chain risk management policy that: (a) Addresses purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance; and (b) Is consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines; and 2. Procedures to facilitate the implementation of the supply chain risk management policy and the associated supply chain risk management controls; b. Designate an [official] to manage the development, documentation, and dissemination of the supply chain risk management policy and procedures; and c. Review and update the current supply chain risk management: 1. Policy [frequency] and following [events] ; and 2. Procedures [frequency] and following [events].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-2",
+    "title": "Supply Chain Risk Management Plan",
+    "description": "a. Develop a plan for managing supply chain risks associated with the research and development, design, manufacturing, acquisition, delivery, integration, operations and maintenance, and disposal of the following systems, system components or system services: [systems, system components, or system services]; b. Review and update the supply chain risk management plan [frequency] or as required, to address threat, organizational or environmental changes; and c. Protect the supply chain risk management plan from unauthorized disclosure and modification.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-2(1)",
+    "title": "Establish SCRM Team",
+    "description": "Establish a supply chain risk management team consisting of [personnel, roles and responsibilities] to lead and support the following SCRM activities: [supply chain risk management activities].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-2",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-3",
+    "title": "Supply Chain Controls and Processes",
+    "description": "a. Establish a process or processes to identify and address weaknesses or deficiencies in the supply chain elements and processes of [system or system component] in coordination with [supply chain personnel]; b. Employ the following controls to protect against supply chain risks to the system, system component, or system service and to limit the harm or consequences from supply chain-related events: [supply chain controls] ; and c. Document the selected and implemented supply chain processes and controls in [security and privacy plans | supply chain risk management plan | [document]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-3(1)",
+    "title": "Diverse Supply Base",
+    "description": "Employ a diverse set of sources for the following system components and services: [organization-defined system components and services].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-3(2)",
+    "title": "Limitation of Harm",
+    "description": "Employ the following controls to limit harm from potential adversaries identifying and targeting the organizational supply chain: [controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-3(3)",
+    "title": "Sub-tier Flow Down",
+    "description": "Ensure that the controls included in the contracts of prime contractors are also included in the contracts of subcontractors.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-3",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-4",
+    "title": "Provenance",
+    "description": "Document, monitor, and maintain valid provenance of the following systems, system components, and associated data: [systems, system components, and associated data].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SR-4(1)",
+    "title": "Identity",
+    "description": "Establish and maintain unique identification of the following supply chain elements, processes, and personnel associated with the identified system and critical system components: [supply chain elements, processes, and personnel].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-4(2)",
+    "title": "Track and Trace",
+    "description": "Establish and maintain unique identification of the following systems and critical system components for tracking through the supply chain: [systems and critical system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-4(3)",
+    "title": "Validate as Genuine and Not Altered",
+    "description": "Employ the following controls to validate that the system or system component received is genuine and has not been altered: [organization-defined controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-4(4)",
+    "title": "Supply Chain Integrity — Pedigree",
+    "description": "Employ [controls] and conduct [analysis method] to ensure the integrity of the system and system components by validating the internal composition and provenance of critical or mission-essential technologies, products, and services.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-4",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-5",
+    "title": "Acquisition Strategies, Tools, and Methods",
+    "description": "Employ the following acquisition strategies, contract tools, and procurement methods to protect against, identify, and mitigate supply chain risks: [strategies, tools, and methods].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-5(1)",
+    "title": "Adequate Supply",
+    "description": "Employ the following controls to ensure an adequate supply of [critical system components]: [controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-5",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-5(2)",
+    "title": "Assessments Prior to Selection, Acceptance, Modification, or Update",
+    "description": "Assess the system, system component, or system service prior to selection, acceptance, modification, or update.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-5",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-6",
+    "title": "Supplier Assessments and Reviews",
+    "description": "Assess and review the supply chain-related risks associated with suppliers or contractors and the system, system component, or system service they provide [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-6(1)",
+    "title": "Testing and Analysis",
+    "description": "Employ [organizational analysis | independent third-party analysis | organizational testing | independent third-party testing] of the following supply chain elements, processes, and actors associated with the system, system component, or system service: [supply chain elements, processes, and actors].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-6",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-7",
+    "title": "Supply Chain Operations Security",
+    "description": "Employ the following Operations Security (OPSEC) controls to protect supply chain-related information for the system, system component, or system service: [OPSEC controls].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": []
+  },
+  {
+    "control_id": "SR-8",
+    "title": "Notification Agreements",
+    "description": "Establish agreements and procedures with entities involved in the supply chain for the system, system component, or system service for the [notification of supply chain compromises | [results of assessments or audits]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-9",
+    "title": "Tamper Resistance and Detection",
+    "description": "Implement a tamper protection program for the system, system component, or system service.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-9(1)",
+    "title": "Multiple Stages of System Development Life Cycle",
+    "description": "Employ anti-tamper technologies, tools, and techniques throughout the system development life cycle.",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-9",
+    "baselines": [
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-10",
+    "title": "Inspection of Systems or Components",
+    "description": "Inspect the following systems or system components [at random | at [frequency] | upon [indications of need for inspection]] to detect tampering: [systems or system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-11",
+    "title": "Component Authenticity",
+    "description": "a. Develop and implement anti-counterfeit policy and procedures that include the means to detect and prevent counterfeit components from entering the system; and b. Report counterfeit system components to [source of counterfeit component | [external reporting organizations] | [personnel or roles]].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-11(1)",
+    "title": "Anti-counterfeit Training",
+    "description": "Train [personnel or roles] to detect counterfeit system components (including hardware, software, and firmware).",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-11",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-11(2)",
+    "title": "Configuration Control for Component Service and Repair",
+    "description": "Maintain configuration control over the following system components awaiting service or repair and serviced or repaired components awaiting return to service: [system components].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-11",
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  },
+  {
+    "control_id": "SR-11(3)",
+    "title": "Anti-counterfeit Scanning",
+    "description": "Scan for counterfeit system components [frequency].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": true,
+    "parent_control_id": "SR-11",
+    "baselines": []
+  },
+  {
+    "control_id": "SR-12",
+    "title": "Component Disposal",
+    "description": "Dispose of [data, documentation, tools, or system components] using the following techniques and methods: [techniques and methods].",
+    "priority": "2",
+    "control_type": "technical",
+    "is_enhancement": false,
+    "parent_control_id": null,
+    "baselines": [
+      "low",
+      "moderate",
+      "high"
+    ]
+  }
+];
+
+const framework = {
+  code: 'nist_800_53',
+  name: 'NIST SP 800-53 Rev 5',
+  version: '5.2.0',
+  description: 'Security and Privacy Controls for Information Systems and Organizations. All 20 families at full base-control coverage plus every non-withdrawn control enhancement, with NIST SP 800-53B baseline membership.',
+  category: 'Cybersecurity',
+  tier_required: 'community',
+  coverage_status: 'comprehensive'
+};
+
+// Exported both flat and nested. The sibling repositories consume this module
+// differently -- one reads framework.version, the other iterates modules
+// expecting code/name/controls at the top level -- and a single generated file
+// serving both keeps the two catalogs from drifting.
+module.exports = {
+  ...framework,
+  framework,
+  controls,
+  expectedCount: 1014
 };

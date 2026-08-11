@@ -231,7 +231,7 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 
 ### Core Security & Compliance
 - **NIST CSF 2.0** — Cybersecurity Framework 2.0 (106 controls across 6 functions)
-- **NIST SP 800-53 Rev 5** — Security and Privacy Controls (300 base controls across all 20 families, priority derived from Low/Moderate/High baseline membership)
+- **NIST SP 800-53 Rev 5** — Security and Privacy Controls (1,014 items across all 20 families: 300 base controls plus all 714 non-withdrawn enhancements, with NIST SP 800-53B Low/Moderate/High baseline membership recorded per control)
 - **NIST SP 800-171 Rev 3** — Protecting Controlled Unclassified Information (110 requirements)
 - **NIST Privacy Framework 1.0** — Privacy risk management across the enterprise
 - **NIST SP 800-207** — Zero Trust Architecture reference model and implementation guide

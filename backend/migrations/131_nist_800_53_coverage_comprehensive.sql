@@ -16,3 +16,8 @@
 UPDATE frameworks SET coverage_status = 'comprehensive' WHERE code = 'nist_800_53';
 
 SELECT 'Migration 131 completed.' AS result;
+
+-- SUPERSEDED (catalog track): the "enhancement-free convention" this header
+-- describes no longer holds. The catalog now carries all 714 non-withdrawn
+-- enhancements alongside the 300 base controls, with NIST SP 800-53B baseline
+-- membership. The coverage_status set here remains correct.
