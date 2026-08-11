@@ -137,7 +137,13 @@ router.get('/me/profile', requirePermission('organizations.read'), async (req, r
 // already captured on organization_profiles (the high-water mark of the
 // confidentiality/integrity/availability impact levels) rather than being set
 // independently, so the two cannot disagree.
-router.put('/me/baseline', requirePermission('organizations.write'), async (req, res) => {
+const baselineUpdateLimiter = createRateLimiter({
+  label: 'organizations-baseline-update',
+  windowMs: 60 * 1000,
+  max: 30
+});
+
+router.put('/me/baseline', requirePermission('organizations.write'), baselineUpdateLimiter, async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const raw = req.body.target_baseline;
@@ -1470,7 +1476,13 @@ router.delete('/:orgId/frameworks/:frameworkId', requirePermission('frameworks.m
 });
 
 // GET /organizations/:orgId/controls
-router.get('/:orgId/controls', requirePermission('organizations.read'), async (req, res) => {
+const orgControlsListLimiter = createRateLimiter({
+  label: 'organizations-controls-list',
+  windowMs: 60 * 1000,
+  max: 120
+});
+
+router.get('/:orgId/controls', requirePermission('organizations.read'), orgControlsListLimiter, async (req, res) => {
   try {
     const orgId = verifyOrgAccess(req, res);
     if (!orgId) return;
