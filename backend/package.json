@@ -121,7 +121,7 @@
   },
   "optionalDependencies": {
     "apn": "^2.2.0",
-    "firebase-admin": "^13.10.0"
+    "firebase-admin": "^14.2.0"
   },
   "overrides": {
     "express-rate-limit": "$express-rate-limit",
