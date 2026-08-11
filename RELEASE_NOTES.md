@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Added
+- feat(catalog): port CMMC and PCI catalogs, fix dead family breakdown ([#276](https://github.com/sherifconteh-collab/ai-grc-platform/pull/276)) — @sherifconteh-collab
 - feat(catalog): crosswalk and assessment coverage for 800-53 enhancements ([#275](https://github.com/sherifconteh-collab/ai-grc-platform/pull/275)) — @sherifconteh-collab
 - feat(catalog): import 714 NIST 800-53 enhancements with baseline membership ([#274](https://github.com/sherifconteh-collab/ai-grc-platform/pull/274)) — @sherifconteh-collab
 - **Risk register, incidents, obligations, objectives, indicators, and departments** (migrations `139`–`143`): the README claimed a "unified risk register" and documented `risks` / `risk_treatments` tables that did not exist. What existed was `risk_scores` (migration `057`), a single computed 0-100 posture number per organization — a metric, not a register. Six modules now close that gap, modeled on the standards rather than invented:

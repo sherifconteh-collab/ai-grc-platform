@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #275: feat(catalog): crosswalk and assessment coverage for 800-53 enhancements -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #276: feat(catalog): port CMMC and PCI catalogs, fix dead family breakdown -->
 
 ## 🎯 What is This?
 
