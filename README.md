@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #259: chore(frontend)(deps-dev): bump @types/node from 26.1.1 to 26.1.2 in /frontend -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #256: chore(frontend)(deps-dev): bump eslint from 10.7.0 to 10.8.0 in /frontend -->
 
 ## 🎯 What is This?
 
