@@ -168,10 +168,15 @@ async function seed() {
     }
 
     // Guard the invariant this whole script is built around, before commit.
+    // Parenthesized deliberately: bare `A OR B AND C` parses as `A OR (B AND
+    // C)` in SQL (AND binds tighter than OR), which would flag every safe
+    // intra-catalog row (they all match the first LIKE) regardless of type
+    // or score -- discovered when this tripped on 894 rows that were all
+    // mapping_type='related' at score 75, nowhere near the auto-credit bar.
     const { rows: [bad] } = await client.query(
       `SELECT COUNT(*)::int AS n
          FROM control_mappings
-        WHERE notes LIKE 'NIST OSCAL rel=%' OR notes LIKE 'Inherited from parent%'
+        WHERE (notes LIKE 'NIST OSCAL rel=%' OR notes LIKE 'Inherited from parent%')
           AND (LOWER(mapping_type) IN ('equivalent', 'exact') OR similarity_score >= 90)`
     );
     if (bad.n > 0) {
