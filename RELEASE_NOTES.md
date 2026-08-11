@@ -9,6 +9,8 @@
 
 > Changes staged but not yet released to production.
 
+## [4.9.0] — 2026-08-11
+
 ### Added
 - feat(catalog): port CMMC and PCI catalogs, fix dead family breakdown ([#276](https://github.com/sherifconteh-collab/ai-grc-platform/pull/276)) — @sherifconteh-collab
 - feat(catalog): crosswalk and assessment coverage for 800-53 enhancements ([#275](https://github.com/sherifconteh-collab/ai-grc-platform/pull/275)) — @sherifconteh-collab
