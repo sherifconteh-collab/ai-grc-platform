@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-10 | PR #264: security(evidence): org-scope evidence_control_links, add the guides tree, document the new endpoints -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #269: security(audit): add append-only enforcement, timestamptz, outcome integrity -->
 
 ## 🎯 What is This?
 
