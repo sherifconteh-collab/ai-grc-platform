@@ -7,6 +7,7 @@ const { processPendingWebhookDeliveries } = require('./webhookService');
 const { generateReportFile } = require('./scheduledReportService');
 const { sendReportEmail } = require('./emailService');
 const { log, serializeError } = require('../utils/logger');
+const { BASELINE_SCOPE_PREDICATE } = require('./baselineScope');
 
 const SCHEDULE_INTERVAL_MS = Object.freeze({
   daily: 24 * 60 * 60 * 1000,
@@ -297,20 +298,26 @@ async function runComplianceSnapshot({ organizationId }) {
        of2.framework_id,
        $1::date AS snapshot_date,
        COUNT(fc.id)::int AS total_controls,
-       COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'satisfied_via_crosswalk'))::int AS implemented,
+       -- 'verified' counts as implemented here. It was previously omitted, so
+       -- the trend snapshots this job writes reported a lower percentage than
+       -- the compliance gate did for the same organization on the same day,
+       -- despite the two describing the same measure. Verifying a control made
+       -- the trend line go down.
+       COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'verified', 'satisfied_via_crosswalk'))::int AS implemented,
        COUNT(ci.id) FILTER (WHERE ci.status = 'partial')::int AS partial,
-       COUNT(ci.id) FILTER (WHERE ci.status NOT IN ('implemented', 'satisfied_via_crosswalk', 'partial') OR ci.id IS NULL)::int AS not_implemented,
+       COUNT(ci.id) FILTER (WHERE ci.status NOT IN ('implemented', 'verified', 'satisfied_via_crosswalk', 'partial') OR ci.id IS NULL)::int AS not_implemented,
        CASE WHEN COUNT(fc.id) > 0
-            THEN ROUND((COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'satisfied_via_crosswalk'))::numeric
+            THEN ROUND((COUNT(ci.id) FILTER (WHERE ci.status IN ('implemented', 'verified', 'satisfied_via_crosswalk'))::numeric
                         / COUNT(fc.id)::numeric) * 100, 2)
             ELSE 0
        END AS compliance_pct
      FROM organization_frameworks of2
      JOIN frameworks f ON f.id = of2.framework_id
      JOIN framework_controls fc ON fc.framework_id = of2.framework_id
+     JOIN organizations o ON o.id = of2.organization_id
      LEFT JOIN control_implementations ci
        ON ci.control_id = fc.id AND ci.organization_id = of2.organization_id
-     WHERE true ` + orgFilter + `
+     WHERE true ` + orgFilter + BASELINE_SCOPE_PREDICATE + `
      GROUP BY of2.organization_id, of2.framework_id
      ON CONFLICT (organization_id, framework_id, snapshot_date) DO UPDATE
        SET total_controls   = EXCLUDED.total_controls,

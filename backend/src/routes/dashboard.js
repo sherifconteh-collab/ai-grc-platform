@@ -8,6 +8,7 @@ const { normalizeTier, tierLevel } = require('../config/tierPolicy');
 router.use(authenticate);
 
 const { getCached } = require('../utils/redisCache');
+const { BASELINE_SCOPE_PREDICATE, baselineScopeJoin } = require('../services/baselineScope');
 const DASHBOARD_CACHE_TTL_MS = Math.max(1000, parseInt(process.env.DASHBOARD_CACHE_TTL_MS || '30000', 10));
 const DASHBOARD_CACHE_TTL_S = Math.ceil(DASHBOARD_CACHE_TTL_MS / 1000);
 
@@ -43,8 +44,10 @@ async function queryDashboardStats(orgId) {
       COUNT(DISTINCT fc.id) as total_applicable
     FROM organization_frameworks of2
     JOIN framework_controls fc ON fc.framework_id = of2.framework_id
+    ${baselineScopeJoin('$1')}
     LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
     WHERE of2.organization_id = $1
+    ${BASELINE_SCOPE_PREDICATE}
   `, [orgId]);
 
   const overall = overallResult.rows[0] || {};
