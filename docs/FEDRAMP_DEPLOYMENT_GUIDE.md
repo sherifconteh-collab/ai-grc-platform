@@ -79,11 +79,12 @@ All secrets must be injected via environment variables — never hardcoded in so
 | `RATE_LIMIT_WINDOW_MS` | `900000` | 15-minute window |
 | `RATE_LIMIT_MAX` | `100` | Requests per window per IP |
 
-> **AU-11 retention is not configurable through the application.** An
-> `AUDIT_LOG_RETENTION_DAYS` variable was previously listed here; no such
-> variable is read anywhere in the codebase and setting it has no effect.
-> Audit-record retention must be enforced outside the platform — see the
-> AU-11 row in section 5.
+> **Audit-record retention** is configured with a `data_retention_policies`
+> row of `resource_type = 'audit_logs'`, not an environment variable. An
+> `AUDIT_LOG_RETENTION_DAYS` variable was previously recommended here; no
+> such variable was ever read by any code. `AUDIT_LOG_MIN_RETENTION_DAYS`
+> (default 365) sets the floor a policy cannot go below. See the AU-11 row
+> in section 5.
 
 ---
 
@@ -148,13 +149,13 @@ do not claim them on the strength of this table.
 | AU-2 | Partial | Events are recorded to `audit_logs.event_type`. Most routes write through `services/auditService.js`, but a number of route handlers issue their own `INSERT INTO audit_logs` with a narrower column set, so field coverage is not uniform across event types. `event_type` is free-text — there is no enforced event registry. |
 | AU-3 | Partial | Recorded per event: `event_type`, `created_at`, `user_id`, `actor_name`, `organization_id`, `resource_type`, `resource_id`, `ip_address`, `user_agent`, `success`, `outcome`, `failure_reason`, `request_id`, `source_system`. **Not recorded as columns:** HTTP method and request path (captured only inside the `details` JSONB by `middleware/auditLog.js`), and before/after values. `authentication_method` is populated for authentication events only (set explicitly by `auditService.logAuthentication`/`logLogout`); `session_id` has no writer at all — the platform issues stateless JWTs carrying no session identifier, so use `request_id` for per-request correlation. Both columns are documented as such in the schema. |
 | AU-4 | **Deployer-supplied** | No audit-log storage-capacity monitoring or alerting exists. Monitor table growth and provision storage externally. |
-| AU-5 | **Deployer-supplied** | No response to audit-logging failures. A failed audit write is written to the process stdout/stderr stream and the originating request still succeeds; these writes do not reach the structured logger or Sentry. Alerting on audit-pipeline failure must be supplied externally. |
+| AU-5 | Implemented | Audit-write and SIEM-forward failures are reported through the structured logger (`audit.write_failed`, `audit.siem_forward_failed`), so they reach Sentry rather than being swallowed to the console, and are counted per process and surfaced on the operations dashboard as `audit_pipeline`. That counter is deliberately separate from `failures_24h`, which counts audited business events that failed — only `audit_pipeline` tells you the trail itself is incomplete. Routing those alerts to a pager or ticket queue remains deployer-supplied. |
 | AU-6 | Implemented | `GET /api/v1/audit/logs` with filtering by user, event type, resource, and date range; `GET /api/v1/audit/stats`; dashboard audit trail at `/dashboard/audit`. Optional SIEM forwarding via `services/siemService.js`. |
-| AU-7 | Partial | Filtering and event-type aggregation are available through the endpoints above. There is no audit-record export endpoint — auditors must pull through the API or the database. |
+| AU-7 | Implemented | `GET /api/v1/audit/export` returns CSV or JSON under `audit.read`, accepting the same filters as `GET /audit/logs` (including a new `outcome` filter) and streaming in keyset batches so a multi-year export is not held in memory. CSV cells are RFC 4180 escaped and formula-prefixed. Each export is itself recorded as an `audit.exported` event. |
 | AU-8 | Implemented | `audit_logs.created_at` is `timestamptz` (migration 152), set server-side by `NOW()` and never supplied by the caller, so every record is unambiguously mappable to UTC. Time synchronization (NTP) on the database host remains deployer-supplied. |
 | AU-9 | Partial | Append-only is enforced in the database by the triggers in migration `153`: `DELETE` and `TRUNCATE` are rejected, and `UPDATE` is rejected for every column except `siem_forwarded`. Row-level security (`FORCE`, migration `105`) provides tenant isolation. This is tamper-**resistant**, not tamper-**evident** — there is no hash chain or record signature, and the application owns the table, so a privileged code path can disable the trigger. Note also that `organization_id` is `ON DELETE CASCADE`, so deleting an organization still removes its audit history. FRH-AU-9(3) requires cryptographic integrity: supplement with write-once log shipping. |
 | AU-10 | Partial | `user_id`, `actor_name`, and `ip_address` are recorded on records written through `auditService`. Note `user_id` is `ON DELETE SET NULL`, so deleting a user detaches the identity from historical records (`actor_name` is retained). No digital signature is applied; FRH-AU-10 requires one — supplement with an external signing service. |
-| AU-11 | **Deployer-supplied** | No retention period is enforced for `audit_logs`. The `data_retention_policies` table lists `audit_logs` as an intended `resource_type`, but the retention scheduler acts on evidence only. Records accumulate indefinitely. |
+| AU-11 | Implemented | `data_retention_policies` rows with `resource_type = 'audit_logs'` are now enforced by the retention sweep. Two safeguards apply: a floor (`AUDIT_LOG_MIN_RETENTION_DAYS`, default 365, never below a hard 90-day floor) so a policy cannot be set low enough to erase the trail within policy, and an active legal hold on `audit_logs` suspends the purge entirely. The purge opens the append-only window inside a single transaction and writes an `audit.retention_purge` record, so the deletion is visible in the trail it modified. Set the policy to 1095 days for FedRAMP High. |
 | AU-12 | Partial | Audit records are generated by route handlers calling `auditService`. The `middleware/auditLog.js` wrapper — the only path that records HTTP method and path — is mounted on a single router (`routes/dataSovereignty.js`) and fires only on 2xx responses, so it does not record failed operations. |
 
 Critical event types that must be logged (verify these exist in your deployment):

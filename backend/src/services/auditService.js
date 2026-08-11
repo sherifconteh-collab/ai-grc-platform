@@ -15,6 +15,44 @@
 const pool = require('../config/database');
 const siemService = require('./siemService');
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
+const { log, serializeError } = require('../utils/logger');
+
+/**
+ * AU-5 (Response to Audit Logging Process Failures).
+ *
+ * An audit pipeline that fails silently is indistinguishable from one that is
+ * idle, which is the failure mode AU-5 exists to prevent. Every failure below
+ * is therefore routed through the structured logger -- reaching Sentry, unlike
+ * the bare console.error calls these replaced -- and counted here so the
+ * operations dashboard can surface a broken pipeline without waiting for
+ * someone to notice missing events.
+ *
+ * The counter is per-process and resets on restart. It is a liveness signal
+ * for the running instance, not a durable metric; the logged events are the
+ * durable record.
+ */
+const auditFailureStats = {
+  writeFailures: 0,
+  siemFailures: 0,
+  lastWriteFailureAt: null,
+  lastSiemFailureAt: null
+};
+
+function recordAuditFailure(kind, event, error, context = {}) {
+  const now = new Date().toISOString();
+  if (kind === 'siem') {
+    auditFailureStats.siemFailures += 1;
+    auditFailureStats.lastSiemFailureAt = now;
+  } else {
+    auditFailureStats.writeFailures += 1;
+    auditFailureStats.lastWriteFailureAt = now;
+  }
+  log('error', event, { ...context, error: serializeError(error) });
+}
+
+function getAuditFailureStats() {
+  return { ...auditFailureStats };
+}
 
 /**
  * Create an audit log entry with AU-2 compliant fields
@@ -91,7 +129,8 @@ async function createAuditLog(params) {
     // Analyze integration data for AI suggestions if provided
     if (integrationData && sourceSystem) {
       analyzeIntegrationData(organizationId, integrationData, sourceSystem).catch(err => {
-        console.error('Integration data analysis error:', err);
+        log('error', 'audit.integration_analysis_failed',
+          { organizationId, sourceSystem, error: serializeError(err) });
       });
     }
 
@@ -117,14 +156,21 @@ async function createAuditLog(params) {
       timestamp: new Date().toISOString(),
       custom_fields: customFields
     }).catch(err => {
-      // Log SIEM forwarding errors but don't fail the audit log creation
-      console.error('SIEM forwarding error:', err);
+      // AU-5: the record is in the local table but did not reach the SIEM, so
+      // any external correlation is now incomplete. Surface it.
+      recordAuditFailure('siem', 'audit.siem_forward_failed', err,
+        { organizationId, eventType, auditLogId });
     });
 
     return auditLogId;
   } catch (error) {
-    // Audit logging failures should be logged but not block operations
-    console.error('Audit log creation error:', error);
+    // AU-5: the write failed, so this event is not in the audit trail. Record
+    // it where an operator will actually see it before rethrowing.
+    recordAuditFailure('write', 'audit.write_failed', error, {
+      eventType,
+      organizationId,
+      resourceType
+    });
     throw error;
   }
 }
@@ -150,7 +196,7 @@ async function forwardToSiem(organizationId, auditLogId, eventType, payload) {
 
     return results;
   } catch (error) {
-    console.error('SIEM forwarding failed:', error);
+    recordAuditFailure('siem', 'audit.siem_forward_failed', error, { organizationId });
     return [];
   }
 }
@@ -326,7 +372,8 @@ async function storeCustomFields(auditLogId, organizationId, customFields, sourc
       }
     }
   } catch (error) {
-    console.error('Error storing custom fields:', error);
+    log('error', 'audit.custom_fields_store_failed',
+      { auditLogId, organizationId, error: serializeError(error) });
     // Don't throw - custom field storage shouldn't break audit logging
   }
 }
@@ -342,7 +389,8 @@ async function analyzeIntegrationData(organizationId, integrationData, sourceSys
       sourceSystem
     );
   } catch (error) {
-    console.error(`Error analyzing integration data for org ${organizationId}, source ${sourceSystem}:`, error);
+    log('error', 'audit.integration_analysis_failed',
+      { organizationId, sourceSystem, error: serializeError(error) });
     // Don't throw - this is a non-critical background operation
   }
 }
@@ -415,5 +463,6 @@ module.exports = {
   extractAuditContext,
   getActorName,
   storeCustomFields,
-  analyzeIntegrationData
+  analyzeIntegrationData,
+  getAuditFailureStats
 };
