@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-10 | PR #268: docs(fedramp): correct AU-2 through AU-12 and immutability claims -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #269: security(audit): add append-only enforcement, timestamptz, outcome integrity -->
 
 ## 🎯 What is This?
 
