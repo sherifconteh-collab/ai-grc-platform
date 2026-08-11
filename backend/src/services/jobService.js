@@ -174,7 +174,24 @@ async function runAuditLogRetention({ organizationId }) {
       [organizationId, String(effectiveDays)]
     );
 
+    // AU-9(3): the purge is about to orphan the oldest survivor's prev_hash,
+    // because the record it points at is one of the rows being deleted. That
+    // is a legitimate discontinuity, but a hash chain cannot tell a legitimate
+    // break from a tampered one on its own -- so record the boundary here and
+    // let scripts/verify-audit-chain.js match breaks against these records.
+    let boundaryHash = null;
     if (count > 0) {
+      const { rows: [boundary] } = await client.query(
+        `SELECT record_hash
+           FROM audit_logs
+          WHERE organization_id = $1
+            AND created_at < NOW() - ($2 || ' days')::interval
+          ORDER BY created_at DESC, id DESC
+          LIMIT 1`,
+        [organizationId, String(effectiveDays)]
+      );
+      boundaryHash = boundary ? boundary.record_hash : null;
+
       // The narrowest possible window in which audit_logs is writable.
       await client.query('ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_no_update');
       try {
@@ -201,7 +218,11 @@ async function runAuditLogRetention({ organizationId }) {
           requested_retention_days: requestedDays,
           floor_days: floorDays,
           floor_applied: floorApplied,
-          policy_ids: policyResult.rows.map((p) => p.id)
+          policy_ids: policyResult.rows.map((p) => p.id),
+          // AU-9(3): the hash of the last record this purge removed. The chain
+          // verifier uses it to distinguish this expected break from tampering.
+          chain_boundary_hash: boundaryHash,
+          chain_break: true
         })]
       );
     }
