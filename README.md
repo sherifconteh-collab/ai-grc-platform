@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #271: refactor(audit): route audit writes through auditService for AU-3 coverage -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #272: security(audit): hash-chain audit records and stop cascade deletion -->
 
 ## 🎯 What is This?
 
