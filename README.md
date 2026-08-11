@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #253: chore(backend)(deps): bump geoip-lite from 2.0.2 to 2.0.3 in /backend -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #265: chore(deps-dev): bump electron from 41.1.0 to 41.10.3 in /electron in the npm_and_yarn group across 1 directory -->
 
 ## 🎯 What is This?
 
