@@ -57,7 +57,7 @@ The resulting installer is in `electron/dist/`.
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 15+ frameworks with 1,000+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 34 frameworks with 1,800+ controls. Built to be:
 
 - **Multi-Framework**: 30+ major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
@@ -96,7 +96,7 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
 - 📊 Compliance dashboard with real-time metrics and custom dashboard builder
-- 🎯 Framework selection (15+ frameworks, 1,000+ controls)
+- 🎯 Framework selection (34 frameworks, 1,800+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
 - 📜 Audit logging with 20 recorded fields per event
@@ -227,7 +227,7 @@ Add `REDIS_URL=redis://localhost:6379` to `backend/.env` to enable distributed r
 
 Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and exception reporting.
 
-## 📚 Supported Frameworks (35+)
+## 📚 Supported Frameworks (34)
 
 ### Core Security & Compliance
 - **NIST CSF 2.0** — Cybersecurity Framework 2.0 (106 controls across 6 functions)
@@ -284,8 +284,10 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 - **CIS Controls v8** (`cis_controls_v8`) — 18 Implementation Groups with crosswalk mappings to NIST 800-53 Rev 5 and NIST CSF 2.0
 - **FedRAMP High Baseline** (`fedramp_high`) — 25 High-only additions (AC, AU, IA, SC, SI, SA, CP, IR, PE, PS, RA, PL families) with crosswalk to NIST 800-53 Rev 5
 
+### Added since
+- **PCI DSS v4.0** (`pci_dss_v4`) — 61 controls across the 12 requirement domains
+
 ### Roadmap (not yet seeded)
-- PCI DSS 4.0
 - COBIT 2019
 
 ## 💡 Key Features
@@ -370,7 +372,7 @@ Full RMF lifecycle management without leaving the platform:
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
-- Track compliance across 15+ frameworks simultaneously
+- Track compliance across 34 frameworks simultaneously
 - **Cross-framework control mapping (Crosswalks)** — 80+ mappings showing control overlaps
 - Unified risk register with inherent/residual scoring, treatments and named acceptance
 - Gap analysis across standards
@@ -716,7 +718,7 @@ controlweave/
 ### Core Tables
 - `organizations` — Multi-tenant support
 - `users` — Authentication and profiles with AES-256-GCM PII encryption and HMAC-SHA-384 email hashing
-- `frameworks` — Framework catalog (15+ frameworks)
+- `frameworks` — Framework catalog (34 frameworks)
 - `framework_controls` — Individual controls/requirements
 - `control_implementations` — Org-specific implementation status
 
@@ -778,7 +780,7 @@ controlweave/
 ### Assessment & Audit
 - `assessment_plans` — Audit and assessment tracking
 - `audit_findings` — Gap identification
-- `audit_logs` — Audit log. Append-only is not yet enforced at the database level in this repository; see `docs/FEDRAMP_DEPLOYMENT_GUIDE.md` section 5 (AU-9)
+- `audit_logs` — Append-only audit log (database-level trigger denies `UPDATE`/`DELETE`) with a per-organization SHA-384 hash chain for tamper evidence; see `docs/FEDRAMP_DEPLOYMENT_GUIDE.md` section 5 (AU-9)
 
 ### Policy & Operations
 - `organization_policies` — Policy lifecycle management
@@ -798,7 +800,7 @@ controlweave/
 ## 🎯 Use Cases
 
 ### For Compliance Officers
-- Track compliance across 15+ frameworks simultaneously
+- Track compliance across 34 frameworks simultaneously
 - Leverage auto-crosswalk to reduce compliance burden by 40-60%
 - Use AI Copilot with RAG for grounded gap analysis and compliance forecasting
 - Generate audit-ready reports and documentation
@@ -876,7 +878,7 @@ controlweave/
 
 ### Phase 1: Foundation ✅
 - ✅ Complete PostgreSQL schema (140+ tables)
-- ✅ 15+ framework seed data (1,000+ controls)
+- ✅ 34 framework seed data (1,800+ controls)
 - ✅ Cross-framework crosswalk mappings (80+)
 - ✅ REST API with full CRUD operations
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA
@@ -998,8 +1000,8 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 ## 📈 Stats
 
-- **Frameworks**: 37+ supported (including CIS Controls v8 and FedRAMP High added in v4.2.0)
-- **Controls**: 1,000+ controls in database
+- **Frameworks**: 34 supported (including CIS Controls v8 and FedRAMP High added in v4.2.0)
+- **Controls**: 1,800+ controls in database
 - **Crosswalks**: 280+ cross-framework mappings (203 new mappings added in v4.2.0)
 - **Connector Templates**: 15 in the Integrations Hub (AWS Security Hub, Qualys VMDR, ServiceNow added in v4.2.0)
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
