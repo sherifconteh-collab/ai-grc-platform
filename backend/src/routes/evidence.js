@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
@@ -758,18 +759,16 @@ router.post('/:id/versions',
 
     // AU-2: replacing the file behind an evidence record changes what an
     // assessor would be shown, so it belongs in the audit log.
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, 'evidence_version_created', 'evidence', $3, $4)`,
-      [
-        req.user.organization_id, req.user.id, req.params.id,
-        JSON.stringify({
-          archived_version: outcome.snapshotVersion,
-          new_version: outcome.result.rows[0].evidence_version,
-          change_note: changeNote
-        })
-      ]
-    ).catch((auditError) => {
+    await auditService.logFromRequest(req, {
+      eventType: 'evidence_version_created',
+      resourceType: 'evidence',
+      resourceId: req.params.id,
+      details: {
+        archived_version: outcome.snapshotVersion,
+        new_version: outcome.result.rows[0].evidence_version,
+        change_note: changeNote
+      }
+    }).catch((auditError) => {
       log('error', 'evidence.version_audit_failed', { error: serializeError(auditError) });
     });
 

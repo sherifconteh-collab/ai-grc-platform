@@ -3,6 +3,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 
@@ -166,11 +167,12 @@ router.post('/links', requirePermission('audit.write'), async (req, res) => {
       [orgId, engagement_id, newToken(), name, expiresAt.toISOString(), req.user.id]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'auditor_workspace_link_created', 'auditor_workspace_link', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, inserted.rows[0].id, JSON.stringify({ name, engagement_id, expires_at: inserted.rows[0].expires_at })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'auditor_workspace_link_created',
+      resourceType: 'auditor_workspace_link',
+      resourceId: inserted.rows[0].id,
+      details: { name, engagement_id, expires_at: inserted.rows[0].expires_at }
+    });
 
     res.status(201).json({
       success: true,

@@ -268,26 +268,14 @@ router.post('/logs', auditWriteLimiter, requirePermission('audit.write'), async 
       }
     }
 
-    const result = await pool.query(
-      `INSERT INTO audit_logs
-       (organization_id, user_id, event_type, resource_type, resource_id, details,
-        ip_address, user_agent, success, outcome, source_system, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, NOW())
-       RETURNING id, event_type, outcome, success, created_at`,
-      [
-        orgId,
-        userId,
-        event_type,
-        resource_type || null,
-        resource_id || null,
-        JSON.stringify(parsedDetails),
-        req.ip || null,
-        req.headers['user-agent'] || null,
-        resolvedOutcome === 'success',
-        resolvedOutcome,
-        source_system || 'mcp_agent'
-      ]
-    );
+    const result = await auditService.logFromRequest(req, {
+      eventType: event_type,
+      resourceType: resource_type || null,
+      resourceId: resource_id || null,
+      details: parsedDetails,
+      success: resolvedOutcome === 'success',
+      sourceSystem: source_system || 'mcp_agent'
+    });
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {

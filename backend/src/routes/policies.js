@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { createHash } = require('crypto');
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { decrypt } = require('../utils/encrypt');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
@@ -235,16 +236,12 @@ router.post('/', requirePermission('controls.write'), async (req, res) => {
     const policy = result.rows[0];
 
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_created', 'policy', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        policy.id,
-        JSON.stringify({ policy_name, policy_type, status })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_created',
+      resourceType: 'policy',
+      resourceId: policy.id,
+      details: { policy_name, policy_type, status }
+    });
 
     // Notification
     await createNotification(
@@ -424,20 +421,16 @@ router.patch('/:id', requirePermission('controls.write'), async (req, res) => {
     const updated = result.rows[0];
 
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_updated', 'policy', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        policyId,
-        JSON.stringify({
-          old_status: existing.status,
-          new_status: updated.status,
-          policy_name: updated.policy_name
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_updated',
+      resourceType: 'policy',
+      resourceId: policyId,
+      details: {
+        old_status: existing.status,
+        new_status: updated.status,
+        policy_name: updated.policy_name
+      }
+    });
 
     // If status changed to published, create notification
     if (nextStatus === 'published' && existing.status !== 'published') {
@@ -736,16 +729,12 @@ router.post('/:id/reviews', requirePermission('controls.write'), async (req, res
     );
 
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_review_created', 'policy', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        policyId,
-        JSON.stringify({ review_type, changes_made, requires_user_acknowledgment })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_review_created',
+      resourceType: 'policy',
+      resourceId: policyId,
+      details: { review_type, changes_made, requires_user_acknowledgment }
+    });
 
     // If changes require acknowledgment, create alert
     if (requires_user_acknowledgment) {
@@ -823,16 +812,12 @@ router.post('/:id/acknowledge', requirePermission('controls.read'), async (req, 
     );
 
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_acknowledged', 'policy', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        policyId,
-        JSON.stringify({ policy_name: policy.policy_name, version: policy.version })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_acknowledged',
+      resourceType: 'policy',
+      resourceId: policyId,
+      details: { policy_name: policy.policy_name, version: policy.version }
+    });
 
     res.status(201).json({
       success: true,
@@ -965,11 +950,12 @@ router.post('/upload', requirePermission('controls.write'), upload.single('polic
     });
     
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_uploaded', 'policy', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, upload.id, JSON.stringify({ file_name: req.file.originalname })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_uploaded',
+      resourceType: 'policy',
+      resourceId: upload.id,
+      details: { file_name: req.file.originalname }
+    });
     
     // Notification
     await createNotification(
@@ -1090,11 +1076,12 @@ router.post('/uploads/:id/analyze', requirePermission('controls.write'), async (
     const results = await performGapAnalysis(orgId, uploadId, framework_ids);
     
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_gap_analysis_completed', 'policy', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, uploadId, JSON.stringify({ frameworks: framework_ids.length, results })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_gap_analysis_completed',
+      resourceType: 'policy',
+      resourceId: uploadId,
+      details: { frameworks: framework_ids.length, results }
+    });
     
     res.json({
       success: true,
@@ -1178,11 +1165,12 @@ router.post('/uploads/:id/set-baseline', requirePermission('controls.write'), as
     }
     
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_baseline_set', 'policy', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, uploadId, JSON.stringify({ file_name: result.file_name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_baseline_set',
+      resourceType: 'policy',
+      resourceId: uploadId,
+      details: { file_name: result.file_name }
+    });
     
     // Notification
     await createNotification(
@@ -1241,16 +1229,12 @@ router.post('/generate-from-baseline', requirePermission('controls.write'), asyn
     );
     
     // Audit log
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'policy_generated_from_baseline', 'policy', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        result.policy.id,
-        JSON.stringify({ baseline: result.baseline_used, frameworks: framework_ids.length })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'policy_generated_from_baseline',
+      resourceType: 'policy',
+      resourceId: result.policy.id,
+      details: { baseline: result.baseline_used, frameworks: framework_ids.length }
+    });
     
     res.status(201).json({
       success: true,

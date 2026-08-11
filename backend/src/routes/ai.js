@@ -187,6 +187,9 @@ function aiHandler(feature, fn, opts = {}) {
       const inputContext = JSON.stringify(req.body || {});
       await llm.logAIDecision(params.organizationId, feature, inputContext, resultText, {
         modelVersion: resolvedModel || null,
+        // AU-3: who and from where, not just which organization.
+        userId: req.user?.id || null,
+        ipAddress: req.ip || null,
         correlationId,
         sessionId,
         resourceType: opts.resourceType ? (typeof opts.resourceType === 'function' ? opts.resourceType(req) : opts.resourceType) : null,
@@ -511,7 +514,10 @@ router.post('/tprm/analyze-evidence', checkAIUsage, async (req, res) => {
     }).catch(() => {});
 
     await llm.logAIDecision(orgId, 'tprm_evidence_analyze', JSON.stringify({ questionnaireId }), String(result), {
-      correlationId, modelVersion: params.model || null
+      correlationId,
+      modelVersion: params.model || null,
+      userId: req.user?.id || null,
+      ipAddress: req.ip || null
     }).catch(() => {});
 
     res.json({ success: true, data: { result, feature: 'tprm_evidence_analyze', provider: params.provider, evidence_count: evidenceResult.rows.length } });

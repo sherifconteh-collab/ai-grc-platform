@@ -7,6 +7,7 @@ const fs = require('fs');
 const { createHash } = require('crypto');
 const xml2js = require('xml2js');
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { vulnerabilityCreated } = require('../services/realtimeEventService');
@@ -1241,25 +1242,19 @@ router.post('/import', requirePermission('evidence.write'), scanUpload.single('f
     const matchers = await loadAssetMatchers(orgId);
     const ingestResult = await upsertVulnerabilityFindings(orgId, evidenceUrl, importedAt, matchers, findings);
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, ip_address, user_agent, success)
-       VALUES ($1, $2, 'vulnerability_scan_imported', 'evidence', $3, $4, $5, $6, true)`,
-      [
-        orgId,
-        userId,
-        evidenceId,
-        JSON.stringify({
-          evidence_id: evidenceId,
-          file_name: safeOriginalName,
-          ext,
-          detected_type: detectedType,
-          ingested: ingestResult,
-          warnings
-        }),
-        req.ip,
-        req.get('user-agent') || null
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'vulnerability_scan_imported',
+      resourceType: 'evidence',
+      resourceId: evidenceId,
+      details: {
+        evidence_id: evidenceId,
+        file_name: safeOriginalName,
+        ext,
+        detected_type: detectedType,
+        ingested: ingestResult,
+        warnings
+      }
+    });
 
     // Emit real-time event for critical/high severity vulnerabilities
     if (ingestResult.inserted > 0) {
@@ -1287,18 +1282,14 @@ router.post('/import', requirePermission('evidence.write'), scanUpload.single('f
     console.error('Vulnerability scan import error:', error);
 
     try {
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, ip_address, user_agent, success, failure_reason)
-         VALUES ($1, $2, 'vulnerability_scan_imported', 'evidence', NULL, $3, $4, $5, false, $6)`,
-        [
-          orgId,
-          userId,
-          JSON.stringify({ error: error.message || 'Import failed' }),
-          req.ip,
-          req.get('user-agent') || null,
-          error.message || 'Import failed'
-        ]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'vulnerability_scan_imported',
+        resourceType: 'evidence',
+        resourceId: null,
+        details: { error: error.message || 'Import failed' },
+        success: false,
+        failureReason: error.message || 'Import failed'
+      });
     } catch (auditError) {
       console.error('Failed to write scan import audit log:', auditError);
     }
@@ -1738,31 +1729,25 @@ router.patch('/:id/workflow/:workItemId', requirePermission('controls.write'), a
       }
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (
-         organization_id, user_id, event_type, resource_type, resource_id, details, success
-       )
-       VALUES ($1, $2, 'vulnerability_workflow_updated', 'vulnerability_workflow', $3, $4::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        updated.id,
-        JSON.stringify({
-          vulnerability_id: id,
-          finding_key: existing.finding_key,
-          old: {
-            action_type: existing.action_type,
-            action_status: existing.action_status,
-            control_effect: existing.control_effect
-          },
-          new: {
-            action_type: updated.action_type,
-            action_status: updated.action_status,
-            control_effect: updated.control_effect
-          }
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'vulnerability_workflow_updated',
+      resourceType: 'vulnerability_workflow',
+      resourceId: updated.id,
+      details: {
+        vulnerability_id: id,
+        finding_key: existing.finding_key,
+        old: {
+          action_type: existing.action_type,
+          action_status: existing.action_status,
+          control_effect: existing.control_effect
+        },
+        new: {
+          action_type: updated.action_type,
+          action_status: updated.action_status,
+          control_effect: updated.control_effect
+        }
+      }
+    });
 
     const workflow = await getWorkflowItems(orgId, id);
     res.json({ success: true, data: { updatedItem: updated, workflow } });

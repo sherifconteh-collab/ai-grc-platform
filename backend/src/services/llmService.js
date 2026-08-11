@@ -2825,13 +2825,21 @@ async function logAIDecision(organizationId, feature, inputText, outputText, opt
 
     await pool.query(`
       INSERT INTO ai_decision_log
-        (organization_id, input_data, input_hash, output_data, output_hash,
-         human_reviewed, risk_level, regulatory_framework, model_version,
-         correlation_id, session_id, processing_timestamp, bias_flags, bias_reviewed,
-         data_lineage)
-      VALUES ($1, $2::jsonb, $3, $4::jsonb, $5, false, $6, $7, $8, $9, $10, NOW(), $11::jsonb, false, $12)
+        (organization_id, user_id, ip_address, feature, input_data, input_hash,
+         output_data, output_hash, human_reviewed, risk_level, regulatory_framework,
+         model_version, correlation_id, session_id, processing_timestamp, bias_flags,
+         bias_reviewed, data_lineage)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8, false, $9, $10, $11, $12, $13, NOW(), $14::jsonb, false, $15)
     `, [
       organizationId,
+      // AU-3: attribution was organization-only before this. The columns on
+      // this table that name people (reviewed_by, approved_by) identify
+      // post-hoc reviewers, not the actor whose request produced the decision.
+      opts.userId || null,
+      opts.ipAddress || null,
+      // Migration 045 added `feature` for exactly this, and the insert never
+      // wrote it, so no stored decision could say which feature produced it.
+      feature,
       safeInput,
       inputHash,
       safeOutput,

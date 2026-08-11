@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { decrypt } = require('../utils/encrypt');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
@@ -347,23 +348,19 @@ router.put('/:id/implementation',
     }
 
     // Log audit
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
-      [
-        orgId,
-        req.user.id,
-        controlId,
-        JSON.stringify({
-          previous_status: previousStatus,
-          new_status: status,
-          crosswalkedControls: crosswalkedControls.length,
-          withdrawnCrosswalkCredits: withdrawnCredits,
-          propagatedEvidenceLinks,
-          poam_created: !!poamItem
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_status_changed',
+      resourceType: 'control',
+      resourceId: controlId,
+      details: {
+        previous_status: previousStatus,
+        new_status: status,
+        crosswalkedControls: crosswalkedControls.length,
+        withdrawnCrosswalkCredits: withdrawnCredits,
+        propagatedEvidenceLinks,
+        poam_created: !!poamItem
+      }
+    });
 
     res.json({
       success: true,
@@ -590,22 +587,18 @@ router.post('/:id/inherit',
     }
 
     if (!dryRun) {
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-         VALUES ($1, $2, 'control_inheritance_triggered', 'control', $3, $4::jsonb, true)`,
-        [
-          orgId,
-          req.user.id,
-          sourceControlId,
-          JSON.stringify({
-            threshold: resolvedThreshold,
-            inherited_status: nextStatus,
-            processed: processed.length,
-            updated: processed.filter((p) => !p.skipped).length,
-            propagatedEvidenceLinks
-          })
-        ]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'control_inheritance_triggered',
+        resourceType: 'control',
+        resourceId: sourceControlId,
+        details: {
+          threshold: resolvedThreshold,
+          inherited_status: nextStatus,
+          processed: processed.length,
+          updated: processed.filter((p) => !p.skipped).length,
+          propagatedEvidenceLinks
+        }
+      });
 
       await enqueueWebhookEvent({
         organizationId: orgId,

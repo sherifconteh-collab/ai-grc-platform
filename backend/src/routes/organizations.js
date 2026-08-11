@@ -3,6 +3,7 @@ const router = express.Router();
 
 const ALLOWED_CONTROL_FUNCTIONS = ['preventive', 'detective', 'corrective'];
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
 const path = require('path');
@@ -339,27 +340,21 @@ router.put('/me/profile', requirePermission('organizations.write'), async (req, 
       ]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, details, success)
-       VALUES ($1, $2, $3, $4, $5::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        onboardingCompletedRequested ? 'organization_onboarding_completed' : 'organization_profile_updated',
-        'organization_profile',
-        JSON.stringify({
-          onboarding_completed: nextProfile.onboarding_completed,
-          rmf_stage: nextProfile.rmf_stage,
-          compliance_profile: nextProfile.compliance_profile,
-          nist_adoption_mode: nextProfile.nist_adoption_mode,
-          cia: {
-            confidentiality: nextProfile.confidentiality_impact,
-            integrity: nextProfile.integrity_impact,
-            availability: nextProfile.availability_impact
-          }
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: onboardingCompletedRequested ? 'organization_onboarding_completed' : 'organization_profile_updated',
+      resourceType: 'organization_profile',
+      details: {
+        onboarding_completed: nextProfile.onboarding_completed,
+        rmf_stage: nextProfile.rmf_stage,
+        compliance_profile: nextProfile.compliance_profile,
+        nist_adoption_mode: nextProfile.nist_adoption_mode,
+        cia: {
+          confidentiality: nextProfile.confidentiality_impact,
+          integrity: nextProfile.integrity_impact,
+          availability: nextProfile.availability_impact
+        }
+      }
+    });
 
     res.json({
       success: true,

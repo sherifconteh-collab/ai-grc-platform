@@ -457,12 +457,12 @@ router.post('/invite', requirePermission('users.manage'), validateBody((body) =>
     `, [orgId, email, inviteToken, primaryRole, roleIds, req.user.id]);
 
     // Audit log
-    await pool.query(`
-      INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, ip_address, success, created_at)
-      VALUES ($1, $2, 'user_invited', 'user', $3, $4, $5, true, NOW())
-    `, [orgId, req.user.id, result.rows[0].id,
-        JSON.stringify({ email, primary_role: primaryRole, role_ids: roleIds }),
-        req.ip || null]).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'user_invited',
+      resourceType: 'user',
+      resourceId: result.rows[0].id,
+      details: { email, primary_role: primaryRole, role_ids: roleIds }
+    }).catch(() => {});
 
     res.status(201).json({
       success: true,
