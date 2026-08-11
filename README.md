@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #270: feat(audit): implement AU-5 failure response, AU-7 export, AU-11 retention -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #271: refactor(audit): route audit writes through auditService for AU-3 coverage -->
 
 ## 🎯 What is This?
 
