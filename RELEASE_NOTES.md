@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Added
+- feat(catalog): import 714 NIST 800-53 enhancements with baseline membership ([#274](https://github.com/sherifconteh-collab/ai-grc-platform/pull/274)) — @sherifconteh-collab
 - **Risk register, incidents, obligations, objectives, indicators, and departments** (migrations `139`–`143`): the README claimed a "unified risk register" and documented `risks` / `risk_treatments` tables that did not exist. What existed was `risk_scores` (migration `057`), a single computed 0-100 posture number per organization — a metric, not a register. Six modules now close that gap, modeled on the standards rather than invented:
   - `departments` (hierarchical business units) and `business_objectives` (COSO's four categories), the organizational spine every other register hangs off. ISO 31000 defines risk as the effect of uncertainty *on objectives*; without recorded objectives a register is a list of bad things with nothing to be bad for.
   - `risks` / `risk_treatments` / `risk_reviews` plus control, asset and objective link tables (ISO 31000 / ISO 27005 / NIST SP 800-30). Inherent **and** residual assessment as likelihood x impact on 1–5 scales, with the product a stored generated column so 5x5 heat-map queries cannot drift from their inputs. Acceptance is a named decision with a rationale and an optional expiry — a lapsed acceptance is surfaced as such rather than left reading "accepted". Reviews snapshot the assessment as it stood, so history survives later edits.

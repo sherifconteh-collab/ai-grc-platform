@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #273: feat(catalog): control hierarchy, baseline scoping, and read-path bounds -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #274: feat(catalog): import 714 NIST 800-53 enhancements with baseline membership -->
 
 ## 🎯 What is This?
 
