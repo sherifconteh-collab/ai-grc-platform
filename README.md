@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #276: feat(catalog): port CMMC and PCI catalogs, fix dead family breakdown -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #259: chore(frontend)(deps-dev): bump @types/node from 26.1.1 to 26.1.2 in /frontend -->
 
 ## 🎯 What is This?
 
