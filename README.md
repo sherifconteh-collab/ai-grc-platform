@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #262: chore(backend)(deps): bump @sentry/node from 10.53.1 to 10.69.0 in /backend -->
+<!-- LAST_UPDATED: 2026-08-11 | PR #253: chore(backend)(deps): bump geoip-lite from 2.0.2 to 2.0.3 in /backend -->
 
 ## 🎯 What is This?
 
