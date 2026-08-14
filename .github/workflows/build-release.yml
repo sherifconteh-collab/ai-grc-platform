@@ -469,7 +469,15 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   build-macos-x64:
     name: macOS Installer (.dmg — x64)
-    runs-on: macos-13
+    # macos-13 (Intel-hosted) runners are effectively unavailable on this
+    # account -- the previous job sat queued for the full 24h timeout and was
+    # auto-cancelled without ever getting a runner (macos-latest picks up
+    # within seconds). electron-builder cross-packages an x64 target from an
+    # arm64 host fine -- confirmed by this repo's own prior (buggy) dual-arch
+    # run, where the arm64 host's `@electron/rebuild arch=x64` native-install
+    # step completed successfully; the packaging defect that run hit was from
+    # building both archs in one invocation, already fixed separately.
+    runs-on: macos-latest
     timeout-minutes: 60
     needs: [check-release, create-release, lockfile-integrity]
     if: |
