@@ -98,7 +98,7 @@
     "multer": "^2.2.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^9.0.3",
-    "openai": "^6.38.0",
+    "openai": "^7.4.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1",
