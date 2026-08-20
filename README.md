@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v4.8.0-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v4.9.0-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-11 | PR #258: chore(frontend)(deps-dev): bump @types/react from 19.2.17 to 19.2.18 in /frontend -->
+<!-- LAST_UPDATED: 2026-08-20 | PR #282: chore(backend)(deps): bump axios from 1.18.1 to 1.19.0 in /backend -->
 
 ## 🎯 What is This?
 
