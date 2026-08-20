@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(frontend)(deps): bump next from 16.2.12 to 16.3.1 in /frontend ([#286](https://github.com/sherifconteh-collab/ai-grc-platform/pull/286)) — @dependabot[bot]
 - chore(backend)(deps): bump axios from 1.18.1 to 1.19.0 in /backend ([#282](https://github.com/sherifconteh-collab/ai-grc-platform/pull/282)) — @dependabot[bot]
 
 - chore(backend)(deps): bump @simplewebauthn/server from 13.3.1 to 13.3.2 in /backend ([#285](https://github.com/sherifconteh-collab/ai-grc-platform/pull/285)) — @dependabot[bot]

@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-20 | PR #282: chore(backend)(deps): bump axios from 1.18.1 to 1.19.0 in /backend -->
+<!-- LAST_UPDATED: 2026-08-20 | PR #286: chore(frontend)(deps): bump next from 16.2.12 to 16.3.1 in /frontend -->
 
 ## 🎯 What is This?
 
