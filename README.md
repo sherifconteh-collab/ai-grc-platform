@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-20 | PR #286: chore(frontend)(deps): bump next from 16.2.12 to 16.3.1 in /frontend -->
+<!-- LAST_UPDATED: 2026-08-20 | PR #277: chore(frontend)(deps-dev): bump @types/node from 26.1.2 to 26.2.0 in /frontend -->
 
 ## 🎯 What is This?
 
