@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-20 | PR #285: chore(backend)(deps): bump @simplewebauthn/server from 13.3.1 to 13.3.2 in /backend -->
+<!-- LAST_UPDATED: 2026-08-20 | PR #282: chore(backend)(deps): bump axios from 1.18.1 to 1.19.0 in /backend -->
 
 ## 🎯 What is This?
 
