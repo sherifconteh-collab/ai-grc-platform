@@ -403,6 +403,18 @@ jobs:
         run: npm ci
         working-directory: electron
 
+      - name: Ensure target-arch embedded-postgres binaries are present
+        run: |
+          # npm ci only installs the host-arch optionalDependencies. Explicitly
+          # install the target arch so the packaged DMG contains postgres/initdb.
+          EP_SPEC=$(node -p "require('./node_modules/embedded-postgres/package.json').version")
+          echo "Installing @embedded-postgres/darwin-arm64@${EP_SPEC}"
+          npm install --no-save "@embedded-postgres/darwin-arm64@${EP_SPEC}"
+          test -x node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres
+          test -x node_modules/@embedded-postgres/darwin-arm64/native/bin/initdb
+          echo "Verified darwin-arm64 binaries present"
+        working-directory: electron
+
       - name: Generate placeholder icons (if not present)
         run: node scripts/generate-icons.js
         working-directory: electron
@@ -523,6 +535,24 @@ jobs:
         # Do not use --prefer-offline: embedded-postgres downloads platform-specific
         # PostgreSQL binaries (~100 MB) that will not be in the npm cache.
         run: npm ci
+        working-directory: electron
+
+      - name: Ensure target-arch embedded-postgres binaries are present
+        run: |
+          # npm ci only installs the host-arch optionalDependencies. Explicitly
+          # install the target arch so the packaged DMG contains postgres/initdb.
+          # This is the root cause of the x64 smoke-test failure on run 31761365337.
+          #
+          # npm refuses platform-mismatched packages by default (EBADPLATFORM):
+          # wanted cpu=x64, current host is arm64 (macos-latest). Force the
+          # install with --force and explicit --os/--cpu so the x64 binaries
+          # are fetched onto this arm64 runner for packaging.
+          EP_SPEC=$(node -p "require('./node_modules/embedded-postgres/package.json').version")
+          echo "Installing @embedded-postgres/darwin-x64@${EP_SPEC} (cross-arch, forced)"
+          npm install --no-save --force --os=darwin --cpu=x64 "@embedded-postgres/darwin-x64@${EP_SPEC}"
+          test -x node_modules/@embedded-postgres/darwin-x64/native/bin/postgres
+          test -x node_modules/@embedded-postgres/darwin-x64/native/bin/initdb
+          echo "Verified darwin-x64 binaries present"
         working-directory: electron
 
       - name: Generate placeholder icons (if not present)
