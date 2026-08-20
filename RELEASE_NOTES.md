@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix(ci): ensure target-arch embedded-postgres binaries for macOS DMG builds ([#287](https://github.com/sherifconteh-collab/ai-grc-platform/pull/287)) — @sherifconteh-collab
 - chore(backend)(deps-dev): bump globals from 17.6.0 to 17.11.0 in /backend ([#284](https://github.com/sherifconteh-collab/ai-grc-platform/pull/284)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @types/node from 26.1.2 to 26.2.0 in /frontend ([#277](https://github.com/sherifconteh-collab/ai-grc-platform/pull/277)) — @dependabot[bot]
 - chore(frontend)(deps): bump next from 16.2.12 to 16.3.1 in /frontend ([#286](https://github.com/sherifconteh-collab/ai-grc-platform/pull/286)) — @dependabot[bot]

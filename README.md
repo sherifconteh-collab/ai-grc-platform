@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-20 | PR #284: chore(backend)(deps-dev): bump globals from 17.6.0 to 17.11.0 in /backend -->
+<!-- LAST_UPDATED: 2026-08-20 | PR #287: fix(ci): ensure target-arch embedded-postgres binaries for macOS DMG builds -->
 
 ## 🎯 What is This?
 
