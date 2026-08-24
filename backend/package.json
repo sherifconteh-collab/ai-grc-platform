@@ -74,7 +74,7 @@
     "seed:oscal-procedures": "node scripts/seed-oscal-assessment-procedures.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
+    "@anthropic-ai/sdk": "^0.120.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@noble/post-quantum": "^0.6.1",
     "@sentry/node": "^10.69.0",
