@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-15 | PR #292: chore(backend)(deps-dev): bump eslint-plugin-security from 4.0.0 to 4.0.1 in /backend -->
+<!-- LAST_UPDATED: 2026-09-15 | PR #293: chore(backend)(deps): bump openai from 6.38.0 to 7.5.0 in /backend -->
 
 ## 🎯 What is This?
 
