@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-15 | PR #296: chore(frontend)(deps-dev): bump @types/node from 26.2.0 to 26.4.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-09-15 | PR #300: chore(frontend)(deps-dev): bump browserslist from 4.28.6 to 4.28.9 in /frontend in the npm_and_yarn group across 1 directory -->
 
 ## 🎯 What is This?
 
