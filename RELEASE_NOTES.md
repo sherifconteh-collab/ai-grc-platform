@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(frontend)(deps-dev): bump @types/react-dom from 19.2.3 to 19.2.5 in /frontend ([#294](https://github.com/sherifconteh-collab/ai-grc-platform/pull/294)) — @dependabot[bot]
 - chore(backend)(deps): bump openai from 6.38.0 to 7.5.0 in /backend ([#293](https://github.com/sherifconteh-collab/ai-grc-platform/pull/293)) — @dependabot[bot]
 - chore(backend)(deps-dev): bump eslint-plugin-security from 4.0.0 to 4.0.1 in /backend ([#292](https://github.com/sherifconteh-collab/ai-grc-platform/pull/292)) — @dependabot[bot]
 - fix(ci): ensure target-arch embedded-postgres binaries for macOS DMG builds ([#287](https://github.com/sherifconteh-collab/ai-grc-platform/pull/287)) — @sherifconteh-collab
