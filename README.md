@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-15 | PR #298: chore(deps-dev): bump fast-uri from 3.1.5 to 3.1.7 in /electron in the npm_and_yarn group across 1 directory -->
+<!-- LAST_UPDATED: 2026-09-15 | PR #295: chore(frontend)(deps-dev): bump eslint from 10.8.1 to 10.10.0 in /frontend -->
 
 ## 🎯 What is This?
 
