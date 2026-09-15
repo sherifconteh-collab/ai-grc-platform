@@ -3,7 +3,7 @@
   "version": "4.9.0",
   "license": "AGPL-3.0",
   "engines": {
-    "node": ">=20.16.0"
+    "node": ">=20.19.0"
   },
   "scripts": {
     "build": "node -e \"console.log('Backend build step complete')\"",

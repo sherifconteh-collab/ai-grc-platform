@@ -1,3 +1,18 @@
+// sanitize-html (2.17.6+) depends on htmlparser2 12.x, which is ESM-only;
+// require()-ing it needs Node's synchronous require(esm) support, backported
+// to the 20.x line in 20.19.0. Fail loudly here instead of letting a route
+// module crash later with a cryptic ERR_REQUIRE_ESM three requires deep.
+{
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  if (major < 20 || (major === 20 && minor < 19)) {
+    console.error(
+      `ControlWeave requires Node.js >=20.19.0 (detected ${process.version}). ` +
+      'Earlier Node 20.x releases cannot require() the ESM-only htmlparser2 dependency that sanitize-html now uses.'
+    );
+    process.exit(1);
+  }
+}
+
 require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
