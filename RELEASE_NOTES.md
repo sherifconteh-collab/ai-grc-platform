@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(deps-dev): bump fast-uri from 3.1.5 to 3.1.7 in /electron in the npm_and_yarn group across 1 directory ([#298](https://github.com/sherifconteh-collab/ai-grc-platform/pull/298)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump eslint-config-next from 16.2.12 to 16.3.3 in /frontend ([#297](https://github.com/sherifconteh-collab/ai-grc-platform/pull/297)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump browserslist from 4.28.6 to 4.28.9 in /frontend in the npm_and_yarn group across 1 directory ([#300](https://github.com/sherifconteh-collab/ai-grc-platform/pull/300)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @types/node from 26.2.0 to 26.4.0 in /frontend ([#296](https://github.com/sherifconteh-collab/ai-grc-platform/pull/296)) — @dependabot[bot]
