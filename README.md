@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-15 | PR #300: chore(frontend)(deps-dev): bump browserslist from 4.28.6 to 4.28.9 in /frontend in the npm_and_yarn group across 1 directory -->
+<!-- LAST_UPDATED: 2026-09-15 | PR #297: chore(frontend)(deps-dev): bump eslint-config-next from 16.2.12 to 16.3.3 in /frontend -->
 
 ## 🎯 What is This?
 
