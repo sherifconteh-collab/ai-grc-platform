@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-20 | PR #287: fix(ci): ensure target-arch embedded-postgres binaries for macOS DMG builds -->
+<!-- LAST_UPDATED: 2026-09-15 | PR #292: chore(backend)(deps-dev): bump eslint-plugin-security from 4.0.0 to 4.0.1 in /backend -->
 
 ## 🎯 What is This?
 
