@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-15 | PR #294: chore(frontend)(deps-dev): bump @types/react-dom from 19.2.3 to 19.2.5 in /frontend -->
+<!-- LAST_UPDATED: 2026-09-15 | PR #296: chore(frontend)(deps-dev): bump @types/node from 26.2.0 to 26.4.0 in /frontend -->
 
 ## 🎯 What is This?
 
