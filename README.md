@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-08-20 | PR #287: fix(ci): ensure target-arch embedded-postgres binaries for macOS DMG builds -->
+<!-- LAST_UPDATED: 2026-09-15 | PR #298: chore(deps-dev): bump fast-uri from 3.1.5 to 3.1.7 in /electron in the npm_and_yarn group across 1 directory -->
 
 ## 🎯 What is This?
 

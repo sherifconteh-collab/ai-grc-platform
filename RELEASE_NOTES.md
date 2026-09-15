@@ -10,6 +10,13 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(deps-dev): bump fast-uri from 3.1.5 to 3.1.7 in /electron in the npm_and_yarn group across 1 directory ([#298](https://github.com/sherifconteh-collab/ai-grc-platform/pull/298)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump eslint-config-next from 16.2.12 to 16.3.3 in /frontend ([#297](https://github.com/sherifconteh-collab/ai-grc-platform/pull/297)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump browserslist from 4.28.6 to 4.28.9 in /frontend in the npm_and_yarn group across 1 directory ([#300](https://github.com/sherifconteh-collab/ai-grc-platform/pull/300)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/node from 26.2.0 to 26.4.0 in /frontend ([#296](https://github.com/sherifconteh-collab/ai-grc-platform/pull/296)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/react-dom from 19.2.3 to 19.2.5 in /frontend ([#294](https://github.com/sherifconteh-collab/ai-grc-platform/pull/294)) — @dependabot[bot]
+- chore(backend)(deps): bump openai from 6.38.0 to 7.5.0 in /backend ([#293](https://github.com/sherifconteh-collab/ai-grc-platform/pull/293)) — @dependabot[bot]
+- chore(backend)(deps-dev): bump eslint-plugin-security from 4.0.0 to 4.0.1 in /backend ([#292](https://github.com/sherifconteh-collab/ai-grc-platform/pull/292)) — @dependabot[bot]
 - fix(ci): ensure target-arch embedded-postgres binaries for macOS DMG builds ([#287](https://github.com/sherifconteh-collab/ai-grc-platform/pull/287)) — @sherifconteh-collab
 - chore(backend)(deps-dev): bump globals from 17.6.0 to 17.11.0 in /backend ([#284](https://github.com/sherifconteh-collab/ai-grc-platform/pull/284)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @types/node from 26.1.2 to 26.2.0 in /frontend ([#277](https://github.com/sherifconteh-collab/ai-grc-platform/pull/277)) — @dependabot[bot]
