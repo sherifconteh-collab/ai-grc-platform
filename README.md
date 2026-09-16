@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-15 | PR #295: chore(frontend)(deps-dev): bump eslint from 10.8.1 to 10.10.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-09-16 | PR #279: chore(frontend)(deps): bump lucide-react from 1.24.0 to 1.31.0 in /frontend -->
 
 ## 🎯 What is This?
 
