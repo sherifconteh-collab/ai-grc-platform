@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-16 | PR #279: chore(frontend)(deps): bump lucide-react from 1.24.0 to 1.31.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-09-16 | PR #301: fix(security): explicit JWT algorithm allow-list on WebSocket auth -->
 
 ## 🎯 What is This?
 

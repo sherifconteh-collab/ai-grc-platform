@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix(security): explicit JWT algorithm allow-list on WebSocket auth ([#301](https://github.com/sherifconteh-collab/ai-grc-platform/pull/301)) — @sherifconteh-collab
 - chore(frontend)(deps): bump lucide-react from 1.24.0 to 1.31.0 in /frontend ([#279](https://github.com/sherifconteh-collab/ai-grc-platform/pull/279)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump eslint from 10.8.1 to 10.10.0 in /frontend ([#295](https://github.com/sherifconteh-collab/ai-grc-platform/pull/295)) — @dependabot[bot]
 - chore(deps-dev): bump fast-uri from 3.1.5 to 3.1.7 in /electron in the npm_and_yarn group across 1 directory ([#298](https://github.com/sherifconteh-collab/ai-grc-platform/pull/298)) — @dependabot[bot]
