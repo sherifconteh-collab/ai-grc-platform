@@ -16,10 +16,13 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   clearMocks: true,
-  // Transpile the ESM-only @noble/* packages so Jest's CommonJS runtime can
-  // load them (the app itself uses native require(ESM) on Node >=20.19).
+  // Transpile the ESM-only @noble/* and htmlparser2 (a sanitize-html
+  // dependency since 2.17.6) packages so Jest's CommonJS runtime can load
+  // them (the app itself uses native require(ESM) on Node >=20.19).
   transform: { '^.+\\.js$': 'babel-jest' },
-  transformIgnorePatterns: ['/node_modules/(?!@noble/)'],
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@noble|htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)/)',
+  ],
   // Tests run without DB access; any DB-touching test must mock pool explicitly.
   testPathIgnorePatterns: ['/node_modules/'],
   // Some upstream test files use longer timeouts for streaming integration
