@@ -15,7 +15,7 @@
     "postinstall": "node scripts/postinstall-ajv-compat.js && node scripts/patch-eslint-ajv.js"
   },
   "dependencies": {
-    "@simplewebauthn/browser": "^13.2.2",
+    "@simplewebauthn/browser": "^14.0.0",
     "axios": "^1.19.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.31.0",
