@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.2.2",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.31.0",
     "next": "^16.3.5",
