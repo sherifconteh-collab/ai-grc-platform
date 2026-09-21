@@ -32,7 +32,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "eslint": "^10.10.0",
-    "eslint-config-next": "^16.3.3",
+    "eslint-config-next": "^16.3.5",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.3"
