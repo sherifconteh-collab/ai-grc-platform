@@ -1,5 +1,11 @@
 const express = require('express')
 const router = express.Router()
+const rateLimit = require('express-rate-limit')
+
+// express-rate-limit router-wide, ahead of any auth or DB work, so every
+// handler below is covered (CodeQL js/missing-rate-limiting). Endpoint-specific
+// limiters further down stay the tighter controls.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false }))
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate')
 const {
   DEMO_ADMIN_ACCOUNTS,
