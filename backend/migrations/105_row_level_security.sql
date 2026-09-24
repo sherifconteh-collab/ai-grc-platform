@@ -11,81 +11,34 @@
 --     queries, migrations, seeds, and platform-admin operations.
 --   - When app.org_id IS set: only rows matching that organization_id are returned.
 --
--- FORCE ROW SECURITY applies the policy even to superusers, making it a true
+-- FORCE ROW LEVEL SECURITY applies the policy even to superusers, making it a true
 -- defense-in-depth measure rather than a bypassable suggestion.
 --
 -- Ships in v3.4.0.
 
--- controls
-ALTER TABLE controls ENABLE ROW SECURITY;
-ALTER TABLE controls FORCE ROW SECURITY;
-
-CREATE POLICY org_isolation ON controls
-  USING (
-    NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
-    OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
-  );
-
--- control_implementations
-ALTER TABLE control_implementations ENABLE ROW SECURITY;
-ALTER TABLE control_implementations FORCE ROW SECURITY;
-
-CREATE POLICY org_isolation ON control_implementations
-  USING (
-    NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
-    OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
-  );
-
--- evidence (conditional: table may not exist in all editions)
+-- Applied only to tables that exist in this edition and carry an
+-- organization_id column (the community schema has no `controls` table), and
+-- idempotently, so a re-run cannot fail on an existing policy.
 DO $$
+DECLARE
+  tbl TEXT;
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'evidence') THEN
-    EXECUTE 'ALTER TABLE evidence ENABLE ROW SECURITY';
-    EXECUTE 'ALTER TABLE evidence FORCE ROW SECURITY';
-    EXECUTE $policy$
-      CREATE POLICY org_isolation ON evidence
-        USING (
-          NULLIF(current_setting(''app.org_id'', TRUE), '''') IS NULL
-          OR organization_id = NULLIF(current_setting(''app.org_id'', TRUE), '''')::uuid
-        )
-    $policy$;
-  END IF;
+  FOREACH tbl IN ARRAY ARRAY['controls', 'control_implementations', 'evidence', 'audit_engagements', 'audit_logs', 'users']
+  LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'organization_id'
+    ) THEN
+      EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
+      EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tbl);
+      EXECUTE format('DROP POLICY IF EXISTS org_isolation ON %I', tbl);
+      EXECUTE format(
+        'CREATE POLICY org_isolation ON %I USING ('
+        || 'NULLIF(current_setting(''app.org_id'', TRUE), '''') IS NULL '
+        || 'OR organization_id = NULLIF(current_setting(''app.org_id'', TRUE), '''')::uuid)',
+        tbl
+      );
+    END IF;
+  END LOOP;
 END;
 $$;
-
--- audit_engagements (assessments)
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'audit_engagements') THEN
-    EXECUTE 'ALTER TABLE audit_engagements ENABLE ROW SECURITY';
-    EXECUTE 'ALTER TABLE audit_engagements FORCE ROW SECURITY';
-    EXECUTE $policy$
-      CREATE POLICY org_isolation ON audit_engagements
-        USING (
-          NULLIF(current_setting(''app.org_id'', TRUE), '''') IS NULL
-          OR organization_id = NULLIF(current_setting(''app.org_id'', TRUE), '''')::uuid
-        )
-    $policy$;
-  END IF;
-END;
-$$;
-
--- audit_logs
-ALTER TABLE audit_logs ENABLE ROW SECURITY;
-ALTER TABLE audit_logs FORCE ROW SECURITY;
-
-CREATE POLICY org_isolation ON audit_logs
-  USING (
-    NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
-    OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
-  );
-
--- users (filtered by organization_id for intra-org visibility)
-ALTER TABLE users ENABLE ROW SECURITY;
-ALTER TABLE users FORCE ROW SECURITY;
-
-CREATE POLICY org_isolation ON users
-  USING (
-    NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
-    OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
-  );
