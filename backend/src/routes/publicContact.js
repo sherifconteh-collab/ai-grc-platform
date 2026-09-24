@@ -3,6 +3,7 @@ const router = express.Router()
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate')
 const {
   DEMO_ADMIN_ACCOUNTS,
+  isDemoModeEnabled,
   resolveDemoAccountPassword
 } = require('../../scripts/lib/demo-account-config')
 const {
@@ -11,6 +12,16 @@ const {
 } = require('../services/emailService')
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Demo credential delivery is opt-in: demo mode must be on, delivery must be
+// explicitly enabled, and a private password must be configured. Otherwise the
+// prospect gets the sales follow-up email -- working credentials are never
+// emailed based on the repository's published default password.
+function demoAccountDeliveryEnabled() {
+  return isDemoModeEnabled()
+    && String(process.env.DEMO_ACCOUNT_DELIVERY_ENABLED || '').toLowerCase() === 'true'
+    && String(process.env.DEMO_ACCOUNT_PASSWORD || '').trim().length > 0
+}
 
 const DEMO_ACCOUNT_BY_TIER = Object.freeze(
   Object.fromEntries(
@@ -70,7 +81,7 @@ router.post(
       const message = String(sanitizeInput(req.body.message || '') || '').trim()
       const requestedTier = normalizeTier(req.body.requestedTier)
       const requestedTierLabel = formatTierLabel(requestedTier)
-      const wantsDemoAccount = req.body.wantsDemoAccount !== false
+      const wantsDemoAccount = req.body.wantsDemoAccount !== false && demoAccountDeliveryEnabled()
 
       const demoAccountEmail = DEMO_ACCOUNT_BY_TIER[requestedTier]
       const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000'

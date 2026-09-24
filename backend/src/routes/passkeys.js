@@ -3,6 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { authenticate, requireTier } = require('../middleware/auth');
 const PASSKEY_TIER = 'enterprise'; // Passkeys available on Enterprise+
@@ -18,7 +19,7 @@ const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 
 function issueTokens(userId) {
   const accessToken = jwt.sign({ userId }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: ACCESS_EXPIRY });
-  const refreshToken = jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: REFRESH_EXPIRY });
+  const refreshToken = jwt.sign({ userId, type: 'refresh', jti: crypto.randomBytes(16).toString('hex') }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: REFRESH_EXPIRY });
   return { accessToken, refreshToken };
 }
 

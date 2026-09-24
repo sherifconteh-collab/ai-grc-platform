@@ -1,8 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
-import { authAPI, API_BASE_URL } from '@/lib/api';
+import { authAPI, refreshAccessToken } from '@/lib/api';
 import { setAccessToken, clearAccessToken, getAccessToken } from '@/lib/tokenStore';
 import { useRouter } from 'next/navigation';
 import { requiresOrganizationOnboarding } from '@/lib/access';
@@ -218,16 +217,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         try {
-          // Use raw axios (not the shared intercepted instance) to avoid a
-          // circular 401 loop: if the refresh call itself returns 401, the
-          // shared api interceptor would try to refresh again and redirect
-          // to /login prematurely.
-          const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken: storedRefreshToken,
-          });
-          const { accessToken } = refreshResponse.data.data;
-          setAccessToken(accessToken);
-          setRefreshToken(storedRefreshToken);
+          // refreshAccessToken uses raw axios (not the shared intercepted
+          // instance), so a 401 here cannot loop through the interceptor.
+          // refreshAccessToken persists the rotated refresh token and shares
+          // one in-flight refresh with any concurrent 401 retries.
+          await refreshAccessToken();
+          setRefreshToken(localStorage.getItem('refreshToken'));
         } catch (refreshErr) {
           // Refresh token is expired or invalid — treat as logged out.
           console.warn('Silent token refresh on page load failed:', refreshErr instanceof Error ? refreshErr.message : String(refreshErr));
@@ -341,7 +336,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearInactivityTimer();
     clearDemoSessionTimer();
     try {
-      await authAPI.logout(refreshToken || undefined);
+      // localStorage holds the latest rotated token; state may lag behind it.
+      await authAPI.logout(localStorage.getItem('refreshToken') || refreshToken || undefined);
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

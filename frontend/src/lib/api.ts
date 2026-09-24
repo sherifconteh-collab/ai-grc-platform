@@ -33,6 +33,47 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Refresh tokens rotate on every use (the backend returns a new one and treats
+// a replayed old one as theft), so every refresh must persist the rotated
+// token, and concurrent 401s must share a single refresh instead of racing
+// several refreshes with the same token.
+let refreshInFlight: Promise<string> | null = null;
+
+async function exchangeRefreshToken(token: string): Promise<string> {
+  // Raw axios, not the intercepted instance, so a 401 here cannot recurse.
+  const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken: token });
+  const { accessToken, refreshToken: rotated } = response.data.data as {
+    accessToken: string;
+    refreshToken?: string;
+  };
+  if (rotated) localStorage.setItem('refreshToken', rotated);
+  setAccessToken(accessToken);
+  return accessToken;
+}
+
+async function performRefresh(): Promise<string> {
+  const used = localStorage.getItem('refreshToken');
+  if (!used) throw new Error('No refresh token');
+  try {
+    return await exchangeRefreshToken(used);
+  } catch (err) {
+    // Another tab may have rotated the shared token while this one was using it.
+    const latest = localStorage.getItem('refreshToken');
+    if (latest && latest !== used) return exchangeRefreshToken(latest);
+    throw err;
+  }
+}
+
+/** Refreshes the access token once, sharing the result with concurrent callers. */
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = performRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
 // Response interceptor - handle token refresh
 api.interceptors.response.use(
   (response) => response,
@@ -44,18 +85,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token');
-        }
-
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refreshToken,
-        });
-
-        const { accessToken } = response.data.data;
-        // Store the new access token in memory only, never in localStorage
-        setAccessToken(accessToken);
+        const accessToken = await refreshAccessToken();
 
         // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
@@ -1329,6 +1359,8 @@ export const ssoAPI = {
     `${API_BASE_URL}/sso/social/${provider}`,
   orgSsoUrl: (orgId: string) =>
     `${API_BASE_URL}/sso/login/org?org_id=${encodeURIComponent(orgId)}`,
+  exchangeCode: (code: string, totpCode?: string) =>
+    api.post('/sso/exchange', totpCode ? { code, totp_code: totpCode } : { code }),
 };
 
 // SIEM APIs

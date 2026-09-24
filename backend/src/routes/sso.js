@@ -13,6 +13,9 @@ const auditService = require('../services/auditService');
 const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
 const { validateBody, requireFields } = require('../middleware/validate');
 const { hashForLookup, hashToken } = require('../utils/encrypt');
+const { verifyTotpOrBackupCode } = require('../services/secondFactorService');
+const { createRateLimiter } = require('../middleware/rateLimit');
+const { log } = require('../utils/logger');
 const { hasPublicColumn } = require('../utils/schema');
 const { resolveExpiryTimestampFromNow } = require('../utils/sessionExpiry');
 
@@ -28,8 +31,27 @@ function escapeLike(str) {
 
 function issueTokens(userId) {
   const accessToken = jwt.sign({ userId }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: ACCESS_EXPIRY });
-  const refreshToken = jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: REFRESH_EXPIRY });
+  const refreshToken = jwt.sign({ userId, type: 'refresh', jti: crypto.randomBytes(16).toString('hex') }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: REFRESH_EXPIRY });
   return { accessToken, refreshToken };
+}
+
+// Single-use code the SSO callback hands to the frontend in place of tokens.
+// Tokens are only released by POST /sso/exchange, which also enforces TOTP.
+const HANDOFF_TTL_SECONDS = 60;
+
+async function redirectWithHandoffCode(res, userId, authMethod) {
+  const code = crypto.randomBytes(32).toString('base64url');
+  await pool.query(
+    `INSERT INTO sso_handoff_codes (code_hash, user_id, auth_method, expires_at)
+     VALUES ($1, $2, $3, NOW() + ($4::int * INTERVAL '1 second'))`,
+    [hashToken(code), userId, authMethod, HANDOFF_TTL_SECONDS]
+  );
+  return res.redirect(`${FRONTEND_URL}/login/sso-callback#code=${encodeURIComponent(code)}`);
+}
+
+// OIDC providers send email_verified as a boolean; Apple sends the string "true".
+function isEmailVerifiedClaim(value) {
+  return value === true || value === 'true';
 }
 
 // email_hash column availability cache for SSO route (checked once per process)
@@ -41,8 +63,7 @@ async function hasSsoEmailHashCol() {
   return ssoEmailHashColumnAvailable;
 }
 
-// SHA-384 (CNSA Suite 1.0). The shared /auth/refresh lookup accepts the legacy
-// SHA-256 digest so pre-cutover sessions keep working until they expire.
+// SHA-384 (CNSA Suite 1.0), matching the /auth/refresh lookup.
 function hashRefreshToken(token) {
   return hashToken(token);
 }
@@ -208,11 +229,7 @@ router.get('/callback/org', async (req, res) => {
       actorName: userinfo.name || email
     });
 
-    const { accessToken, refreshToken } = issueTokens(userId);
-    await storeSession(userId, refreshToken);
-    return res.redirect(
-      `${FRONTEND_URL}/login/sso-callback#at=${encodeURIComponent(accessToken)}&rt=${encodeURIComponent(refreshToken)}`
-    );
+    return redirectWithHandoffCode(res, userId, 'sso');
   } catch (err) {
     console.error('SSO callback error:', err);
     
@@ -309,11 +326,11 @@ router.get('/callback/:provider', async (req, res) => {
     const cfg = sso.SOCIAL_PROVIDERS[provider];
     if (!cfg) return res.redirect(`${FRONTEND_URL}/login?error=unknown_provider`);
 
-    let name, providerUserId, accessToken;
+    let name, providerUserId, accessToken, emailVerified;
 
     if (provider === 'github') {
       const ghUser = await sso.exchangeGitHubCode(code, callbackUrl(provider));
-      ({ email, name, providerUserId, accessToken } = ghUser);
+      ({ email, name, providerUserId, accessToken, emailVerified } = ghUser);
     } else {
       const { tokenSet, userinfo } = await sso.exchangeOidcCode(
         cfg.discoveryUrl,
@@ -327,6 +344,7 @@ router.get('/callback/:provider', async (req, res) => {
       name = userinfo.name || userinfo.preferred_username;
       providerUserId = userinfo.sub;
       accessToken = tokenSet.access_token;
+      emailVerified = isEmailVerifiedClaim(userinfo.email_verified);
     }
 
     if (!email) return res.redirect(`${FRONTEND_URL}/login?error=no_email`);
@@ -353,6 +371,14 @@ router.get('/callback/:provider', async (req, res) => {
         [accessToken, provider, providerUserId]
       );
     } else {
+      // Linking a new provider identity to an existing account by email is
+      // only safe when the provider vouches that the address is verified;
+      // otherwise anyone who can set an arbitrary email on a provider account
+      // could sign in as the matching ControlWeave user.
+      if (!emailVerified) {
+        return res.redirect(`${FRONTEND_URL}/login?error=email_not_verified`);
+      }
+
       // Check if user exists by email (must already have an account)
       const ssoEmailHash = (await hasSsoEmailHashCol()) ? hashForLookup(email.toLowerCase()) : null;
       let existingUser;
@@ -414,11 +440,7 @@ router.get('/callback/:provider', async (req, res) => {
       });
     }
 
-    const { accessToken: at, refreshToken: rt } = issueTokens(userId);
-    await storeSession(userId, rt);
-    return res.redirect(
-      `${FRONTEND_URL}/login/sso-callback#at=${encodeURIComponent(at)}&rt=${encodeURIComponent(rt)}`
-    );
+    return redirectWithHandoffCode(res, userId, `social:${provider}`);
   } catch (err) {
     console.error(`Social ${req.params.provider} callback error:`, err);
     
@@ -480,6 +502,73 @@ router.delete('/social-logins/:provider', authenticate, requireTier(SSO_TIER), a
     return res.json({ data: { unlinked: true } });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to unlink social login' });
+  }
+});
+
+// POST /sso/exchange -- trade a single-use SSO handoff code for tokens.
+// Public by design: the caller has no session yet, and the 256-bit code is the
+// credential. A TOTP-enabled user must also supply totp_code; the code is only
+// consumed on success or on a wrong second factor (which forces a fresh SSO
+// round-trip rather than allowing unlimited TOTP guesses).
+const exchangeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, label: 'sso-exchange' });
+
+router.post('/exchange', exchangeLimiter, async (req, res) => {
+  try {
+    const code = String(req.body?.code || '').trim();
+    const totpCode = String(req.body?.totp_code || '').trim();
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'code is required' });
+    }
+    const codeHash = hashToken(code);
+
+    const pending = await pool.query(
+      `SELECT h.user_id, h.auth_method, u.is_active, u.organization_id,
+              COALESCE(u.totp_enabled, false) AS totp_enabled,
+              u.totp_secret, u.totp_backup_codes
+       FROM sso_handoff_codes h
+       JOIN users u ON u.id = h.user_id
+       WHERE h.code_hash = $1 AND h.expires_at > NOW()`,
+      [codeHash]
+    );
+    const user = pending.rows[0];
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired sign-in code' });
+    }
+    if (!user.is_active) {
+      await pool.query('DELETE FROM sso_handoff_codes WHERE code_hash = $1', [codeHash]);
+      return res.status(401).json({ success: false, error: 'Account is disabled' });
+    }
+
+    if (user.totp_enabled) {
+      if (!totpCode) {
+        return res.json({
+          success: false,
+          totp_required: true,
+          message: 'Enter the 6-digit code from your authenticator app to complete sign-in.'
+        });
+      }
+      const valid = await verifyTotpOrBackupCode({ ...user, id: user.user_id }, totpCode);
+      if (!valid) {
+        await pool.query('DELETE FROM sso_handoff_codes WHERE code_hash = $1', [codeHash]);
+        return res.status(401).json({ success: false, error: 'Invalid authenticator code. Please sign in again.' });
+      }
+    }
+
+    // Consume atomically so a code can never be redeemed twice.
+    const consumed = await pool.query(
+      'DELETE FROM sso_handoff_codes WHERE code_hash = $1 AND expires_at > NOW() RETURNING user_id',
+      [codeHash]
+    );
+    if (consumed.rows.length === 0) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired sign-in code' });
+    }
+
+    const { accessToken, refreshToken } = issueTokens(user.user_id);
+    await storeSession(user.user_id, refreshToken);
+    return res.json({ success: true, data: { accessToken, refreshToken } });
+  } catch (err) {
+    log('error', 'sso.exchange_failed', { error: err.message });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
 
