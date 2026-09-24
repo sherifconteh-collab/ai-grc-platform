@@ -52,7 +52,7 @@ const navigationSections: NavigationSection[] = [
       { name: 'Threat Intelligence', href: '/dashboard/threat-intel', icon: '🎯', requiredPermissions: ['assets.read'] },
       { name: 'AI Threat Library', href: '/dashboard/plot4ai', icon: '🃏', requiredPermissions: ['organizations.read'] },
       { name: 'Vendor Contracts', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'] },
-      { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['organizations.read'] },
+      { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['tprm.read'] },
       { name: 'Financial Compliance', href: '/dashboard/cmdb/financial-services-workspace', icon: '🏦', requiredPermissions: ['assets.read'] },
     ],
   },

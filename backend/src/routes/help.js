@@ -647,25 +647,28 @@ Financial services frameworks (FINRA, SEC, SR 11-7) are pre-crosswalked to NIST 
 
 Schedule automated evidence collection from integrated sources on a recurring basis.
 
+## Availability
+Automated collection currently runs for **Splunk** (manual and scheduled rules). The other sources below can be configured, but running their rules returns "not available yet" and creates no evidence; upload that evidence manually until their collectors ship.
+
 ## Source Categories
 
 ### 🛡️ SIEM & Security
 - **Splunk** — Import search results from Splunk Enterprise or Splunk Cloud. Evidence: failed login reports, firewall deny logs, privileged access audits, correlation search results.
-- **Microsoft Sentinel** — Collect security incidents, analytics rule matches, and hunting query results from Azure Sentinel. Evidence: security incidents, analytics rule matches, threat hunting results, watchlist alerts.
-- **CrowdStrike Falcon** — Collect endpoint detection and response (EDR) data. Evidence: threat detections, endpoint compliance status, vulnerability assessments, device inventory snapshots.
+- **Microsoft Sentinel** *(collector coming soon)* — Collect security incidents, analytics rule matches, and hunting query results from Azure Sentinel. Evidence: security incidents, analytics rule matches, threat hunting results, watchlist alerts.
+- **CrowdStrike Falcon** *(collector coming soon)* — Collect endpoint detection and response (EDR) data. Evidence: threat detections, endpoint compliance status, vulnerability assessments, device inventory snapshots.
 
 ### ☁️ Cloud Platforms
-- **AWS CloudTrail** — Import API activity logs, resource change events, and governance evidence from AWS. Evidence: IAM policy changes, S3 bucket access logs, EC2 instance lifecycle events, root account activity.
+- **AWS CloudTrail** *(collector coming soon)* — Import API activity logs, resource change events, and governance evidence from AWS. Evidence: IAM policy changes, S3 bucket access logs, EC2 instance lifecycle events, root account activity.
 
 ### 🔧 DevOps & SCM
-- **Jira** — Import issues, epics, and project tracking data. Evidence: change request tickets, risk register issues, remediation task status, sprint completion reports.
-- **GitHub** — Import repository audit logs, PR review approvals, code scanning alerts, and Dependabot vulnerability data. Evidence: PR review approvals (code review evidence), Dependabot security alerts, CodeQL results (SAST evidence), repository audit log (access changes, branch protections).
+- **Jira** *(collector coming soon)* — Import issues, epics, and project tracking data. Evidence: change request tickets, risk register issues, remediation task status, sprint completion reports.
+- **GitHub** *(collector coming soon)* — Import repository audit logs, PR review approvals, code scanning alerts, and Dependabot vulnerability data. Evidence: PR review approvals (code review evidence), Dependabot security alerts, CodeQL results (SAST evidence), repository audit log (access changes, branch protections).
 
 ### 🎫 IT Service Management
-- **ITSM Platform** — Collect ITSM records including incidents, change requests, and configuration items. Evidence: incident records, change request approvals, CMDB configuration items, problem management records.
+- **ITSM Platform** *(collector coming soon)* — Collect ITSM records including incidents, change requests, and configuration items. Evidence: incident records, change request approvals, CMDB configuration items, problem management records.
 
 ### 🔌 Custom
-- **Custom Connector** — Use webhooks or API integrations to push evidence from any external source.
+- **Custom Connector** *(collector coming soon)* — Use webhooks or API integrations to push evidence from any external source.
 
 ## Creating a Rule
 1. Navigate to **Evidence** in the sidebar

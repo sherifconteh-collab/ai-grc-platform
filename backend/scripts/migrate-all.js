@@ -6,6 +6,26 @@ const pool = require('../src/config/database');
 const { getNumberedMigrationEntries, validateMigrationDirectory } = require('./lib/migrationValidation');
 
 const migrationsDir = path.join(__dirname, '../migrations');
+
+// Session-level advisory lock key shared by every migration runner. Two
+// overlapping deploys (or a manual run during a deploy) must not apply the
+// same migration concurrently.
+const MIGRATION_LOCK_KEY = 72_917_150;
+const MIGRATION_LOCK_TIMEOUT_MS = 10 * 60 * 1000;
+const MIGRATION_LOCK_POLL_MS = 2000;
+
+async function acquireMigrationLock(client) {
+  const deadline = Date.now() + MIGRATION_LOCK_TIMEOUT_MS;
+  for (;;) {
+    const result = await client.query('SELECT pg_try_advisory_lock($1) AS locked', [MIGRATION_LOCK_KEY]);
+    if (result.rows[0].locked) return;
+    if (Date.now() > deadline) {
+      throw new Error('Timed out waiting for another migration run to finish.');
+    }
+    console.log('WAIT another migration run holds the lock');
+    await new Promise((resolve) => setTimeout(resolve, MIGRATION_LOCK_POLL_MS));
+  }
+}
 const DESKTOP_RECONCILE_FILENAME = '100_desktop_schema_reconcile.sql';
 
 function sanitizeSqlForNonUtf8Server(sql) {
@@ -78,6 +98,13 @@ async function runMigrations() {
       throw new Error(`Duplicate migration bodies detected: ${duplicatePairs}`);
     }
 
+    await acquireMigrationLock(client);
+    if (process.env.NODE_ENV === 'production' && (baselineOnError || allowChecksumDrift)) {
+      console.warn(
+        'WARN MIGRATION_BASELINE_ON_ERROR / MIGRATION_ALLOW_CHECKSUM_DRIFT is enabled in production. '
+        + 'Unset it once the one-off recovery is complete.'
+      );
+    }
     await ensureMigrationsTable(client);
     const encodingResult = await client.query('SHOW SERVER_ENCODING');
     const serverEncoding = String(encodingResult.rows[0]?.server_encoding || '').toUpperCase();
@@ -153,6 +180,9 @@ async function runMigrations() {
       }
     }
   } finally {
+    // Advisory locks are released when the session ends; unlock explicitly so
+    // a pooled connection never carries the lock beyond this run.
+    await client.query('SELECT pg_advisory_unlock_all()').catch(() => {});
     client.release();
     await pool.end();
   }

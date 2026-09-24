@@ -100,7 +100,14 @@ async function runJob(jobRow) {
       }
       return runRetentionCleanup({ organizationId: jobRow.organization_id });
     case 'integration_sync':
-      return { synced: true, connector_id: payload.connectorId || null, mode: payload.mode || 'manual' };
+      // Background connector sync is not implemented; never report a sync
+      // that did not happen. Connectors run on demand via the integrations hub.
+      return {
+        noop: true,
+        synced: false,
+        connector_id: payload.connectorId || null,
+        reason: 'Background integration sync is not implemented; use POST /integrations-hub/connectors/:id/run.'
+      };
     case 'evidence_auto_collect':
       if (!jobRow.organization_id) {
         return { noop: true, reason: 'No organization_id on job.' };

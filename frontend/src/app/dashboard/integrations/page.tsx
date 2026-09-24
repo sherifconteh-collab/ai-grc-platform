@@ -130,8 +130,10 @@ export default function IntegrationsPage() {
     try {
       await integrationsHubAPI.runConnector(id);
       await load();
-    } catch {
-      setError('Failed to trigger connector run.');
+    } catch (err: unknown) {
+      const apiError = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+      setError(typeof apiError === 'string' ? apiError : 'Failed to trigger connector run.');
+      await load();
     } finally {
       setRunningId(null);
     }
