@@ -4,6 +4,7 @@ const router = express.Router();
 const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const pool = require('../config/database');
+const { compliancePercentage: calcCompliance } = require('../services/complianceMetrics');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 
 router.use(authenticate);
@@ -14,10 +15,11 @@ async function getComplianceData(orgId) {
   const overallResult = await pool.query(`
     SELECT
       COUNT(DISTINCT fc.id) as total_controls,
-      COUNT(DISTINCT CASE WHEN ci.status = 'implemented' THEN ci.id END) as implemented,
+      COUNT(DISTINCT CASE WHEN ci.status IN ('implemented', 'verified') THEN ci.id END) as implemented,
       COUNT(DISTINCT CASE WHEN ci.status = 'satisfied_via_crosswalk' THEN ci.id END) as crosswalked,
       COUNT(DISTINCT CASE WHEN ci.status = 'in_progress' THEN ci.id END) as in_progress,
-      COUNT(DISTINCT CASE WHEN ci.status = 'needs_review' THEN ci.id END) as needs_review
+      COUNT(DISTINCT CASE WHEN ci.status = 'needs_review' THEN ci.id END) as needs_review,
+      COUNT(DISTINCT CASE WHEN ci.status = 'not_applicable' THEN ci.id END) as not_applicable
     FROM organization_frameworks of2
     JOIN framework_controls fc ON fc.framework_id = of2.framework_id
     LEFT JOIN control_implementations ci ON ci.control_id = fc.id AND ci.organization_id = $1
@@ -28,9 +30,10 @@ async function getComplianceData(orgId) {
     SELECT
       f.name, f.code,
       COUNT(DISTINCT fc.id) as total_controls,
-      COUNT(DISTINCT CASE WHEN ci.status = 'implemented' THEN ci.id END) as implemented,
+      COUNT(DISTINCT CASE WHEN ci.status IN ('implemented', 'verified') THEN ci.id END) as implemented,
       COUNT(DISTINCT CASE WHEN ci.status = 'satisfied_via_crosswalk' THEN ci.id END) as crosswalked,
-      COUNT(DISTINCT CASE WHEN ci.status = 'in_progress' THEN ci.id END) as in_progress
+      COUNT(DISTINCT CASE WHEN ci.status = 'in_progress' THEN ci.id END) as in_progress,
+      COUNT(DISTINCT CASE WHEN ci.status = 'not_applicable' THEN ci.id END) as not_applicable
     FROM organization_frameworks of2
     JOIN frameworks f ON f.id = of2.framework_id
     JOIN framework_controls fc ON fc.framework_id = f.id
@@ -158,9 +161,7 @@ async function getSspData(orgId) {
   const controlsCrosswalked = toNumber(overall.crosswalked);
   const controlsInProgress = toNumber(overall.in_progress);
   const controlsNeedsReview = toNumber(overall.needs_review);
-  const compliancePercent = controlsTotal > 0
-    ? Math.round(((controlsImplemented + controlsCrosswalked) / controlsTotal) * 100)
-    : 0;
+  const compliancePercent = calcCompliance(controlsImplemented + controlsCrosswalked, controlsTotal, toNumber(overall.not_applicable));
 
   const assetSummary = assetSummaryResult.rows[0] || {};
   const vulnerabilitySummary = vulnerabilitySummaryResult.rows[0] || {};
@@ -248,7 +249,7 @@ router.get('/compliance/pdf', requirePermission('reports.read'), async (req, res
     const total = parseInt(overall.total_controls) || 1;
     const implemented = parseInt(overall.implemented) || 0;
     const crosswalked = parseInt(overall.crosswalked) || 0;
-    const compliancePct = Math.round(((implemented + crosswalked) / total) * 100);
+    const compliancePct = calcCompliance(implemented + crosswalked, total, parseInt(overall.not_applicable) || 0);
 
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
@@ -289,7 +290,7 @@ router.get('/compliance/pdf', requirePermission('reports.read'), async (req, res
     for (const fw of data.frameworks) {
       const fwTotal = parseInt(fw.total_controls);
       const fwImpl = parseInt(fw.implemented) + parseInt(fw.crosswalked);
-      const fwPct = fwTotal > 0 ? Math.round((fwImpl / fwTotal) * 100) : 0;
+      const fwPct = calcCompliance(fwImpl, fwTotal, parseInt(fw.not_applicable) || 0);
 
       doc.fontSize(13).fillColor('#1f2937').text(`${fw.name} (${fw.code})`);
       doc.fontSize(10).fillColor('#6b7280')
@@ -401,7 +402,7 @@ router.get('/compliance/excel', requirePermission('reports.read'), async (req, r
         implemented: parseInt(fw.implemented),
         crosswalked: parseInt(fw.crosswalked),
         in_progress: parseInt(fw.in_progress) || 0,
-        pct: fwTotal > 0 ? `${Math.round((fwDone / fwTotal) * 100)}%` : '0%'
+        pct: `${calcCompliance(fwDone, fwTotal, parseInt(fw.not_applicable) || 0)}%`
       });
     }
 

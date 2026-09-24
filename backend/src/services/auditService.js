@@ -13,6 +13,7 @@
  */
 
 const pool = require('../config/database');
+const { markRequestAudited } = require('../utils/auditContext');
 const siemService = require('./siemService');
 const dynamicFieldsService = require('./dynamicAuditFieldsService');
 
@@ -62,6 +63,9 @@ async function createAuditLog(params) {
   } = params;
 
   const outcome = success ? 'success' : 'failure';
+  // Tell the baseline audit middleware this request already has a specific
+  // event (synchronously, before the first await, so ordering cannot race).
+  markRequestAudited();
 
   try {
     // Insert audit log

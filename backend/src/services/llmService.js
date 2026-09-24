@@ -354,30 +354,36 @@ async function resolveApiKey(provider, organizationId) {
   return { key: null, source: null };
 }
 
+// Bound every provider call so a slow or unreachable BYOK provider fails fast
+// instead of holding the request (and the UI) open. SDK retries are off: the
+// provider fallback chain already moves on to the next configured provider.
+const AI_PROVIDER_TIMEOUT_MS = Math.max(5000, Number(process.env.AI_PROVIDER_TIMEOUT_MS || 60000));
+const SDK_CLIENT_OPTIONS = Object.freeze({ timeout: AI_PROVIDER_TIMEOUT_MS, maxRetries: 0 });
+
 function getClient(provider, orgApiKey) {
   if (provider === 'claude') {
     if (!orgApiKey) return null;
-    return new Anthropic.default({ apiKey: orgApiKey });
+    return new Anthropic.default({ apiKey: orgApiKey, ...SDK_CLIENT_OPTIONS });
   }
   if (provider === 'openai') {
     if (!orgApiKey) return null;
-    return new OpenAI.default({ apiKey: orgApiKey });
+    return new OpenAI.default({ apiKey: orgApiKey, ...SDK_CLIENT_OPTIONS });
   }
   if (provider === 'grok') {
     if (!orgApiKey) return null;
-    return new OpenAI.default({ apiKey: orgApiKey, baseURL: XAI_API_BASE });
+    return new OpenAI.default({ apiKey: orgApiKey, baseURL: XAI_API_BASE, ...SDK_CLIENT_OPTIONS });
   }
   if (provider === 'gemini') {
     return orgApiKey ? { apiKey: orgApiKey } : null;
   }
   if (provider === 'groq') {
     if (!orgApiKey) return null;
-    return new OpenAI.default({ apiKey: orgApiKey, baseURL: GROQ_API_BASE });
+    return new OpenAI.default({ apiKey: orgApiKey, baseURL: GROQ_API_BASE, ...SDK_CLIENT_OPTIONS });
   }
   if (provider === 'ollama') {
     if (!orgApiKey) return null;
     // orgApiKey is the base URL for Ollama; Ollama ignores the Authorization header
-    return new OpenAI.default({ apiKey: 'ollama', baseURL: orgApiKey });
+    return new OpenAI.default({ apiKey: 'ollama', baseURL: orgApiKey, ...SDK_CLIENT_OPTIONS });
   }
   return null;
 }
@@ -499,7 +505,8 @@ async function executeProviderChat({ provider, client, model, messages, systemPr
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(AI_PROVIDER_TIMEOUT_MS)
       }
     );
 
@@ -920,10 +927,19 @@ async function* chatStream({ provider = 'claude', model, messages, systemPrompt,
     };
     if (safeStreamSystemPrompt) payload.systemInstruction = { parts: [{ text: safeStreamSystemPrompt }] };
 
-    const response = await fetch(
-      `${GEMINI_API_BASE}/models/${encodeURIComponent(chosenModel)}:streamGenerateContent?key=${client.apiKey}&alt=sse`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
-    );
+    // Time out the connection, not the stream: once headers arrive the
+    // response may legitimately stream for longer than the timeout.
+    const connect = new AbortController();
+    const connectTimer = setTimeout(() => connect.abort(), AI_PROVIDER_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(
+        `${GEMINI_API_BASE}/models/${encodeURIComponent(chosenModel)}:streamGenerateContent?key=${client.apiKey}&alt=sse`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: connect.signal }
+      );
+    } finally {
+      clearTimeout(connectTimer);
+    }
     if (!response.ok) {
       throw new Error(`Gemini streaming failed with status ${response.status}`);
     }

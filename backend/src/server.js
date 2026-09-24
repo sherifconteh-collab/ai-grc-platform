@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const { auditBaseline } = require('./middleware/auditLog');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
@@ -177,6 +178,8 @@ app.use('/api/v1/auth/refresh', refreshRateLimiter);
 app.use('/api/v1/auth/forgot-password', passwordRecoveryRateLimiter);
 app.use('/api/v1/auth/reset-password', passwordRecoveryRateLimiter);
 app.use('/api/v1', apiRateLimiter);
+// Baseline audit trail for every state-changing request (AU-2 / AU-12)
+app.use('/api/v1', auditBaseline);
 
 // Validate edition at startup
 validateEdition();
