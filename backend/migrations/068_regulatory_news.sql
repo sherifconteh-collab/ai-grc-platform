@@ -22,6 +22,23 @@ CREATE TABLE IF NOT EXISTS regulatory_news_items (
   UNIQUE (organization_id, source, url)
 );
 
+-- Migration 024 also creates regulatory_news_items with an older, narrower
+-- schema (no relevant_frameworks/impact_level/keywords/is_archived/etc.).
+-- Since 024 numerically precedes 068, on a from-scratch migration run its
+-- CREATE TABLE wins the race and this one's CREATE TABLE IF NOT EXISTS above
+-- silently no-ops, leaving the columns this migration's indexes need missing
+-- until migration 100 backfills them. Add them here defensively so the
+-- indexes below never fail regardless of which CREATE TABLE actually ran.
+ALTER TABLE regulatory_news_items
+  ADD COLUMN IF NOT EXISTS content TEXT,
+  ADD COLUMN IF NOT EXISTS url TEXT,
+  ADD COLUMN IF NOT EXISTS relevant_frameworks TEXT[],
+  ADD COLUMN IF NOT EXISTS impact_level VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS keywords TEXT[],
+  ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
+
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_org ON regulatory_news_items(organization_id);
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_source ON regulatory_news_items(source);
 CREATE INDEX IF NOT EXISTS idx_regulatory_news_published ON regulatory_news_items(published_at DESC);

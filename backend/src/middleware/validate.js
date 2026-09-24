@@ -63,10 +63,59 @@ function sanitizeInput(value) {
   return sanitizeHtml(value.replace(/\0/g, ''), { allowedTags: [], allowedAttributes: {} });
 }
 
+/**
+ * Strips HTML like sanitizeInput, then decodes the entities the stripper leaves
+ * behind, for values stored as plain text and rendered by React.
+ *
+ * sanitizeInput escapes `&` to `&amp;`, so a department named "Legal &
+ * Compliance" is stored as "Legal &amp; Compliance" and rendered literally with
+ * the entity visible — React escapes on output, so escaping again on input
+ * double-escapes. Tags are already gone by the time this decoding runs, so
+ * turning `&amp;` back into `&` cannot reintroduce markup.
+ *
+ * Use this for names, titles, and descriptions. Keep sanitizeInput where the
+ * value may legitimately still contain markup-ish text.
+ */
+// SECURITY: `lt` and `gt` are deliberately absent, and must stay absent.
+//
+// Decoding `&lt;`/`&gt;` would reconstruct live markup from input sanitize-html
+// had already neutralized: sanitize-html parses entities, so a user submitting
+// the text "&lt;script&gt;alert(1)&lt;/script&gt;" leaves it escaped, and
+// decoding those two entities turns it back into a real script tag. Every
+// entity below decodes to a character that cannot begin a tag, so no
+// combination of them can produce one.
+const TEXT_ENTITIES = Object.freeze({
+  amp: '&', quot: '"', '#39': "'"
+});
+
+/**
+ * Strips HTML like sanitizeInput, then restores the handful of characters the
+ * stripper escapes that are not markup-capable, for values stored as plain text
+ * and rendered by React.
+ *
+ * sanitizeInput escapes `&`, so a department named "Legal & Compliance" is
+ * stored as "Legal &amp; Compliance" and rendered with the entity visible —
+ * React escapes on output, so escaping on input double-escapes. Names carrying
+ * an ampersand or apostrophe ("AT&T", "O'Brien") are the common case.
+ *
+ * Angle brackets are never restored; see TEXT_ENTITIES above.
+ *
+ * Use this for names, titles, and descriptions. Keep sanitizeInput where the
+ * value may legitimately still contain markup-ish text.
+ */
+function sanitizeText(value) {
+  if (typeof value !== 'string') return value;
+  return sanitizeInput(value).replace(
+    /&(amp|quot|#39);/g,
+    (_match, entity) => TEXT_ENTITIES[entity]
+  );
+}
+
 module.exports = {
   validateBody,
   requireFields,
   isUuid,
   isNonEmptyString,
-  sanitizeInput
+  sanitizeInput,
+  sanitizeText
 };

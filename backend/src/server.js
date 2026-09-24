@@ -1,3 +1,18 @@
+// sanitize-html (2.17.6+) depends on htmlparser2 12.x, which is ESM-only;
+// require()-ing it needs Node's synchronous require(esm) support, backported
+// to the 20.x line in 20.19.0. Fail loudly here instead of letting a route
+// module crash later with a cryptic ERR_REQUIRE_ESM three requires deep.
+{
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  if (major < 20 || (major === 20 && minor < 19)) {
+    console.error(
+      `ControlWeave requires Node.js >=20.19.0 (detected ${process.version}). ` +
+      'Earlier Node 20.x releases cannot require() the ESM-only htmlparser2 dependency that sanitize-html now uses.'
+    );
+    process.exit(1);
+  }
+}
+
 require('dotenv').config();
 const express = require('express');
 const { auditBaseline } = require('./middleware/auditLog');
@@ -43,6 +58,10 @@ function safeRequire(modulePath) {
 }
 const _reminderMod = safeRequire('./services/reminderService');
 const startReminderScheduler = _reminderMod ? _reminderMod.startReminderScheduler : null;
+const _reportSchedulerMod = safeRequire('./services/reportScheduler');
+const startReportScheduler = _reportSchedulerMod ? _reportSchedulerMod.startReportScheduler : null;
+const _retentionSchedulerMod = safeRequire('./services/retentionScheduler');
+const startRetentionScheduler = _retentionSchedulerMod ? _retentionSchedulerMod.startRetentionScheduler : null;
 const { SECURITY_CONFIG } = require('./config/security');
 const { validateEdition, getEditionInfo, attachEditionInfo } = require('./middleware/edition');
 const { getRedisAdapterStatus } = require('./services/websocketService');
@@ -374,6 +393,16 @@ const evidenceRoutes = safeRequire('./routes/evidence');
 const auditRoutes = require('./routes/audit');
 const auditFieldsRoutes = require('./routes/auditFields');
 const rolesRoutes = require('./routes/roles');
+const accessGovernanceRoutes = require('./routes/accessGovernance');
+// Risk and resilience registers. Ordered as they depend on one another:
+// departments and objectives are the organizational spine, risks hang off
+// them, incidents and indicators reference risks.
+const departmentsRoutes = require('./routes/departments');
+const objectivesRoutes = require('./routes/objectives');
+const risksRoutes = require('./routes/risks');
+const incidentsRoutes = require('./routes/incidents');
+const obligationsRoutes = require('./routes/obligations');
+const indicatorsRoutes = require('./routes/indicators');
 const usersRoutes = require('./routes/users');
 const cmdbRoutes = safeRequire('./routes/cmdb');
 const assetsRoutes = safeRequire('./routes/assets');
@@ -389,6 +418,7 @@ const vulnerabilitiesRoutes = safeRequire('./routes/vulnerabilities');
 const sbomRoutes = safeRequire('./routes/sbom');
 const dynamicConfigRoutes = require('./routes/dynamicConfig');
 const poamRoutes = require('./routes/poam');
+const poamMilestonesRoutes = require('./routes/poamMilestones');
 const exceptionsRoutes = require('./routes/exceptions');
 const controlHealthRoutes = require('./routes/controlHealth');
 const dashboardBuilderRoutes = require('./routes/dashboardBuilder');
@@ -432,10 +462,17 @@ const contactsRoutes = safeRequire('./routes/contacts');
 const internationalAiLawsRoutes = safeRequire('./routes/internationalAiLaws');
 const issueReportRoutes = require('./routes/issueReport');
 const pendingEvidenceRoutes = safeRequire('./routes/pendingEvidence');
+const pendingControlAssessmentsRoutes = safeRequire('./routes/pendingControlAssessments');
 const plot4aiRoutes = safeRequire('./routes/plot4ai');
 const publicContactRoutes = safeRequire('./routes/publicContact');
 const ragRoutes = safeRequire('./routes/rag');
 const rmfRoutes = safeRequire('./routes/rmf');
+const rmfInheritanceRoutes = safeRequire('./routes/rmfInheritance');
+const trustCenterRoutes = safeRequire('./routes/trustCenter');
+const trainingRoutes = safeRequire('./routes/training');
+const benchmarksRoutes = safeRequire('./routes/benchmarks');
+const complianceGateRoutes = safeRequire('./routes/complianceGate');
+const cyberResilienceRoutes = safeRequire('./routes/cyberResilience');
 const stateAiLawsRoutes = safeRequire('./routes/stateAiLaws');
 const totpRoutes = require('./routes/totp');
 const pushTokensRoutes = require('./routes/pushTokens');
@@ -457,6 +494,13 @@ if (evidenceRoutes) app.use('/api/v1/evidence', evidenceRoutes);
 app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/audit', auditFieldsRoutes); // Dynamic fields management under same base path
 app.use('/api/v1/roles', rolesRoutes);
+app.use('/api/v1/access-governance', accessGovernanceRoutes);
+app.use('/api/v1/departments', departmentsRoutes);
+app.use('/api/v1/objectives', objectivesRoutes);
+app.use('/api/v1/risks', risksRoutes);
+app.use('/api/v1/incidents', incidentsRoutes);
+app.use('/api/v1/obligations', obligationsRoutes);
+app.use('/api/v1/indicators', indicatorsRoutes);
 app.use('/api/v1/users', usersRoutes);
 if (cmdbRoutes) app.use('/api/v1/cmdb', cmdbRoutes);
 if (assetsRoutes) app.use('/api/v1/assets', assetsRoutes);
@@ -475,7 +519,10 @@ if (splunkRoutes) app.use('/api/v1/integrations', splunkRoutes);
 if (vulnerabilitiesRoutes) app.use('/api/v1/vulnerabilities', vulnerabilitiesRoutes);
 if (sbomRoutes) app.use('/api/v1/sbom', sbomRoutes);
 app.use('/api/v1/config', dynamicConfigRoutes);
+// Milestones mount on the same base path; poamMilestones.js declares only
+// /:id/milestones routes, so ordering between the two does not collide.
 app.use('/api/v1/poam', poamRoutes);
+app.use('/api/v1/poam', poamMilestonesRoutes);
 app.use('/api/v1/exceptions', exceptionsRoutes);
 app.use('/api/v1/control-health', controlHealthRoutes);
 app.use('/api/v1/dashboard-builder', dashboardBuilderRoutes);
@@ -515,10 +562,17 @@ app.use('/api/v1/help', helpRoutes);
 if (internationalAiLawsRoutes) app.use('/api/v1/international-ai-laws', internationalAiLawsRoutes);
 app.use('/api/v1/issues', issueReportRoutes);
 if (pendingEvidenceRoutes) app.use('/api/v1/pending-evidence', pendingEvidenceRoutes);
+if (pendingControlAssessmentsRoutes) app.use('/api/v1/pending-control-assessments', pendingControlAssessmentsRoutes);
 if (plot4aiRoutes) app.use('/api/v1/plot4ai', plot4aiRoutes);
 if (publicContactRoutes) app.use('/api/v1/public', publicContactRoutes);
 if (ragRoutes) app.use('/api/v1/rag', ragRoutes);
 if (rmfRoutes) app.use('/api/v1/rmf', rmfRoutes);
+if (rmfInheritanceRoutes) app.use('/api/v1/rmf', rmfInheritanceRoutes);
+if (trustCenterRoutes) app.use('/api/v1/trust-center', trustCenterRoutes);
+if (trainingRoutes) app.use('/api/v1/training', trainingRoutes);
+if (benchmarksRoutes) app.use('/api/v1/benchmarks', benchmarksRoutes);
+if (complianceGateRoutes) app.use('/api/v1/compliance', complianceGateRoutes);
+if (cyberResilienceRoutes) app.use('/api/v1/resilience', cyberResilienceRoutes);
 if (stateAiLawsRoutes) app.use('/api/v1/state-ai-laws', stateAiLawsRoutes);
 
 // Error handling middleware
@@ -723,6 +777,54 @@ async function ensureAssessmentProcedures() {
   log('info', 'assessment.procedures.seeded', { status: 'done' });
 }
 
+// Auto-heal already-deployed instances whose framework catalog predates
+// scripts/seed-missing-controls.js (missing NIST 800-53 MA/MP/PE/PS/PT/SA/SR
+// families plus NIST CSF 2.0 / ISO 27001 gaps). Idempotent — the script itself
+// skips controls that already exist, so re-running it is always safe.
+async function ensureFrameworkCatalogCompleteness() {
+  const client = await pool.connect();
+  let maFamilyCount;
+  try {
+    const { rows } = await client.query(
+      `SELECT COUNT(*)::int AS count
+       FROM framework_controls fc
+       JOIN frameworks f ON f.id = fc.framework_id
+       WHERE f.code = 'nist_800_53' AND fc.control_id LIKE 'MA-%'`
+    );
+    maFamilyCount = rows[0].count;
+  } finally {
+    client.release();
+  }
+  if (maFamilyCount > 0) {
+    log('info', 'framework.catalog.check', { status: 'complete', ma_family_count: maFamilyCount });
+    return;
+  }
+
+  const fwCheck = await pool.query(`SELECT id FROM frameworks WHERE code = 'nist_800_53' LIMIT 1`);
+  if (fwCheck.rows.length === 0) {
+    log('info', 'framework.catalog.check', { status: 'nist_800_53_not_seeded' });
+    return;
+  }
+
+  log('info', 'framework.catalog.seeding', { status: 'starting', reason: 'missing_800_53_families' });
+  const { spawn } = require('child_process');
+  const scriptPath = path.join(__dirname, '../scripts/seed-missing-controls.js');
+  if (!fs.existsSync(scriptPath)) {
+    log('warn', 'framework.catalog.seed_missing', {
+      status: 'skipped',
+      reason: 'seed-missing-controls.js was not packaged with this build.'
+    });
+    return;
+  }
+
+  const child = spawn(process.execPath, [scriptPath], { env: process.env, stdio: 'inherit' });
+  await new Promise((resolve, reject) => {
+    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`seed-missing-controls exited with code ${code}`))));
+    child.on('error', reject);
+  });
+  log('info', 'framework.catalog.seeded', { status: 'done' });
+}
+
 function notifyNoLicenseConfigured() {
   const adminEmail = (process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
   if (!adminEmail) {
@@ -840,6 +942,8 @@ async function ensureLicenseFromDb() {
 // Other startup tasks (notifications, reminders, platform admin, assessment
 // procedures) are intentionally deferred until after the server is listening.
 let stopReminders = () => {};
+let stopReportScheduler = () => {};
+let stopRetentionScheduler = () => {};
 const HOST = process.env.HOST || '0.0.0.0';
 
 ensureLicenseFromDb()
@@ -864,6 +968,8 @@ ensureLicenseFromDb()
       // Start background jobs only after the HTTP server is reachable.
       if (databaseConfigured) {
         stopReminders = startReminderScheduler ? startReminderScheduler() : () => {};
+        stopReportScheduler = startReportScheduler ? startReportScheduler() : () => {};
+        stopRetentionScheduler = startRetentionScheduler ? startRetentionScheduler() : () => {};
 
         // Start scheduled database backups if enabled.
         // In PM2 cluster mode pm_id is set per-worker (0-indexed); only worker 0
@@ -875,6 +981,7 @@ ensureLicenseFromDb()
         }
 
         ensureAssessmentProcedures()
+          .then(() => ensureFrameworkCatalogCompleteness())
           .catch((err) => log('error', 'startup.assessment_seed_error', { error: err.message }));
         ensurePlatformAdmin()
           .catch((err) => log('error', 'startup.admin_seed_error', { error: err.message }));
@@ -897,6 +1004,8 @@ ensureLicenseFromDb()
     function shutdown(signal) {
       log('warn', 'server.shutdown.requested', { signal });
       stopReminders();
+      stopReportScheduler();
+      stopRetentionScheduler();
       const _bs = safeRequire('./services/backupScheduler');
       if (_bs) _bs.stop();
       server.close(() => {

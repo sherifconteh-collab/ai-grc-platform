@@ -16,6 +16,15 @@ type CotsDeploymentModel =
   | 'other';
 type CotsDataAccessLevel = 'none' | 'metadata' | 'limited' | 'full';
 type CotsLifecycleStatus = 'planned' | 'active' | 'deprecated' | 'retired';
+type CotsAuthorizationStatus =
+  | 'none'
+  | 'fedramp_ready'
+  | 'fedramp_in_process'
+  | 'fedramp_authorized'
+  | 'agency_ato'
+  | 'dod_il_authorized'
+  | 'other';
+type CotsAuthorizationImpactLevel = 'li_saas' | 'low' | 'moderate' | 'high';
 type Criticality = 'low' | 'medium' | 'high' | 'critical';
 type ContractType = 'msa' | 'sow' | 'license' | 'dpa' | 'baa' | 'sla' | 'other';
 type ContractStatus = 'draft' | 'active' | 'renewal_pending' | 'expired' | 'terminated';
@@ -50,6 +59,9 @@ interface CotsProduct {
   lifecycle_status: string;
   criticality: string | null;
   support_end_date: string | null;
+  authorization_status: string | null;
+  authorization_impact_level: string | null;
+  external_authorization_id: string | null;
   notes: string | null;
 }
 
@@ -101,6 +113,9 @@ interface CotsFormState {
   lifecycle_status: string;
   criticality: string;
   support_end_date: string;
+  authorization_status: string;
+  authorization_impact_level: string;
+  external_authorization_id: string;
   notes: string;
 }
 
@@ -149,6 +164,9 @@ const DEFAULT_COTS_FORM: CotsFormState = {
   lifecycle_status: 'active',
   criticality: '',
   support_end_date: '',
+  authorization_status: '',
+  authorization_impact_level: '',
+  external_authorization_id: '',
   notes: ''
 };
 
@@ -182,6 +200,21 @@ const COTS_DEPLOYMENT_MODELS: readonly CotsDeploymentModel[] = [
 ] as const;
 const COTS_DATA_ACCESS_LEVELS: readonly CotsDataAccessLevel[] = ['none', 'metadata', 'limited', 'full'] as const;
 const COTS_LIFECYCLE_STATUSES: readonly CotsLifecycleStatus[] = ['planned', 'active', 'deprecated', 'retired'] as const;
+const COTS_AUTHORIZATION_STATUSES: readonly CotsAuthorizationStatus[] = [
+  'none',
+  'fedramp_ready',
+  'fedramp_in_process',
+  'fedramp_authorized',
+  'agency_ato',
+  'dod_il_authorized',
+  'other'
+] as const;
+const COTS_AUTHORIZATION_IMPACT_LEVELS: readonly CotsAuthorizationImpactLevel[] = [
+  'li_saas',
+  'low',
+  'moderate',
+  'high'
+] as const;
 const CRITICALITY_LEVELS: readonly Criticality[] = ['low', 'medium', 'high', 'critical'] as const;
 const CONTRACT_TYPES: readonly ContractType[] = ['msa', 'sow', 'license', 'dpa', 'baa', 'sla', 'other'] as const;
 const CONTRACT_STATUSES: readonly ContractStatus[] = ['draft', 'active', 'renewal_pending', 'expired', 'terminated'] as const;
@@ -211,6 +244,32 @@ function toEnumValue<T extends string>(value: string, allowed: readonly T[]): T 
   const normalized = value.trim().toLowerCase();
   if (!normalized) return null;
   return (allowed as readonly string[]).includes(normalized) ? (normalized as T) : null;
+}
+
+const AUTHORIZATION_STATUS_LABELS: Record<string, string> = {
+  fedramp_ready: 'FedRAMP Ready',
+  fedramp_in_process: 'FedRAMP In Process',
+  fedramp_authorized: 'FedRAMP Authorized',
+  agency_ato: 'Agency ATO',
+  dod_il_authorized: 'DoD IL Authorized',
+  other: 'Other Authorization'
+};
+
+const AUTHORIZATION_IMPACT_LABELS: Record<string, string> = {
+  li_saas: 'LI-SaaS',
+  low: 'Low',
+  moderate: 'Moderate',
+  high: 'High'
+};
+
+function formatAuthorizationBadge(
+  authorizationStatus: string | null,
+  authorizationImpactLevel: string | null
+): string | null {
+  if (!authorizationStatus || authorizationStatus === 'none') return null;
+  const statusLabel = AUTHORIZATION_STATUS_LABELS[authorizationStatus] || authorizationStatus;
+  const impactLabel = authorizationImpactLevel ? AUTHORIZATION_IMPACT_LABELS[authorizationImpactLevel] : null;
+  return impactLabel ? `${statusLabel} (${impactLabel})` : statusLabel;
 }
 
 export default function OrganizationSystemsAndVendors({
@@ -317,6 +376,9 @@ export default function OrganizationSystemsAndVendors({
       lifecycle_status: product.lifecycle_status || 'active',
       criticality: product.criticality || '',
       support_end_date: formatDate(product.support_end_date),
+      authorization_status: product.authorization_status || '',
+      authorization_impact_level: product.authorization_impact_level || '',
+      external_authorization_id: product.external_authorization_id || '',
       notes: product.notes || ''
     });
   };
@@ -417,6 +479,11 @@ export default function OrganizationSystemsAndVendors({
       const dataAccessLevel = toEnumValue(cotsForm.data_access_level, COTS_DATA_ACCESS_LEVELS);
       const lifecycleStatus = toEnumValue(cotsForm.lifecycle_status, COTS_LIFECYCLE_STATUSES) || 'active';
       const criticality = toEnumValue(cotsForm.criticality, CRITICALITY_LEVELS);
+      const authorizationStatus = toEnumValue(cotsForm.authorization_status, COTS_AUTHORIZATION_STATUSES);
+      const authorizationImpactLevel = toEnumValue(
+        cotsForm.authorization_impact_level,
+        COTS_AUTHORIZATION_IMPACT_LEVELS
+      );
       const payload = {
         system_id: cotsForm.system_id || null,
         product_name: cotsForm.product_name.trim(),
@@ -428,6 +495,9 @@ export default function OrganizationSystemsAndVendors({
         lifecycle_status: lifecycleStatus,
         criticality,
         support_end_date: cotsForm.support_end_date || null,
+        authorization_status: authorizationStatus,
+        authorization_impact_level: authorizationImpactLevel,
+        external_authorization_id: cotsForm.external_authorization_id.trim() || null,
         notes: cotsForm.notes.trim() || null
       };
 
@@ -667,20 +737,33 @@ export default function OrganizationSystemsAndVendors({
         <h3 className="text-lg font-semibold text-gray-900">COTS Products</h3>
         <SimpleTable
           columns={['Product', 'Vendor', 'System', 'Status', 'Actions']}
-          rows={products.map((product) => ({
-            key: product.id,
-            cells: [
-              product.product_name,
-              product.vendor_name,
-              product.system_name || 'Org-wide',
-              product.lifecycle_status,
-              <ActionButtons
-                key={`product-actions-${product.id}`}
-                onEdit={() => startEditCots(product)}
-                onDelete={() => handleCotsDelete(product.id)}
-              />
-            ]
-          }))}
+          rows={products.map((product) => {
+            const authorizationBadge = formatAuthorizationBadge(
+              product.authorization_status,
+              product.authorization_impact_level
+            );
+            return {
+              key: product.id,
+              cells: [
+                <span key={`product-name-${product.id}`} className="flex flex-wrap items-center gap-2">
+                  {product.product_name}
+                  {authorizationBadge && (
+                    <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      {authorizationBadge}
+                    </span>
+                  )}
+                </span>,
+                product.vendor_name,
+                product.system_name || 'Org-wide',
+                product.lifecycle_status,
+                <ActionButtons
+                  key={`product-actions-${product.id}`}
+                  onEdit={() => startEditCots(product)}
+                  onDelete={() => handleCotsDelete(product.id)}
+                />
+              ]
+            };
+          })}
           emptyText="No COTS products tracked yet."
         />
 
@@ -721,6 +804,26 @@ export default function OrganizationSystemsAndVendors({
               label="Support End Date"
               value={cotsForm.support_end_date}
               onChange={(value) => setCotsForm((current) => ({ ...current, support_end_date: value }))}
+            />
+            <LabeledSelect
+              label="Authorization Status"
+              value={cotsForm.authorization_status}
+              onChange={(value) => setCotsForm((current) => ({ ...current, authorization_status: value }))}
+              options={['', ...COTS_AUTHORIZATION_STATUSES]}
+              optionLabelMap={{ '': 'Not set', ...AUTHORIZATION_STATUS_LABELS, none: 'None' }}
+            />
+            <LabeledSelect
+              label="Authorization Impact Level"
+              value={cotsForm.authorization_impact_level}
+              onChange={(value) => setCotsForm((current) => ({ ...current, authorization_impact_level: value }))}
+              options={['', ...COTS_AUTHORIZATION_IMPACT_LEVELS]}
+              optionLabelMap={{ '': 'Not set', ...AUTHORIZATION_IMPACT_LABELS }}
+            />
+            <LabeledInput
+              label="External Authorization ID"
+              value={cotsForm.external_authorization_id}
+              onChange={(value) => setCotsForm((current) => ({ ...current, external_authorization_id: value }))}
+              placeholder="e.g. FedRAMP package ID"
             />
           </div>
           <LabeledTextArea

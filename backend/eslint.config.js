@@ -42,7 +42,7 @@ module.exports = [
     }
   },
   {
-    files: ['scripts/run-migrations.js', 'src/utils/auditLogger.js'],
+    files: ['scripts/run-migrations.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

@@ -33,7 +33,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: 'Anthropic (Claude)',
     settingKey: 'anthropic_api_key',
     hasKey: false,
-    models: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001'],
+    models: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-fable-5'],
     placeholder: 'sk-ant-api03-…',
     docsUrl: 'https://console.anthropic.com/settings/keys'
   },
@@ -42,7 +42,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: 'OpenAI',
     settingKey: 'openai_api_key',
     hasKey: false,
-    models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
+    models: ['gpt-5.5', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.3-codex'],
     placeholder: 'sk-proj-…',
     docsUrl: 'https://platform.openai.com/api-keys'
   },
@@ -51,7 +51,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: 'Google Gemini',
     settingKey: 'gemini_api_key',
     hasKey: false,
-    models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
+    models: ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'],
     placeholder: 'AIza…',
     docsUrl: 'https://aistudio.google.com/app/apikey'
   },
@@ -60,7 +60,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: 'xAI (Grok)',
     settingKey: 'xai_api_key',
     hasKey: false,
-    models: ['grok-4-latest', 'grok-3-latest'],
+    models: ['grok-4.5', 'grok-4.3', 'grok-4.1-fast'],
     placeholder: 'xai-…',
     docsUrl: 'https://console.x.ai/'
   }

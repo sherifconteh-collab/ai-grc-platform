@@ -2,19 +2,41 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { decrypt } = require('../utils/encrypt');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { enqueueWebhookEvent } = require('../services/webhookService');
+const poamGate = require('../services/poamGateService');
+const crosswalkCredits = require('../services/crosswalkCreditService');
+const rateLimit = require('express-rate-limit');
+const { createRateLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
 
 const STRICT_CROSSWALK_MAPPING_TYPES = ['equivalent', 'exact'];
 
+// Statuses POST /:id/inherit may write to mapped controls. Mirrors the
+// allowlist PUT /:id/implementation validates against.
+const INHERITABLE_STATUSES = [
+  'not_started', 'in_progress', 'implemented', 'needs_review',
+  'satisfied_via_crosswalk', 'verified', 'not_applicable'
+];
+
+// IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
+// can trace a recognized rate-limiting middleware covering every route below —
+// it does not model this repo's own createRateLimiter, so the per-route limits
+// further down are invisible to it. Set above the per-route caps so those stay
+// the binding constraint in normal use; this layer only catches broad abuse.
+// Same pattern as routes/accessGovernance.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000 }));
+
 router.use(authenticate);
 
 // GET /controls/:id
-router.get('/:id', requirePermission('controls.read'), async (req, res) => {
+router.get('/:id',
+  createRateLimiter({ label: 'control-detail', windowMs: 60 * 1000, max: 120 }),
+  requirePermission('controls.read'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT fc.id, fc.control_id,
@@ -23,7 +45,7 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
              fc.control_type, fc.priority,
              f.id as framework_id, f.name as framework_name, f.code as framework_code,
              COALESCE(ci.status, 'not_started') as implementation_status,
-             ci.implementation_notes, ci.evidence_location, ci.assigned_to, ci.notes, ci.implementation_date,
+             ci.implementation_notes, ci.evidence_location, ci.assigned_to, ci.notes, ci.implementation_date, ci.due_date,
              u.first_name || ' ' || u.last_name as assigned_to_name, u.email as assigned_to_email
       FROM framework_controls fc
       JOIN frameworks f ON f.id = fc.framework_id
@@ -40,7 +62,22 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
     }
 
     const row = result.rows[0];
-    res.json({ success: true, data: { ...row, assigned_to_email: decrypt(row.assigned_to_email) } });
+
+    // A control marked satisfied without evidence of its own is the first thing
+    // an assessor questions, so ship the provenance with it rather than leaving
+    // the bare status to speak for itself.
+    const crosswalkCreditRows = row.implementation_status === 'satisfied_via_crosswalk'
+      ? await crosswalkCredits.getCreditsForControl(req.user.organization_id, req.params.id)
+      : [];
+
+    res.json({
+      success: true,
+      data: {
+        ...row,
+        assigned_to_email: decrypt(row.assigned_to_email),
+        crosswalk_credits: crosswalkCreditRows
+      }
+    });
   } catch (error) {
     log('error', 'get_control_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load control' });
@@ -48,7 +85,12 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
 });
 
 // PUT /controls/:id/implementation
-router.put('/:id/implementation', requirePermission('controls.write'), validateBody((body) => {
+// Crosswalk propagation makes this one status change fan out into a mapping
+// query plus a read-modify-write per credited control, so it costs far more
+// than the single row it appears to update.
+router.put('/:id/implementation',
+  createRateLimiter({ label: 'control-implementation-update', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('controls.write'), validateBody((body) => {
   const errors = requireFields(body, ['status']);
   const allowedStatuses = ['not_started', 'in_progress', 'implemented', 'needs_review', 'satisfied_via_crosswalk', 'verified', 'not_applicable'];
   if (body.status && !allowedStatuses.includes(body.status)) {
@@ -81,18 +123,16 @@ router.put('/:id/implementation', requirePermission('controls.write'), validateB
     );
     const previousStatus = existingResult.rows.length > 0 ? existingResult.rows[0].status : 'not_started';
 
-    // Check if this is a transition from non-compliant to compliant
-    const nonCompliantStatuses = ['not_started', 'in_progress', 'needs_review'];
-    const compliantStatuses = ['implemented', 'satisfied_via_crosswalk', 'verified'];
-    const isComplianceChange = nonCompliantStatuses.includes(previousStatus) && compliantStatuses.includes(status);
+    // Claiming a control is compliant is gated: it requires a written
+    // justification and produces a POA&M an auditor has to sign off. The rule
+    // lives in poamGateService so that PATCH /implementations/:id/status and
+    // PATCH /implementations/:id/test-result enforce exactly the same thing --
+    // they are the endpoints the dashboard actually calls, and until now they
+    // enforced nothing at all.
+    const isComplianceChange = poamGate.isComplianceTransition(previousStatus, status);
 
-    // If transitioning to compliant without POA&M justification, require it
     if (isComplianceChange && !poam_justification) {
-      return res.status(400).json({
-        success: false,
-        error: 'When marking a control as compliant, you must provide poam_justification explaining the remediation',
-        requires_poam_submission: true
-      });
+      return res.status(400).json(poamGate.justificationRequiredResponse());
     }
 
     // Upsert implementation
@@ -116,109 +156,43 @@ router.put('/:id/implementation', requirePermission('controls.write'), validateB
     );
     const control = controlResult.rows[0];
 
-    // If transitioning to compliant, create or link POA&M
+    // If transitioning to compliant, create or advance the POA&M and file the
+    // approval request. The POA&M, its update record and the approval request
+    // are one unit of work -- an approval request pointing at a POA&M that was
+    // never written is worse than neither -- so they share a transaction.
     let poamItem = null;
     if (isComplianceChange && poam_justification) {
-      // Check if a POA&M already exists for this control
-      const existingPoamResult = await pool.query(
-        `SELECT id FROM poam_items 
-         WHERE organization_id = $1 AND control_id = $2 AND status IN ('open', 'in_progress', 'pending_review')
-         ORDER BY created_at DESC LIMIT 1`,
-        [orgId, controlId]
-      );
-
-      if (existingPoamResult.rows.length > 0) {
-        // Update existing POA&M
-        const poamId = existingPoamResult.rows[0].id;
-        const updatedPoam = await pool.query(
-          `UPDATE poam_items
-           SET status = 'pending_auditor_review',
-               remediation_plan = COALESCE(remediation_plan, $3),
-               closure_notes = $4,
-               updated_at = NOW()
-           WHERE id = $1 AND organization_id = $2
-           RETURNING *`,
-          [poamId, orgId, poam_justification, `Control ${control?.control_id} marked as ${status}`]
-        );
-        poamItem = updatedPoam.rows[0];
-
-        // Add update record
-        await pool.query(
-          `INSERT INTO poam_item_updates (
-             organization_id, poam_item_id, update_type, note, previous_status, new_status, changed_by
-           )
-           VALUES ($1, $2, 'status_change', $3, 'in_progress', 'pending_auditor_review', $4)`,
-          [orgId, poamId, `Control remediated: ${poam_justification}`, req.user.id]
-        );
-      } else {
-        // Create new POA&M
-        const newPoam = await pool.query(
-          `INSERT INTO poam_items (
-             organization_id, title, description, source_type, control_id,
-             status, priority, remediation_plan, closure_notes, created_by
-           )
-           VALUES ($1, $2, $3, 'control', $4, 'pending_auditor_review', 'medium', $5, $6, $7)
-           RETURNING *`,
-          [
-            orgId,
-            `Remediation: ${control?.control_id} - ${control?.title}`,
-            `Control transitioned from ${previousStatus} to ${status}`,
-            controlId,
-            poam_justification,
-            `Control marked as ${status}`,
-            req.user.id
-          ]
-        );
-        poamItem = newPoam.rows[0];
-
-        // Add initial update record
-        await pool.query(
-          `INSERT INTO poam_item_updates (
-             organization_id, poam_item_id, update_type, note, new_status, changed_by
-           )
-           VALUES ($1, $2, 'status_change', $3, 'pending_auditor_review', $4)`,
-          [orgId, poamItem.id, 'POA&M created for control compliance change', req.user.id]
-        );
-      }
-
-      // Create approval request
-      await pool.query(
-        `INSERT INTO poam_approval_requests (
-           organization_id, poam_item_id, control_id, previous_control_status,
-           new_control_status, justification, submitted_by, framework_specific_type,
-           framework_specific_data
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [
+      poamItem = await poamGate.inTransaction((client) =>
+        poamGate.recordComplianceTransition(client, {
           orgId,
-          poamItem.id,
+          userId: req.user.id,
           controlId,
           previousStatus,
-          status,
-          poam_justification,
-          req.user.id,
-          framework_specific_type || 'standard',
-          framework_specific_data || {}
-        ]
+          newStatus: status,
+          justification: poam_justification,
+          frameworkSpecificType: framework_specific_type,
+          frameworkSpecificData: framework_specific_data
+        })
       );
 
-      // Send notification to auditors
-      await enqueueWebhookEvent({
-        organizationId: orgId,
-        eventType: 'control.compliance_change',
-        payload: {
-          control_id: controlId,
-          control_code: control?.control_id,
-          previous_status: previousStatus,
-          new_status: status,
-          poam_id: poamItem.id
-        }
-      }).catch(() => {});
+      // After COMMIT: a webhook queued inside the transaction would announce a
+      // compliance change that a rollback then erased.
+      await poamGate.notifyComplianceTransition({
+        orgId,
+        userId: req.user.id,
+        controlId,
+        controlCode: control?.control_id,
+        previousStatus,
+        newStatus: status,
+        poamItem
+      });
     }
 
     // Auto-crosswalk: if implemented, find high-similarity mappings
     let crosswalkedControls = [];
     let propagatedEvidenceLinks = 0;
+    let withdrawnCredits = 0;
+    const appliedCredits = [];
     if (status === 'implemented') {
       const thresholdConfig = await getConfigValue(orgId, 'crosswalk', 'inheritance_min_similarity', { value: 90 });
       const similarityThreshold = Number(
@@ -264,25 +238,60 @@ router.put('/:id/implementation', requirePermission('controls.write'), validateB
             OR cm.similarity_score = 100
           )
           AND cm.source_control_id != cm.target_control_id
-      `, [controlId, similarityThreshold, STRICT_CROSSWALK_MAPPING_TYPES]);
+          -- Credit only frameworks the organization is actually pursuing;
+          -- satisfying controls in a framework they have not adopted inflates
+          -- the posture the dashboards report. Organizations that have never
+          -- populated organization_frameworks have declared no scope, so the
+          -- original unrestricted behavior stands for them.
+          AND (
+            NOT EXISTS (SELECT 1 FROM organization_frameworks scope WHERE scope.organization_id = $4)
+            OR EXISTS (
+              SELECT 1 FROM organization_frameworks scope
+              WHERE scope.organization_id = $4 AND scope.framework_id = fc.framework_id
+            )
+          )
+      `, [controlId, similarityThreshold, STRICT_CROSSWALK_MAPPING_TYPES, orgId]);
 
       for (const mapping of mappings.rows) {
         const mappedControlId = mapping.mapped_control_id;
 
-        await pool.query(`
-          INSERT INTO control_implementations (control_id, organization_id, status, notes)
-          VALUES ($1, $2, 'satisfied_via_crosswalk', $3)
-          ON CONFLICT (control_id, organization_id) DO UPDATE SET
-            status = CASE WHEN control_implementations.status = 'not_started' THEN 'satisfied_via_crosswalk' ELSE control_implementations.status END,
-            notes = CASE WHEN control_implementations.status = 'not_started'
-              THEN COALESCE(control_implementations.notes || E'\n', '') || $3
-              ELSE control_implementations.notes END
+        // The CTE reads the target's status before the upsert rewrites it, so
+        // the ledger can record what to restore on withdrawal and so a target
+        // that was already satisfied by someone's own work is not logged as
+        // crosswalk credit.
+        const credited = await pool.query(`
+          WITH prior AS (
+            SELECT status FROM control_implementations
+            WHERE control_id = $1 AND organization_id = $2
+          ),
+          upserted AS (
+            INSERT INTO control_implementations (control_id, organization_id, status, notes)
+            VALUES ($1, $2, 'satisfied_via_crosswalk', $3)
+            ON CONFLICT (control_id, organization_id) DO UPDATE SET
+              status = CASE WHEN control_implementations.status = 'not_started' THEN 'satisfied_via_crosswalk' ELSE control_implementations.status END,
+              notes = CASE WHEN control_implementations.status = 'not_started'
+                THEN COALESCE(control_implementations.notes || E'\n', '') || $3
+                ELSE control_implementations.notes END
+            RETURNING status
+          )
+          SELECT COALESCE((SELECT status FROM prior), 'not_started') AS previous_status,
+                 (SELECT status FROM upserted) AS new_status
         `, [mappedControlId, orgId, `Auto-satisfied via crosswalk (${mapping.similarity_score}% ${mapping.mapping_type || 'mapped'} match)`]);
+
+        const creditApplied = credited.rows[0]?.new_status === 'satisfied_via_crosswalk';
+        if (creditApplied) {
+          appliedCredits.push({
+            targetControlId: mappedControlId,
+            similarityScore: mapping.similarity_score,
+            mappingType: mapping.mapping_type,
+            previousStatus: credited.rows[0].previous_status
+          });
+        }
 
         if (shouldPropagateEvidence) {
           const propagated = await pool.query(
-            `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-             SELECT DISTINCT ecl.evidence_id, $2::uuid, $3
+            `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+             SELECT DISTINCT ecl.evidence_id, $2::uuid, $3, e.organization_id
              FROM evidence_control_links ecl
              JOIN evidence e ON e.id = ecl.evidence_id
              WHERE ecl.control_id = $4::uuid
@@ -303,34 +312,62 @@ router.put('/:id/implementation', requirePermission('controls.write'), validateB
           title: mapping.mapped_title,
           framework: mapping.framework_name,
           similarity: mapping.similarity_score,
-          mappingType: mapping.mapping_type || null
+          mappingType: mapping.mapping_type || null,
+          // False when the target was already implemented, verified, or
+          // otherwise claimed by human work — the mapping matched, but no
+          // credit was applied and nothing was recorded in the ledger.
+          credited: creditApplied
         });
       }
+
+      // Record provenance for every credit applied, so it can be explained to
+      // an assessor and withdrawn if this source stops being implemented.
+      // Bookkeeping must never fail the status change the user asked for.
+      try {
+        await crosswalkCredits.recordCredits(pool, {
+          organizationId: orgId,
+          sourceControlId: controlId,
+          credits: appliedCredits,
+          actorUserId: req.user.id
+        });
+      } catch (creditError) {
+        log('error', 'crosswalk.record_credits_failed', {
+          organizationId: orgId, controlId, error: creditError?.message || String(creditError)
+        });
+      }
+    } else if (crosswalkCredits.CREDITING_STATUSES.includes(previousStatus)) {
+      // The source has left a crediting status: withdraw the controls it was
+      // holding up, unless another implemented source still justifies them.
+      const withdrawal = await crosswalkCredits.handleSourceStatusChange({
+        organizationId: orgId,
+        controlId,
+        newStatus: status,
+        actorUserId: req.user.id
+      });
+      withdrawnCredits = withdrawal.withdrawn || 0;
     }
 
     // Log audit
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
-      [
-        orgId,
-        req.user.id,
-        controlId,
-        JSON.stringify({
-          previous_status: previousStatus,
-          new_status: status,
-          crosswalkedControls: crosswalkedControls.length,
-          propagatedEvidenceLinks,
-          poam_created: !!poamItem
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_status_changed',
+      resourceType: 'control',
+      resourceId: controlId,
+      details: {
+        previous_status: previousStatus,
+        new_status: status,
+        crosswalkedControls: crosswalkedControls.length,
+        withdrawnCrosswalkCredits: withdrawnCredits,
+        propagatedEvidenceLinks,
+        poam_created: !!poamItem
+      }
+    });
 
     res.json({
       success: true,
       data: {
         implementation: result.rows[0],
         crosswalkedControls,
+        withdrawnCrosswalkCredits: withdrawnCredits,
         propagatedEvidenceLinks,
         poam_item: poamItem,
         status_change_detected: previousStatus !== status,
@@ -345,7 +382,11 @@ router.put('/:id/implementation', requirePermission('controls.write'), validateB
 
 // POST /controls/:id/inherit
 // Manually trigger inheritance to mapped controls with dynamic threshold support.
-router.post('/:id/inherit', requirePermission('controls.write'), async (req, res) => {
+// The heaviest route here: several queries per mapped control, and a control
+// can carry dozens of mappings. Held well below the ordinary write limit.
+router.post('/:id/inherit',
+  createRateLimiter({ label: 'control-inherit', windowMs: 60 * 1000, max: 20 }),
+  requirePermission('controls.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const sourceControlId = req.params.id;
@@ -375,6 +416,19 @@ router.post('/:id/inherit', requirePermission('controls.write'), async (req, res
       [orgId, sourceControlId]
     );
     const sourceStatus = sourceImpl.rows[0]?.status || 'in_progress';
+    // inheritedStatus comes straight from the request body and is written to
+    // control_implementations.status for every mapped control. There is no CHECK
+    // constraint on that column, and dashboards, reminders, and scheduled
+    // reports all branch on its value — an unrecognized string would silently
+    // drop those controls out of every calculation. Validate against the same
+    // allowlist PUT /:id/implementation uses.
+    if (inheritedStatus && !INHERITABLE_STATUSES.includes(inheritedStatus)) {
+      return res.status(400).json({
+        success: false,
+        error: `inheritedStatus must be one of: ${INHERITABLE_STATUSES.join(', ')}`
+      });
+    }
+
     const nextStatus = inheritedStatus || (sourceStatus === 'implemented' ? 'satisfied_via_crosswalk' : sourceStatus);
     const evidencePropagationConfig = await getConfigValue(orgId, 'crosswalk', 'auto_propagate_evidence_exact', { value: false });
     const shouldPropagateEvidence = typeof propagateEvidence === 'boolean'
@@ -409,11 +463,22 @@ router.post('/:id/inherit', requirePermission('controls.write'), async (req, res
            OR cm.similarity_score = 100
          )
          AND cm.source_control_id != cm.target_control_id
+         -- Same activated-framework scope the automatic path applies, so
+         -- inheritance cannot credit a framework the organization has not
+         -- adopted just because it was triggered manually.
+         AND (
+           NOT EXISTS (SELECT 1 FROM organization_frameworks scope WHERE scope.organization_id = $4)
+           OR EXISTS (
+             SELECT 1 FROM organization_frameworks scope
+             WHERE scope.organization_id = $4 AND scope.framework_id = fc.framework_id
+           )
+         )
        ORDER BY cm.similarity_score DESC`,
-      [sourceControlId, resolvedThreshold, STRICT_CROSSWALK_MAPPING_TYPES]
+      [sourceControlId, resolvedThreshold, STRICT_CROSSWALK_MAPPING_TYPES, orgId]
     );
 
     const processed = [];
+    const inheritedCredits = [];
     let propagatedEvidenceLinks = 0;
     for (const mapRow of mappings.rows) {
       const current = await pool.query(
@@ -457,8 +522,8 @@ router.post('/:id/inherit', requirePermission('controls.write'), async (req, res
 
       if (shouldPropagateEvidence) {
         const propagated = await pool.query(
-          `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-           SELECT DISTINCT ecl.evidence_id, $2::uuid, $3
+          `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+           SELECT DISTINCT ecl.evidence_id, $2::uuid, $3, e.organization_id
            FROM evidence_control_links ecl
            JOIN evidence e ON e.id = ecl.evidence_id
            WHERE ecl.control_id = $4::uuid
@@ -491,25 +556,49 @@ router.post('/:id/inherit', requirePermission('controls.write'), async (req, res
           req.user.id
         ]
       );
+
+      // control_inheritance_events is an append-only history of what happened.
+      // The ledger is the live record of what is currently being credited, which
+      // is what withdrawal and assessor-facing provenance read.
+      if (nextStatus === 'satisfied_via_crosswalk') {
+        inheritedCredits.push({
+          targetControlId: mapRow.target_control_id,
+          similarityScore: mapRow.similarity_score,
+          mappingType: mapRow.mapping_type,
+          previousStatus: currentStatus
+        });
+      }
+    }
+
+    if (!dryRun && inheritedCredits.length > 0) {
+      try {
+        await crosswalkCredits.recordCredits(pool, {
+          organizationId: orgId,
+          sourceControlId,
+          credits: inheritedCredits,
+          actorUserId: req.user.id
+        });
+      } catch (creditError) {
+        log('error', 'crosswalk.record_credits_failed', {
+          organizationId: orgId, controlId: sourceControlId,
+          error: creditError?.message || String(creditError)
+        });
+      }
     }
 
     if (!dryRun) {
-      await pool.query(
-        `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-         VALUES ($1, $2, 'control_inheritance_triggered', 'control', $3, $4::jsonb, true)`,
-        [
-          orgId,
-          req.user.id,
-          sourceControlId,
-          JSON.stringify({
-            threshold: resolvedThreshold,
-            inherited_status: nextStatus,
-            processed: processed.length,
-            updated: processed.filter((p) => !p.skipped).length,
-            propagatedEvidenceLinks
-          })
-        ]
-      );
+      await auditService.logFromRequest(req, {
+        eventType: 'control_inheritance_triggered',
+        resourceType: 'control',
+        resourceId: sourceControlId,
+        details: {
+          threshold: resolvedThreshold,
+          inherited_status: nextStatus,
+          processed: processed.length,
+          updated: processed.filter((p) => !p.skipped).length,
+          propagatedEvidenceLinks
+        }
+      });
 
       await enqueueWebhookEvent({
         organizationId: orgId,
@@ -579,7 +668,7 @@ router.get('/:id/history', requirePermission('controls.read'), async (req, res) 
              u.first_name || ' ' || u.last_name as changed_by
       FROM audit_logs al
       LEFT JOIN users u ON u.id = al.user_id
-      WHERE al.resource_id = $1
+      WHERE (al.resource_id = $1 OR al.resource_id IN (SELECT id FROM control_implementations WHERE control_id = $1 AND organization_id = $2))
         AND al.resource_type = 'control'
         AND al.organization_id = $2
       ORDER BY al.created_at DESC

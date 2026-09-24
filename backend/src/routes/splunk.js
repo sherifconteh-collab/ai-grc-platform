@@ -239,8 +239,8 @@ router.post('/splunk/import-evidence', requirePermission('evidence.write'), vali
       const validControlIds = validControlRows.rows.map((row) => row.id);
       for (const controlId of validControlIds) {
         await pool.query(
-          `INSERT INTO evidence_control_links (evidence_id, control_id, notes)
-           VALUES ($1, $2, $3)
+          `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+           SELECT $1, $2, $3, e.organization_id FROM evidence e WHERE e.id = $1
            ON CONFLICT DO NOTHING`,
           [evidenceRecord.id, controlId, 'Imported from Splunk']
         );

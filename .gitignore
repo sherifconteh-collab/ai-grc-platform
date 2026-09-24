@@ -35,6 +35,11 @@ out/
 logs/
 *.log
 
+# Uploaded and generated evidence files. completeCampaign() writes access
+# review summaries here containing subject and reviewer email addresses, so
+# these must never be committed.
+backend/uploads/
+
 # Temporary files
 tmp/
 temp/

@@ -273,8 +273,11 @@ export const organizationAPI = {
   removeFramework: (orgId: string, frameworkId: string) =>
     api.delete(`/organizations/${orgId}/frameworks/${frameworkId}`),
 
-  getControls: (orgId: string, params?: { frameworkId?: string; status?: string }) =>
+  getControls: (orgId: string, params?: { frameworkId?: string; status?: string; control_function?: string; page?: number; limit?: number }) =>
     api.get(`/organizations/${orgId}/controls`, { params }),
+
+  setTargetBaseline: (baseline: 'low' | 'moderate' | 'high' | null) =>
+    api.put('/organizations/me/baseline', { target_baseline: baseline }),
 
   exportControlAnswers: (
     orgId: string,
@@ -376,6 +379,9 @@ export const organizationAPI = {
     lifecycle_status?: 'planned' | 'active' | 'deprecated' | 'retired' | null;
     criticality?: 'low' | 'medium' | 'high' | 'critical' | null;
     support_end_date?: string | null;
+    authorization_status?: 'none' | 'fedramp_ready' | 'fedramp_in_process' | 'fedramp_authorized' | 'agency_ato' | 'dod_il_authorized' | 'other' | null;
+    authorization_impact_level?: 'li_saas' | 'low' | 'moderate' | 'high' | null;
+    external_authorization_id?: string | null;
     notes?: string | null;
   }) => api.post('/organizations/me/cots-products', data),
 
@@ -390,6 +396,9 @@ export const organizationAPI = {
     lifecycle_status?: 'planned' | 'active' | 'deprecated' | 'retired' | null;
     criticality?: 'low' | 'medium' | 'high' | 'critical' | null;
     support_end_date?: string | null;
+    authorization_status?: 'none' | 'fedramp_ready' | 'fedramp_in_process' | 'fedramp_authorized' | 'agency_ato' | 'dod_il_authorized' | 'other' | null;
+    authorization_impact_level?: 'li_saas' | 'low' | 'moderate' | 'high' | null;
+    external_authorization_id?: string | null;
     notes?: string | null;
   }) => api.put(`/organizations/me/cots-products/${productId}`, data),
 
@@ -493,6 +502,20 @@ export const auditAPI = {
   getStats: (params: { startDate?: string; endDate?: string }) =>
     api.get('/audit/stats', { params }),
 
+  // AU-7. Returns the raw response as a Blob so the caller can hand it
+  // straight to a download; the endpoint streams, so this must not be parsed
+  // as JSON for the CSV format.
+  exportLogs: (params: {
+    format?: 'csv' | 'json';
+    userId?: string;
+    eventType?: string;
+    resourceType?: string;
+    resourceId?: string;
+    outcome?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => api.get('/audit/export', { params, responseType: 'blob' }),
+
   getEventTypes: () => api.get('/audit/event-types'),
 
   getUserLogs: (userId: string) => api.get(`/audit/user/${userId}`),
@@ -572,7 +595,7 @@ export const sbomAPI = {
 
 // Implementations APIs
 export const implementationsAPI = {
-  getAll: (params?: { frameworkId?: string; status?: string; assignedTo?: string; priority?: string; controlId?: string }) =>
+  getAll: (params?: { frameworkId?: string; status?: string; assignedTo?: string; priority?: string; controlId?: string; page?: number; limit?: number }) =>
     api.get('/implementations', { params }),
 
   ensureForControl: (controlId: string) =>
@@ -633,9 +656,19 @@ export const dataGovernanceAPI = {
 };
 
 // Evidence APIs
+export interface EvidenceType {
+  code: string;
+  label: string;
+  description: string;
+}
+
 export const evidenceAPI = {
-  getAll: (params?: { search?: string; tags?: string; limit?: number; offset?: number }) =>
+  getAll: (params?: { search?: string; tags?: string; evidence_type?: string; limit?: number; offset?: number }) =>
     api.get('/evidence', { params }),
+
+  // The framework-neutral evidence vocabulary, served from the database so the
+  // picker always matches what the API will accept.
+  getTypes: () => api.get('/evidence/types'),
 
   upload: (formData: FormData) =>
     api.post('/evidence/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: UPLOAD_TIMEOUT }),
@@ -647,8 +680,33 @@ export const evidenceAPI = {
 
   download: (id: string) => api.get(`/evidence/${id}/download`, { responseType: 'blob' }),
 
-  update: (id: string, data: { description?: string; tags?: string[]; pii_classification?: string; pii_types?: string[]; data_sensitivity?: string }) =>
+  update: (id: string, data: { description?: string; tags?: string[]; pii_classification?: string; pii_types?: string[]; data_sensitivity?: string; evidence_type?: string; change_note?: string }) =>
     api.put(`/evidence/${id}`, data),
+
+  // Version history. The current version is the evidence record itself;
+  // getVersions returns the superseded ones, newest first.
+  getVersions: (id: string) => api.get(`/evidence/${id}/versions`),
+
+  // Replace the file with a new revision. The superseded file and its hash are
+  // retained, so integrity stays demonstrable across the replacement.
+  createVersion: (id: string, formData: FormData) =>
+    api.post(`/evidence/${id}/versions`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT
+    }),
+
+  downloadVersion: (id: string, versionNumber: number) =>
+    api.get(`/evidence/${id}/versions/${versionNumber}/download`, { responseType: 'blob' }),
+
+  // Recompute the file's SHA-256 and compare it against the hash recorded at
+  // upload. Returns { matches, expected_hash, current_hash, previous_verified_at }.
+  integrityCheck: (id: string) => api.get(`/evidence/${id}/integrity-check`),
+
+  // The register risks this document supports (migration 149). Read-only:
+  // linking is owned by the risk, so exactly one screen writes the
+  // relationship. Going via the document's controls only answers the question
+  // transitively, and only when those controls happen to carry it.
+  getRisks: (id: string) => api.get(`/evidence/${id}/risks`),
 
   remove: (id: string) => api.delete(`/evidence/${id}`),
 
@@ -681,6 +739,67 @@ export const rolesAPI = {
   getUserRoles: (userId: string) => api.get(`/roles/user/${userId}`),
 
   bootstrapAuditorSubroles: () => api.post('/roles/bootstrap-auditor-subroles'),
+};
+
+// Access Governance APIs
+export const accessGovernanceAPI = {
+  getEntitlements: (params?: { page?: number; limit?: number }) =>
+    api.get('/access-governance/entitlements', { params }),
+
+  getSodRules: () => api.get('/access-governance/sod/rules'),
+
+  createSodRule: (data: {
+    name: string;
+    description?: string;
+    conflictingPermissions: string[];
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+  }) => api.post('/access-governance/sod/rules', data),
+
+  updateSodRule: (ruleId: string, data: {
+    description?: string;
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    isActive?: boolean;
+  }) => api.patch(`/access-governance/sod/rules/${ruleId}`, data),
+
+  getSodViolations: () => api.get('/access-governance/sod/violations'),
+
+  simulate: (data: { roleIds?: string[]; permissions?: string[] }) =>
+    api.post('/access-governance/simulate', data),
+
+  getCampaigns: () => api.get('/access-governance/campaigns'),
+
+  createCampaign: (data: { name: string; description?: string; dueDate?: string }) =>
+    api.post('/access-governance/campaigns', data),
+
+  getCampaign: (campaignId: string) => api.get(`/access-governance/campaigns/${campaignId}`),
+
+  activateCampaign: (campaignId: string) =>
+    api.post(`/access-governance/campaigns/${campaignId}/activate`),
+
+  cancelCampaign: (campaignId: string) =>
+    api.post(`/access-governance/campaigns/${campaignId}/cancel`),
+
+  decideItem: (campaignId: string, itemId: string, data: {
+    decision: 'certified' | 'revoked';
+    notes?: string;
+  }) => api.patch(`/access-governance/campaigns/${campaignId}/items/${itemId}`, data),
+
+  completeCampaign: (campaignId: string) =>
+    api.post(`/access-governance/campaigns/${campaignId}/complete`),
+
+  uploadRbacDocument: (formData: FormData) =>
+    api.post('/access-governance/rbac-documents', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT,
+    }),
+
+  getRbacDocuments: () => api.get('/access-governance/rbac-documents'),
+
+  saveRbacAnalysis: (documentId: string, analysis: Record<string, unknown>) =>
+    api.put(`/access-governance/rbac-documents/${documentId}/analysis`, { analysis }),
+
+  deleteRbacDocument: (documentId: string) =>
+    api.delete(`/access-governance/rbac-documents/${documentId}`),
 };
 
 // Users APIs
@@ -731,6 +850,16 @@ function cmdbResource(routePath: string) {
   };
 }
 
+// Mirrors MAPPING_COMPLIANCE_STATUS in backend/src/routes/cmdb.js. Kept as a
+// named type so a value the server would reject cannot be constructed here.
+//
+// This repo's vocabulary is NOT the sibling repo's: it uses 'partial' rather
+// than 'partially_compliant', and has no 'not_assessed'. There is no CHECK
+// constraint on the column, so a wrong value here is caught only by the
+// route's own validation -- as a 400, at runtime.
+export type AssetControlComplianceStatus =
+  | 'compliant' | 'partial' | 'non_compliant' | 'not_applicable';
+
 export const cmdbAPI = {
   hardware:        cmdbResource("hardware"),
   software:        cmdbResource("software"),
@@ -745,6 +874,38 @@ export const cmdbAPI = {
     create:     (data: Record<string, unknown>)        => api.post('/cmdb/relationships', data),
     remove:     (id: string)                           => api.delete(`/cmdb/relationships/${id}`),
   },
+
+  // asset_control_mappings has existed since migration 005 with no API and no
+  // UI reaching it. These are both ends of that mapping.
+  // Body keys are snake_case here, matching this repo's cmdb router
+  // (requireFields checks 'control_id', and MAPPING_FIELDS drives the update
+  // whitelist). The risks router next door takes camelCase -- the two
+  // conventions genuinely differ, so these are not interchangeable.
+  assetControls: {
+    list:   (assetId: string) => api.get(`/cmdb/assets/${assetId}/controls`),
+    create: (assetId: string, data: {
+      control_id: string;
+      compliance_status?: AssetControlComplianceStatus;
+      notes?: string;
+    }) => api.post(`/cmdb/assets/${assetId}/controls`, data),
+    update: (assetId: string, controlId: string, data: {
+      compliance_status?: AssetControlComplianceStatus;
+      last_assessed?: string;
+      next_assessment?: string;
+      evidence_url?: string;
+      notes?: string;
+    }) => api.put(`/cmdb/assets/${assetId}/controls/${controlId}`, data),
+    remove: (assetId: string, controlId: string) =>
+      api.delete(`/cmdb/assets/${assetId}/controls/${controlId}`),
+  },
+  controlAssets: (controlId: string) => api.get(`/cmdb/controls/${controlId}/assets`),
+
+  // The reverse of risk_asset_links (migration 140), which was wired on the
+  // risk side only -- an asset owner could never ask what this is exposed to.
+  assetRisks: {
+    list: (assetId: string) => api.get(`/cmdb/assets/${assetId}/risks`),
+  },
+  riskExposure: () => api.get('/cmdb/risk-exposure'),
 };
 
 // AI Analysis APIs
@@ -752,6 +913,8 @@ export const aiAPI = {
   getStatus: () => api.get('/ai/status'),
   gapAnalysis: (data?: { provider?: string; model?: string }) =>
     api.post('/ai/gap-analysis', data || {}, { timeout: AI_REQUEST_TIMEOUT }),
+  rbacAnalysis: (documentId: string, data?: { provider?: string; model?: string }) =>
+    api.post('/ai/rbac-analysis', { documentId, ...(data || {}) }, { timeout: AI_REQUEST_TIMEOUT }),
   crosswalkOptimizer: (data?: { provider?: string; model?: string }) =>
     api.post('/ai/crosswalk-optimizer', data || {}, { timeout: AI_REQUEST_TIMEOUT }),
   complianceForecast: (data?: { provider?: string; model?: string }) =>
@@ -1261,6 +1424,22 @@ export const pendingEvidenceAPI = {
     api.post(`/pending-evidence/${id}/reject`, { notes }),
 };
 
+// Pending Control Assessments APIs (AI-suggested control status changes with approval workflow)
+export const pendingControlAssessmentsAPI = {
+  scan: () => api.post('/pending-control-assessments/scan'),
+
+  getAll: (status?: 'pending' | 'approved' | 'rejected' | 'all') =>
+    api.get('/pending-control-assessments', { params: { status: status || 'pending' } }),
+
+  getStats: () => api.get('/pending-control-assessments/stats'),
+
+  approve: (id: string, notes?: string) =>
+    api.post(`/pending-control-assessments/${id}/approve`, { notes }),
+
+  reject: (id: string, notes?: string) =>
+    api.post(`/pending-control-assessments/${id}/reject`, { notes }),
+};
+
 // Reports APIs
 export const reportsAPI = {
   getTypes: () => api.get('/reports/types'),
@@ -1276,6 +1455,25 @@ export const reportsAPI = {
 
   downloadSspJson: () =>
     api.get('/reports/ssp/json', { responseType: 'blob' }),
+};
+
+// Scheduled Reports API
+export interface ScheduledReportInput {
+  name: string;
+  report_type: 'compliance_summary' | 'framework_gap' | 'evidence_status' | 'audit_trail' | 'executive';
+  schedule: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+  format?: 'pdf' | 'csv' | 'json';
+  recipients?: string[];
+  filters?: Record<string, unknown>;
+  is_active?: boolean;
+}
+
+export const scheduledReportsAPI = {
+  getAll: () => api.get('/reports/scheduled'),
+  create: (data: ScheduledReportInput) => api.post('/reports/scheduled', data),
+  update: (id: string, data: Partial<ScheduledReportInput>) => api.patch(`/reports/scheduled/${id}`, data),
+  remove: (id: string) => api.delete(`/reports/scheduled/${id}`),
+  runNow: (id: string) => api.post(`/reports/scheduled/${id}/run`),
 };
 
 // Issue Reporting APIs
@@ -1341,11 +1539,85 @@ export const opsAPI = {
 
 // POA&M APIs
 export const poamAPI = {
-  getList: (params?: { status?: string; priority?: string; controlId?: string; limit?: number; offset?: number }) =>
-    api.get('/poam', { params }),
+  getList: (params?: {
+    status?: string; priority?: string; source_type?: string; controlId?: string;
+    riskId?: string; vulnerabilityId?: string; ownerId?: string;
+    limit?: number; offset?: number;
+  }) => api.get('/poam', { params }),
+
+  // Returns { item, updates, controls, risks } — the timeline and both link
+  // sets come back with the detail fetch, so a detail page needs one call.
   getById: (id: string) => api.get(`/poam/${id}`),
   create: (data: Record<string, unknown>) => api.post('/poam', data),
   update: (id: string, data: Record<string, unknown>) => api.patch(`/poam/${id}`, data),
+
+  addUpdate: (id: string, note: string) => api.post(`/poam/${id}/updates`, { note }),
+
+  submitForReview: (id: string, data: {
+    control_id?: string; previous_control_status?: string; new_control_status?: string;
+    justification?: string; supporting_evidence_ids?: string[];
+    framework_specific_type?: string; framework_specific_data?: Record<string, unknown>;
+  }) => api.post(`/poam/${id}/submit-for-review`, data),
+
+  // Comments must be at least 10 characters — the backend rejects shorter ones,
+  // so validate client-side at the same threshold rather than letting a review
+  // be composed and then refused.
+  review: (id: string, data: { outcome: 'approved' | 'rejected' | 'changes_requested'; comments: string }) =>
+    api.post(`/poam/${id}/review`, data),
+
+  getApprovalHistory: (id: string) => api.get(`/poam/${id}/approval-history`),
+
+  // The per-framework remediation vocabulary (ISO CAR/OFI, SOC 2 deficiency,
+  // FISCAM CAP/NFR, HIPAA CAP, PCI RAV, NIST, FedRAMP). Scoped to the org's
+  // activated frameworks unless `all` is passed.
+  getFrameworkTypes: (params?: { framework_code?: string; all?: boolean }) =>
+    api.get('/poam/framework-types', { params }),
+
+  getAuditorGuidance: (frameworkCode: string, typeCode: string) =>
+    api.get(`/poam/auditor-guidance/${encodeURIComponent(frameworkCode)}/${encodeURIComponent(typeCode)}`),
+
+  getApprovalRequestContext: (approvalRequestId: string) =>
+    api.get(`/poam/approval-request/${approvalRequestId}/context`),
+
+  createFromVulnerability: (vulnerabilityId: string, data?: Record<string, unknown>) =>
+    api.post(`/poam/from-vulnerability/${vulnerabilityId}`, data || {}),
+
+  createFromRisk: (riskId: string, data?: {
+    treatment_id?: string | null; control_id?: string | null; title?: string; due_date?: string;
+  }) => api.post(`/poam/from-risk/${riskId}`, data || {}),
+
+  // Many-to-many control linkage (migration 141). poam_items.control_id remains
+  // the originating control; these cover the rest.
+  linkControl: (id: string, data: { control_id: string; notes?: string }) =>
+    api.post(`/poam/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/poam/${id}/controls/${controlId}`),
+
+  exportUrl: (format: 'csv' | 'pdf', params?: Record<string, string | undefined>) => {
+    const search = new URLSearchParams({ format });
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value) search.set(key, value);
+    });
+    return `/poam/export?${search.toString()}`;
+  },
+  download: (format: 'csv' | 'pdf', params?: Record<string, string | undefined>) =>
+    api.get(poamAPI.exportUrl(format, params), { responseType: 'blob' }),
+};
+
+// than in the already-oversized routes/poam.js.
+export const poamMilestonesAPI = {
+  getAll: (poamItemId: string) => api.get(`/poam/${poamItemId}/milestones`),
+
+  create: (poamItemId: string, data: {
+    description: string; target_date?: string | null; status?: string; sort_order?: number;
+  }) => api.post(`/poam/${poamItemId}/milestones`, data),
+
+  update: (poamItemId: string, milestoneId: string, data: {
+    description?: string; target_date?: string | null; status?: string; sort_order?: number;
+  }) => api.patch(`/poam/${poamItemId}/milestones/${milestoneId}`, data),
+
+  remove: (poamItemId: string, milestoneId: string) =>
+    api.delete(`/poam/${poamItemId}/milestones/${milestoneId}`),
 };
 
 // SSO APIs
@@ -1633,7 +1905,8 @@ export const exceptionsAPI = {
   create: (data: Record<string, unknown>) => api.post('/exceptions', data),
   update: (id: string, data: Record<string, unknown>) => api.patch(`/exceptions/${id}`, data),
   approve: (id: string, data?: { notes?: string }) => api.post(`/exceptions/${id}/approve`, data || {}),
-  revoke: (id: string, data?: { notes?: string }) => api.post(`/exceptions/${id}/revoke`, data || {}),
+  // Note: backend reads `note` (singular) from the request body, not `notes`.
+  revoke: (id: string, data?: { note?: string }) => api.post(`/exceptions/${id}/revoke`, data || {}),
 };
 
 // Data Sovereignty API
@@ -1760,6 +2033,125 @@ export const rmfAPI = {
     api.post(`/rmf/packages/${id}/authorization`, data),
 };
 
+export interface LeveragedAuthorizationInput {
+  cots_product_id: string;
+  inheritance_type?: 'full' | 'partial' | 'hybrid';
+  status?: 'active' | 'pending' | 'expired' | 'revoked';
+  authorization_reference?: string | null;
+  inherited_controls?: string[];
+  provider_responsibilities?: string | null;
+  customer_responsibilities?: string | null;
+  review_date?: string | null;
+  expiration_date?: string | null;
+  notes?: string | null;
+}
+
+// RMF Leveraged Authorizations — package inheritance from COTS products (routes/rmfInheritance.js)
+export const rmfInheritanceAPI = {
+  getLeveragedAuthorizations: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/leveraged-authorizations`),
+  getEligibleCotsProducts: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/eligible-cots-products`),
+  createLeveragedAuthorization: (packageId: string, data: LeveragedAuthorizationInput) =>
+    api.post(`/rmf/packages/${packageId}/leveraged-authorizations`, data),
+  updateLeveragedAuthorization: (packageId: string, linkId: string, data: Partial<LeveragedAuthorizationInput>) =>
+    api.put(`/rmf/packages/${packageId}/leveraged-authorizations/${linkId}`, data),
+  deleteLeveragedAuthorization: (packageId: string, linkId: string) =>
+    api.delete(`/rmf/packages/${packageId}/leveraged-authorizations/${linkId}`),
+  getCrmReport: (packageId: string) => api.get(`/rmf/packages/${packageId}/crm-report`),
+  downloadCrmReportCsv: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/crm-report`, { params: { format: 'csv' }, responseType: 'blob' }),
+  downloadCrmReportPdf: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/crm-report/pdf`, { responseType: 'blob' }),
+  downloadOscalSsp: (packageId: string) =>
+    api.get(`/rmf/packages/${packageId}/oscal`, { responseType: 'blob' }),
+};
+
+// Trust Center — public compliance-posture page (routes/trustCenter.js)
+export const trustCenterAPI = {
+  getConfig: () => api.get('/trust-center/config'),
+  updateConfig: (data: {
+    enabled?: boolean;
+    display_name?: string | null;
+    description?: string | null;
+    contact_email?: string | null;
+    show_frameworks?: boolean;
+    show_compliance_scores?: boolean;
+    show_authorizations?: boolean;
+  }) => api.put('/trust-center/config', data),
+  regenerateToken: () => api.post('/trust-center/config/regenerate-token'),
+  getPublicPage: (token: string) =>
+    fetch(`${API_BASE_URL}/trust-center/public/${encodeURIComponent(token)}`).then(res => res.json()),
+};
+
+// Auditor Workspace — public read-only share links (routes/auditorWorkspace.js)
+export const auditorWorkspacePublicAPI = {
+  getPublicWorkspace: (token: string) =>
+    fetch(`${API_BASE_URL}/auditor-workspace/public/${encodeURIComponent(token)}`).then((res) => res.json()),
+};
+
+// Classroom mode — guided training scenarios (routes/training.js)
+export const trainingAPI = {
+  getScenarios: () => api.get('/training/scenarios'),
+  createScenario: (data: {
+    title: string;
+    description?: string | null;
+    difficulty?: 'beginner' | 'intermediate' | 'advanced';
+    steps?: Array<{ title: string; description?: string | null; hint?: string | null; target_page?: string | null }>;
+  }) => api.post('/training/scenarios', data),
+  updateScenario: (id: string, data: Record<string, unknown>) => api.put(`/training/scenarios/${id}`, data),
+  deleteScenario: (id: string) => api.delete(`/training/scenarios/${id}`),
+  updateProgress: (id: string, completedSteps: number[]) =>
+    api.post(`/training/scenarios/${id}/progress`, { completed_steps: completedSteps }),
+  getProgress: (id: string) => api.get(`/training/scenarios/${id}/progress`),
+};
+
+// Anonymized industry benchmarking (routes/benchmarks.js)
+export const benchmarksAPI = {
+  getFrameworkBenchmarks: () => api.get('/benchmarks/frameworks'),
+};
+
+// Compliance-as-code CI gate (routes/complianceGate.js)
+export const complianceGateAPI = {
+  checkGate: (params?: { framework_id?: string; min_pct?: number }) =>
+    api.get('/compliance/gate', { params }),
+  exportSnippet: (params?: { framework_id?: string; min_pct?: number; format?: 'github_actions' | 'gitlab_ci' | 'curl' }) =>
+    api.get('/compliance/gate/export', { params }),
+};
+
+// Cyber Resilience — BC/DR plans, tabletop/DR testing, resilience score (routes/cyberResilience.js)
+export const cyberResilienceAPI = {
+  getPlans: () => api.get('/resilience/plans'),
+  createPlan: (data: {
+    plan_type: 'incident_response' | 'business_continuity' | 'disaster_recovery' | 'ransomware_playbook';
+    title: string;
+    description?: string | null;
+    status?: 'draft' | 'active' | 'under_review' | 'retired';
+    system_id?: string | null;
+    rto_target_hours?: number | null;
+    rpo_target_hours?: number | null;
+    owner_id?: string | null;
+    last_tested_date?: string | null;
+    next_test_due?: string | null;
+    document_url?: string | null;
+  }) => api.post('/resilience/plans', data),
+  updatePlan: (id: string, data: Record<string, unknown>) => api.put(`/resilience/plans/${id}`, data),
+  deletePlan: (id: string) => api.delete(`/resilience/plans/${id}`),
+  getTests: (planId: string) => api.get(`/resilience/plans/${planId}/tests`),
+  createTest: (planId: string, data: {
+    test_type: 'tabletop' | 'functional' | 'full_scale';
+    scenario: string;
+    test_date?: string;
+    participants?: string[];
+    outcome: 'passed' | 'partial' | 'failed';
+    actual_rto_hours?: number | null;
+    actual_rpo_hours?: number | null;
+    findings?: string | null;
+    remediation_poam_id?: string | null;
+  }) => api.post(`/resilience/plans/${planId}/tests`, data),
+  getScore: () => api.get('/resilience/score'),
+};
+
 // PLOT4ai Threat Library API (Community tier — AI Threat Modeling)
 export const plot4aiAPI = {
   getThreats: (params?: { category?: number; aitype?: string; role?: string; phase?: string; search?: string }) =>
@@ -1778,11 +2170,293 @@ export const stateAiLawsAPI = {
   getSummary: () => api.get('/state-ai-laws/summary'),
 };
 
+// International AI Laws API — EU AI Act, UK, Canada, Brazil, Singapore, Japan, South Korea, China, Australia, India
+export const internationalAiLawsAPI = {
+  getJurisdictions: () => api.get('/international-ai-laws/jurisdictions'),
+  getControls: (params?: { jurisdiction?: string; region?: string; control_type?: string; priority?: string; search?: string }) =>
+    api.get('/international-ai-laws/controls', { params }),
+  getControl: (controlId: string) => api.get(`/international-ai-laws/controls/${controlId}`),
+  getSummary: () => api.get('/international-ai-laws/summary'),
+};
+
 // Push Tokens API — device push token registration for mobile apps (iOS APNs / Android FCM)
 export const pushTokensAPI = {
   register: (data: { token: string; platform: 'ios' | 'android' }) =>
     api.post('/push-tokens', data),
   unregister: (token: string) => api.delete(`/push-tokens/${encodeURIComponent(token)}`),
+};
+
+// ---------------------------------------------------------------------------
+// Risk and resilience registers
+//
+// Shared vocabularies are exported so pages, filters and badges all agree with
+// the CHECK constraints in migrations 139-143 rather than each re-declaring a
+// slightly different list.
+// ---------------------------------------------------------------------------
+
+export type RiskCategory =
+  | 'strategic' | 'operational' | 'financial' | 'compliance' | 'cyber' | 'privacy'
+  | 'third_party' | 'legal' | 'reputational' | 'environmental' | 'health_safety'
+  | 'technology' | 'ai' | 'other';
+
+export type RiskStatus =
+  | 'identified' | 'assessed' | 'treatment_planned' | 'treated' | 'accepted'
+  | 'monitoring' | 'closed';
+
+export type TreatmentStrategy = 'avoid' | 'mitigate' | 'transfer' | 'accept';
+export type TreatmentStatus = 'planned' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
+export type SeverityBand = 'low' | 'medium' | 'high' | 'critical';
+
+export type IncidentCategory =
+  | 'security' | 'privacy' | 'availability' | 'integrity' | 'compliance'
+  | 'third_party' | 'physical' | 'fraud' | 'safety' | 'ai' | 'other';
+
+export type IncidentStatus =
+  | 'new' | 'triaged' | 'investigating' | 'contained' | 'eradicated'
+  | 'recovered' | 'closed' | 'false_positive';
+
+export type ObligationSourceType =
+  | 'regulation' | 'statute' | 'contract' | 'standard' | 'certification'
+  | 'internal_policy' | 'customer_commitment' | 'court_order' | 'other';
+
+export type ComplianceStatus =
+  | 'not_assessed' | 'compliant' | 'partially_compliant' | 'non_compliant' | 'not_applicable';
+
+export type AttestationOutcome =
+  | 'met' | 'partially_met' | 'not_met' | 'not_applicable' | 'waived';
+
+export type ObjectiveCategory = 'strategic' | 'operational' | 'reporting' | 'compliance';
+export type IndicatorType = 'kri' | 'kpi' | 'kci';
+export type IndicatorDirection = 'lower_is_better' | 'higher_is_better';
+export type BreachLevel = 'green' | 'amber' | 'red';
+
+export const RISK_CATEGORIES: RiskCategory[] = [
+  'strategic', 'operational', 'financial', 'compliance', 'cyber', 'privacy',
+  'third_party', 'legal', 'reputational', 'environmental', 'health_safety',
+  'technology', 'ai', 'other'
+];
+
+export const RISK_STATUSES: RiskStatus[] = [
+  'identified', 'assessed', 'treatment_planned', 'treated', 'accepted',
+  'monitoring', 'closed'
+];
+
+export const INCIDENT_CATEGORIES: IncidentCategory[] = [
+  'security', 'privacy', 'availability', 'integrity', 'compliance',
+  'third_party', 'physical', 'fraud', 'safety', 'ai', 'other'
+];
+
+export const INCIDENT_STATUSES: IncidentStatus[] = [
+  'new', 'triaged', 'investigating', 'contained', 'eradicated',
+  'recovered', 'closed', 'false_positive'
+];
+
+export const OBLIGATION_SOURCE_TYPES: ObligationSourceType[] = [
+  'regulation', 'statute', 'contract', 'standard', 'certification',
+  'internal_policy', 'customer_commitment', 'court_order', 'other'
+];
+
+export const departmentsAPI = {
+  list: (params?: { page?: number; limit?: number; includeInactive?: boolean }) =>
+    api.get('/departments', { params }),
+  get: (id: string) => api.get(`/departments/${id}`),
+  create: (data: {
+    name: string; code?: string; description?: string;
+    parentId?: string; headUserId?: string; costCenter?: string;
+  }) => api.post('/departments', data),
+  update: (id: string, data: {
+    name?: string; code?: string; description?: string; parentId?: string | null;
+    headUserId?: string | null; costCenter?: string; isActive?: boolean;
+  }) => api.put(`/departments/${id}`, data),
+  remove: (id: string) => api.delete(`/departments/${id}`),
+};
+
+export const objectivesAPI = {
+  list: (params?: {
+    page?: number; limit?: number; category?: ObjectiveCategory;
+    status?: string; departmentId?: string;
+  }) => api.get('/objectives', { params }),
+  get: (id: string) => api.get(`/objectives/${id}`),
+  create: (data: {
+    title: string; description?: string; category?: ObjectiveCategory;
+    reference?: string; ownerUserId?: string; departmentId?: string;
+    status?: string; targetDate?: string;
+  }) => api.post('/objectives', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/objectives/${id}`, data),
+  remove: (id: string) => api.delete(`/objectives/${id}`),
+};
+
+export const risksAPI = {
+  list: (params?: {
+    page?: number; limit?: number; category?: RiskCategory; status?: RiskStatus;
+    departmentId?: string; ownerUserId?: string; minResidualScore?: number;
+    reviewOverdue?: boolean;
+  }) => api.get('/risks', { params }),
+  get: (id: string) => api.get(`/risks/${id}`),
+  summary: () => api.get('/risks/summary'),
+  heatMap: () => api.get('/risks/heat-map'),
+  create: (data: {
+    title: string; description?: string; category?: RiskCategory;
+    threatSource?: string; vulnerability?: string;
+    inherentLikelihood?: number; inherentImpact?: number;
+    residualLikelihood?: number; residualImpact?: number;
+    treatmentStrategy?: TreatmentStrategy; status?: RiskStatus;
+    ownerUserId?: string; departmentId?: string;
+    identifiedDate?: string; nextReviewDate?: string; tags?: string[];
+  }) => api.post('/risks', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/risks/${id}`, data),
+  remove: (id: string) => api.delete(`/risks/${id}`),
+
+  accept: (id: string, data: { rationale: string; acceptedUntil?: string }) =>
+    api.post(`/risks/${id}/accept`, data),
+  addReview: (id: string, data: {
+    outcome?: 'unchanged' | 'reassessed' | 'escalated' | 'de_escalated' | 'closed';
+    notes?: string; nextReviewDate?: string;
+  }) => api.post(`/risks/${id}/reviews`, data),
+
+  addTreatment: (id: string, data: {
+    title: string; description?: string; treatmentType?: TreatmentStrategy;
+    status?: TreatmentStatus; ownerUserId?: string; dueDate?: string;
+    targetResidualScore?: number; estimatedCost?: number;
+  }) => api.post(`/risks/${id}/treatments`, data),
+  updateTreatment: (id: string, treatmentId: string, data: Record<string, unknown>) =>
+    api.put(`/risks/${id}/treatments/${treatmentId}`, data),
+
+  linkControl: (id: string, data: {
+    controlId: string;
+    effectiveness?: 'not_assessed' | 'ineffective' | 'partially_effective' | 'effective';
+    notes?: string;
+  }) => api.post(`/risks/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/risks/${id}/controls/${controlId}`),
+  linkAsset: (id: string, data: { assetId: string }) => api.post(`/risks/${id}/assets`, data),
+  unlinkAsset: (id: string, assetId: string) => api.delete(`/risks/${id}/assets/${assetId}`),
+  linkObjective: (id: string, data: { objectiveId: string }) =>
+    api.post(`/risks/${id}/objectives`, data),
+  unlinkObjective: (id: string, objectiveId: string) =>
+    api.delete(`/risks/${id}/objectives/${objectiveId}`),
+
+  // Remediation linkage (migration 140). To create a new POA&M from a risk
+  // rather than link an existing one, use poamAPI.createFromRisk.
+  linkPoam: (id: string, data: { poamItemId: string }) => api.post(`/risks/${id}/poam`, data),
+  unlinkPoam: (id: string, poamItemId: string) => api.delete(`/risks/${id}/poam/${poamItemId}`),
+
+  // Third-party linkage (migration 148). tprm_vendors.risk_tier is a static
+  // onboarding classification, not a scored and reviewed risk, so this is the
+  // edge that makes vendor concentration visible to the register.
+  linkVendor: (id: string, data: { vendorId: string; notes?: string }) =>
+    api.post(`/risks/${id}/vendors`, data),
+  unlinkVendor: (id: string, vendorId: string) =>
+    api.delete(`/risks/${id}/vendors/${vendorId}`),
+
+  // Evidence linkage (migration 149). `relevance` records why the document is
+  // evidence for this risk: the same file supports different risks for
+  // different reasons, so the reason belongs on the link.
+  linkEvidence: (id: string, data: {
+    evidenceId: string;
+    relevance?: 'assessment' | 'treatment' | 'monitoring' | 'acceptance';
+    notes?: string;
+  }) => api.post(`/risks/${id}/evidence`, data),
+  unlinkEvidence: (id: string, evidenceId: string) =>
+    api.delete(`/risks/${id}/evidence/${evidenceId}`),
+};
+
+export const incidentsAPI = {
+  list: (params?: {
+    page?: number; limit?: number; category?: IncidentCategory;
+    severity?: SeverityBand; status?: IncidentStatus; departmentId?: string;
+    ownerUserId?: string; openOnly?: boolean; breachesOnly?: boolean;
+  }) => api.get('/incidents', { params }),
+  get: (id: string) => api.get(`/incidents/${id}`),
+  metrics: () => api.get('/incidents/metrics'),
+  create: (data: {
+    title: string; description?: string; category?: IncidentCategory;
+    severity?: SeverityBand; detectionSource?: string;
+    occurredAt?: string; detectedAt?: string; ownerUserId?: string;
+    departmentId?: string; impactSummary?: string; isBreach?: boolean;
+    affectedRecordCount?: number; affectedDataTypes?: string[];
+    regulatoryNotificationRequired?: boolean; notificationDeadline?: string;
+    tags?: string[];
+  }) => api.post('/incidents', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/incidents/${id}`, data),
+
+  // Status changes go through their own endpoint so the phase timestamp and
+  // timeline entry cannot be skipped; update() deliberately does not take one.
+  changeStatus: (id: string, data: { status: IncidentStatus; note?: string }) =>
+    api.post(`/incidents/${id}/status`, data),
+  recordNotification: (id: string, data: {
+    audience: 'regulator' | 'data_subjects'; notifiedAt?: string; detail?: string;
+  }) => api.post(`/incidents/${id}/notify`, data),
+  addTimelineEntry: (id: string, data: {
+    summary: string; entryType?: string; detail?: string; occurredAt?: string;
+  }) => api.post(`/incidents/${id}/timeline`, data),
+
+  linkRisk: (id: string, data: {
+    riskId: string; relationship?: 'materialized' | 'related' | 'identified_new_risk';
+  }) => api.post(`/incidents/${id}/risks`, data),
+  unlinkRisk: (id: string, riskId: string) => api.delete(`/incidents/${id}/risks/${riskId}`),
+  linkControl: (id: string, data: {
+    controlId: string; relationship?: 'failed' | 'detected' | 'contained' | 'related';
+  }) => api.post(`/incidents/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/incidents/${id}/controls/${controlId}`),
+  linkAsset: (id: string, data: {
+    assetId: string; impact?: 'none' | 'degraded' | 'unavailable' | 'compromised' | 'destroyed';
+  }) => api.post(`/incidents/${id}/assets`, data),
+  unlinkAsset: (id: string, assetId: string) => api.delete(`/incidents/${id}/assets/${assetId}`),
+};
+
+export const obligationsAPI = {
+  list: (params?: {
+    page?: number; limit?: number; sourceType?: ObligationSourceType;
+    status?: string; complianceStatus?: ComplianceStatus; criticality?: SeverityBand;
+    departmentId?: string; jurisdiction?: string; overdueOnly?: boolean;
+  }) => api.get('/obligations', { params }),
+  get: (id: string) => api.get(`/obligations/${id}`),
+  summary: () => api.get('/obligations/summary'),
+  create: (data: {
+    title: string; description?: string; sourceType?: ObligationSourceType;
+    sourceName?: string; citation?: string; jurisdiction?: string;
+    frameworkId?: string; ownerUserId?: string; departmentId?: string;
+    status?: string; criticality?: SeverityBand; frequency?: string;
+    effectiveDate?: string; nextDueDate?: string; penaltyDescription?: string;
+    tags?: string[];
+  }) => api.post('/obligations', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/obligations/${id}`, data),
+  remove: (id: string) => api.delete(`/obligations/${id}`),
+
+  attest: (id: string, data: {
+    outcome: AttestationOutcome; notes?: string;
+    periodStart?: string; periodEnd?: string; evidenceId?: string;
+  }) => api.post(`/obligations/${id}/attestations`, data),
+  linkControl: (id: string, data: { controlId: string; notes?: string }) =>
+    api.post(`/obligations/${id}/controls`, data),
+  unlinkControl: (id: string, controlId: string) =>
+    api.delete(`/obligations/${id}/controls/${controlId}`),
+};
+
+export const indicatorsAPI = {
+  list: (params?: {
+    page?: number; limit?: number; indicatorType?: IndicatorType;
+    breachLevel?: BreachLevel; riskId?: string; departmentId?: string;
+    activeOnly?: boolean;
+  }) => api.get('/indicators', { params }),
+  get: (id: string, params?: { measurementLimit?: number }) =>
+    api.get(`/indicators/${id}`, { params }),
+  summary: () => api.get('/indicators/summary'),
+  create: (data: {
+    name: string; description?: string; indicatorType?: IndicatorType;
+    unit?: string; targetValue?: number; amberThreshold?: number;
+    redThreshold?: number; direction?: IndicatorDirection;
+    measurementFrequency?: string; ownerUserId?: string; departmentId?: string;
+    riskId?: string; objectiveId?: string; controlId?: string; dataSource?: string;
+  }) => api.post('/indicators', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/indicators/${id}`, data),
+  remove: (id: string) => api.delete(`/indicators/${id}`),
+
+  recordMeasurement: (id: string, data: {
+    value: number; measuredAt?: string; notes?: string;
+  }) => api.post(`/indicators/${id}/measurements`, data),
 };
 
 export default api;

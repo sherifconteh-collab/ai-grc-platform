@@ -13,9 +13,24 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { createRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 const { log } = require('../utils/logger');
 
+// Three layers, in this specific order: (1) a cheap per-process IP-based
+// limiter first, so unauthenticated requests are bounded before they reach
+// authenticate's JWT/DB work (also the middleware CodeQL's static analysis
+// can trace as guarding this router); (2) authenticate; (3) the org-scoped
+// Redis-backed limiter, which needs req.user for its key and so must run
+// after auth -- this is the real production control across instances.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 120 }));
 router.use(authenticate);
+router.use(createRateLimiter({
+  label: 'rmf',
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  keyGenerator: (req) => `org:${req.user?.organization_id || req.ip}`
+}));
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -75,6 +90,7 @@ router.get('/packages', requirePermission('assessments.read'), async (req, res) 
       `SELECT rp.*,
               (SELECT COUNT(*) FROM rmf_step_history sh WHERE sh.rmf_package_id = rp.id) AS transition_count,
               (SELECT COUNT(*) FROM rmf_authorization_decisions ad WHERE ad.rmf_package_id = rp.id AND ad.is_active = true) AS active_decisions,
+              (SELECT COUNT(*) FROM rmf_leveraged_authorizations la WHERE la.rmf_package_id = rp.id AND la.status = 'active') AS leveraged_count,
               creator.first_name || ' ' || creator.last_name AS created_by_name
        FROM rmf_packages rp
        LEFT JOIN users creator ON creator.id = rp.created_by
@@ -203,12 +219,29 @@ router.get('/packages/:id', requirePermission('assessments.read'), async (req, r
       [pkg.id]
     );
 
+    // Fetch leveraged authorizations (controls inherited from COTS products)
+    const leveragedResult = await pool.query(
+      `SELECT la.*, cp.product_name, cp.vendor_name, cp.product_type,
+              cp.lifecycle_status, cp.support_end_date,
+              cp.authorization_status, cp.authorization_impact_level,
+              cp.external_authorization_id,
+              (cp.lifecycle_status IN ('deprecated', 'retired')
+               OR (cp.support_end_date IS NOT NULL AND cp.support_end_date < CURRENT_DATE)
+               OR (la.expiration_date IS NOT NULL AND la.expiration_date < CURRENT_DATE)) AS at_risk
+       FROM rmf_leveraged_authorizations la
+       JOIN cots_products cp ON cp.id = la.cots_product_id
+       WHERE la.rmf_package_id = $1 AND la.organization_id = $2
+       ORDER BY la.created_at DESC`,
+      [pkg.id, orgId]
+    );
+
     res.json({
       success: true,
       data: {
         ...pkg,
         history: historyResult.rows,
-        authorization_decisions: decisionsResult.rows
+        authorization_decisions: decisionsResult.rows,
+        leveraged_authorizations: leveragedResult.rows
       }
     });
   } catch (error) {
@@ -617,6 +650,32 @@ router.get('/summary', requirePermission('assessments.read'), async (req, res) =
       [orgId]
     );
 
+    // Active leveraged authorizations (controls inherited from COTS products)
+    const leveragedTotal = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM rmf_leveraged_authorizations
+       WHERE organization_id = $1 AND status = 'active'`,
+      [orgId]
+    );
+
+    // At-risk leveraged authorizations: active links whose provider product is
+    // deprecated/retired, past support end, or whose authorization is expiring
+    const atRiskLeveraged = await pool.query(
+      `SELECT la.id, la.rmf_package_id, la.expiration_date, la.status,
+              rp.system_name, cp.product_name, cp.lifecycle_status, cp.support_end_date
+       FROM rmf_leveraged_authorizations la
+       JOIN rmf_packages rp ON rp.id = la.rmf_package_id
+       JOIN cots_products cp ON cp.id = la.cots_product_id
+       WHERE la.organization_id = $1
+         AND la.status = 'active'
+         AND (cp.lifecycle_status IN ('deprecated', 'retired')
+              OR (cp.support_end_date IS NOT NULL AND cp.support_end_date < CURRENT_DATE)
+              OR (la.expiration_date IS NOT NULL AND la.expiration_date <= CURRENT_DATE + INTERVAL '90 days'))
+       ORDER BY la.expiration_date ASC NULLS LAST
+       LIMIT 10`,
+      [orgId]
+    );
+
     // Recent transitions
     const recentActivity = await pool.query(
       `SELECT sh.*, rp.system_name,
@@ -642,6 +701,8 @@ router.get('/summary', requirePermission('assessments.read'), async (req, res) =
         ),
         active_authorizations: activeAuth.rows[0]?.count || 0,
         expiring_authorizations: expiring.rows,
+        leveraged_authorizations_total: leveragedTotal.rows[0]?.count || 0,
+        at_risk_leveraged: atRiskLeveraged.rows,
         recent_activity: recentActivity.rows
       }
     });

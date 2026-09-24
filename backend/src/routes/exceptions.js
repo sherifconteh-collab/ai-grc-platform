@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { enqueueWebhookEvent } = require('../services/webhookService');
 
@@ -88,11 +89,12 @@ router.post('/', requirePermission('controls.write'), async (req, res) => {
     );
 
     const row = insert.rows[0];
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'control_exception_created', 'control_exception', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, row.id, JSON.stringify({ control_id, title })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_exception_created',
+      resourceType: 'control_exception',
+      resourceId: row.id,
+      details: { control_id, title }
+    });
 
     await emitExceptionEvent(orgId, 'exception.created', { id: row.id, control_id, status: row.status });
 
@@ -163,11 +165,12 @@ router.patch('/:id', requirePermission('controls.write'), async (req, res) => {
       ]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'control_exception_updated', 'control_exception', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ old_status: existing.rows[0].status, new_status: update.rows[0].status })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_exception_updated',
+      resourceType: 'control_exception',
+      resourceId: id,
+      details: { old_status: existing.rows[0].status, new_status: update.rows[0].status }
+    });
 
     await emitExceptionEvent(orgId, 'exception.updated', {
       id,
@@ -202,11 +205,12 @@ router.post('/:id/approve', requirePermission('controls.write'), async (req, res
       return res.status(404).json({ success: false, error: 'Control exception not found' });
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'control_exception_approved', 'control_exception', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ status: 'active' })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_exception_approved',
+      resourceType: 'control_exception',
+      resourceId: id,
+      details: { status: 'active' }
+    });
 
     await emitExceptionEvent(orgId, 'exception.approved', { id, status: 'active' });
 
@@ -237,11 +241,12 @@ router.post('/:id/revoke', requirePermission('controls.write'), async (req, res)
       return res.status(404).json({ success: false, error: 'Control exception not found' });
     }
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'control_exception_revoked', 'control_exception', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, id, JSON.stringify({ status: 'revoked', note })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'control_exception_revoked',
+      resourceType: 'control_exception',
+      resourceId: id,
+      details: { status: 'revoked', note }
+    });
 
     await emitExceptionEvent(orgId, 'exception.revoked', { id, status: 'revoked', note });
 

@@ -31,23 +31,23 @@ const TASK_COMPLEXITY = {
 // Provider tiers for each complexity level (ordered by preference)
 const ROUTING_STRATEGY = {
   complex: [
-    { provider: 'claude', model: 'claude-sonnet-4-5-20250929' },
-    { provider: 'openai', model: 'gpt-4o' },
-    { provider: 'grok', model: 'grok-4-latest' },
-    { provider: 'gemini', model: 'gemini-2.5-pro' }
+    { provider: 'claude', model: 'claude-sonnet-5' },
+    { provider: 'openai', model: 'gpt-5.5' },
+    { provider: 'grok', model: 'grok-4.5' },
+    { provider: 'gemini', model: 'gemini-3.1-pro-preview' }
   ],
   moderate: [
-    { provider: 'gemini', model: 'gemini-2.5-flash' },
+    { provider: 'gemini', model: 'gemini-3.5-flash' },
     { provider: 'claude', model: 'claude-haiku-4-5-20251001' },
-    { provider: 'openai', model: 'gpt-4o-mini' },
-    { provider: 'grok', model: 'grok-3-latest' },
-    { provider: 'groq', model: 'llama-3.3-70b-versatile' }
+    { provider: 'openai', model: 'gpt-5.4-mini' },
+    { provider: 'grok', model: 'grok-4.1-fast' },
+    { provider: 'groq', model: 'openai/gpt-oss-120b' }
   ],
   simple: [
-    { provider: 'groq', model: 'llama-3.3-70b-versatile' },
-    { provider: 'gemini', model: 'gemini-2.5-flash' },
+    { provider: 'groq', model: 'openai/gpt-oss-120b' },
+    { provider: 'gemini', model: 'gemini-3.5-flash' },
     { provider: 'claude', model: 'claude-haiku-4-5-20251001' },
-    { provider: 'openai', model: 'gpt-4o-mini' },
+    { provider: 'openai', model: 'gpt-5.4-mini' },
     { provider: 'ollama', model: 'llama3.2' }
   ]
 };

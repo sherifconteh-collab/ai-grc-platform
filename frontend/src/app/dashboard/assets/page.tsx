@@ -7,6 +7,8 @@ import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { assetsAPI, Asset, AssetCategory, Environment } from '@/lib/assetsApi';
 import { vulnerabilitiesAPI } from '@/lib/api';
+import AssetControlLinks from '@/components/cmdb/AssetControlLinks';
+import AssetRiskLinks from '@/components/cmdb/AssetRiskLinks';
 
 interface CreateAssetFormState {
   category_id: string;
@@ -550,6 +552,20 @@ function AssetsPageContent() {
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">Open Vulnerabilities</h3>
                     <AssetVulnSummary assetId={selectedAsset.id} />
                   </div>
+
+                  {/* asset_control_mappings (migration 005) and risk_asset_links
+                      (migration 140) both existed with nothing reaching them
+                      from here. A vulnerability count answers "what is wrong
+                      with this asset"; these answer "what is it meant to
+                      satisfy" and "what is it exposed to". */}
+                  {/* canWrite is true because this repo's cmdb router applies
+                      authenticate and no requirePermission, and this page
+                      already lets any authenticated user create and edit
+                      assets. The prop stays so the component does not have to
+                      change if a permission is added later. */}
+                  <AssetControlLinks assetId={selectedAsset.id} canWrite />
+
+                  <AssetRiskLinks assetId={selectedAsset.id} />
 
                   {selectedDependencies.length > 0 && (
                     <div>

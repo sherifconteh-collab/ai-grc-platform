@@ -6,6 +6,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { rmfAPI, organizationAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/lib/access';
+import LeveragedAuthorizations from '@/components/rmf/LeveragedAuthorizations';
 
 interface OrgSystem {
   id: string;
@@ -37,6 +38,7 @@ interface RmfPackage {
   next_assessment_due: string | null;
   transition_count: number;
   active_decisions: number;
+  leveraged_count?: number;
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
@@ -73,6 +75,17 @@ interface DashboardSummary {
   status_distribution: Record<string, number>;
   active_authorizations: number;
   expiring_authorizations: { system_name: string; expiration_date: string; decision_type: string }[];
+  leveraged_authorizations_total: number;
+  at_risk_leveraged: {
+    id: string;
+    rmf_package_id: string;
+    system_name: string;
+    product_name: string;
+    lifecycle_status: string | null;
+    support_end_date: string | null;
+    expiration_date: string | null;
+    status: string;
+  }[];
   recent_activity: {
     id: string;
     from_step: string | null;
@@ -418,7 +431,7 @@ export default function RmfLifecyclePage() {
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
               <StatCard label="Total Packages" value={summary?.total_packages ?? packages.length} />
               <StatCard label="Active Authorizations" value={summary?.active_authorizations ?? 0} color="text-green-600" />
               <StatCard
@@ -430,6 +443,11 @@ export default function RmfLifecyclePage() {
                 label="Denied / Revoked"
                 value={(summary?.status_distribution?.denied ?? 0) + (summary?.status_distribution?.revoked ?? 0)}
                 color="text-red-600"
+              />
+              <StatCard
+                label="Leveraged Authorizations"
+                value={summary?.leveraged_authorizations_total ?? 0}
+                color="text-indigo-600"
               />
             </div>
 
@@ -443,6 +461,29 @@ export default function RmfLifecyclePage() {
                       <span className="font-medium text-gray-800">{ea.system_name}</span>
                       <span className="text-amber-700">
                         {DECISION_BADGES[ea.decision_type]?.label || ea.decision_type.toUpperCase()} expires {formatDate(ea.expiration_date)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* At-risk leveraged authorizations */}
+            {(summary?.at_risk_leveraged?.length ?? 0) > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                <h3 className="font-semibold text-amber-800 mb-3">⚠ At-Risk Leveraged Authorizations</h3>
+                <div className="space-y-2">
+                  {summary!.at_risk_leveraged.map(rl => (
+                    <div key={rl.id} className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-gray-800">
+                        {rl.system_name} <span className="text-gray-400">←</span> {rl.product_name}
+                      </span>
+                      <span className="text-amber-700">
+                        {rl.lifecycle_status && ['deprecated', 'retired'].includes(rl.lifecycle_status)
+                          ? `Product ${rl.lifecycle_status}`
+                          : rl.support_end_date
+                          ? `Support ends ${formatDate(rl.support_end_date)}`
+                          : `Expires ${formatDate(rl.expiration_date)}`}
                       </span>
                     </div>
                   ))}
@@ -537,6 +578,7 @@ export default function RmfLifecyclePage() {
                     <div className="flex items-center gap-4 text-xs text-gray-500">
                       <span>📍 {RMF_STEPS[stepIdx]?.label || pkg.current_step}</span>
                       {pkg.categorization_level && <span>📊 {pkg.categorization_level.toUpperCase()} Impact</span>}
+                      {(pkg.leveraged_count ?? 0) > 0 && <span>🔗 {pkg.leveraged_count} leveraged</span>}
                       <span className="ml-auto">Updated {formatDate(pkg.updated_at)}</span>
                     </div>
                   </div>
@@ -665,6 +707,17 @@ export default function RmfLifecyclePage() {
                   <DetailField label="Created By" value={selectedPackage.created_by_name} />
                 </div>
               </div>
+
+              {/* Leveraged authorizations (COTS/SaaS inheritance) */}
+              <LeveragedAuthorizations
+                packageId={selectedPackage.id}
+                canWrite={canWrite}
+                onChanged={() => {
+                  loadPackageDetail(selectedPackage.id);
+                  loadSummary();
+                  loadPackages();
+                }}
+              />
 
               {/* Authorization decisions */}
               {selectedPackage.authorization_decisions?.length > 0 && (

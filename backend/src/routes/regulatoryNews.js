@@ -5,6 +5,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const regulatoryNewsService = require('../services/regulatoryNewsService');
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 
 // Rate limiter for regulatory news endpoints
 const regulatoryNewsRateLimiter = createRateLimiter({
@@ -121,11 +122,11 @@ router.post('/refresh', requirePermission('notifications.write'), async (req, re
     const items = await regulatoryNewsService.refreshNews(orgId);
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, details, success)
-       VALUES ($1, $2, 'regulatory_news_refreshed', 'regulatory_news', $3::jsonb, true)`,
-      [orgId, req.user.id, JSON.stringify({ items_count: items.length })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'regulatory_news_refreshed',
+      resourceType: 'regulatory_news',
+      details: { items_count: items.length }
+    });
     
     res.json({
       success: true,
@@ -136,11 +137,12 @@ router.post('/refresh', requirePermission('notifications.write'), async (req, re
     console.error('Refresh regulatory news error:', error);
     
     // Log failed audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, details, success)
-       VALUES ($1, $2, 'regulatory_news_refresh_failed', 'regulatory_news', $3::jsonb, false)`,
-      [orgId, req.user.id, JSON.stringify({ error: error.message })]
-    ).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'regulatory_news_refresh_failed',
+      resourceType: 'regulatory_news',
+      details: { error: error.message },
+      success: false
+    }).catch(() => {});
     
     res.status(500).json({ success: false, error: 'Failed to refresh regulatory news' });
   }
@@ -160,11 +162,11 @@ router.post('/mark-all-read', requirePermission('notifications.write'), async (r
     );
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, details, success)
-       VALUES ($1, $2, 'regulatory_news_marked_all_read', 'regulatory_news', $3::jsonb, true)`,
-      [orgId, req.user.id, JSON.stringify({ items_marked: result.rowCount })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'regulatory_news_marked_all_read',
+      resourceType: 'regulatory_news',
+      details: { items_marked: result.rowCount }
+    });
     
     res.json({
       success: true,

@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const llm = require('../services/llmService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
@@ -228,10 +229,12 @@ router.put('/llm', requirePermission('settings.manage'), validateBody((body) => 
 
     // Audit log each provider key that was set/updated
     if (updatedProviders.length > 0) {
-      await pool.query(`
-        INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, ip_address, success, created_at)
-        VALUES ($1, $2, 'api_key_updated', 'org_settings', $1, $3, $4, true, NOW())
-      `, [orgId, req.user.id, JSON.stringify({ providers: updatedProviders, action: 'set' }), req.ip || null]).catch(() => {});
+      await auditService.logFromRequest(req, {
+        eventType: 'api_key_updated',
+        resourceType: 'org_settings',
+        resourceId: orgId,
+        details: { providers: updatedProviders, action: 'set' }
+      }).catch(() => {});
     }
 
     // Invalidate cached API keys so the new provider/key is used immediately.
@@ -276,7 +279,7 @@ router.post('/llm/test', requirePermission('settings.manage'), validateBody((bod
       const OpenAI = require('openai');
       const client = new OpenAI.default({ apiKey });
       const resp = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.4-mini',
         max_tokens: 50,
         messages: [{ role: 'user', content: 'Say "API key verified" in exactly those words.' }]
       });
@@ -290,7 +293,7 @@ router.post('/llm/test', requirePermission('settings.manage'), validateBody((bod
       };
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -311,7 +314,7 @@ router.post('/llm/test', requirePermission('settings.manage'), validateBody((bod
       const OpenAI = require('openai');
       const client = new OpenAI.default({ apiKey, baseURL: process.env.XAI_API_BASE || 'https://api.x.ai/v1' });
       const resp = await client.chat.completions.create({
-        model: 'grok-3-latest',
+        model: 'grok-4.1-fast',
         max_tokens: 50,
         messages: [{ role: 'user', content: 'Say "API key verified" in exactly those words.' }]
       });
@@ -322,7 +325,7 @@ router.post('/llm/test', requirePermission('settings.manage'), validateBody((bod
       const OpenAI = require('openai');
       const client = new OpenAI.default({ apiKey, baseURL: 'https://api.groq.com/openai/v1' });
       const resp = await client.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         max_tokens: 50,
         messages: [{ role: 'user', content: 'Say "API key verified" in exactly those words.' }]
       });
@@ -371,10 +374,12 @@ router.delete('/llm/:provider', requirePermission('settings.manage'), async (req
     );
 
     // Audit log key removal
-    await pool.query(`
-      INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, ip_address, success, created_at)
-      VALUES ($1, $2, 'api_key_removed', 'org_settings', $1, $3, $4, true, NOW())
-    `, [orgId, req.user.id, JSON.stringify({ provider: req.params.provider, action: 'remove' }), req.ip || null]).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'api_key_removed',
+      resourceType: 'org_settings',
+      resourceId: orgId,
+      details: { provider: req.params.provider, action: 'remove' }
+    }).catch(() => {});
 
     res.json({ success: true, message: `${req.params.provider} API key removed` });
   } catch (err) {
@@ -1694,10 +1699,12 @@ router.post('/account/cancel', requirePermission('settings.manage'), validateBod
     `, [orgId, cancelMeta]);
 
     // Audit log
-    await pool.query(`
-      INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, ip_address, success, created_at)
-      VALUES ($1, $2, 'account_cancelled', 'organization', $1, $3, $4, true, NOW())
-    `, [orgId, req.user.id, cancelMeta, req.ip || null]).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'account_cancelled',
+      resourceType: 'organization',
+      resourceId: orgId,
+      details: cancelMeta
+    }).catch(() => {});
 
     res.json({
       success: true,
@@ -1722,13 +1729,13 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
     // 1. Organization profile
     const orgResult = await pool.query(
       `SELECT o.id, o.name, o.tier, o.created_at, o.updated_at,
-              op.company_legal_name, op.industry, op.website, op.hq_location,
+              op.company_legal_name, op.industry, op.website, op.headquarters_location,
               op.employee_count_range, op.company_description, op.system_name,
               op.system_description, op.authorization_boundary, op.operating_environment_summary,
               op.confidentiality_impact, op.integrity_impact, op.availability_impact,
               op.impact_rationale, op.environment_types, op.deployment_model,
               op.cloud_providers, op.data_sensitivity_types, op.rmf_stage,
-              op.information_types, op.compliance_profile
+              op.compliance_profile
        FROM organizations o
        LEFT JOIN organization_profiles op ON op.organization_id = o.id
        WHERE o.id = $1`, [orgId]
@@ -1759,14 +1766,16 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
 
     // 4. Assets
     const assetsResult = await pool.query(
-      `SELECT a.name, a.asset_type, a.description, a.criticality, a.status,
-              a.owner, a.location, a.ip_address, a.mac_address,
+      `SELECT a.name, a.criticality, a.status,
+              owner.email AS owner_email, a.location, a.ip_address, a.mac_address,
               ac.name AS category_name, ac.code AS category_code
        FROM assets a
        LEFT JOIN asset_categories ac ON ac.id = a.category_id
+       LEFT JOIN users owner ON owner.id = a.owner_id
        WHERE a.organization_id = $1
        ORDER BY a.name`, [orgId]
     );
+    assetsResult.rows = assetsResult.rows.map((a) => ({ ...a, owner_email: a.owner_email ? decrypt(a.owner_email) : null }));
 
     // 5. Users (name and email only — no passwords)
     const usersResult = await pool.query(
@@ -1774,6 +1783,7 @@ router.get('/account/export', requirePermission('settings.manage'), async (req, 
        FROM users u WHERE u.organization_id = $1
        ORDER BY u.created_at`, [orgId]
     );
+    usersResult.rows = usersResult.rows.map((u) => ({ ...u, email: u.email ? decrypt(u.email) : null }));
 
     // 6. Audit logs (last 1000)
     const auditResult = await pool.query(
@@ -1900,10 +1910,12 @@ router.put('/smtp', orgSettingsRateLimiter, requirePermission('settings.manage')
       emailService.invalidateSmtpCacheForOrg(orgId);
     }
 
-    await pool.query(`
-      INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, ip_address, success, created_at)
-      VALUES ($1, $2, 'smtp_config_updated', 'settings', $1, $3, $4, true, NOW())
-    `, [orgId, req.user.id, JSON.stringify({ updated_by: req.user.email }), req.ip || null]).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'smtp_config_updated',
+      resourceType: 'settings',
+      resourceId: orgId,
+      details: { updated_by: req.user.email }
+    }).catch(() => {});
 
     res.json({ success: true, message: 'SMTP configuration saved. Send a test email to verify.' });
   } catch (error) {

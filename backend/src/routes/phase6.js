@@ -22,6 +22,29 @@ const aiOrgRateLimiter = createOrgRateLimiter({
   label: 'phase6-ai-org'
 });
 
+// llmService.chat() throws a 400 "No API key configured for <provider>..."
+// error (buildNoKeyError) when BYOK isn't set up for any provider. Routes
+// that actually call the LLM (regulatory-impact/analyze, remediation/generate,
+// analyze/comprehensive) surface that as the same NO_PROVIDER_CONFIGURED
+// envelope routes/ai.js's checkAIUsage returns, instead of a generic 500 —
+// so the frontend's BYOK setup prompt fires here too.
+function isNoProviderError(error) {
+  return error?.statusCode === 400 && /No API key configured/i.test(error?.message || '');
+}
+
+function respondToAIRouteError(res, error, fallbackMessage) {
+  if (isNoProviderError(error)) {
+    return res.status(422).json({
+      success: false,
+      error: 'No AI provider configured.',
+      code: 'NO_PROVIDER_CONFIGURED',
+      message: 'Add a free API key for Gemini or Groq in Settings → LLM Configuration to get started.',
+      freeProviders: ['gemini', 'groq', 'ollama']
+    });
+  }
+  res.status(500).json({ success: false, error: fallbackMessage });
+}
+
 // All routes require authentication
 router.use(authenticate);
 router.use(aiOrgRateLimiter);
@@ -151,10 +174,7 @@ router.post('/regulatory-impact/analyze', requirePermission('ai.use'), async (re
     });
   } catch (error) {
     console.error('Error analyzing regulatory impact:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to analyze regulatory impact'
-    });
+    respondToAIRouteError(res, error, 'Failed to analyze regulatory impact');
   }
 });
 
@@ -270,10 +290,7 @@ router.post('/remediation/generate', requirePermission('ai.use'), async (req, re
     });
   } catch (error) {
     console.error('Error generating remediation plan:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate remediation plan'
-    });
+    respondToAIRouteError(res, error, 'Failed to generate remediation plan');
   }
 });
 

@@ -1,6 +1,13 @@
 // @tier: community
 const pool = require('../config/database');
 const { getLLMService } = require('./llmService');
+const { log } = require('../utils/logger');
+
+// Ceiling on how many controls go into a single policy-section prompt. With
+// 800-53 enhancements the AC family alone reaches ~131 controls, and this
+// prompt is the only uncapped catalog-to-token path in the codebase.
+const MAX_CONTROLS_PER_POLICY_SECTION = 60;
+
 
 /**
  * NIST 800-53 Control Families - Used as the structural template for policies
@@ -65,6 +72,7 @@ async function generatePolicyFromFrameworks(orgId, userId, policyName, policyTyp
          fc.title,
          fc.description,
          fc.control_type,
+         fc.is_enhancement,
          f.id AS framework_id,
          f.name AS framework_name,
          f.code AS framework_code,
@@ -205,7 +213,29 @@ async function generateSectionContent(orgId, policyName, policyType, family, con
 
     // Build prompt for AI
     const frameworkNames = frameworks.map(f => f.name).join(', ');
-    const controlList = controls.map(c => 
+    // Every control in the family went into the prompt uncapped. That was
+    // survivable at ~25 controls per family, but the 800-53 enhancement import
+    // takes AC alone from 23 to 131, and this is the only place in the codebase
+    // where catalog size multiplies prompt tokens with no ceiling. Base
+    // controls are listed first so that when the cap bites it drops
+    // enhancements rather than the controls they refine -- an enhancement is
+    // meaningless in a policy that never states its parent requirement.
+    const orderedControls = [
+      ...controls.filter((c) => !c.is_enhancement),
+      ...controls.filter((c) => c.is_enhancement)
+    ];
+    const includedControls = orderedControls.slice(0, MAX_CONTROLS_PER_POLICY_SECTION);
+    const omittedCount = orderedControls.length - includedControls.length;
+
+    if (omittedCount > 0) {
+      log('warn', 'policy.section_controls_truncated', {
+        family: family.code,
+        included: includedControls.length,
+        omitted: omittedCount
+      });
+    }
+
+    const controlList = includedControls.map(c =>
       `- ${c.control_id}: ${c.title} (${c.framework_code})`
     ).join('\n');
 
@@ -223,12 +253,12 @@ Create a detailed policy section that addresses the following controls from mult
 ${controlList}
 
 Requirements:
-1. Write clear, actionable policy statements that address ALL listed controls
+1. Write clear, actionable policy statements that address the listed controls
 2. When multiple frameworks have similar controls, integrate them into unified policy statements
 3. Use professional, formal policy language
 4. Include specific requirements, responsibilities, and procedures
 5. Make it practical and implementable for ${org.organization_size || 'medium-sized'} ${org.industry || 'organizations'}
-6. Length: 300-500 words
+6. Length: 300-500 words for a short control list; up to 900 words when more than 40 controls are listed, rather than omitting requirements to hit a word count
 
 Format the response as a cohesive policy section with:
 - Purpose statement

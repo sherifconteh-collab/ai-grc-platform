@@ -79,6 +79,7 @@ const {
   FEATURE_TASK_PROFILE,
   resolveTaskModel,
 } = require('./ai/providerConfig');
+const { sanitizePromptLabel } = require('./ai/promptSafety');
 
 
 // ---------- Org default provider ----------
@@ -143,10 +144,10 @@ function markAISuccess(provider, model, requestedProvider) {
 
 function getDefaultModelForProvider(provider) {
   if (provider === 'claude') return 'claude-haiku-4-5-20251001';
-  if (provider === 'openai') return 'gpt-4o-mini';
-  if (provider === 'grok') return 'grok-3-latest';
-  if (provider === 'gemini') return 'gemini-2.5-flash';
-  if (provider === 'groq') return 'llama-3.3-70b-versatile';
+  if (provider === 'openai') return 'gpt-5.4-mini';
+  if (provider === 'grok') return 'grok-4.1-fast';
+  if (provider === 'gemini') return 'gemini-3.5-flash';
+  if (provider === 'groq') return 'openai/gpt-oss-20b';
   if (provider === 'ollama') return 'llama3.2';
   return null;
 }
@@ -1569,7 +1570,8 @@ For EACH adopted framework, provide:
 Also provide a cross-framework summary:
 - Regulatory changes that affect multiple adopted frameworks simultaneously
 - Priority actions across the entire compliance portfolio
-- Gaps between current compliance posture and upcoming requirements` }]
+- Gaps between current compliance posture and upcoming requirements` }],
+    feature: 'regulatory_monitor'
   });
 }
 
@@ -1809,7 +1811,8 @@ Provide:
 6. **Evidence Required** – What scan or patch evidence to collect for audit closure
 
 If no assets appear to be affected, explicitly state that and explain why.`
-    }]
+    }],
+    feature: 'iavm_asset_alert'
   });
 }
 
@@ -1844,7 +1847,8 @@ Generate a complete IR plan with:
 7. Communication plan (internal stakeholders, regulators, affected parties)
 8. Evidence preservation requirements
 9. Regulatory notification requirements (GDPR 72hr, HIPAA, etc.)
-10. Roles and responsibilities matrix` }]
+10. Roles and responsibilities matrix` }],
+    feature: 'incident_response'
   });
 }
 
@@ -1944,7 +1948,8 @@ Provide:
 5. Trend analysis and emerging risks
 6. Risk acceptance recommendations vs mitigation priorities
 7. Return data in a structured JSON section for heatmap visualization:
-   { "heatmapData": [{ "item": "name", "likelihood": 1-5, "impact": 1-5, "category": "..." }] }` }]
+   { "heatmapData": [{ "item": "name", "likelihood": 1-5, "impact": 1-5, "category": "..." }] }` }],
+      feature: 'risk_heatmap'
     });
   });
 }
@@ -1974,7 +1979,8 @@ Provide:
 5. Recommended monitoring frequency
 6. Questionnaire items to send to the vendor
 7. Due diligence checklist
-8. Compliance framework alignment (which controls does this vendor impact)` }]
+8. Compliance framework alignment (which controls does this vendor impact)` }],
+    feature: 'vendor_risk'
   });
 }
 
@@ -2071,7 +2077,8 @@ For each asset, identify:
 3. Any gaps where assets lack required controls
 4. Recommended control implementations per asset category
 5. Return structured mapping data:
-   { "mappings": [{ "asset": "name", "controls": [{ "id": "XX-1", "framework": "code", "priority": "high", "reason": "..." }] }] }` }]
+   { "mappings": [{ "asset": "name", "controls": [{ "id": "XX-1", "framework": "code", "priority": "high", "reason": "..." }] }] }` }],
+    feature: 'asset_control_mapping'
   });
 }
 
@@ -2113,7 +2120,8 @@ Analyze and provide:
 4. Questions to ask department heads about undocumented systems
 5. Automated discovery recommendations (tools and techniques)
 6. Risk exposure from potential unregistered assets
-7. Compliance impact of Shadow IT on adopted frameworks` }]
+7. Compliance impact of Shadow IT on adopted frameworks` }],
+    feature: 'shadow_it'
   });
 }
 
@@ -2161,7 +2169,8 @@ Assess:
 8. Model documentation completeness
 9. Transparency and explainability gaps
 10. AIUC-1 agentic AI certification readiness (Data & Privacy, Security, Safety, Reliability, Accountability, Societal Impact)
-11. Recommended governance actions prioritized by risk level` }]
+11. Recommended governance actions prioritized by risk level` }],
+    feature: 'ai_governance'
   });
 }
 
@@ -2193,7 +2202,8 @@ Organization Data:
 - Total Assets: ${assetCount.rows[0].count}
 - Total Evidence: ${evidenceCount.rows[0].count}
 
-Answer the question thoroughly based on this data.` }]
+Answer the question thoroughly based on this data.` }],
+    feature: 'compliance_query'
   });
 }
 
@@ -2226,7 +2236,8 @@ Provide:
 4. Suggested training providers/resources
 5. Training schedule recommendation
 6. How each training topic maps to specific control gaps
-7. KPIs to measure training effectiveness` }]
+7. KPIs to measure training effectiveness` }],
+    feature: 'training_recommendations'
   });
 }
 
@@ -2287,7 +2298,8 @@ Provide:
 3. Technical vs procedural requirements
 4. Estimated implementation effort
 5. Key evidence artifacts needed
-6. Related controls and dependencies` }]
+6. Related controls and dependencies` }],
+    feature: 'control_analysis'
   });
 }
 
@@ -2346,7 +2358,8 @@ Provide:
 3. Vulnerability assessment areas
 4. Compliance requirements (which frameworks apply)
 5. Recommended security controls
-6. Monitoring recommendations` }]
+6. Monitoring recommendations` }],
+    feature: 'asset_risk'
   });
 }
 
@@ -2375,7 +2388,8 @@ Generate a complete, professional policy including:
 6. Compliance and enforcement
 7. Related policies and references
 8. Revision history template
-Map requirements to the organization's adopted frameworks where applicable.` }]
+Map requirements to the organization's adopted frameworks where applicable.` }],
+    feature: 'policy_generator'
   });
 }
 
@@ -2618,7 +2632,92 @@ Return a JSON object with:
   "related_controls": ["..."],
   "repeat_finding": false
 }${retryBlock}`
-    }]
+    }],
+    feature: 'finding_analysis'
+  });
+}
+
+// =====================================================================
+// RBAC DOCUMENT ANALYSIS
+// =====================================================================
+// Analyzes a customer-uploaded RBAC document (roles matrix, SoD matrix,
+// roles & responsibilities) against the org's live permission catalog,
+// roles, and SoD rules. Uploaded documents can be large; cap what reaches
+// the prompt so a single spreadsheet export cannot blow the context window
+// or the org's token budget.
+const RBAC_ANALYSIS_MAX_DOCUMENT_CHARS = 24000;
+
+function rbacAnalysisFeatureError(statusCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+
+async function analyzeRbacDocument({ organizationId, documentId, provider, model, schemaRetryHint = null }) {
+  const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // 404 (not 400) for a malformed id: aiHandler rewrites any 400 into its
+  // missing-API-key message, which would mislead here.
+  if (!documentId || !UUID_PATTERN.test(String(documentId))) {
+    throw rbacAnalysisFeatureError(404, 'RBAC document not found');
+  }
+  const { rows: [document] } = await pool.query(
+    'SELECT id, file_name, document_type, extracted_text FROM rbac_documents WHERE id = $1 AND organization_id = $2',
+    [documentId, organizationId]
+  );
+  if (!document) throw rbacAnalysisFeatureError(404, 'RBAC document not found');
+
+  const [catalog, roles, sodRules] = await Promise.all([
+    pool.query('SELECT name, description FROM permissions ORDER BY name'),
+    pool.query(`
+      SELECT r.name,
+             COALESCE(ARRAY_AGG(p.name) FILTER (WHERE p.id IS NOT NULL), '{}') AS permissions
+      FROM roles r
+      LEFT JOIN role_permissions rp ON rp.role_id = r.id
+      LEFT JOIN permissions p ON p.id = rp.permission_id
+      WHERE r.organization_id = $1 OR r.is_system_role = true
+      GROUP BY r.id ORDER BY r.name
+    `, [organizationId]),
+    pool.query(`
+      SELECT name, conflicting_permissions, severity FROM sod_rules
+      WHERE is_active = true AND (organization_id = $1 OR organization_id IS NULL)
+    `, [organizationId])
+  ]);
+
+  const documentText = String(document.extracted_text || '').slice(0, RBAC_ANALYSIS_MAX_DOCUMENT_CHARS);
+
+  return chat({
+    provider, model, organizationId,
+    systemPrompt: await buildPersonalizedSystem(organizationId, null, 'compact', null, 'controls'),
+    messages: [{
+      role: 'user',
+      content: `You are an identity and access governance analyst. An organization has uploaded its own RBAC documentation for review.${buildFewShotBlock('rbac_analysis')}
+
+Document: "${sanitizePromptLabel(document.file_name)}" (declared type: ${document.document_type})
+Document content:
+"""
+${documentText}
+"""
+
+Platform permission catalog (the ONLY valid values for mapped_permissions, suggested_platform_roles[].permissions, and suggested_sod_rules[].conflicting_permissions):
+${compactJSON(catalog.rows)}
+
+Existing platform roles and their permissions:
+${compactJSON(roles.rows)}
+
+Active SoD rules already enforced in the platform:
+${compactJSON(sodRules.rows)}
+
+Analyze the document:
+1. Extract every role it defines with its duties, and map each role's duties onto the platform permission catalog (omit duties with no catalog equivalent, but mention them in notes).
+2. Identify separation-of-duties conflicts: duties combined within one documented role, contradictions between the document and its own SoD matrix (if present), and conflicts with the active platform SoD rules.
+3. Suggest platform roles worth creating (only where no existing role already covers the mapped permission set).
+4. Suggest new SoD rules for conflicts the document reveals that the active platform rules do not already cover; use at least 2 catalog permission keys per rule and do not duplicate existing rules.
+5. List governance gaps and risks the document exposes.
+
+Return ONLY a JSON object with keys: summary, roles, sod_conflicts, suggested_platform_roles, suggested_sod_rules, gaps_and_risks — matching the exemplar structure exactly.${schemaRetryHint ? `\n\n[CORRECTION REQUIRED]\n${schemaRetryHint}` : ''}`
+    }],
+    feature: 'rbac_analysis'
   });
 }
 
@@ -2742,13 +2841,21 @@ async function logAIDecision(organizationId, feature, inputText, outputText, opt
 
     await pool.query(`
       INSERT INTO ai_decision_log
-        (organization_id, input_data, input_hash, output_data, output_hash,
-         human_reviewed, risk_level, regulatory_framework, model_version,
-         correlation_id, session_id, processing_timestamp, bias_flags, bias_reviewed,
-         data_lineage)
-      VALUES ($1, $2::jsonb, $3, $4::jsonb, $5, false, $6, $7, $8, $9, $10, NOW(), $11::jsonb, false, $12)
+        (organization_id, user_id, ip_address, feature, input_data, input_hash,
+         output_data, output_hash, human_reviewed, risk_level, regulatory_framework,
+         model_version, correlation_id, session_id, processing_timestamp, bias_flags,
+         bias_reviewed, data_lineage)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8, false, $9, $10, $11, $12, $13, NOW(), $14::jsonb, false, $15)
     `, [
       organizationId,
+      // AU-3: attribution was organization-only before this. The columns on
+      // this table that name people (reviewed_by, approved_by) identify
+      // post-hoc reviewers, not the actor whose request produced the decision.
+      opts.userId || null,
+      opts.ipAddress || null,
+      // Migration 045 added `feature` for exactly this, and the insert never
+      // wrote it, so no stored decision could say which feature produced it.
+      feature,
       safeInput,
       inputHash,
       safeOutput,
@@ -2968,6 +3075,7 @@ module.exports = {
   generateAuditPbcDraft,
   generateAuditWorkpaperDraft,
   generateAuditFindingDraft,
+  analyzeRbacDocument,
   logAIUsage,
   logAIDecision,
   getUsageCount,

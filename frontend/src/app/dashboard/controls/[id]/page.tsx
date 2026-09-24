@@ -7,6 +7,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { controlsAPI, implementationsAPI, usersAPI, aiAPI, assessmentsAPI, evidenceAPI, poamAPI, vulnerabilitiesAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/lib/access';
+import type { PoamItem } from '@/lib/poamTypes';
 
 interface Implementation {
   id: string;
@@ -24,11 +25,23 @@ interface Implementation {
 
 interface StatusHistoryEntry {
   id: string;
+  event_type: string;
   old_status: string;
   new_status: string;
   notes: string | null;
   changed_at: string;
   changed_by_name: string;
+}
+
+const TEST_RESULT_EVENT_TYPES = ['test_result_changed', 'assessment_result_updated', 'assessment_result_recorded'];
+
+/** Vulnerability rows as the risk-summary panel consumes them. */
+interface ControlVulnerability {
+  id: string;
+  cve_id: string | null;
+  rule_id: string | null;
+  severity: string | null;
+  status: string | null;
 }
 
 interface EvidenceItem {
@@ -82,11 +95,12 @@ function getTestResultInfo(status: string) {
 }
 
 function getPriorityLabel(priority: string | number) {
-  const p = Number(priority);
-  if (p >= 3) return { label: 'Critical', color: 'bg-red-100 text-red-800' };
-  if (p === 2) return { label: 'High', color: 'bg-orange-100 text-orange-800' };
-  if (p === 1) return { label: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
-  return { label: 'Low', color: 'bg-blue-100 text-blue-800' };
+  const raw = String(priority ?? '').toLowerCase().replace(/^p/, '');
+  if (raw === 'critical') return { label: 'Critical', color: 'bg-red-100 text-red-800' };
+  if (raw === 'high' || raw === '1') return { label: 'High', color: 'bg-orange-100 text-orange-800' };
+  if (raw === 'medium' || raw === '2') return { label: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
+  if (raw === 'low' || raw === '3') return { label: 'Low', color: 'bg-blue-100 text-blue-800' };
+  return { label: 'Unspecified', color: 'bg-gray-100 text-gray-600' };
 }
 
 function formatDate(dateStr: string | null) {
@@ -133,9 +147,10 @@ export default function ControlDetailPage() {
   const [procedureSavingId, setProcedureSavingId] = useState<string | null>(null);
 
   // Risk summary — POA&Ms and vulnerabilities linked to this control
-  const [controlPoams, setControlPoams] = useState<any[]>([]);
-  const [controlVulns, setControlVulns] = useState<any[]>([]);
+  const [controlPoams, setControlPoams] = useState<PoamItem[]>([]);
+  const [controlVulns, setControlVulns] = useState<ControlVulnerability[]>([]);
   const [riskLoading, setRiskLoading] = useState(false);
+  const [raisingPoam, setRaisingPoam] = useState(false);
 
   // Control-level test result (auditor verdict)
   const [testResult, setTestResult] = useState('not_assessed');
@@ -217,12 +232,37 @@ export default function ControlDetailPage() {
         poamAPI.getList({ controlId: id, limit: 10 }),
         vulnerabilitiesAPI.getAll({ limit: 10 }),
       ]);
-      if (poamRes.status === 'fulfilled') setControlPoams(poamRes.value.data?.data || []);
-      if (vulnRes.status === 'fulfilled') setControlVulns(vulnRes.value.data?.data || []);
+      // Both endpoints wrap their rows in { data: { items, ... } }; reading
+      // .data directly yields an object whose .length is undefined, which
+      // silently hides the whole risk panel.
+      if (poamRes.status === 'fulfilled') setControlPoams(poamRes.value.data?.data?.items || []);
+      if (vulnRes.status === 'fulfilled') setControlVulns(vulnRes.value.data?.data?.items || []);
     } finally {
       setRiskLoading(false);
     }
   }, [id]);
+
+  // Raise a POA&M against this control by hand. Gaps found by a test or a
+  // finding raise one automatically; this covers everything else -- a weakness
+  // someone spotted that no automated path caught.
+  const handleRaisePoam = useCallback(async () => {
+    if (!canUpdateImplementation) return;
+    try {
+      setRaisingPoam(true);
+      const controlCode = controlData?.control_id || controlData?.control_code || 'control';
+      await poamAPI.create({
+        title: `Remediate ${controlCode}`,
+        description: `Raised from the control detail page for ${controlCode}.`,
+        source_type: 'control',
+        control_id: id,
+        status: 'open',
+        priority: 'medium',
+      });
+      await loadRiskSummary();
+    } finally {
+      setRaisingPoam(false);
+    }
+  }, [canUpdateImplementation, controlData, id, loadRiskSummary]);
 
   useEffect(() => {
     if (id) {
@@ -265,6 +305,14 @@ export default function ControlDetailPage() {
     if (testResultCounts.satisfied > 0) return { status: 'satisfied', incomplete: testResultCounts.not_assessed > 0 };
     return { status: 'not_assessed', incomplete: false };
   }, [assessmentProcedures.length, testResultCounts]);
+
+  const { workflowHistory, testResultHistory } = useMemo(() => {
+    const entries = implementation?.status_history || [];
+    return {
+      workflowHistory: entries.filter((entry) => !TEST_RESULT_EVENT_TYPES.includes(entry.event_type)),
+      testResultHistory: entries.filter((entry) => TEST_RESULT_EVENT_TYPES.includes(entry.event_type)),
+    };
+  }, [implementation?.status_history]);
 
   const quickSetProcedureStatus = async (
     procId: string,
@@ -548,7 +596,7 @@ export default function ControlDetailPage() {
   }
 
   const statusInfo = implementation ? getStatusInfo(implementation.status) : getStatusInfo('not_started');
-  const priorityInfo = controlData ? getPriorityLabel(controlData.priority) : getPriorityLabel(0);
+  const priorityInfo = controlData ? getPriorityLabel(controlData.priority) : getPriorityLabel('');
   const linkedEvidenceIds = new Set((implementation?.evidence || []).map((ev) => ev.id));
 
   return (
@@ -701,9 +749,49 @@ export default function ControlDetailPage() {
           </div>
         )}
 
-        {/* Risk & Compliance Summary — linked POA&Ms and vulnerabilities */}
-        {(controlPoams.length > 0 || controlVulns.length > 0 || riskLoading) && (
+        {/* Test Result History — every recorded control-level and procedure-level verdict change */}
+        {implementation && (
           <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Test Result History</h3>
+            {testResultHistory.length > 0 ? (
+              <div className="relative">
+                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                <div className="space-y-4">
+                  {testResultHistory.map((entry) => (
+                    <div key={entry.id} className="relative flex items-start gap-4 pl-10">
+                      <div className="absolute left-2.5 top-2 w-3 h-3 rounded-full bg-purple-600 border-2 border-white shadow"></div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getTestResultInfo(entry.old_status).color}`}>
+                            {getTestResultInfo(entry.old_status).label}
+                          </span>
+                          <span className="text-gray-400 text-xs">→</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getTestResultInfo(entry.new_status).color}`}>
+                            {getTestResultInfo(entry.new_status).label}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-auto">{formatDatetime(entry.changed_at)}</span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          by {entry.changed_by_name || 'Unknown'}
+                          {entry.notes && <span className="ml-2 italic">— {entry.notes}</span>}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No test results recorded yet.</p>
+            )}
+          </div>
+        )}
+
+        {/* Risk & Compliance Summary — linked POA&Ms and vulnerabilities.
+            Rendered unconditionally: this panel used to be hidden unless a
+            POA&M or vulnerability already existed, which meant a control with
+            no remediation showed nothing and offered no way to raise any. The
+            empty states below were unreachable code. */}
+        <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Risk & Compliance Summary</h3>
             {riskLoading ? (
               <div className="text-sm text-gray-400">Loading...</div>
@@ -713,15 +801,38 @@ export default function ControlDetailPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-semibold text-gray-700">POA&amp;Ms</h4>
-                    <Link href={`/dashboard/poam?controlId=${id}`} className="text-xs text-purple-600 hover:underline">View all →</Link>
+                    <div className="flex items-center gap-3">
+                      {canUpdateImplementation && (
+                        <button
+                          onClick={handleRaisePoam}
+                          disabled={raisingPoam}
+                          className="text-xs text-purple-600 hover:underline disabled:opacity-50"
+                        >
+                          {raisingPoam ? 'Raising...' : '+ Raise POA&M'}
+                        </button>
+                      )}
+                      <Link href={`/dashboard/poam?controlId=${id}`} className="text-xs text-purple-600 hover:underline">View all →</Link>
+                    </div>
                   </div>
                   {controlPoams.length === 0 ? (
-                    <p className="text-xs text-gray-400">No open POA&amp;Ms for this control.</p>
+                    <p className="text-xs text-gray-400">
+                      No open POA&amp;Ms for this control. One is raised automatically when a test comes back
+                      other than satisfied or a finding is recorded against this control.
+                    </p>
                   ) : (
                     <div className="space-y-2">
-                      {controlPoams.slice(0, 5).map((p: any) => (
+                      {controlPoams.slice(0, 5).map((p) => (
                         <div key={p.id} className="flex items-center justify-between text-xs bg-gray-50 rounded px-3 py-2">
-                          <span className="text-gray-800 truncate max-w-[180px]" title={p.weakness_name || p.title}>{p.weakness_name || p.title || '—'}</span>
+                          <Link
+                            href={`/dashboard/poam/${p.id}`}
+                            className="text-purple-700 hover:underline truncate max-w-[180px]"
+                            title={p.title || undefined}
+                          >
+                            {p.title || '—'}
+                            <span className="block text-gray-400 capitalize">
+                              from {String(p.source_type || 'manual').replace(/_/g, ' ')}
+                            </span>
+                          </Link>
                           <span className={`ml-2 shrink-0 px-1.5 py-0.5 rounded font-medium ${
                             p.status === 'open' ? 'bg-red-100 text-red-700' :
                             p.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
@@ -742,9 +853,9 @@ export default function ControlDetailPage() {
                     <p className="text-xs text-gray-400">No vulnerabilities linked.</p>
                   ) : (
                     <div className="space-y-2">
-                      {controlVulns.slice(0, 5).map((v: any) => (
+                      {controlVulns.slice(0, 5).map((v) => (
                         <div key={v.id} className="flex items-center justify-between text-xs bg-gray-50 rounded px-3 py-2">
-                          <span className="text-gray-800 font-mono truncate max-w-[160px]" title={v.cve_id || v.rule_id}>{v.cve_id || v.rule_id || '—'}</span>
+                          <span className="text-gray-800 font-mono truncate max-w-[160px]" title={v.cve_id || v.rule_id || undefined}>{v.cve_id || v.rule_id || '—'}</span>
                           <span className={`ml-2 shrink-0 px-1.5 py-0.5 rounded font-medium ${
                             v.severity === 'critical' ? 'bg-red-100 text-red-700' :
                             v.severity === 'high' ? 'bg-orange-100 text-orange-700' :
@@ -758,8 +869,7 @@ export default function ControlDetailPage() {
                 </div>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {/* Assessment Procedures (NIST 800-53A / SCA Testing) */}
         {assessmentProcedures.length > 0 && (
@@ -1290,11 +1400,11 @@ export default function ControlDetailPage() {
         {/* Status History Timeline */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Status History</h3>
-          {implementation?.status_history && implementation.status_history.length > 0 ? (
+          {workflowHistory.length > 0 ? (
             <div className="relative">
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
               <div className="space-y-4">
-                {implementation.status_history.map((entry) => (
+                {workflowHistory.map((entry) => (
                   <div key={entry.id} className="relative flex items-start gap-4 pl-10">
                     <div className="absolute left-2.5 top-2 w-3 h-3 rounded-full bg-purple-600 border-2 border-white shadow"></div>
                     <div className="flex-1">

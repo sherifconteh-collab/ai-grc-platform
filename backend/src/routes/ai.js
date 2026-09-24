@@ -1,6 +1,7 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const { authenticate, requirePermission, requireTier } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const llm = require('../services/llmService');
@@ -27,6 +28,12 @@ const aiDecisionWriteLimiter = createOrgRateLimiter({
 });
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
+
+// Every route below is already covered by the Redis-backed aiOrgRateLimiter
+// applied further down (org-scoped, the real production control). This adds
+// a second, cheap IP-based layer ahead of authenticate, so an unauthenticated
+// flood is bounded before any DB/JWT work runs.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 // All AI routes require authentication
 router.use(authenticate);
@@ -180,6 +187,9 @@ function aiHandler(feature, fn, opts = {}) {
       const inputContext = JSON.stringify(req.body || {});
       await llm.logAIDecision(params.organizationId, feature, inputContext, resultText, {
         modelVersion: resolvedModel || null,
+        // AU-3: who and from where, not just which organization.
+        userId: req.user?.id || null,
+        ipAddress: req.ip || null,
         correlationId,
         sessionId,
         resourceType: opts.resourceType ? (typeof opts.resourceType === 'function' ? opts.resourceType(req) : opts.resourceType) : null,
@@ -348,6 +358,15 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// ======================== RBAC DOCUMENT ANALYSIS ========================
+// Analyzes a customer-uploaded RBAC document (rbac_documents, see the
+// access-governance routes) against the org's permission catalog, roles, and
+// SoD rules. Gated on access_governance.read on top of the router-wide ai.use.
+router.post('/rbac-analysis', checkAIUsage, requirePermission('access_governance.read'),
+  aiHandler('rbac_analysis', (req, params) =>
+    llm.analyzeRbacDocument({ ...params, documentId: req.body.documentId, schemaRetryHint: req.schemaRetryHint || null }))
+);
+
 // ======================== 1. GAP ANALYSIS ========================
 router.post('/gap-analysis', checkAIUsage, aiHandler('gap_analysis', (req, params) =>
   llm.generateGapAnalysis({ ...params, schemaRetryHint: req.schemaRetryHint || null })
@@ -495,7 +514,10 @@ router.post('/tprm/analyze-evidence', checkAIUsage, async (req, res) => {
     }).catch(() => {});
 
     await llm.logAIDecision(orgId, 'tprm_evidence_analyze', JSON.stringify({ questionnaireId }), String(result), {
-      correlationId, modelVersion: params.model || null
+      correlationId,
+      modelVersion: params.model || null,
+      userId: req.user?.id || null,
+      ipAddress: req.ip || null
     }).catch(() => {});
 
     res.json({ success: true, data: { result, feature: 'tprm_evidence_analyze', provider: params.provider, evidence_count: evidenceResult.rows.length } });
@@ -987,7 +1009,8 @@ Return ONLY valid JSON. No markdown fences, no explanation.`;
     model: params.model,
     organizationId: orgId,
     systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }]
+    messages: [{ role: 'user', content: userPrompt }],
+    feature: 'security_posture'
   });
 
   // Parse JSON from LLM response
@@ -1144,7 +1167,10 @@ router.get('/reasoning-memory/entries', requireTier('enterprise'), async (req, r
 });
 
 // DELETE /ai/reasoning-memory — clear all reasoning memory for this org
-router.delete('/reasoning-memory', requireTier('enterprise'), async (req, res) => {
+// Bulk-wipes org-wide state, so it needs the stronger write-tier permission
+// every other mutating action in this file uses, not just the router-wide
+// ai.use gate that everyone with AI access already holds.
+router.delete('/reasoning-memory', requireTier('enterprise'), requirePermission('assessments.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const result = await pool.query(

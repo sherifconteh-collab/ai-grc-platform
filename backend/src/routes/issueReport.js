@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 
@@ -84,12 +85,12 @@ router.post('/report', issueReportLimiter, async (req, res) => {
       tier
     };
 
-    const result = await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, details, success, outcome, source_system)
-       VALUES ($1, $2, 'issue_report_submitted', 'issue_report', $3::jsonb, true, 'success', 'controlweave')
-       RETURNING id, created_at`,
-      [orgId, userId, JSON.stringify(details)]
-    );
+    const result = await auditService.logFromRequest(req, {
+      eventType: 'issue_report_submitted',
+      resourceType: 'issue_report',
+      details: details,
+      sourceSystem: 'controlweave'
+    });
 
     const issueId = result.rows[0].id;
     const createdAt = result.rows[0].created_at;

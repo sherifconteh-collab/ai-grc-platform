@@ -264,7 +264,7 @@ jobs:
                   undocumented_pages.append((page_name, path))
 
           # ── 3. DB migration files ────────────────────────────────────────────
-          migration_files = glob.glob("db/migrations/*.sql")
+          migration_files = glob.glob("backend/migrations/*.sql")
           undocumented_migrations = []
           for path in sorted(migration_files):
               base = os.path.basename(path)

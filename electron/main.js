@@ -800,7 +800,10 @@ app.whenReady().then(async () => {
 
       logStartup('info', 'All critical resources present — smoke test passed');
       process.exitCode = 0;
-      app.quit();
+      // app.quit() is graceful/async and can leave GPU/zygote/crashpad helper
+      // processes running long enough to hang the CI smoke-test step; exit
+      // immediately instead since there is no user session to tear down.
+      app.exit(0);
       return;
     }
 
@@ -836,22 +839,28 @@ app.whenReady().then(async () => {
   } catch (err) {
     logStartupError('Desktop startup failed', err);
     process.exitCode = 1;
-    if (!IS_SMOKE_TEST) {
-      dialog.showErrorBox(
-        'ControlWeave — Startup Error',
-        [
-          'Failed to start one or more internal servers.',
-          '',
-          err.message,
-          '',
-          `Startup log: ${startupLogPath || 'Unavailable'}`,
-          '',
-          'Please ensure:',
-          '  • No other application is using ports 3000, 3001, or 5433',
-          '  • You have write permission to the application data folder',
-        ].join('\n')
-      );
+    if (IS_SMOKE_TEST) {
+      // Same reasoning as the success path above: app.quit() is graceful/async
+      // and can let the process report exit code 0 to the CI shell regardless
+      // of process.exitCode, silently passing a smoke test that actually found
+      // a packaging defect. app.exit() forces the exit code immediately.
+      app.exit(1);
+      return;
     }
+    dialog.showErrorBox(
+      'ControlWeave — Startup Error',
+      [
+        'Failed to start one or more internal servers.',
+        '',
+        err.message,
+        '',
+        `Startup log: ${startupLogPath || 'Unavailable'}`,
+        '',
+        'Please ensure:',
+        '  • No other application is using ports 3000, 3001, or 5433',
+        '  • You have write permission to the application data folder',
+      ].join('\n')
+    );
     app.quit();
   }
 });

@@ -16,29 +16,87 @@
 --
 -- Ships in v3.4.0.
 
--- Applied only to tables that exist in this edition and carry an
--- organization_id column (the community schema has no `controls` table), and
--- idempotently, so a re-run cannot fail on an existing policy.
+-- controls (conditional: no migration creates a table literally named
+-- "controls" today -- framework_controls is the global catalog with no
+-- organization_id, control_implementations is the org-scoped table handled
+-- below -- guard the same way evidence/audit_engagements are guarded below
+-- in case a future edition introduces one)
 DO $$
-DECLARE
-  tbl TEXT;
 BEGIN
-  FOREACH tbl IN ARRAY ARRAY['controls', 'control_implementations', 'evidence', 'audit_engagements', 'audit_logs', 'users']
-  LOOP
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'organization_id'
-    ) THEN
-      EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
-      EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tbl);
-      EXECUTE format('DROP POLICY IF EXISTS org_isolation ON %I', tbl);
-      EXECUTE format(
-        'CREATE POLICY org_isolation ON %I USING ('
-        || 'NULLIF(current_setting(''app.org_id'', TRUE), '''') IS NULL '
-        || 'OR organization_id = NULLIF(current_setting(''app.org_id'', TRUE), '''')::uuid)',
-        tbl
-      );
-    END IF;
-  END LOOP;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'controls') THEN
+    EXECUTE 'ALTER TABLE controls ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'ALTER TABLE controls FORCE ROW LEVEL SECURITY';
+    EXECUTE $policy$
+      CREATE POLICY org_isolation ON controls
+        USING (
+          NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
+          OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
+        )
+    $policy$;
+  END IF;
 END;
 $$;
+
+-- control_implementations
+ALTER TABLE control_implementations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE control_implementations FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY org_isolation ON control_implementations
+  USING (
+    NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
+    OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
+  );
+
+-- evidence (conditional: table may not exist in all editions)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'evidence') THEN
+    EXECUTE 'ALTER TABLE evidence ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'ALTER TABLE evidence FORCE ROW LEVEL SECURITY';
+    EXECUTE $policy$
+      CREATE POLICY org_isolation ON evidence
+        USING (
+          NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
+          OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
+        )
+    $policy$;
+  END IF;
+END;
+$$;
+
+-- audit_engagements (assessments)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'audit_engagements') THEN
+    EXECUTE 'ALTER TABLE audit_engagements ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'ALTER TABLE audit_engagements FORCE ROW LEVEL SECURITY';
+    EXECUTE $policy$
+      CREATE POLICY org_isolation ON audit_engagements
+        USING (
+          NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
+          OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
+        )
+    $policy$;
+  END IF;
+END;
+$$;
+
+-- audit_logs
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY org_isolation ON audit_logs
+  USING (
+    NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
+    OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
+  );
+
+-- users (filtered by organization_id for intra-org visibility)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY org_isolation ON users
+  USING (
+    NULLIF(current_setting('app.org_id', TRUE), '') IS NULL
+    OR organization_id = NULLIF(current_setting('app.org_id', TRUE), '')::uuid
+  );

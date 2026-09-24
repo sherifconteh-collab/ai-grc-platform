@@ -2199,11 +2199,25 @@ async function seedProcedures() {
   try {
     await client.query('BEGIN');
 
-    // Clear existing procedures
-    await client.query('DELETE FROM assessment_plan_procedures');
-    await client.query('DELETE FROM assessment_results');
-    await client.query('DELETE FROM assessment_procedures');
-    console.log('Cleared existing assessment procedures.');
+    // This script previously opened by deleting assessment_results -- real
+    // customer assessment outcomes, the record of what an assessor actually
+    // concluded about a control. Re-seeding the procedure *catalog* is not a
+    // reason to destroy assessment history, and a seed script that silently
+    // erases audit outcomes is a data-loss bug rather than a reset.
+    //
+    // Procedures are now upserted by (framework_control_id, procedure_id) and
+    // results are left alone. Set RESET_ASSESSMENT_DATA=true to get the old
+    // destructive behavior, which is occasionally wanted for a demo reset --
+    // but it has to be asked for now.
+    if (String(process.env.RESET_ASSESSMENT_DATA || '').toLowerCase() === 'true') {
+      console.warn('RESET_ASSESSMENT_DATA=true -- deleting assessment results and plan links.');
+      await client.query('DELETE FROM assessment_plan_procedures');
+      await client.query('DELETE FROM assessment_results');
+      await client.query('DELETE FROM assessment_procedures');
+      console.log('Cleared existing assessment procedures and results.');
+    } else {
+      console.log('Upserting procedures; existing assessment_results preserved.');
+    }
 
     let totalProcedures = 0;
 
@@ -2244,7 +2258,19 @@ async function seedProcedures() {
              (framework_control_id, procedure_id, procedure_type, title, description,
               expected_evidence, assessment_method, depth, frequency_guidance,
               assessor_notes, source_document, sort_order)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             ON CONFLICT (framework_control_id, procedure_id) DO UPDATE SET
+               procedure_type = EXCLUDED.procedure_type,
+               title = EXCLUDED.title,
+               description = EXCLUDED.description,
+               expected_evidence = EXCLUDED.expected_evidence,
+               assessment_method = EXCLUDED.assessment_method,
+               depth = EXCLUDED.depth,
+               frequency_guidance = EXCLUDED.frequency_guidance,
+               assessor_notes = EXCLUDED.assessor_notes,
+               source_document = EXCLUDED.source_document,
+               sort_order = EXCLUDED.sort_order,
+               updated_at = NOW()`,
             [
               frameworkControlId,
               proc.procedure_id,

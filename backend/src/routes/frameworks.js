@@ -414,7 +414,7 @@ router.get('/', requirePermission('frameworks.read'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT f.id, f.name, f.code, f.version, f.description, f.category, f.tier_required,
-             f.framework_group,
+             f.framework_group, f.coverage_status,
              COUNT(fc.id) as control_count
       FROM frameworks f
       LEFT JOIN framework_controls fc ON fc.framework_id = f.id

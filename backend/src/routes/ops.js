@@ -5,6 +5,7 @@ const pool = require('../config/database');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { enqueueJob, processPendingJobs, runRetentionCleanup } = require('../services/jobService');
 const { processPendingWebhookDeliveries } = require('../services/webhookService');
+const { getAuditFailureStats } = require('../services/auditService');
 
 router.use(authenticate);
 router.use(requirePermission('settings.manage'));
@@ -146,12 +147,15 @@ router.get('/overview', async (req, res) => {
       webhooksByStatus[row.delivery_status] = Number(row.count || 0);
     }
 
+    const auditPipeline = getAuditFailureStats();
+
     const openIssueCount =
       Number(activity.failures_24h || 0)
       + Number(findings.open_vulnerabilities || 0)
       + Number(poam.active_poam_items || 0)
       + Number(jobsByStatus.failed || 0)
-      + Number(webhooksByStatus.failed || 0);
+      + Number(webhooksByStatus.failed || 0)
+      + Number(auditPipeline.writeFailures || 0);
 
     res.json({
       success: true,
@@ -168,6 +172,12 @@ router.get('/overview', async (req, res) => {
         },
         jobs: jobsByStatus,
         webhooks: webhooksByStatus,
+        // AU-5: distinct from summary.failures_24h, which counts audited
+        // business events that failed. These count failures of the audit
+        // pipeline itself -- writes that never reached the table, and records
+        // that never reached the SIEM. A non-zero value here means the trail
+        // is incomplete, which failures_24h can never tell you.
+        audit_pipeline: auditPipeline,
         top_events_7d: topEventsResult.rows.map((row) => ({
           event_type: row.event_type,
           count: Number(row.count || 0)

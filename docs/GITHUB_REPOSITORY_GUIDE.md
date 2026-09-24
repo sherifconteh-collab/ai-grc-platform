@@ -631,7 +631,7 @@ Before making repo public:
 
 **In your README.md**, add a section:
 
-```markdown
+````markdown
 ## 🤖 Works with Claude Code
 
 This platform includes an MCP (Model Context Protocol) server that allows 
@@ -656,7 +656,7 @@ python server.py
 ```
 
 See [mcp-server/README.md](mcp-server/README.md) for full documentation.
-```
+````
 
 ---
 

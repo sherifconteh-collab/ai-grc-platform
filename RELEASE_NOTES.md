@@ -1,6 +1,367 @@
+# Release Notes
 
 > ControlWeave is fully open source. Every feature is available in this build —
 > there are no tier-gated or premium-only capabilities.
+
+---
+
+## [Unreleased]
+
+> Changes staged but not yet released to production.
+
+### Changed
+- fix(security): explicit JWT algorithm allow-list on WebSocket auth ([#301](https://github.com/sherifconteh-collab/ai-grc-platform/pull/301)) — @sherifconteh-collab
+- chore(frontend)(deps): bump lucide-react from 1.24.0 to 1.31.0 in /frontend ([#279](https://github.com/sherifconteh-collab/ai-grc-platform/pull/279)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump eslint from 10.8.1 to 10.10.0 in /frontend ([#295](https://github.com/sherifconteh-collab/ai-grc-platform/pull/295)) — @dependabot[bot]
+- chore(deps-dev): bump fast-uri from 3.1.5 to 3.1.7 in /electron in the npm_and_yarn group across 1 directory ([#298](https://github.com/sherifconteh-collab/ai-grc-platform/pull/298)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump eslint-config-next from 16.2.12 to 16.3.3 in /frontend ([#297](https://github.com/sherifconteh-collab/ai-grc-platform/pull/297)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump browserslist from 4.28.6 to 4.28.9 in /frontend in the npm_and_yarn group across 1 directory ([#300](https://github.com/sherifconteh-collab/ai-grc-platform/pull/300)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/node from 26.2.0 to 26.4.0 in /frontend ([#296](https://github.com/sherifconteh-collab/ai-grc-platform/pull/296)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/react-dom from 19.2.3 to 19.2.5 in /frontend ([#294](https://github.com/sherifconteh-collab/ai-grc-platform/pull/294)) — @dependabot[bot]
+- chore(backend)(deps): bump openai from 6.38.0 to 7.5.0 in /backend ([#293](https://github.com/sherifconteh-collab/ai-grc-platform/pull/293)) — @dependabot[bot]
+- chore(backend)(deps-dev): bump eslint-plugin-security from 4.0.0 to 4.0.1 in /backend ([#292](https://github.com/sherifconteh-collab/ai-grc-platform/pull/292)) — @dependabot[bot]
+- fix(ci): ensure target-arch embedded-postgres binaries for macOS DMG builds ([#287](https://github.com/sherifconteh-collab/ai-grc-platform/pull/287)) — @sherifconteh-collab
+- chore(backend)(deps-dev): bump globals from 17.6.0 to 17.11.0 in /backend ([#284](https://github.com/sherifconteh-collab/ai-grc-platform/pull/284)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/node from 26.1.2 to 26.2.0 in /frontend ([#277](https://github.com/sherifconteh-collab/ai-grc-platform/pull/277)) — @dependabot[bot]
+- chore(frontend)(deps): bump next from 16.2.12 to 16.3.1 in /frontend ([#286](https://github.com/sherifconteh-collab/ai-grc-platform/pull/286)) — @dependabot[bot]
+- chore(backend)(deps): bump axios from 1.18.1 to 1.19.0 in /backend ([#282](https://github.com/sherifconteh-collab/ai-grc-platform/pull/282)) — @dependabot[bot]
+
+- chore(backend)(deps): bump @simplewebauthn/server from 13.3.1 to 13.3.2 in /backend ([#285](https://github.com/sherifconteh-collab/ai-grc-platform/pull/285)) — @dependabot[bot]
+
+## [4.9.0] — 2026-08-11
+
+### Added
+- feat(catalog): port CMMC and PCI catalogs, fix dead family breakdown ([#276](https://github.com/sherifconteh-collab/ai-grc-platform/pull/276)) — @sherifconteh-collab
+- feat(catalog): crosswalk and assessment coverage for 800-53 enhancements ([#275](https://github.com/sherifconteh-collab/ai-grc-platform/pull/275)) — @sherifconteh-collab
+- feat(catalog): import 714 NIST 800-53 enhancements with baseline membership ([#274](https://github.com/sherifconteh-collab/ai-grc-platform/pull/274)) — @sherifconteh-collab
+- **Risk register, incidents, obligations, objectives, indicators, and departments** (migrations `139`–`143`): the README claimed a "unified risk register" and documented `risks` / `risk_treatments` tables that did not exist. What existed was `risk_scores` (migration `057`), a single computed 0-100 posture number per organization — a metric, not a register. Six modules now close that gap, modeled on the standards rather than invented:
+  - `departments` (hierarchical business units) and `business_objectives` (COSO's four categories), the organizational spine every other register hangs off. ISO 31000 defines risk as the effect of uncertainty *on objectives*; without recorded objectives a register is a list of bad things with nothing to be bad for.
+  - `risks` / `risk_treatments` / `risk_reviews` plus control, asset and objective link tables (ISO 31000 / ISO 27005 / NIST SP 800-30). Inherent **and** residual assessment as likelihood x impact on 1–5 scales, with the product a stored generated column so 5x5 heat-map queries cannot drift from their inputs. Acceptance is a named decision with a rationale and an optional expiry — a lapsed acceptance is surfaced as such rather than left reading "accepted". Reviews snapshot the assessment as it stood, so history survives later edits.
+  - `incidents` / `incident_timeline` plus risk, control and asset link tables (NIST SP 800-61r2). Per-phase timestamps rather than a status history, because the intervals *are* the metrics — dwell time, time to contain, time to resolve. Transitions are validated against an explicit graph: an incident cannot be eradicated before it is contained. Breach notification is first class, with the GDPR Art. 33 style clock tracked and overdue reported as how far past, not a generic flag.
+  - `compliance_obligations` / `obligation_attestations` / `obligation_control_links`: what the organization is bound to, by whom, by when. Distinct from controls because obligations have a source with authority and they expire. Recurring due dates advance from the *due date*, never from the attestation date, so a repeatedly-late annual obligation cannot drift its own deadline out of the period the regulator expects.
+  - `indicators` / `indicator_measurements`: KRI / KPI / KCI with amber and red thresholds and an explicit `direction`, so "higher is worse" and "higher is better" indicators are both handled instead of whichever case the author had in mind. `breach_level` is persisted at write time, so retuning a threshold does not silently rewrite historic breaches.
+
+  Twelve permissions (`risks.*`, `incidents.*`, `obligations.*`, `objectives.*`, `indicators.*`, `departments.*`) are seeded and granted in the same migrations that introduce the routes using them. Incident *write* goes to `user` as well as `admin`: incident reporting has to be available to whoever noticed the problem, or it gets reported by email and never reaches the register. Six new dashboard pages (`/dashboard/risks` with the 5x5 residual heat map, `/dashboard/incidents`, `/dashboard/obligations`, `/dashboard/indicators`, `/dashboard/objectives`, `/dashboard/departments`). — @sherifconteh-collab
+- **Access Governance module**: entitlement reporting (who-has-what across users, roles, and effective permissions, with over-privileged and dormant-access flags), separation-of-duties (SoD) toxic-combination rules with a live violations report, access review certification campaigns (draft → active → completed, generating an AC-2 evidence record on completion), and a role/permission simulator for positive/negative access testing before assigning a role. New `sod_rules`, `access_review_campaigns`, and `access_review_items` tables (migration `132`), gated by new `access_governance.read`/`.manage` permissions. New `/dashboard/access-governance` page. — @sherifconteh-collab
+- **AI-assisted RBAC document import**: upload an existing role definition spreadsheet, SoD matrix, or roles & responsibilities document (PDF/DOCX/TXT/MD/CSV) and have AI map its roles onto the platform's permission catalog, flag SoD conflicts (including contradictions with the document's own matrix), and suggest platform roles and SoD rules — each suggestion applied only via an explicit, reviewed action, never automatically. New `rbac_documents` table (migration `133`) and `rbac_analysis` AI feature (`POST /api/v1/ai/rbac-analysis`). — @sherifconteh-collab
+- **Nine-organization demo roster** — one per industry vertical (financial services, healthcare, defense, technology, energy, retail, biotech, higher education) plus an external audit firm with a seeded three-engagement workbench. Industry-addressed logins (`admin@financial.com` and so on), with the legacy tier logins kept as working aliases. A config-level guard fails the seed if any organization would ship without AI-governance framework coverage. — @sherifconteh-collab
+- **SOC 2: all five Trust Services Criteria** (migration `135`): the framework shipped with 27 controls, every one a `CC*` — the Security category alone, so an engagement scoped to anything else had no controls to assess. Adds the 28 missing criteria across Availability (A1), Confidentiality (C1), Processing Integrity (PI1), and Privacy (P1–P8), each with the same examine / interview / test program the existing controls carry, and moves `coverage_status` to `comprehensive`. Descriptions are ControlWeave's own paraphrase; the AICPA text is copyrighted and is not reproduced. — @sherifconteh-collab
+- **Control function classification** (migration `136`): `framework_controls.control_functions text[]` carrying `preventive` / `detective` / `corrective`, backfilled from control titles using word-boundary matching (matching descriptions too produced false positives such as "unauthorized" reading as "authoriz"). 415 of 1,072 controls are classified; the rest are deliberately left blank rather than guessed at. — @sherifconteh-collab
+- **Framework-neutral evidence type taxonomy** (migration `137`): a 14-value `evidence_types` vocabulary, an `evidence.evidence_type` foreign key, and `assessment_procedures.expected_evidence_types`, so evidence is labelled consistently regardless of framework — all 1,128 procedures across 33 frameworks now carry expected types. Pre-existing evidence stays untyped rather than being guessed at. New `GET /evidence/types` and an `?evidence_type=` list filter. — @sherifconteh-collab
+- **Crosswalk credit ledger, provenance, and automatic withdrawal** (migration `138`, `control_crosswalk_credits`): auto-crosswalk already credited mapped controls forward, but the credit was permanent and unexplained. Every credit is now recorded per (organization, credited control, source control) with the similarity score, mapping type, and the status the control held beforehand. `GET /controls/:id` returns that provenance on any control sitting at `satisfied_via_crosswalk`, including whether the crediting source is still implemented. When a source control leaves `implemented`/`verified` — through `PUT /controls/:id/implementation` or `PATCH /implementations/:id/status` — its credits are withdrawn and each credited control is restored to its recorded prior status, unless another still-implemented source justifies it or someone has since implemented the control themselves. Both directions are audit-logged (`crosswalk_credit_applied` / `crosswalk_credit_withdrawn`) as AU-2 posture changes. — @sherifconteh-collab
+
+### Changed
+- chore(frontend)(deps-dev): bump @types/react from 19.2.17 to 19.2.18 in /frontend ([#258](https://github.com/sherifconteh-collab/ai-grc-platform/pull/258)) — @dependabot[bot]
+- chore(backend)(deps): bump firebase-admin from 13.10.0 to 14.2.0 in /backend ([#257](https://github.com/sherifconteh-collab/ai-grc-platform/pull/257)) — @dependabot[bot]
+- chore(deps-dev): bump electron from 41.1.0 to 41.10.3 in /electron in the npm_and_yarn group across 1 directory ([#265](https://github.com/sherifconteh-collab/ai-grc-platform/pull/265)) — @dependabot[bot]
+- chore(backend)(deps): bump geoip-lite from 2.0.2 to 2.0.3 in /backend ([#253](https://github.com/sherifconteh-collab/ai-grc-platform/pull/253)) — @dependabot[bot]
+- chore(backend)(deps): bump @sentry/node from 10.53.1 to 10.69.0 in /backend ([#262](https://github.com/sherifconteh-collab/ai-grc-platform/pull/262)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump eslint from 10.7.0 to 10.8.0 in /frontend ([#256](https://github.com/sherifconteh-collab/ai-grc-platform/pull/256)) — @dependabot[bot]
+- chore(frontend)(deps-dev): bump @types/node from 26.1.1 to 26.1.2 in /frontend ([#259](https://github.com/sherifconteh-collab/ai-grc-platform/pull/259)) — @dependabot[bot]
+- feat(catalog): control hierarchy, baseline scoping, and read-path bounds ([#273](https://github.com/sherifconteh-collab/ai-grc-platform/pull/273)) — @sherifconteh-collab
+- security(audit): hash-chain audit records and stop cascade deletion ([#272](https://github.com/sherifconteh-collab/ai-grc-platform/pull/272)) — @sherifconteh-collab
+- refactor(audit): route audit writes through auditService for AU-3 coverage ([#271](https://github.com/sherifconteh-collab/ai-grc-platform/pull/271)) — @sherifconteh-collab
+- feat(audit): implement AU-5 failure response, AU-7 export, AU-11 retention ([#270](https://github.com/sherifconteh-collab/ai-grc-platform/pull/270)) — @sherifconteh-collab
+- security(audit): add append-only enforcement, timestamptz, outcome integrity ([#269](https://github.com/sherifconteh-collab/ai-grc-platform/pull/269)) — @sherifconteh-collab
+- security(evidence): org-scope evidence_control_links, add the guides tree, document the new endpoints ([#264](https://github.com/sherifconteh-collab/ai-grc-platform/pull/264)) — @sherifconteh-collab
+- fix(db): reconcile 17 tables whose columns never existed after a shadowed migration ([#266](https://github.com/sherifconteh-collab/ai-grc-platform/pull/266)) — @sherifconteh-collab
+- feat(poam): port the remediation UI and its integrations from ControlWeaver-Pro ([#252](https://github.com/sherifconteh-collab/ai-grc-platform/pull/252)) — @sherifconteh-collab
+- feat(registers): risk register, incidents, obligations, objectives, indicators and departments ([#250](https://github.com/sherifconteh-collab/ai-grc-platform/pull/250)) — @sherifconteh-collab
+- **Departments and Business Objectives merged into one page.** Both were thin org-configuration lists with no lifecycle of their own, and they are read together — you assign an objective to a department, and a department's open-risk count only means something next to the objectives it owns. Now `/dashboard/structure` with a tab each, permission-gated per tab. `/dashboard/departments` and `/dashboard/objectives` redirect to the matching tab rather than 404, so bookmarks keep working. Sidebar drops from 48 entries to 47. — @sherifconteh-collab
+- **Sidebar regrouped into collapsible sections with subsections.** It was four flat lists totalling 48 links, "Compliance" alone holding sixteen. Now seven sections (plus a gated eighth for platform admins) following the GRC domains — Compliance, Risk, Regulatory, Assets & Security, Insights & Reporting, Organization, Learn & Support — with subsection headings inside the larger ones. Only the section containing the current route is expanded; collapse state persists per section; navigating to a URL expands whichever section contains it. Active highlighting now takes the longest matching href, so `/dashboard/controls/pending-assessments` no longer lights up "Controls" as well. No destination was added or removed in the regrouping itself. — @sherifconteh-collab
+- feat(access-governance): add access governance module + AI-assisted RBAC import ([#237](https://github.com/sherifconteh-collab/ai-grc-platform/pull/237)) — @sherifconteh-collab
+- Complete NIST SP 800-53 Rev 5 base-control set (issue #217 Wave 1) ([#236](https://github.com/sherifconteh-collab/ai-grc-platform/pull/236)) — @sherifconteh-collab
+- **Auto-crosswalk now only credits frameworks the organization has activated.** Previously any mapped control could be credited, including controls in frameworks the organization was not pursuing, which inflated the compliance percentage the dashboard reports. Organizations with no rows in `organization_frameworks` have declared no scope, so the previous unrestricted behavior still applies to them. — @sherifconteh-collab
+
+### Removed
+- **Three unreachable AI dashboard pages deleted** (`ai-analysis`, `ai-governance`, `ai-monitoring` — 1,109 lines). None appeared in the sidebar, and the `ai-security` hub that aggregates their statistics did not link to them either; the only inbound link was `ai-analysis` → `ai-governance`, and `ai-analysis` was itself orphaned. All three were read-only, so no capability is lost beyond the detail views. The sibling ControlWeaver-Pro repository had already removed exactly these three and kept `ai-security` as the consolidated hub; this repository had been carrying them as dead weight. Both are now at parity on `ai-insights`, `ai-laws`, `ai-security`. — @sherifconteh-collab
+
+### Fixed
+- **The IP hygiene check read several short quotations as one long one.** `scripts/ip-hygiene-check.js` rule 3 (`standards.possible-verbatim.long-quote`) matched a quote character, 120 or more characters of anything, then the same quote character again — measuring the distance from the first quotation mark on a line to any later one rather than the length of a quotation. A sentence naming several terms of art, or one carrying two ordinary possessive apostrophes, therefore read as a single 120-character quotation of a standard. Four of this repository's seven flags were that mistake, three of them prose in `RELEASE_NOTES.md` itself. Delimiters are now paired in order of appearance, and an apostrophe with word characters on both sides is treated as punctuation; the three genuine flags, all long framework descriptions in the `db/seed_*.sql` files, still fire. The mirror of this check in the sibling repository is wired into CI, where the same defect was failing two jobs on content no pull request had touched. — @sherifconteh-collab
+- **Seventeen tables had columns that had never existed in any database built from this schema.** Each is declared by `CREATE TABLE IF NOT EXISTS` in two different migration files; whichever sorts first wins, and the loser's column list becomes a silent no-op. Found by building a database from the full migration set and diffing every table declared more than once against its own source. Confirmed as live breakage, not just latent risk, by executing the application's own queries against the result: SSO login configuration (`ssoService.getOrgSsoConfig` — `column "enabled" does not exist`), SIEM export configuration (`siemService.listSiemConfigs` — `column "name" does not exist`), the background job runner's retry counter (`jobService`'s `attempts = attempts + 1` — `column "attempts" does not exist`), and creating a data retention policy (`routes/dataGovernance.js` — `column "policy_name" does not exist`) were all completely broken. The remaining thirteen were reconciled on the same evidence standard migration `125` already used for `audit_pbc_requests` / `audit_findings` / `auditor_workspace_links`: the live column set was missing columns the application's own code reads, writes, or updates by name. Migration `150` adds every orphaned column via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, safe to run against a database in either shape. `backend/scripts/check-migration-schema-drift.js` (`npm run check:migration-drift`, wired into CI) now fails any future migration that reintroduces this shape — verified by temporarily reverting migration `150` and confirming the check catches all seventeen. — @sherifconteh-collab
+- **Corrected eleven wrong table names in the README's schema reference.** Nine were naming drift that had been wrong for several releases: `evidence_items` → `evidence`, `control_evidence` → `evidence_control_links`, `audit_events` → `audit_logs`, `assessments` → `assessment_plans`, `assessment_findings` → `audit_findings`, `policies` → `organization_policies`, `ai_systems` → `assets` (category `AI Agent`), `ai_system_controls` → `asset_control_mappings`, and `webhooks` → `webhook_subscriptions` / `webhook_deliveries`. The remaining two, `risks` and `risk_treatments`, were documented but genuinely absent — this release makes them real rather than deleting the claim. Every corrected name was verified against a live database. — @sherifconteh-collab
+
+### Security
+- **`js-yaml` bumped to 4.3.1 and `nanoid` overridden to ≥3.3.17 across all three packages** (backend, frontend, electron), closing a quadratic-CPU-consumption DoS in `js-yaml`'s `!!omap` resolution (CVE-2026-59870, transitive via `jest`/`electron-builder`/`electron-updater`) and an infinite-loop generator bug in `nanoid` (GHSA-2v37-7h3g-55p8, transitive via `sanitize-html` → `postcss`). Neither is reachable from untrusted input in this codebase today, but both are pulled in by tooling that runs on every build. — @sherifconteh-collab
+- **Rate limits on the control and implementation routes crosswalk propagation made expensive**: `PUT /controls/:id/implementation` and `PATCH /implementations/:id/status` (60/min — one status change now fans out into a mapping query plus a read-modify-write per credited control, or a withdrawal walk over everything the control was holding up), `POST /controls/:id/inherit` (20/min — several queries per mapped control, and a control can carry dozens of mappings), and `GET /controls/:id` (120/min). Neither route file had any rate limiting before. — @sherifconteh-collab
+- **Rate limits on seven previously unlimited evidence routes**: `GET /evidence/:id/download` and `GET /evidence/:id/integrity-check` (30/min each — the download path is the bulk-exfiltration route for files that may carry PII, and integrity-check re-hashes the stored file on every call), `DELETE /evidence/:id` (30/min, destructive and irreversible), `PUT /evidence/:id`, `POST /evidence/:id/link`, `DELETE /evidence/:evidenceId/unlink/:controlId` (60/min each), and `GET /evidence/:id` (120/min). — @sherifconteh-collab
+- **`express-rate-limit` router bound on `controls.js`, `evidence.js`, and `implementations.js`**, applied ahead of `authenticate` so a cheap IP-based limit exists before any JWT verification or database lookup runs. The custom `createRateLimiter` keys on the authenticated user and therefore cannot protect that work. Caps sit above the per-route limits so those remain the binding constraint in normal use. — @sherifconteh-collab
+- **Eight high-severity advisories cleared in the desktop wrapper, and `electron/` added to the audit in CI.** The directory had never been audited — `security.yml` covered `backend/` and `frontend/` only — so the advisories had accumulated unseen: a credential leak in `builder-util-runtime` (<9.7.0) that forwards `PRIVATE-TOKEN` and mixed-case `Authorization` headers across an origin redirect, an uncontrolled search path in AppImage builds in `app-builder-lib` (<26.15.0), and an unbounded-expansion DoS in `brace-expansion` (<5.0.8, where the existing `>=5.0.6` override was one patch short). Fixed by moving `electron-builder` to 26.15.3 and tightening the override. `electron-builder` is a devDependency, so the production-only `--omit=dev` gate could never have caught this — it is nonetheless the tool that builds the installer users download, which is why the new step audits the full tree. — @sherifconteh-collab
+- **`sanitize-html` pinned to 2.17.5, closing GHSA-vccv-cmxp-4j9h.** Incomplete URI-scheme validation let `javascript:` URIs through the `action`, `formaction`, `data`, `poster` and `background` attributes on every version up to and including 2.17.4. This sits directly under `middleware/validate.js`'s `sanitizeText`, so it is in the path of the same input this release hardened against double-escaping. **Pinned exactly rather than `^2.17.5`:** 2.17.6 moves to `htmlparser2@^12`, which dropped its `require` export condition and is ESM-only, so a caret range floats onto a version that cannot be `require()`d from this CommonJS backend on the Node 20 that CI runs — it fails the Jest suite outright and would throw `ERR_REQUIRE_ESM` at boot. 2.17.5 stays on `htmlparser2@10`, which still ships a dual CJS/ESM build. — @sherifconteh-collab
+
+### Documentation
+
+- docs(fedramp): correct AU-2 through AU-12 and immutability claims ([#268](https://github.com/sherifconteh-collab/ai-grc-platform/pull/268)) — @sherifconteh-collab
+
+## [4.8.0] — 2026-08-02
+
+> **Numbering note**: there is no `[4.7.0]` section. The three `package.json`
+> files were already at 4.7.0 while the newest heading here was `[4.6.1]`, and
+> the work in that gap is the content still sitting under `[Unreleased]` above.
+> This entry does not retitle someone else's section to close the gap; it
+> records what this release adds and leaves the earlier drift visible.
+
+### Added
+
+- **CMDB: asset-to-control mapping and risk exposure.** `asset_control_mappings`
+  (migration 005) and `risk_asset_links` (migration 140) both existed with no
+  reachable API. Adds `GET`/`POST`/`PUT`/`DELETE /cmdb/assets/:assetId/controls`,
+  `GET /cmdb/controls/:controlId/assets`, `GET /cmdb/assets/:assetId/risks` and
+  `GET /cmdb/risk-exposure`.
+- **Risk register: vendor linkage.** Migration 148 adds `risk_vendor_links`, the
+  fourth link table alongside controls, assets and objectives. `tprm_vendors`
+  carried a `risk_tier`, but that is a static onboarding classification rather
+  than a scored, treated and reviewed risk, so vendor concentration was
+  invisible to the register and the register invisible during a vendor review.
+  `POST`/`DELETE /risks/:id/vendors/:vendorId`, vendors in `GET /risks/:id`, and
+  `risks` / `open_risk_count` / `max_residual_score` on the TPRM vendor detail
+  response.
+- **Risk register: evidence linkage.** Migration 149 adds `risk_evidence_links`,
+  the last of the register's unconnected edges. Evidence has been linkable to
+  controls since migration 009/014, so a risk's evidence was only reachable
+  transitively — via its controls, and only when those controls happened to
+  carry the document. "Show me you are managing this exposure" is a different
+  question from "show me these controls exist". The link carries a `relevance`
+  (`assessment` / `treatment` / `monitoring` / `acceptance`) because the same
+  document supports different risks for different reasons. `POST`/`DELETE
+  /risks/:id/evidence/:evidenceId`, evidence in `GET /risks/:id`, and the
+  reverse read `GET /evidence/:id/risks`. The row carries this repo's
+  `retention_until` rather than the sibling repo's `expires_at`, which here
+  belongs to `legal_holds`.
+
+- **Link UIs for the CMDB, vendor and evidence edges.** `AssetControlLinks`
+  (writable — the only place in the product that creates an
+  `asset_control_mappings` row), `AssetRiskLinks`, `RiskVendorLinks`,
+  `RiskEvidenceLinks`, `VendorRiskLinks`, and a Risks tab on the evidence
+  drawer. Wired into `/dashboard/assets`, `/dashboard/risks/[id]`,
+  `/dashboard/tprm` and `/dashboard/evidence`. Adapted to this repo rather than
+  copied: the controls picker reads `organizationAPI.getControls` scoped to the
+  organization's activated frameworks, the `cmdb` router takes snake_case
+  bodies while the `risks` router next door takes camelCase, evidence expiry
+  renders `retention_until`, and the compliance vocabulary is this repo's
+  (`partial`, with an unassessed mapping represented as NULL) rather than the
+  sibling's.
+- **End-to-end verification harness** — `scripts/qa-link-routes-e2e.sh`
+  (`npm run qa:e2e:links`), shared with ControlWeaver-Pro. 35 assertions against
+  a running API covering both directions of every link in 146–149, the
+  migration 005 mapping, generated-column arithmetic, `relevance` validation
+  returning a 400 that names the options rather than a 500 from the CHECK
+  constraint, `ON CONFLICT` idempotency, unlink, and cross-organization
+  isolation on all three new read paths. `DEMO_PASSWORD` comes from the
+  environment; the cross-tenant checks skip when it is unset rather than
+  silently passing.
+
+- **Evidence version history** (migration `144`, issue #570): "versioning" was an integer counter. `PUT /evidence/:id` incremented `evidence_version` and overwrote the row, so a prior version's file, hash or PII classification could not be retrieved — the number went up and nothing was kept. `evidence_versions` now holds an immutable snapshot of the row as it stood *before* each update, taken inside the update's own transaction. Integrity stays demonstrable across a re-upload because the superseded file and its hash are both retained, and a reclassification no longer destroys the record of what the evidence was classified as while it was being relied on. New `GET/POST /evidence/:id/versions` and `GET /evidence/:id/versions/:versionNumber/download`. Hashing is SHA-384 throughout, per this repo's CNSA Suite 1.0 floor. — @sherifconteh-collab
+- **Federal POA&M structure** (migration `145`, issue #569): `poam_milestones` (a federal POA&M is a list of discrete milestones with their own target dates, not one overall `due_date`), `resources_required`, and `scheduled_completion_date` separated from `due_date` so slippage is visible rather than silently erased when a date is revised. — @sherifconteh-collab
+- **POA&M CSV and PDF export** — `GET /poam/export?format=csv|pdf`, carrying every linked control, the framework type, both dates with computed slippage in days, milestone counts, resources required, and any linked risks and treatment. — @sherifconteh-collab
+- **Risk register ↔ POA&M linkage** (migration `146`): migration `140` tied risks to controls (what treats the risk), assets (what is exposed) and objectives (what is threatened) — but not to the remediation work itself, so the register recorded the decision to treat a risk and had no link to what was being done about it. Adds `risk_poam_links` (many-to-many; one remediation routinely addresses several risks) plus `poam_items.treatment_id` for the tighter case where a POA&M executes one specific treatment. `POST /poam/from-risk/:riskId` sets priority from the residual score. Closing remediation deliberately does **not** move a residual score: inherent and residual are stored separately so an assessor can see what the controls achieved, and a score that moved on its own would destroy that evidence — the risk is flagged review-due instead. — @sherifconteh-collab
+- **Many-to-many POA&M ↔ control linkage** (migration `147`): `poam_items.control_id` was a single nullable FK, so one remediation could not span several controls even though evidence (`evidence_control_links`) and risks (`risk_control_links`) both could. One access-review remediation commonly closes findings against AC-2, AC-3 and AC-6 at once. Existing `control_id` values are backfilled and the column is retained as the originating control. — @sherifconteh-collab
+- **POA&M register and detail pages** (`/dashboard/poam`, `/dashboard/poam/[id]`) with a sidebar entry at `controls.read`, matching what the endpoints require. Fields, milestones, progress timeline, submit-for-review, approval history, the auditor decision panel with its separation-of-duties guard, control and risk links, and export. The control detail page has linked to `/dashboard/poam` for as long as it has had a POA&M panel; the route did not exist, so the link 404'd. — @sherifconteh-collab
+- **Evidence detail drawer** — metadata editing with a change note, version history showing each version's PII classification as it was, prior-version download, file replacement, and the integrity check. `GET /evidence/:id/integrity-check` existed and was absent from the API client entirely. — @sherifconteh-collab
+- **Risk detail page** (`/dashboard/risks/[id]`) — the page `GET /risks/:id` never had. Inherent vs residual assessment, treatments, reviews, acceptance, control/asset/objective links, and the new remediation panel. The register was a list and a heat map; clicking a row did nothing. — @sherifconteh-collab
+- **Framework-appropriate terminology** — an ISO 27001 organization sees "Corrective Action Request", SOC 2 "Deficiency", FISCAM and HIPAA "Corrective Action Plan", PCI DSS "Risk Assessment & Validation", NIST and FedRAMP "POA&M". The seven vocabularies have shipped in `frameworkPoamService.js` since the feature was built and were unreachable (see Fixed). Labels only — URLs, tables and API paths are unchanged. — @sherifconteh-collab
+
+### Fixed
+
+- **The backend did not boot.** `routes/assessments.js` requires
+  `./assessments/_shared`, and the earlier dead-code cleanup deleted that whole
+  directory — including `_shared.js`, a legitimate extraction from the
+  3366-line monolith rather than one of the copied sub-routers. `server.js`
+  requires `assessments.js` at startup, so the tree could not start a server at
+  all. `check:syntax` parses each file without ever resolving a `require`, and
+  `npm run build` is a stub that prints a line, so both gates passed on it.
+- **`GET /risks/:id` returned 500 for every risk.** The vendors query added with
+  migration 148 selected `v.name`; the column is `vendor_name`. The six link
+  queries share one `Promise.all`, so that single wrong column took down the
+  whole endpoint — controls, assets, objectives, POA&Ms, vendors and evidence
+  all unreachable, not just vendors.
+- **The asset-control picker offered values the server rejects.**
+  `MAPPING_COMPLIANCE_STATUS` here is `compliant` / `non_compliant` / `partial`
+  / `not_applicable`; the first version of the component used
+  `partially_compliant` plus a `not_assessed` value that does not exist. Every
+  status change would have returned 400. There is no CHECK constraint on that
+  column, so only the route's own validation would have caught it.
+- **The evidence drawer described its integrity check as recomputing SHA-256.**
+  This repo hashes evidence with SHA-384 per the CNSA Suite 1.0 floor in
+  `.claude/rules/security.md`; only the column name is legacy.
+
+- **The compliance gate was enforced on a code path the product does not use.** `PUT /controls/:id` demanded a `poam_justification`, created the POA&M and filed an approval request. The dashboard calls `PATCH /implementations/:id/status` and `PATCH /implementations/:id/test-result`, and neither had a single POA&M reference — so a control could be marked compliant from the UI with no justification and nothing produced for an auditor. The rule now lives in `services/poamGateService.js` and is applied on all three paths, preserving the `requires_poam_submission` 400 contract for existing API clients. — @sherifconteh-collab
+- **Nothing that found a gap raised remediation.** Recording a control test or an assessment procedure as `other_than_satisfied` — NIST SP 800-53A for "this control has gaps" — produced nothing, and the finding-creation handler in `routes/assessments.js` had no POA&M references at all. Across every `INSERT INTO poam_items` site only `'control'` and `'vulnerability'` were ever written; `'audit_finding'` and `'assessment'` were declared in `ALLOWED_SOURCE_TYPE` and dead. Those three events now raise a draft POA&M against the control, idempotent per (control, source), with owner, dates and remediation plan deliberately left blank for a human. Nothing is auto-closed, auto-approved or auto-assigned. — @sherifconteh-collab
+- **`GET /poam/framework-types` was unreachable.** Declared after `/:id`, so Express bound `id="framework-types"` and returned "POA&M item not found". The entire multi-framework vocabulary was dead code behind it, which is why every screen said "POA&M" regardless of framework. It now resolves and is scoped to the organization's activated frameworks. — @sherifconteh-collab
+- **`routes/poam.js` had no rate limiter at all**, unlike its sibling `routes/poamMilestones.js`. — @sherifconteh-collab
+- **`routes/assessments.js` had no rate limiting either.** It carries the entire assessment surface — procedures, results, engagements, PBC, workpapers, findings and sign-offs — behind `authenticate` and nothing else. Surfaced by CodeQL while reviewing this change, and closed the same way the six route files in v4.6.0 were: an explicit per-router limiter, because CodeQL cannot trace the app-wide `apiRateLimiter` mounted on `/api/v1`. 1500 per 15 minutes, above `risks.js`'s 400 because an auditor working through an engagement legitimately makes many calls in one session. — @sherifconteh-collab
+- The control detail page's Risk & Compliance panel rendered only when a POA&M or vulnerability already existed, so a control with neither showed nothing, offered no way to raise one, and its empty state was unreachable code. — @sherifconteh-collab
+
+### Security
+
+- **`express-rate-limit` was undeclared in `package.json`.** It resolved only as
+  a transitive dependency of `@modelcontextprotocol/sdk` while **29 route files
+  require it directly** — if that SDK dropped or relocated it, none of those
+  routers would load and the backend would stop booting. Declared at `^8.5.2`
+  rather than the `^8.2.2` that was resolved, because 8.2.2 pins
+  `ip-address@10.1.0`, inside the range flagged for decoding leading-zero octets
+  as decimal and bypassing SSRF checks. The pre-existing exact-version override
+  became `$express-rate-limit` so it follows the declared range instead of
+  conflicting with it.
+- **Five advisories cleared across both dependency trees**, each a pin that was
+  correct when written and had fallen one patch short: `brace-expansion`
+  `>=5.0.9`, `hono` `^4.12.34`, `socket.io-parser` `>=4.2.7`, `fast-uri`
+  `>=4.1.2`, `ip-address` `>=10.4.0`. `fast-uri` resolves on the 4.x line here
+  and on 3.x in the sibling repo, so the fixed version genuinely differs between
+  them — checked rather than copied. Backend and frontend both report zero
+  vulnerabilities under the flags CI uses.
+
+### Changed
+
+- `csvEscape` extracted from `routes/rmfInheritance.js` into `utils/csv.js` and shared with the POA&M export, so two compliance exporters cannot drift into subtly different field escaping. — @sherifconteh-collab
+
+---
+
+## [4.6.1] — 2026-07-21
+
+### Changed
+
+- **`seed-frameworks.js` refactor** ([#234](https://github.com/sherifconteh-collab/ai-grc-platform/pull/234)): split the ~1,400-line single array literal into one data module per framework under `backend/scripts/lib/frameworks/`, with an `expected-counts.js` manifest the seed run verifies against.
+- Dependency bumps: `actions/checkout` and `actions/setup-node` to v7 in CI ([#225](https://github.com/sherifconteh-collab/ai-grc-platform/pull/225), [#226](https://github.com/sherifconteh-collab/ai-grc-platform/pull/226)), `next` 16.2.7→16.2.10 ([#228](https://github.com/sherifconteh-collab/ai-grc-platform/pull/228)), `@types/node` 25.9.5→26.1.1 ([#227](https://github.com/sherifconteh-collab/ai-grc-platform/pull/227)), `@tailwindcss/postcss` 4.3.2→4.3.3 ([#231](https://github.com/sherifconteh-collab/ai-grc-platform/pull/231)), `recharts` 2.15.4→3.9.2 ([#233](https://github.com/sherifconteh-collab/ai-grc-platform/pull/233)).
+
+### Fixed
+
+- **Reverted TypeScript 7.0.2** back to 6.0.3 ([#232](https://github.com/sherifconteh-collab/ai-grc-platform/pull/232)): the bump had passed `tsc --noEmit` CI but broke `npm run build` and `npm run lint` in practice (`typescript-estree` incompatibility) — CI's typecheck-only gate didn't exercise either.
+
+## [4.6.0] — 2026-07-20
+
+### Added
+
+- **Connector-to-control AI auto-assessment with approval workflow** ([#222](https://github.com/sherifconteh-collab/ai-grc-platform/pull/222)): when a connector rule produces new evidence linked to a control, an AI assessment pass can suggest a status change (forward progress or regression), staged as a pending assessment for human approval before `control_implementations` is ever touched — mirroring the established "AI proposes, human approves" pattern from pending evidence. Ships migration `130` (`pending_control_assessments`).
+- **Framework catalog completion plan (waves 0–4)** ([#216](https://github.com/sherifconteh-collab/ai-grc-platform/pull/216)): the per-framework roadmap referenced by migration `123_framework_coverage_status.sql` — NIST 800-53 base controls, FedRAMP/CMMC baseline derivation, ISO family, PCI DSS v4, CIS v8, DISA STIG + CCI.
+- **Working QA/test script suite** ([#220](https://github.com/sherifconteh-collab/ai-grc-platform/pull/220)): ported ControlWeaver-Pro's QA scripts (`qa-dynamic.js`, `qa-auditor-workflow.js`, mega-QA, demo-account helpers, and more) — the 11+ `qa:*`/`test:*` npm scripts that previously failed with "Cannot find module" now run, and the bugs they surfaced were fixed in the same PR.
+
+### Fixed
+
+- **Scheduled reports now actually generate and deliver** ([#221](https://github.com/sherifconteh-collab/ai-grc-platform/pull/221)): `scheduled_reports` had CRUD and a job-runner that only ever touched `last_run_at`. New `scheduledReportService` generates a real PDF/CSV/JSON file from live data per report type, `emailService.sendReportEmail()` delivers it over the org's existing SMTP transport, and the runner is invoked on schedule.
+- **Control test-result history is recorded and displayed** ([#219](https://github.com/sherifconteh-collab/ai-grc-platform/pull/219)): the Control Testing card's Save button silently overwrote prior verdicts with no audit trail, and the Status History timeline rendered assessment-outcome entries as "Not Started → Not Started". Test-result changes now write a `test_result_changed` audit event and render in a dedicated Test Result History timeline (history is only guaranteed going forward — pre-fix changes were never recorded).
+- **Every framework now has crosswalk mappings** ([#224](https://github.com/sherifconteh-collab/ai-grc-platform/pull/224)): a live audit found 14 of 33 frameworks had zero crosswalk mappings (HITECH, five ISO 27000-family standards, ISO 42005, FISCAM, FFIEC, SR 11-7, SEC/FINRA AI catalogs, both AI Governance Law catalogs). The ISO 27001:2022 seed script existed but was never wired into any npm script; it and the other gaps are now seeded and verified.
+
+### Changed
+
+- Release hygiene: the `[Unreleased]` section had accumulated every merged-PR bullet since v3.5.0 without ever being cleared when releases were cut, and sat buried mid-file. It now lives at the top and is emptied at each release; entries above are the post-4.5.1 changes it contained.
+
+## [4.5.1] — 2026-07-14
+
+### Changed
+
+- **Documentation accuracy pass**: `docs/SELF_HOSTED_INSTALL.md` and `STAGING_ENVIRONMENT.md` described a defunct "community mirror vs. commercial Docker image" distribution model with paid license-key feature unlocks, contradicting the actual fully open source, no-tier-gating reality already documented in `.claude/rules/tier-system.md` and this repo's own `CLAUDE.md`. Rewrote both to describe the real single-build, dual-license (AGPL v3 / commercial) model.
+- Mirrors the equivalent cleanup done in the sibling `ControlWeaver-Pro` repo, where the same stale tier/billing language was scattered across dozens of `docs/guides/*.md` files, the GitHub Wiki source tree, and the Settings page itself.
+
+---
+
+## [4.5.0] — 2026-07-14
+
+### Added
+
+- **Claude-triggered PR documentation review** (`claude-doc-review.yml`): runs `anthropics/claude-code-action@v1` on every non-draft PR with a fixed doc-focused prompt, alongside the existing Copilot code-review bot. Requires a one-time manual setup by a repo admin (install the Claude GitHub App, add `ANTHROPIC_API_KEY`) before it can run.
+- **`roles.manage` and `users.manage` now check the caller's own permissions before granting new ones**: `POST/PUT /roles` and `POST /roles/assign` reject any permission (direct or via an assigned role) the requester doesn't already hold; `PATCH /users/:userId` requires the caller to already be an admin before granting the `admin` role, and blocks self role-changes outright. Role/permission changes are now audit-logged (`role.created`, `role.updated`, `role.assigned`, `user.role_changed`).
+- Seeded `ai.read`, `ai.write`, `organizations.write`, and `reports.manage` permissions (migration) — used in route gates since these features shipped but never seeded, so every non-admin user was silently 403'd on all AI-governance/monitoring endpoints and most of the Organizations write surface.
+
+### Changed
+
+- **`ROLE_FALLBACK_PERMISSIONS` fallback is now a true fallback**: it only applies when a user has zero rows in `role_permissions` (accounts never migrated onto the roles system). Previously it was unconditionally unioned on top of real custom-role permissions, which meant a custom role could only ever add permissions on top of the legacy `admin`/`auditor`/`user` floor — never restrict below it. This silently defeated the shipped `auditor_observer` role's `assessments.write` restriction; it now actually restricts.
+- **`DELETE /ai/reasoning-memory`** (bulk-wipes org-wide AI memory) now requires `assessments.write` instead of the low-bar router-wide `ai.use` gate, matching every other mutating action in that file.
+- **`performance.js`** now uses `requireAdmin` instead of `requirePermission('admin')` — the latter checked a string that was never a real seeded permission, so it only ever worked by coincidentally matching the `'*'` wildcard.
+
+### Fixed
+
+- **Login timing oracle**: the "no such user" branch of `POST /auth/login` now runs a dummy `bcrypt.compare` against a fixed hash so it costs the same as a real wrong-password check, closing an email-enumeration timing side-channel.
+- **Password complexity was only enforced on invite acceptance**, not on self-registration or password reset (both only checked length). All three paths now require the same complexity policy.
+- **Failed logins and account lockouts were never audit-logged** — only successful logins were. Both now write `user.login_failed` / `user.login_blocked_locked` audit events.
+- **Registration/invite-acceptance email races returned a misleading 500** instead of 409 when two concurrent requests for the same email both passed the initial existence check (the DB unique constraint still prevented the duplicate — only the response code was wrong).
+- `organization_name` is now sanitized the same way `email`/`full_name` already were on registration.
+
+## [4.4.0] — 2026-07-13
+
+### Added
+
+- **UI for ten previously headless backend features**: a platform-wide audit found these routes had working APIs but no way to reach them from the app. All now have full UI:
+  - **Scheduled Reports** — new tab in `dashboard/reports`: create/edit schedules (name, report type, cadence, format, recipients) and trigger a manual run.
+  - **Exceptions** — new `dashboard/exceptions` page: status-filtered list, create/approve/revoke workflow for time-boxed control exceptions.
+  - **Control Health** — new "Health" view in `dashboard/controls`: a deterministic 0–100 score per control (evidence freshness, assessment outcome, open vulnerabilities/POA&M items, active exceptions) with a KPI summary row and a per-control factor breakdown.
+  - **Contacts** — new tab in `dashboard/organization`: a simple directory (name, email, title, team, notes) for people referenced elsewhere in the platform but never manageable directly.
+  - **Vendor Security Ratings** — new tab in `dashboard/tprm`: manual risk scoring (always available) plus optional SecurityScorecard/BitSight refresh for orgs that supply their own API key.
+  - **Data Sovereignty** — new `dashboard/data-sovereignty` page with Config / Jurisdictions / Regulatory Changes / Gap Analysis tabs.
+  - **AI Insights (Phase 6)** — new tabs in `dashboard/ai-insights`: a deterministic Predictive Risk Score (no AI provider required), plus AI-generated Regulatory Impact analysis and Smart Remediation Plans (gracefully prompt for a BYOK provider when none is configured).
+  - **AI Laws** — new `dashboard/ai-laws` page with US State and International tabs, surfacing the jurisdiction frameworks that previously had no dedicated view.
+  - **Dashboard Views** — new `dashboard/views` page: saved-view CRUD with per-view widgets (MVP — form-based add/edit, no drag-and-drop grid yet).
+- **Framework coverage honesty labeling**: every framework now carries a `coverage_status` (`comprehensive` / `core_controls` / `representative`) surfaced as a badge on framework cards, so a partially-seeded catalog (e.g. NIST 800-53's base-only control set) is never presented as if it were complete.
+- **CI guard against a repeat of the broken `.exe` release** (see Fixed below): `build-release.yml` now runs a `lockfile-integrity` job before any platform build starts, failing fast with a clear message if `frontend/package-lock.json` is ever missing a required cross-platform native-binding entry again.
+
+### Changed
+
+- **`implementations.js`/`organizations.js` priority filtering**: `?priority=high` now matches NIST's numeric priority values (`1`/`P1`) as well as the UI's word-based ones, via an equivalence-set lookup instead of an exact string match.
+- **Pagination added** to `GET /implementations` and `GET /organizations/:orgId/controls` (opt-in `page`/`limit`, `LIMIT 2000` safety cap when omitted) — previously unbounded.
+- **`GET /organizations/:orgId/controls`** now returns a real `mapping_count` (source + target crosswalk counts) instead of always `0`.
+- **`seed-missing-controls.js` is now wired in**: chained into the `seed:frameworks` npm script and run automatically at startup (`ensureFrameworkCatalogCompleteness()`) if the NIST 800-53 catalog is missing its MA/MP/PE/PS/PT/SA/SR families — previously it existed but was never invoked by anything.
+- **`/bump-version` playbook**: the frontend lockfile regeneration step now uses a full `npm install` instead of `--package-lock-only`, which is what silently produced the broken v4.3.0 release lockfile in the first place.
+
+### Fixed
+
+- **The v4.3.0 GitHub Release shipped with zero installer assets.** `frontend/package-lock.json` had been pruned down to only its generating platform's entries for every native multi-platform dependency (`lightningcss`, `@tailwindcss/oxide`, `sharp`, `unrs-resolver`), so the Windows job crashed at `next build` with `Cannot find module '../lightningcss.win32-x64-msvc.node'` and the macOS/Linux jobs never ran (gated on the same matrix). Regenerated the lockfile with a full `npm install`, which restores every platform variant; verified against a real test build via `workflow_dispatch`.
+- **Encrypted assignee email returned as ciphertext**: `GET /implementations`, `GET /implementations/:id`, and the org-controls export all now decrypt `assigned_to_email` before returning it (migration-098 field encryption had never been applied to these three read paths).
+- **Control-answer CSV import silently dropped every assignee**: the import's email→user lookup map was built from the still-encrypted `email` column, which could never match the plaintext email in the uploaded file; now decrypts per row before building the map.
+- **`due_date` was aliased to `implementation_date`**, so marking a control implemented silently wiped the due date set at assignment time. Added a dedicated `due_date` column (migration) and updated every read/write path (`implementations.js`, `controls.js`, org-controls export/import) to use it.
+- **Audit-log `resource_id` inconsistency broke control history and the activity feed**: `PATCH /implementations/:id/status` logged the *implementation* id while every other control-audit write logged the *framework_control* id, so `GET /controls/:id/history` silently missed all UI-driven status changes and the activity feed showed blank control names for them. Unified on framework_control id going forward, with legacy-id fallback joins so older rows still resolve (no audit-log rows were rewritten — AU-2 immutability).
+- **"Control Verified" notification linked to a 404**: the deep-link builder referenced a column (`ctrl.rows[0]?.id`) that was never selected by the query, so it always fell back to a broken URL. Now selects and links to the real framework_control id.
+- **`controlHealth.js` inflated open-item counts**: a flat 5-table `LEFT JOIN` + `GROUP BY` cross-multiplied rows whenever a control had more than one row in more than one joined table, artificially depressing health scores. Rewritten with a `LEFT JOIN LATERAL` per related table so each aggregate is computed independently.
+- **Auditor Workspace public share link was unreachable**: the "copy link" button generated a URL for a frontend page (`/auditor-workspace/shared/[token]`) that didn't exist. Built it — a public, unauthenticated page rendering the workspace summary, engagement, findings, PBC requests, and recent evidence.
+- **`PATCH /implementations/:id/status` update was not org-scoped** at the UPDATE statement itself (only guarded by a prior SELECT) — added `AND organization_id = $n` for defense in depth.
+
+### Security
+
+- **Auditor share-link management required only `audit.read`**, letting a read-only auditor mint or deactivate public tokens exposing org compliance data. `POST /links` and `PATCH /links/:id` now require `audit.write` (newly seeded permission, granted to `admin` and `auditor` roles).
+- **Auditor Workspace public share page passed an unencoded URL token directly into a `fetch()` request URL** (`fetch(\`.../public/${token}\`)`), letting a crafted share-link token manipulate the resulting request path/query instead of being treated as an opaque segment. Fixed with `encodeURIComponent(token)`.
+- **`compliance.read`/`compliance.manage` permissions were referenced by `phase6.js` but never seeded anywhere**, so every non-admin user was silently 403'd on all AI risk-scoring, regulatory-impact, and remediation-plan endpoints. Seeded and granted to `admin`/`user` roles.
+
+---
+
+## [4.3.0] — 2026-07-08
+
+### Added
+
+- **RMF Leveraged Authorizations**: RMF packages can now inherit controls and authorization posture from COTS/SaaS products, following the FedRAMP-style leveraged-authorization model. New table `rmf_leveraged_authorizations` (migration 116) links `rmf_packages` to `cots_products` with inheritance type (full/partial/hybrid), an inherited-control list, shared-responsibility notes, and expiration tracking. New route module `routes/rmfInheritance.js` provides CRUD, an eligible-products lookup, and at-risk flagging when the underlying COTS product is deprecated/retired or its authorization has lapsed.
+- **Customer Responsibility Matrix (CRM) export**: generate a CRM as JSON, CSV, or PDF directly from a package's leveraged authorizations (`GET /rmf/packages/:id/crm-report`, `/crm-report/pdf`).
+- **OSCAL SSP export**: export an RMF package as a NIST OSCAL 1.1.2 System Security Plan (`GET /rmf/packages/:id/oscal`), including leveraged authorizations and per-control shared-responsibility annotations. New pure serializer `services/oscalService.js`.
+- **Trust Center**: organizations can publish an opt-in, token-gated public page showing aggregate framework compliance and active-authorization counts (migration 117, `routes/trustCenter.js`, public page at `/trust/[token]`). Nothing beyond the enabled toggles is ever exposed.
+- **Classroom mode**: guided, step-by-step training scenarios (migration 118, `routes/training.js`, `dashboard/training`) with three built-in templates (internal audit engagement, taking a system to ATO, vendor risk review) plus an instructor progress view for org-authored scenarios.
+- **Anonymized industry benchmarking**: compare an organization's framework compliance against a k-anonymity-guarded peer aggregate (minimum 5 participating organizations), with an org-level opt-out (`routes/benchmarks.js`, `dashboard/reports`).
+- **Compliance-as-code CI gate**: `GET /compliance/gate` returns HTTP 200/412 based on whether framework compliance meets a threshold, for direct use in CI pipelines with a service-account token. See `docs/COMPLIANCE_AS_CODE.md`.
+- **Cyber Resilience module**: BC/DR, incident-response, and ransomware-playbook plan tracking with tabletop/functional/full-scale exercise logging and RTO/RPO attainment (migration 119, `routes/cyberResilience.js`, `dashboard/resilience`). A computed Cyber Resilience Score blends plan coverage, test cadence, RTO/RPO attainment, and existing backup-log health.
+- COTS products gained `authorization_status`, `authorization_impact_level`, and `external_authorization_id` fields to support leveraged-authorization eligibility.
+
+### Changed
+
+- `GET /rmf/packages`, `/rmf/packages/:id`, and `/rmf/summary` now include leveraged-authorization counts and at-risk entries alongside existing fields.
+- **LLM provider/model catalog refreshed**: `providerConfig.js`'s `PROVIDERS` and `TASK_PROFILES`, plus every other place in the codebase that independently hardcoded a copy of the same model list (routing/fallback logic in `modelRouter.js` and `llmService.js`, quota-downgrade paths in `multiAgentOrchestrator.js`, API-key connectivity-check pings in `orgSettings.js`/`platformAdmin.js`, and the BYOK provider-picker UI in four frontend settings pages/components), now reference current model IDs across all six providers. Groq's entire prior lineup (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `gemma2-9b-it`, `deepseek-r1-distill-llama-70b`) had been fully deprecated/decommissioned upstream and is replaced with `openai/gpt-oss-120b`/`20b`, `groq/compound`, `groq/compound-mini`, and `meta-llama/llama-4-scout-17b-16e-instruct`.
+- **CI guard for duplicate migration numbers**: `security.yml` now fails the build on any *new* duplicate-numbered migration file, grandfathering the 17 pre-existing collisions from parallel-branch merges.
+- **ControlWeaver-Pro's TEVV-DB-6/7 checks made real**: (companion-repo change, noted here for context) the "syntactically valid SQL" and "unclosed DO block" checks previously never failed the build regardless of what they found, due to an uninitialized `FAILED` flag and a POSIX-regex quirk that made the dollar-quote detection never match a real `DO $$`/`END $$;` line.
+
+### Fixed
+
+- **macOS release build — EMFILE during code-signing**: `build-release.yml`'s macOS jobs now bump the runner's open-file-descriptor `ulimit` before packaging, fixing an `EMFILE: too many open files` failure that occurred while copying/signing the large, un-`asar`-packed `node_modules` tree.
+- **macOS release build — xmldom/plist crash**: scoped the `@xmldom/xmldom` dependency override so electron-builder's bundled `plist` package still resolves a pre-0.9 version, fixing a `DOMParser.parseFromString` crash during packaging on both macOS architectures.
+- **Linux release build — smoke-test hang**: `electron/main.js`'s smoke-test branch now calls `app.exit(0)` instead of `app.quit()`, so the process actually terminates instead of hanging until the CI step timeout.
+- **CI never ran real database migrations**: added a `migration-integrity` job to `security.yml` that runs every migration against a fresh `postgres:16` service container on every push/PR — previously nothing in CI touched a real database, which is how the row-level-security syntax bug below shipped undetected.
+- **Row-Level Security was silently broken**: migration `105_row_level_security.sql` used invalid `ROW SECURITY` syntax (should be `ROW LEVEL SECURITY`) and had a dollar-quoting bug that broke policy creation for `evidence`/`audit_engagements`/`controls` — found and fixed by actually executing the full migration chain against a real Postgres instance for the first time.
+- **Migration 024/068 schema collision**: `068_regulatory_news.sql` now defensively backfills its enrichment columns with `ADD COLUMN IF NOT EXISTS`, since migration 024's older, narrower `regulatory_news_items` definition wins the table-creation race on a from-scratch install.
+- **AIBOM now genuinely derived from code**: `sbom.yml`'s AI Bill of Materials generation was a hardcoded Python provider list; replaced with `backend/scripts/generate-aibom.js`, a real Node script that reads the live `PROVIDERS` object so the AIBOM can no longer drift from the actual LLM integration.
+- **Doc-scanner glob was checking the wrong path**: `update-docs-on-merge.yml`'s migration-documentation check globbed a non-existent `db/migrations/` path and had been silently matching zero files (always reporting "all migrations documented") since it was written; fixed to `backend/migrations/`.
+- **CodeQL `js/missing-rate-limiting` (37 alerts)**: all 37 findings traced to one CodeQL blind spot — flagged routes were already covered by the app-wide `apiRateLimiter` mounted on `/api/v1` in `server.js`, which CodeQL's cross-file analysis can't trace. Added an explicit per-router rate limiter to each of the six new route files (matching the existing `trustCenter.js` pattern) to close the detection gap and add a real second layer of defense.
+- **Per-router rate limiter ran before `authenticate`**: the six new route files applied their org-scoped rate limiter ahead of `authenticate`, so `req.user` was always unset when the limiter's key was built and every request silently fell back to a shared IP-based bucket instead of an org-scoped one. Fixed with a 3-way order — a cheap IP-based limiter first (bounds unauthenticated request volume before `authenticate`'s own DB/JWT work runs, and is what CodeQL's static analysis traces as covering the router), then `authenticate`, then the org-scoped limiter last, since it needs `req.user` for its key.
+- **AIBOM listed unused-capability providers as bundled dependencies**: the AI Bill of Materials treated all six BYOK LLM providers as `machine-learning-model` components regardless of whether they have any real, shipped code dependency — misrepresenting supported integration surface as embedded material. Only `claude`/`openai` have actual npm SDK dependencies; `gemini`/`grok`/`groq`/`ollama` are called over plain HTTP only if an operator configures a key, with zero shipped SDK. Moved the latter into CycloneDX's dedicated `services` array and added metadata clarifying that every provider reflects supported integration surface, not per-deployment runtime usage.
+- **Controls list page mislabeled `verified` controls as "Not Started"**: `getStatusBadgeClass`/`getStatusLabel` only handled `implemented`/`satisfied_via_crosswalk`/`in_progress`, falling through to a gray "Not Started" badge for `verified`, `needs_review`, and `not_applicable` — so a control an auditor had verified rendered as if untouched. The control detail page already handled `verified` correctly; brought the list page in line with it and added the missing statuses to the status filter and both inline status-edit dropdowns.
+- **Compliance gate undercounted `verified` controls**: `GET /compliance/gate` only treated `implemented`/`satisfied_via_crosswalk` as compliant, omitting `verified`, which every other progress query (`frameworks.js`, `dashboard.js`, `controls.js`) already counts as compliant — could return a false 412 even when the dashboard showed the threshold met.
+- **Reverted migration idempotency edits on already-numbered files**: an earlier pass added `IF NOT EXISTS` guards to `001`, `005`, `113`, `114`, `115`, but editing an already-numbered (and likely already-deployed) migration changes its stored checksum, which makes `scripts/migrate-all.js` hard-fail with "Checksum mismatch" on any existing database — blocking the deploy of this PR's real new migrations. Reverted those five files to their original content; the RLS syntax fix (`105_row_level_security.sql`) and the 024/068 race-condition fix are unaffected since they fix genuine bugs rather than being purely defensive.
+- **`migration-integrity` CI job had a Postgres password mismatch**: the service container's `POSTGRES_PASSWORD` didn't match the `DATABASE_URL` used to connect, so the new migration-integrity job failed authentication before running a single migration.
+- **Cyber Resilience test date silently defaulted on malformed input**: `POST /resilience/plans/:id/tests` treated an invalid `test_date` (e.g. `not-a-date`) the same as an omitted one, silently recording the test against today's date instead of rejecting the request with 400 like every other date field in this route.
+- **Dependency vulnerabilities**: resolved all 16 backend + 6 frontend `npm audit` findings (`hono`, `multer`, `nodemailer`, `js-yaml`, `protobufjs`, `ws`, `@babel/core`, `@grpc/grpc-js`, `@opentelemetry/core`, `form-data` chain) — all but one via non-breaking `npm audit fix`; `nodemailer` bumped to `9.0.3` (the only breaking change flagged, limited to stricter default TLS certificate validation, which this project's SMTP usage doesn't rely on bypassing).
 
 ---
 
@@ -196,36 +557,6 @@
 ### Licensing
 
 - Relicensed to the ControlWeave dual license (AGPL-3.0 + commercial).
-
-## [Unreleased]
-
-> Changes staged but not yet released to production.
-
-### Changed
-- chore(ci): bump actions/checkout from 4 to 7 ([#205](https://github.com/sherifconteh-collab/ai-grc-platform/pull/205)) — @dependabot[bot]
-- chore(deps-dev): bump form-data from 4.0.5 to 4.0.6 in /electron in the npm_and_yarn group across 1 directory ([#203](https://github.com/sherifconteh-collab/ai-grc-platform/pull/203)) — @dependabot[bot]
-- chore(frontend)(deps): bump react and @types/react in /frontend ([#198](https://github.com/sherifconteh-collab/ai-grc-platform/pull/198)) — @dependabot[bot]
-- chore(backend)(deps): bump ioredis from 5.10.1 to 5.11.0 in /backend ([#194](https://github.com/sherifconteh-collab/ai-grc-platform/pull/194)) — @dependabot[bot]
-- chore(frontend)(deps): bump react-dom from 19.2.6 to 19.2.7 in /frontend ([#199](https://github.com/sherifconteh-collab/ai-grc-platform/pull/199)) — @dependabot[bot]
-- chore(backend)(deps): bump firebase-admin from 13.8.0 to 13.10.0 in /backend ([#196](https://github.com/sherifconteh-collab/ai-grc-platform/pull/196)) — @dependabot[bot]
-- chore(frontend)(deps): bump axios from 1.16.0 to 1.16.1 in /frontend ([#193](https://github.com/sherifconteh-collab/ai-grc-platform/pull/193)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump @types/node from 25.9.0 to 25.9.1 in /frontend ([#195](https://github.com/sherifconteh-collab/ai-grc-platform/pull/195)) — @dependabot[bot]
-- chore(backend)(deps): bump stripe from 22.1.1 to 22.2.0 in /backend ([#192](https://github.com/sherifconteh-collab/ai-grc-platform/pull/192)) — @dependabot[bot]
-- chore(ci): bump gitleaks/gitleaks-action from 2 to 3 ([#191](https://github.com/sherifconteh-collab/ai-grc-platform/pull/191)) — @dependabot[bot]
-- chore(deps-dev): bump tmp from 0.2.5 to 0.2.7 in /electron in the npm_and_yarn group across 1 directory ([#189](https://github.com/sherifconteh-collab/ai-grc-platform/pull/189)) — @dependabot[bot]
-- chore: v4.2.2 — fix 23-hour build times (npm cache + scoped macOS/Linux triggers) ([#190](https://github.com/sherifconteh-collab/ai-grc-platform/pull/190)) — @sherifconteh-collab
-- chore: release v4.2.1 — CI improvements + release changelog publishing ([#188](https://github.com/sherifconteh-collab/ai-grc-platform/pull/188)) — @sherifconteh-collab
-- feat(v4.2.0): port ControlWeaver-Pro v4.2.0 features + dependency updates ([#187](https://github.com/sherifconteh-collab/ai-grc-platform/pull/187)) — @sherifconteh-collab
-- chore(frontend)(deps): bump lucide-react from 1.14.0 to 1.16.0 in /frontend ([#185](https://github.com/sherifconteh-collab/ai-grc-platform/pull/185)) — @dependabot[bot]
-- chore(backend)(deps-dev): bump globals from 17.5.0 to 17.6.0 in /backend ([#186](https://github.com/sherifconteh-collab/ai-grc-platform/pull/186)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump @playwright/test from 1.59.1 to 1.60.0 in /frontend ([#183](https://github.com/sherifconteh-collab/ai-grc-platform/pull/183)) — @dependabot[bot]
-- chore(backend)(deps): bump @anthropic-ai/sdk from 0.97.0 to 0.98.0 in /backend ([#182](https://github.com/sherifconteh-collab/ai-grc-platform/pull/182)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump tailwindcss from 4.2.4 to 4.3.0 in /frontend ([#179](https://github.com/sherifconteh-collab/ai-grc-platform/pull/179)) — @dependabot[bot]
-- chore(frontend)(deps-dev): bump @types/react from 19.2.14 to 19.2.15 in /frontend ([#177](https://github.com/sherifconteh-collab/ai-grc-platform/pull/177)) — @dependabot[bot]
-- fix(ci): split macOS build into native arm64 + x64 jobs; fix framework tiers ([#176](https://github.com/sherifconteh-collab/ai-grc-platform/pull/176)) — @sherifconteh-collab
-- feat: ControlWeave 4.0.0 — full open-source parity (de-tier + all features) ([#174](https://github.com/sherifconteh-collab/ai-grc-platform/pull/174)) — @sherifconteh-collab
-
-- feat: sync ControlWeave v3.4.0 + v3.5.0 functionality ([#173](https://github.com/sherifconteh-collab/ai-grc-platform/pull/173)) — @sherifconteh-collab
 
 ## [3.5.0] — 2026-05-18
 

@@ -1,6 +1,18 @@
 const express = require('express');
 const router = express.Router();
+
+// Upper bound for an explicit page request. The catalog is heading past
+// 2,000 controls once 800-53 enhancements and the derived FedRAMP
+// baselines land, so a 100-row ceiling forces far too many round trips.
+const MAX_CONTROLS_PAGE_SIZE = 500;
+// Ceiling for a caller that asks for no pagination at all. Such a caller
+// still gets a `pagination` object carrying `total` and `truncated`, so a
+// short response is always distinguishable from a complete one.
+const UNPAGINATED_CONTROLS_CAP = 5000;
+
+const ALLOWED_CONTROL_FUNCTIONS = ['preventive', 'detective', 'corrective'];
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
 const path = require('path');
@@ -12,6 +24,10 @@ const { getFrameworkLimit, normalizeTier, shouldEnforceAiLimitForByok } = requir
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { log } = require('../utils/logger');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { decrypt } = require('../utils/encrypt');
+
+const VALID_TARGET_BASELINES = ['low', 'moderate', 'high'];
+
 
 
 router.use(authenticate);
@@ -104,6 +120,63 @@ router.get('/me/profile', requirePermission('organizations.read'), async (req, r
   } catch (error) {
     log('error', 'organizations.profile.read_failed', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to load organization profile' });
+  }
+});
+
+// PUT /organizations/me/baseline
+//
+// Sets the impact baseline compliance percentages are measured against. NIST
+// SP 800-53B selects 149 controls at Low, 287 at Moderate and 370 at High; an
+// organization pursuing Moderate should be scored against its 287 rather than
+// against the whole catalog. NULL restores the unscoped behavior.
+//
+// Frameworks that carry no baseline data (everything except 800-53 today) stay
+// fully in scope regardless -- see services/baselineScope.js.
+//
+// Follow-up worth doing: this should derive from the FIPS 199 categorization
+// already captured on organization_profiles (the high-water mark of the
+// confidentiality/integrity/availability impact levels) rather than being set
+// independently, so the two cannot disagree.
+const baselineUpdateLimiter = createRateLimiter({
+  label: 'organizations-baseline-update',
+  windowMs: 60 * 1000,
+  max: 30
+});
+
+router.put('/me/baseline', requirePermission('organizations.write'), baselineUpdateLimiter, async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const raw = req.body.target_baseline;
+    const baseline = raw === null || raw === undefined || raw === ''
+      ? null
+      : String(raw).toLowerCase();
+
+    if (baseline !== null && !VALID_TARGET_BASELINES.includes(baseline)) {
+      return res.status(400).json({
+        success: false,
+        error: `target_baseline must be one of: ${VALID_TARGET_BASELINES.join(', ')}, or null to unset.`
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE organizations SET target_baseline = $2 WHERE id = $1 RETURNING id, target_baseline`,
+      [orgId, baseline]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Organization not found' });
+    }
+
+    await auditService.logFromRequest(req, {
+      eventType: 'organization.baseline_changed',
+      resourceType: 'organization',
+      resourceId: orgId,
+      details: { target_baseline: baseline }
+    }).catch(() => {});
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    log('error', 'organizations.baseline_update_failed', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to update target baseline' });
   }
 });
 
@@ -336,27 +409,21 @@ router.put('/me/profile', requirePermission('organizations.write'), async (req, 
       ]
     );
 
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, details, success)
-       VALUES ($1, $2, $3, $4, $5::jsonb, true)`,
-      [
-        orgId,
-        req.user.id,
-        onboardingCompletedRequested ? 'organization_onboarding_completed' : 'organization_profile_updated',
-        'organization_profile',
-        JSON.stringify({
-          onboarding_completed: nextProfile.onboarding_completed,
-          rmf_stage: nextProfile.rmf_stage,
-          compliance_profile: nextProfile.compliance_profile,
-          nist_adoption_mode: nextProfile.nist_adoption_mode,
-          cia: {
-            confidentiality: nextProfile.confidentiality_impact,
-            integrity: nextProfile.integrity_impact,
-            availability: nextProfile.availability_impact
-          }
-        })
-      ]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: onboardingCompletedRequested ? 'organization_onboarding_completed' : 'organization_profile_updated',
+      resourceType: 'organization_profile',
+      details: {
+        onboarding_completed: nextProfile.onboarding_completed,
+        rmf_stage: nextProfile.rmf_stage,
+        compliance_profile: nextProfile.compliance_profile,
+        nist_adoption_mode: nextProfile.nist_adoption_mode,
+        cia: {
+          confidentiality: nextProfile.confidentiality_impact,
+          integrity: nextProfile.integrity_impact,
+          availability: nextProfile.availability_impact
+        }
+      }
+    });
 
     res.json({
       success: true,
@@ -766,13 +833,15 @@ router.post('/me/cots-products', requirePermission('organizations.write'), async
          organization_id, system_id,
          product_name, vendor_name, product_version, product_type,
          deployment_model, data_access_level, lifecycle_status, criticality,
-         support_end_date, notes, created_by, updated_by
+         support_end_date, authorization_status, authorization_impact_level,
+         external_authorization_id, notes, created_by, updated_by
        )
        VALUES (
          $1, $2,
          $3, $4, $5, $6,
          $7, $8, $9, $10,
-         $11, $12, $13, $14
+         $11, $12, $13,
+         $14, $15, $16, $17
        )
        RETURNING *`,
       [
@@ -787,6 +856,9 @@ router.post('/me/cots-products', requirePermission('organizations.write'), async
         payload.lifecycle_status,
         payload.criticality,
         payload.support_end_date,
+        payload.authorization_status,
+        payload.authorization_impact_level,
+        payload.external_authorization_id,
         payload.notes,
         req.user.id,
         req.user.id
@@ -853,8 +925,11 @@ router.put('/me/cots-products/:productId', requirePermission('organizations.writ
            lifecycle_status = $10,
            criticality = $11,
            support_end_date = $12,
-           notes = $13,
-           updated_by = $14,
+           authorization_status = $13,
+           authorization_impact_level = $14,
+           external_authorization_id = $15,
+           notes = $16,
+           updated_by = $17,
            updated_at = NOW()
        WHERE id = $1 AND organization_id = $2
        RETURNING *`,
@@ -871,6 +946,9 @@ router.put('/me/cots-products/:productId', requirePermission('organizations.writ
         payload.lifecycle_status,
         payload.criticality,
         payload.support_end_date,
+        payload.authorization_status,
+        payload.authorization_impact_level,
+        payload.external_authorization_id,
         payload.notes,
         req.user.id
       ]
@@ -1398,21 +1476,39 @@ router.delete('/:orgId/frameworks/:frameworkId', requirePermission('frameworks.m
 });
 
 // GET /organizations/:orgId/controls
-router.get('/:orgId/controls', requirePermission('organizations.read'), async (req, res) => {
+const orgControlsListLimiter = createRateLimiter({
+  label: 'organizations-controls-list',
+  windowMs: 60 * 1000,
+  max: 120
+});
+
+router.get('/:orgId/controls', requirePermission('organizations.read'), orgControlsListLimiter, async (req, res) => {
   try {
     const orgId = verifyOrgAccess(req, res);
     if (!orgId) return;
-    const { frameworkId, status } = req.query;
+    const { frameworkId, status, page, limit } = req.query;
 
     let query = `
       SELECT fc.id, fc.control_id,
              COALESCE(occ.title, fc.title) as title,
              COALESCE(occ.description, fc.description) as description,
-             fc.control_type, fc.priority,
+             fc.control_type, fc.control_functions, fc.priority,
              f.name as framework_name, f.code as framework_code,
              COALESCE(ci.status, 'not_started') as status,
              ci.assigned_to, ci.notes,
-             u.first_name || ' ' || u.last_name as assigned_to_name
+             u.first_name || ' ' || u.last_name as assigned_to_name,
+             (
+               (SELECT COUNT(*)::int FROM control_mappings cms WHERE cms.source_control_id = fc.id AND cms.target_control_id <> fc.id)
+               +
+               (SELECT COUNT(*)::int FROM control_mappings cmt WHERE cmt.target_control_id = fc.id AND cmt.source_control_id <> fc.id)
+             ) AS mapping_count
+    `;
+
+    // Kept separate from the SELECT list so the COUNT below runs against
+    // exactly the same joins and filters. Every join here is one-to-one
+    // (organization_frameworks, overrides and implementations are each unique
+    // per control+org), so COUNT(*) is not inflated.
+    let fromWhere = `
       FROM organization_frameworks of2
       JOIN framework_controls fc ON fc.framework_id = of2.framework_id
       JOIN frameworks f ON f.id = fc.framework_id
@@ -1427,25 +1523,77 @@ router.get('/:orgId/controls', requirePermission('organizations.read'), async (r
     let paramIndex = 2;
 
     if (frameworkId) {
-      query += ` AND f.id = $${paramIndex}`;
+      fromWhere += ` AND f.id = $${paramIndex}`;
       params.push(frameworkId);
       paramIndex++;
     }
 
     if (status) {
       if (status === 'not_started') {
-        query += ` AND (ci.status IS NULL OR ci.status = 'not_started')`;
+        fromWhere += ` AND (ci.status IS NULL OR ci.status = 'not_started')`;
       } else {
-        query += ` AND ci.status = $${paramIndex}`;
+        fromWhere += ` AND ci.status = $${paramIndex}`;
         params.push(status);
         paramIndex++;
       }
     }
 
-    query += ' ORDER BY f.name, fc.control_id';
+    // Overlap (&&) not containment, so a control labeled detective+corrective
+    // matches a request for either one.
+    const requestedFunctions = String(req.query.control_function || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => ALLOWED_CONTROL_FUNCTIONS.includes(value));
+
+    if (requestedFunctions.length > 0) {
+      fromWhere += ` AND fc.control_functions && $${paramIndex}::text[]`;
+      params.push(requestedFunctions);
+      paramIndex++;
+    }
+
+    query += fromWhere + ' ORDER BY f.name, fc.control_id, fc.id';
+
+    // The total is computed on every request, paginated or not. Without it the
+    // unpaginated branch below could silently return fewer controls than exist
+    // -- it previously applied a bare LIMIT 2000 with no total and no
+    // pagination object, so a catalog that outgrew the cap would drop controls
+    // off the end of the list with no error and no signal to the client. A
+    // compliance tool hiding controls from an auditor is the worst failure
+    // mode available to it, so the count is worth the extra query.
+    const countResult = await pool.query(`SELECT COUNT(*)::int AS total ${fromWhere}`, params);
+    const total = countResult.rows[0].total;
+
+    const usePagination = page !== undefined || limit !== undefined;
+    let pagination;
+    if (usePagination) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      // Raised from 100. The asset control picker asks for 500 and silently
+      // received 100, so its client-side search only ever saw the first page
+      // of the catalog.
+      const limitNum = Math.min(MAX_CONTROLS_PAGE_SIZE, Math.max(1, parseInt(limit, 10) || 50));
+      const offset = (pageNum - 1) * limitNum;
+      query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(limitNum, offset);
+      pagination = { page: pageNum, limit: limitNum, total, truncated: offset + limitNum < total };
+    } else {
+      query += ` LIMIT ${UNPAGINATED_CONTROLS_CAP}`;
+      pagination = {
+        page: 1,
+        limit: UNPAGINATED_CONTROLS_CAP,
+        total,
+        truncated: total > UNPAGINATED_CONTROLS_CAP
+      };
+    }
 
     const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows, controls: result.rows });
+    if (pagination.truncated) {
+      log('warn', 'organizations.controls.truncated', {
+        organizationId: orgId,
+        returned: result.rows.length,
+        total
+      });
+    }
+    res.json({ success: true, data: result.rows, controls: result.rows, pagination });
   } catch (error) {
     log('error', 'organizations.controls.failed', { error: error.message });
     res.status(500).json({ success: false, error: 'Failed to load controls' });
@@ -1904,12 +2052,13 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
         COALESCE(occ.title, fc.title) as title,
         COALESCE(occ.description, fc.description) as description,
         fc.control_type,
+        fc.control_functions,
         fc.priority,
         COALESCE(ci.status, 'not_started') as status,
         ci.implementation_notes,
         ci.evidence_location,
         ci.notes,
-        ci.implementation_date as due_date,
+        ci.due_date,
         u.email as assigned_to_email,
         NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), '') as assigned_to_name
       FROM organization_frameworks of2
@@ -1947,7 +2096,15 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
     query += ' ORDER BY f.name, fc.control_id';
 
     const result = await pool.query(query, params);
-    const rows = result.rows || [];
+    const rows = (result.rows || []).map((row) => {
+      let assignedToEmail = null;
+      try {
+        assignedToEmail = decrypt(row.assigned_to_email);
+      } catch (error) {
+        assignedToEmail = null;
+      }
+      return { ...row, assigned_to_email: assignedToEmail };
+    });
 
     const exportColumns = [
       'framework_control_id',
@@ -1957,6 +2114,7 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
       'title',
       'description',
       'control_type',
+      'control_functions',
       'priority',
       'status',
       'implementation_notes',
@@ -1966,6 +2124,14 @@ router.get('/:orgId/controls/export', requirePermission('implementations.read'),
       'assigned_to_name',
       'due_date'
     ];
+
+    // control_functions is a text[]; flatten it so both CSV and XLSX render a
+    // readable cell instead of a stringified array.
+    rows.forEach((row) => {
+      if (Array.isArray(row.control_functions)) {
+        row.control_functions = row.control_functions.join('; ');
+      }
+    });
 
     const stamp = new Date().toISOString().slice(0, 10);
     const filename = `controlweave-control-answers-${orgId}-${stamp}.${format}`;
@@ -2222,12 +2388,26 @@ router.post(
       const hasExistingImplementation = new Set(existingResult.rows.map((row) => String(row.control_id)));
 
       const userResult = await pool.query(
-        `SELECT id, LOWER(email) as email
+        `SELECT id, email
          FROM users
          WHERE organization_id = $1 AND is_active = true`,
         [orgId]
       );
-      const userIdByEmail = new Map(userResult.rows.map((row) => [String(row.email || ''), String(row.id)]));
+      // email is stored encrypted — decrypt in JS before building the lookup
+      // map. decrypt() returns legacy plaintext values unchanged, so this is
+      // safe for rows that predate encryption as well.
+      const userIdByEmail = new Map();
+      userResult.rows.forEach((row) => {
+        let decryptedEmail = null;
+        try {
+          decryptedEmail = decrypt(row.email);
+        } catch (error) {
+          decryptedEmail = null;
+        }
+        if (decryptedEmail) {
+          userIdByEmail.set(String(decryptedEmail).trim().toLowerCase(), String(row.id));
+        }
+      });
       const userIds = new Set(userResult.rows.map((row) => String(row.id)));
 
       const summary = {
@@ -2249,7 +2429,7 @@ router.post(
 
       const upsertSql = `
         INSERT INTO control_implementations
-          (control_id, organization_id, status, implementation_notes, evidence_location, assigned_to, notes, implementation_date)
+          (control_id, organization_id, status, implementation_notes, evidence_location, assigned_to, notes, due_date)
         VALUES
           ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (control_id, organization_id) DO UPDATE SET
@@ -2258,7 +2438,7 @@ router.post(
           evidence_location = CASE WHEN $11 THEN EXCLUDED.evidence_location ELSE control_implementations.evidence_location END,
           assigned_to = CASE WHEN $12 THEN EXCLUDED.assigned_to ELSE control_implementations.assigned_to END,
           notes = CASE WHEN $13 THEN EXCLUDED.notes ELSE control_implementations.notes END,
-          implementation_date = CASE WHEN $14 THEN EXCLUDED.implementation_date ELSE control_implementations.implementation_date END
+          due_date = CASE WHEN $14 THEN EXCLUDED.due_date ELSE control_implementations.due_date END
         RETURNING (xmax = 0) AS inserted
       `;
 

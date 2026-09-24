@@ -1,0 +1,88 @@
+# ControlWeave (ai-grc-platform) Label Definitions
+# Used by the sync-labels workflow to ensure repository labels exist.
+# Ported from ControlWeaver-Pro's labels.yml, trimmed to only labels this
+# repo's workflows actually apply — no dead labels with no automation behind
+# them.
+
+# --- Compliance Control Family Labels ---
+# Applied automatically by compliance-labeler.yml via keyword matching on the
+# issue/PR title+body — NOT a verified NIST 800-53 control mapping. Treat as
+# a rough categorization hint that still needs a human to confirm relevance.
+- name: "compliance:AC"
+  color: "1d76db"
+  description: "Keyword hint: Access Control (NIST 800-53 AC) — unverified"
+- name: "compliance:AU-2"
+  color: "1d76db"
+  description: "Keyword hint: Audit Events (NIST 800-53 AU-2) — unverified"
+- name: "compliance:CM-3"
+  color: "1d76db"
+  description: "Keyword hint: Config Change Control (NIST 800-53 CM-3) — unverified"
+- name: "compliance:RA-5"
+  color: "1d76db"
+  description: "Keyword hint: Vulnerability Scanning (NIST 800-53 RA-5) — unverified"
+- name: "compliance:SA-3"
+  color: "1d76db"
+  description: "Keyword hint: SDLC (NIST 800-53 SA-3) — unverified"
+- name: "compliance:SA-5"
+  color: "1d76db"
+  description: "Keyword hint: System Documentation (NIST 800-53 SA-5) — unverified"
+- name: "compliance:SA-11"
+  color: "1d76db"
+  description: "Keyword hint: Dev Security Testing (NIST 800-53 SA-11) — unverified"
+- name: "compliance:SI-2"
+  color: "1d76db"
+  description: "Keyword hint: Flaw Remediation (NIST 800-53 SI-2) — unverified"
+- name: "compliance:SI-10"
+  color: "1d76db"
+  description: "Keyword hint: Input Validation (NIST 800-53 SI-10) — unverified"
+
+# --- Framework Labels ---
+- name: "framework:nist-800-53"
+  color: "5319e7"
+  description: "Related to NIST 800-53 controls"
+- name: "framework:iso-27001"
+  color: "5319e7"
+  description: "Related to ISO 27001 controls"
+- name: "framework:soc2"
+  color: "5319e7"
+  description: "Related to SOC 2 trust services criteria"
+- name: "framework:hipaa"
+  color: "5319e7"
+  description: "Related to HIPAA security rule"
+- name: "framework:gdpr"
+  color: "5319e7"
+  description: "Related to GDPR requirements"
+
+# --- Workflow / Process Labels ---
+- name: "documentation"
+  color: "0075ca"
+  description: "Documentation changes"
+- name: "review-needed"
+  color: "fbca04"
+  description: "Needs manual review"
+- name: "needs-review"
+  color: "fbca04"
+  description: "Awaiting review"
+- name: "copilot-review-requested"
+  color: "0e8a16"
+  description: "A GitHub Copilot code review has been requested for this PR"
+- name: "copilot-review-unavailable"
+  color: "d93f0b"
+  description: "Copilot review could not be requested — feature may not be enabled for this repo/org"
+
+# --- Area Labels ---
+- name: "security"
+  color: "b60205"
+  description: "Security-related changes"
+- name: "dependencies"
+  color: "0366d6"
+  description: "Dependency updates"
+- name: "backend"
+  color: "c5def5"
+  description: "Backend changes"
+- name: "frontend"
+  color: "c5def5"
+  description: "Frontend changes"
+- name: "ci"
+  color: "c5def5"
+  description: "CI/CD pipeline changes"

@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -33,6 +33,18 @@ jobs:
       - name: Frontend - npm audit
         run: |
           cd frontend
+          npm ci
+          npm audit --audit-level=moderate
+
+      # The desktop wrapper was previously unaudited, which let eight high
+      # advisories sit in electron-builder's tree unnoticed — including a
+      # credential leak on cross-origin redirect in builder-util-runtime and an
+      # uncontrolled search path in AppImage builds. electron-builder is a
+      # devDependency, so the production-only audit further down cannot catch
+      # it, but it is the tool that produces the installer users download.
+      - name: Electron - npm audit
+        run: |
+          cd electron
           npm ci
           npm audit --audit-level=moderate
 
@@ -68,7 +80,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -83,11 +95,85 @@ jobs:
           cd backend
           npx jest --ci
 
-      - name: Frontend - typecheck
+      - name: Check for new duplicate migration numbers
+        run: |
+          cd backend/migrations
+          KNOWN_DUPS="012 013 014 015 016 017 018 019 020 021 022 023 024 048 057 061 072"
+          ALL_DUPS=$(ls *.sql | sed 's/^\([0-9]*\)_.*/\1/' | sort | uniq -d)
+          FAILED=0
+          for dup in $ALL_DUPS; do
+            if ! echo "$KNOWN_DUPS" | grep -qw "$dup"; then
+              echo "New duplicate migration number: $dup"
+              FAILED=1
+            else
+              echo "Known legacy duplicate (grandfathered): $dup"
+            fi
+          done
+          [ "$FAILED" -eq 0 ] && echo "No new duplicate migration numbers"
+          exit $FAILED
+
+      - name: Check for migration schema drift
+        run: |
+          cd backend
+          npm run check:migration-drift
+
+      - name: Frontend - typecheck, API types, and production build
         run: |
           cd frontend
           npm ci
           npm run typecheck
+          # `tsc --noEmit` alone is not enough of a gate. PR #213 bumped
+          # TypeScript to 7.0.2, passed typecheck, and still broke `npm run
+          # build` and `npm run lint` -- it had to be reverted in #232. The
+          # generate:api-types step catches a second class of break that
+          # typecheck also misses: a dependency whose API the openapi-typescript
+          # toolchain relies on shifting underneath it.
+          #
+          # `npm run lint` is deliberately NOT gated here yet: it currently fails
+          # on a pre-existing eslint-plugin-react / ESLint 10 incompatibility
+          # ("contextOrFilename.getFilename is not a function") that is unrelated
+          # to any individual PR. Add it once that is resolved.
+          npm run generate:api-types
+          npm run build
+
+  migration-integrity:
+    name: Migration Integrity (Real Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_DB: grc_ci_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: '20' }
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+      - name: Run all migrations against a fresh Postgres 16 instance
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
+        run: node scripts/migrate-all.js
+
+      - name: Verify row-level security actually isolates organizations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
+        # Re-connects as a throwaway NOSUPERUSER NOBYPASSRLS role, because RLS is
+        # invisible to the superuser this job otherwise runs as.
+        run: npm run verify:rls
+
+      - name: Seed frameworks and verify against expected-counts manifest
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
+        run: npm run seed:frameworks
 
   secret-scanning:
     name: Scan for Hardcoded Secrets
@@ -154,6 +240,20 @@ jobs:
             echo ""
             echo "⚠️  Suspicious patterns found - manual security review required"
             echo "This PR needs careful review before merging"
+            # These patterns (eval, child_process, dynamic require, non-HTTPS URLs,
+            # base64) have legitimate uses elsewhere in this codebase, so this check
+            # stays advisory rather than blocking — but it must not silently hide the
+            # finding behind an unqualified green checkmark. Surface it on the Actions
+            # run summary, which the previous version of this job never did (the
+            # warning only ever reached raw step logs, so nothing about it was visible
+            # from the PR checks list or the summary page).
+            {
+              echo "### ⚠️ Suspicious Code Patterns Detected"
+              echo ""
+              echo "This check does not block merges (the patterns above have legitimate"
+              echo "uses elsewhere in this codebase), but a human should review the matches"
+              echo "in the job log before merging."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "✅ No suspicious patterns detected"
           fi
@@ -270,19 +370,24 @@ jobs:
           echo "🔑 NIST 800-160 AC-6 — Least Privilege"
           FAIL=0
 
-          # Routes that intentionally bypass auth (login, webhooks, health, public ops)
-          SKIP_ROUTES="auth.js openclawWebhook.js help.js ops.js"
+          # Routes that intentionally bypass auth (login, webhooks, health, public ops,
+          # public contact/demo-request form). Every entry here must be a route file
+          # that is genuinely meant to be reachable without authentication.
+          SKIP_ROUTES="auth.js openclawWebhook.js help.js ops.js publicContact.js"
 
           echo "Checking auth middleware coverage per route file..."
           for f in backend/src/routes/*.js; do
             name=$(basename "$f")
             echo "$SKIP_ROUTES" | grep -qw "$name" && continue
-            if ! grep -qE "authenticate|requirePermission|requireRole|requireAnyPermission|requireAllPermissions" "$f"; then
-              echo "⚠️  WARNING: $name registers routes but has no auth/permission middleware (NIST 800-160 AC-6)"
+            if ! grep -qE "authenticate|requirePermission|requireRole|requireAnyPermission|requireAllPermissions|requireAdmin" "$f"; then
+              echo "❌ $name registers routes but has no auth/permission middleware (NIST 800-160 AC-6) — add auth middleware, or add it to SKIP_ROUTES above if it is genuinely meant to be public"
+              FAIL=1
             fi
           done
 
-          # Wildcard '*' permission grants must be restricted to the 'admin' role block only
+          # Wildcard '*' permission grants must be restricted to the 'admin' role block only.
+          # Left as an advisory warning (not blocking) — legitimate role configs can vary
+          # in structure, so this needs a human's judgment rather than an automatic gate.
           WILDCARD_LINES=$(grep -n "'\\*'\|\"\\*\"" backend/src/middleware/auth.js | grep -v "admin:")
           if [ -n "$WILDCARD_LINES" ]; then
             echo "⚠️  WARNING: Wildcard permission '*' found outside admin role block — review carefully:"
@@ -447,6 +552,44 @@ jobs:
             FAIL=1
           fi
 
+          # ── Regression guard: per-router rate limiting (CodeQL js/missing-rate-limiting) ──
+          # The app-wide apiRateLimiter in server.js covers every route at runtime, but
+          # CodeQL's static analysis can't trace across that file boundary — it only
+          # recognizes well-known rate-limiting libraries it has a model for, and flags
+          # every DB-touching route handler in a file that doesn't import one. This
+          # repo's custom Redis-backed createRateLimiter() (middleware/rateLimit.js) is
+          # NOT built on express-rate-limit and is NOT something CodeQL recognizes —
+          # confirmed by testing: a file using only createRateLimiter() still gets
+          # flagged. Only an actual `require('express-rate-limit')` import (as used
+          # router-wide in trustCenter.js, audit.js, auditorWorkspace.js) satisfies it.
+          # This already caused a real CI failure once (37 alerts, fixed per
+          # RELEASE_NOTES.md v4.3.0) and again on PR #209 (audit.js,
+          # auditorWorkspace.js) — this check exists so it can't happen a third time
+          # silently. A full retroactive fix across every route file is a separate,
+          # larger effort (65 files as of this check's introduction, listed below as a
+          # grandfathered baseline) — this only blocks NEW route files from being added
+          # without it, the same way TEVV-DB's duplicate-migration guard grandfathers
+          # pre-existing collisions but blocks new ones.
+          BASELINE_NO_EXPRESS_RATE_LIMIT="ai.js aiGovernance.js aiMonitoring.js assessments.js assets.js auditFields.js auth.js autoEvidenceCollection.js billing.js cmdb.js contacts.js controlHealth.js controls.js customFrameworks.js dashboard.js dashboardBuilder.js dataGovernance.js dataSovereignty.js dynamicConfig.js environments.js evidence.js exceptions.js externalAi.js externalAiKeys.js frameworks.js help.js implementations.js integrationsHub.js internationalAiLaws.js issueReport.js license.js notifications.js openclawWebhook.js ops.js orgSettings.js organizations.js passkeys.js pendingEvidence.js performance.js phase6.js platformAdmin.js plot4ai.js poam.js policies.js publicContact.js pushTokens.js rag.js realtime.js regulatoryNews.js reports.js roles.js sbom.js serviceAccounts.js siem.js splunk.js sso.js stateAiLaws.js threatIntel.js totp.js tprm.js tprmPublic.js users.js vendorSecurity.js vulnerabilities.js webhooks.js"
+
+          echo ""
+          echo "Checking express-rate-limit coverage (new route files only)..."
+          for f in backend/src/routes/*.js; do
+            name=$(basename "$f")
+            echo "$BASELINE_NO_EXPRESS_RATE_LIMIT" | grep -qw "$name" && continue
+            if ! grep -q "require('express-rate-limit')" "$f"; then
+              echo "❌ $name has no express-rate-limit import and is not in the" \
+                   "grandfathered baseline — CodeQL will flag its DB-touching route" \
+                   "handlers as js/missing-rate-limiting. createRateLimiter() does NOT" \
+                   "satisfy this (CodeQL doesn't recognize it). Add" \
+                   "\`const rateLimit = require('express-rate-limit'); router.use(rateLimit({...}))\`" \
+                   "before authenticate — see audit.js or auditorWorkspace.js for the" \
+                   "pattern (NIST 800-160 SC-5)."
+              FAIL=1
+            fi
+          done
+          [ $FAIL -eq 0 ] && echo "✅ No new route files are missing an express-rate-limit import"
+
           exit $FAIL
 
   nist-800-160-supply-chain:
@@ -456,7 +599,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -503,6 +646,10 @@ jobs:
             echo "❌ High/critical vulnerability in frontend production dependencies (NIST 800-160 SA-12)"
             FAIL=1
           }
+          (cd electron && npm audit --omit=dev --audit-level=high) || {
+            echo "❌ High/critical vulnerability in electron production dependencies (NIST 800-160 SA-12)"
+            FAIL=1
+          }
 
           exit $FAIL
 
@@ -513,7 +660,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 

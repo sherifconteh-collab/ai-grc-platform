@@ -2,11 +2,23 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const { createNotification } = require('../services/notificationService');
 const { invalidateAICache } = require('../services/llmService');
+const poamGate = require('../services/poamGateService');
+const crosswalkCredits = require('../services/crosswalkCreditService');
+const rateLimit = require('express-rate-limit');
+const { createRateLimiter } = require('../middleware/rateLimit');
+const { decrypt } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
+
+// IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
+// can trace a recognized rate-limiting middleware covering every route below —
+// it does not model this repo's own createRateLimiter. Same pattern as
+// routes/accessGovernance.js; the per-route limits remain the real control.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1500 }));
 
 router.use(authenticate);
 
@@ -58,15 +70,24 @@ router.post('/by-control/:controlId/ensure', requirePermission('implementations.
   }
 });
 
+// Bridges NIST's numeric priority values ('1'/'2'/'3') and the UI's
+// word-based priority filter (critical/high/medium/low).
+const PRIORITY_EQUIVALENTS = {
+  critical: ['critical'],
+  high: ['1', 'P1', 'high'],
+  medium: ['2', 'P2', 'medium'],
+  low: ['3', 'P3', 'low'],
+};
+
 // GET /implementations
 router.get('/', requirePermission('implementations.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
-    const { frameworkId, status, assignedTo, priority, controlId } = req.query;
+    const { frameworkId, status, assignedTo, priority, controlId, page, limit } = req.query;
 
     let query = `
       SELECT ci.id, ci.status, ci.implementation_notes, ci.evidence_location,
-             ci.assigned_to, ci.notes, ci.implementation_date, ci.created_at,
+             ci.assigned_to, ci.notes, ci.implementation_date, ci.due_date, ci.created_at,
              fc.control_id as control_code, fc.title as control_title, fc.priority,
              fc.id as framework_control_id,
              f.name as framework_name, f.code as framework_code,
@@ -97,8 +118,9 @@ router.get('/', requirePermission('implementations.read'), async (req, res) => {
       idx++;
     }
     if (priority) {
-      query += ` AND fc.priority = $${idx}`;
-      params.push(priority);
+      const set = PRIORITY_EQUIVALENTS[String(priority).toLowerCase()] || [String(priority)];
+      query += ` AND fc.priority = ANY($${idx}::text[])`;
+      params.push(set);
       idx++;
     }
     if (controlId) {
@@ -107,10 +129,37 @@ router.get('/', requirePermission('implementations.read'), async (req, res) => {
       idx++;
     }
 
-    query += ' ORDER BY ci.created_at DESC';
+    query += ' ORDER BY ci.created_at DESC, ci.id DESC';
+
+    const usePagination = page !== undefined || limit !== undefined;
+    let pagination = null;
+    if (usePagination) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+      const offset = (pageNum - 1) * limitNum;
+      query += ` LIMIT $${idx} OFFSET $${idx + 1}`;
+      params.push(limitNum, offset);
+      pagination = { page: pageNum, limit: limitNum };
+    } else {
+      query += ' LIMIT 2000';
+    }
 
     const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows });
+    const rows = result.rows.map((row) => {
+      let assignedToEmail = null;
+      try {
+        assignedToEmail = decrypt(row.assigned_to_email);
+      } catch (error) {
+        assignedToEmail = null;
+      }
+      return { ...row, assigned_to_email: assignedToEmail };
+    });
+
+    const payload = { success: true, data: rows };
+    if (pagination) {
+      payload.pagination = pagination;
+    }
+    res.json(payload);
   } catch (error) {
     log('error', 'implementations_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to load implementations' });
@@ -129,10 +178,14 @@ router.get('/activity/feed', requirePermission('implementations.read'), async (r
              u.first_name || ' ' || u.last_name as changed_by_name,
              COALESCE(al.details->>'status', '') as new_status,
              COALESCE(al.details->>'old_status', '') as old_status,
-             fc.control_id as control_code, fc.title as control_title
+             COALESCE(fc.control_id, fc_legacy.control_id) as control_code,
+             COALESCE(fc.title, fc_legacy.title) as control_title
       FROM audit_logs al
       LEFT JOIN users u ON u.id = al.user_id
       LEFT JOIN framework_controls fc ON fc.id = al.resource_id
+      LEFT JOIN control_implementations ci_legacy
+        ON ci_legacy.id = al.resource_id AND ci_legacy.organization_id = al.organization_id
+      LEFT JOIN framework_controls fc_legacy ON fc_legacy.id = ci_legacy.control_id
       WHERE al.organization_id = $1
         AND al.resource_type = 'control'
       ORDER BY al.created_at DESC
@@ -153,7 +206,7 @@ router.get('/due/upcoming', requirePermission('implementations.read'), async (re
     const days = parseInt(req.query.days) || 30;
 
     const result = await pool.query(`
-      SELECT ci.id, ci.status, ci.implementation_date, ci.assigned_to,
+      SELECT ci.id, ci.status, ci.due_date, ci.assigned_to,
              fc.control_id as control_code, fc.title as control_title, fc.priority,
              f.name as framework_name,
              u.first_name || ' ' || u.last_name as assigned_to_name
@@ -163,9 +216,9 @@ router.get('/due/upcoming', requirePermission('implementations.read'), async (re
       LEFT JOIN users u ON u.id = ci.assigned_to
       WHERE ci.organization_id = $1
         AND ci.status IN ('in_progress', 'needs_review')
-        AND ci.implementation_date IS NOT NULL
-        AND ci.implementation_date <= CURRENT_DATE + ($2 || ' days')::INTERVAL
-      ORDER BY ci.implementation_date ASC
+        AND ci.due_date IS NOT NULL
+        AND ci.due_date <= CURRENT_DATE + ($2 || ' days')::INTERVAL
+      ORDER BY ci.due_date ASC
     `, [orgId, days.toString()]);
 
     res.json({ success: true, data: result.rows });
@@ -180,7 +233,7 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
   try {
     const result = await pool.query(`
       SELECT ci.id, ci.status, ci.implementation_notes, ci.evidence_location,
-             ci.assigned_to, ci.notes, ci.implementation_date, ci.implementation_date as due_date,
+             ci.assigned_to, ci.notes, ci.implementation_date, ci.due_date,
              CASE WHEN ci.status = 'implemented' THEN ci.implementation_date ELSE NULL END as completed_at,
              ci.created_at,
              fc.id as framework_control_id, fc.control_id as control_code, fc.title as control_title, fc.priority,
@@ -199,9 +252,15 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
     }
 
     const implementation = result.rows[0];
+    try {
+      implementation.assigned_to_email = decrypt(implementation.assigned_to_email);
+    } catch (error) {
+      implementation.assigned_to_email = null;
+    }
 
     const statusHistoryResult = await pool.query(`
       SELECT al.id,
+             al.event_type,
              COALESCE(al.details->>'old_status', 'not_started') as old_status,
              COALESCE(al.details->>'status', al.details->>'new_status', 'not_started') as new_status,
              al.details->>'notes' as notes,
@@ -211,10 +270,10 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
       LEFT JOIN users u ON u.id = al.user_id
       WHERE al.organization_id = $1
         AND al.resource_type = 'control'
-        AND al.resource_id = $2
+        AND al.resource_id = ANY($2::uuid[])
       ORDER BY al.created_at DESC
       LIMIT 50
-    `, [req.user.organization_id, req.params.id]);
+    `, [req.user.organization_id, [implementation.framework_control_id, req.params.id]]);
 
     const evidenceResult = await pool.query(`
       SELECT e.id, e.file_name, e.description, e.mime_type,
@@ -239,7 +298,11 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
 });
 
 // PATCH /implementations/:id/status
-router.patch('/:id/status', requirePermission('implementations.write'), validateBody((body) => {
+// Leaving a crediting status triggers crosswalk withdrawal, which walks every
+// control this one was holding up — more work than the single-row update looks.
+router.patch('/:id/status',
+  createRateLimiter({ label: 'implementation-status-update', windowMs: 60 * 1000, max: 60 }),
+  requirePermission('implementations.write'), validateBody((body) => {
   const errors = requireFields(body, ['status']);
   const allowedStatuses = ['not_started', 'in_progress', 'implemented', 'needs_review', 'satisfied_via_crosswalk', 'verified', 'not_applicable'];
   if (body.status && !allowedStatuses.includes(body.status)) {
@@ -251,7 +314,7 @@ router.patch('/:id/status', requirePermission('implementations.write'), validate
     const { status, notes } = req.body;
 
     const existing = await pool.query(
-      'SELECT id, status FROM control_implementations WHERE id = $1 AND organization_id = $2',
+      'SELECT id, status, control_id FROM control_implementations WHERE id = $1 AND organization_id = $2',
       [req.params.id, req.user.organization_id]
     );
 
@@ -272,36 +335,89 @@ router.patch('/:id/status', requirePermission('implementations.write'), validate
       return res.status(403).json({ success: false, error: 'Only auditors or admins can set status to Verified.' });
     }
 
+    // Claiming compliance is gated here exactly as it is on PUT /controls/:id.
+    // This is the endpoint the control detail page actually calls, so until the
+    // gate moved into poamGateService the dashboard could mark a control
+    // compliant without a justification and without producing anything for an
+    // auditor to review.
+    const isComplianceChange = poamGate.isComplianceTransition(oldStatus, status);
+    const poamJustification = req.body.poam_justification;
+    if (isComplianceChange && !poamJustification) {
+      return res.status(400).json(poamGate.justificationRequiredResponse());
+    }
+
     const result = await pool.query(`
       UPDATE control_implementations SET status = $1, notes = COALESCE($2, notes),
         implementation_date = CASE WHEN $4 = 'implemented' THEN CURRENT_DATE ELSE implementation_date END
-      WHERE id = $3 RETURNING *
-    `, [status, notes || null, req.params.id, status]);
+      WHERE id = $3 AND organization_id = $5 RETURNING *
+    `, [status, notes || null, req.params.id, status, req.user.organization_id]);
 
-    // Log audit
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details)
-       VALUES ($1, $2, 'control_status_changed', 'control', $3, $4)`,
-      [req.user.organization_id, req.user.id, existing.rows[0].id,
-       JSON.stringify({ old_status: oldStatus, status, notes })]
-    );
+    let poamItem = null;
+    if (isComplianceChange && poamJustification) {
+      poamItem = await poamGate.inTransaction((client) =>
+        poamGate.recordComplianceTransition(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          controlId: existing.rows[0].control_id,
+          previousStatus: oldStatus,
+          newStatus: status,
+          justification: poamJustification,
+          frameworkSpecificType: req.body.framework_specific_type,
+          frameworkSpecificData: req.body.framework_specific_data
+        })
+      );
+
+      await poamGate.notifyComplianceTransition({
+        orgId: req.user.organization_id,
+        userId: req.user.id,
+        controlId: existing.rows[0].control_id,
+        previousStatus: oldStatus,
+        newStatus: status,
+        poamItem
+      });
+    }
+
+    // Forward-only enforcement still permits implemented -> needs_review /
+    // not_applicable, so this path can also drop a source out of a crediting
+    // status and must withdraw whatever it was holding up.
+    let withdrawnCredits = 0;
+    if (crosswalkCredits.CREDITING_STATUSES.includes(oldStatus)) {
+      const withdrawal = await crosswalkCredits.handleSourceStatusChange({
+        organizationId: req.user.organization_id,
+        controlId: existing.rows[0].control_id,
+        newStatus: status,
+        actorUserId: req.user.id
+      });
+      withdrawnCredits = withdrawal.withdrawn || 0;
+    }
+
+    // Log audit — resource_id references the framework_control id, matching
+    // how controls.js logs control status changes (not the implementation id).
+    await auditService.logFromRequest(req, {
+      eventType: 'control_status_changed',
+      resourceType: 'control',
+      resourceId: existing.rows[0].control_id,
+      details: { old_status: oldStatus, status, notes, withdrawn_crosswalk_credits: withdrawnCredits }
+    });
 
     // Notify org when a control reaches 'verified'
     if (status === 'verified') {
       const ctrl = await pool.query(
-        `SELECT fc.control_id FROM control_implementations ci
+        `SELECT fc.id AS framework_control_id, fc.control_id AS control_code
+         FROM control_implementations ci
          JOIN framework_controls fc ON fc.id = ci.control_id
-         WHERE ci.id = $1 LIMIT 1`,
-        [req.params.id]
+         WHERE ci.id = $1 AND ci.organization_id = $2 LIMIT 1`,
+        [req.params.id, req.user.organization_id]
       );
-      const controlRef = ctrl.rows[0]?.control_id || req.params.id;
+      const controlRef = ctrl.rows[0]?.control_code || req.params.id;
+      const frameworkControlId = ctrl.rows[0]?.framework_control_id;
       await createNotification(
         req.user.organization_id,
         null, // broadcast to org
         'status_change',
         'Control Verified',
         `Control ${controlRef} has been marked as Verified.`,
-        `/dashboard/controls/${ctrl.rows[0]?.id || req.params.id}`
+        frameworkControlId ? `/dashboard/controls/${frameworkControlId}` : undefined
       );
     }
 
@@ -309,7 +425,12 @@ router.patch('/:id/status', requirePermission('implementations.write'), validate
     // This ensures gap analysis and compliance forecasting reflect the latest data
     invalidateAICache(req.user.organization_id);
 
-    res.json({ success: true, data: result.rows[0] });
+    res.json({
+      success: true,
+      data: result.rows[0],
+      poam_item: poamItem,
+      requires_auditor_review: isComplianceChange
+    });
   } catch (error) {
     log('error', 'update_status_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update status' });
@@ -333,7 +454,7 @@ router.patch('/:id/assign', requirePermission('implementations.write'), validate
     const result = await pool.query(`
       UPDATE control_implementations SET
         assigned_to = $1,
-        implementation_date = $2,
+        due_date = $2,
         notes = COALESCE($3, notes)
       WHERE id = $4 AND organization_id = $5
       RETURNING *
@@ -388,17 +509,97 @@ router.patch('/:id/test-result', requirePermission('assessments.write'), validat
 }), async (req, res) => {
   try {
     const { test_result, test_notes } = req.body;
-    const result = await pool.query(
-      `UPDATE control_implementations
-       SET test_result = $1, test_notes = $2, updated_at = NOW()
-       WHERE id = $3 AND organization_id = $4
-       RETURNING id, test_result, test_notes, updated_at`,
-      [test_result, test_notes || null, req.params.id, req.user.organization_id]
+
+    const existing = await pool.query(
+      'SELECT id, test_result, control_id FROM control_implementations WHERE id = $1 AND organization_id = $2',
+      [req.params.id, req.user.organization_id]
     );
-    if (result.rows.length === 0) {
+
+    if (existing.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Implementation not found' });
     }
-    res.json({ success: true, data: result.rows[0] });
+
+    const oldTestResult = existing.rows[0].test_result;
+    const hasTestNotes = Object.prototype.hasOwnProperty.call(req.body || {}, 'test_notes');
+    const controlId = existing.rows[0].control_id;
+
+    // NIST SP 800-53A outcomes drive remediation in both directions:
+    // 'satisfied' claims the control passes and is gated like any other
+    // compliance claim; 'other_than_satisfied' declares a gap and raises a
+    // draft POA&M so the gap cannot be recorded and then quietly forgotten.
+    const isComplianceChange = poamGate.isTestResultComplianceTransition(oldTestResult, test_result);
+    const poamJustification = req.body.poam_justification;
+    if (isComplianceChange && !poamJustification) {
+      return res.status(400).json(poamGate.justificationRequiredResponse());
+    }
+
+    const result = await pool.query(
+      `UPDATE control_implementations
+       SET test_result = $1,
+           test_notes = CASE WHEN $2 THEN $3 ELSE test_notes END,
+           updated_at = NOW()
+       WHERE id = $4 AND organization_id = $5
+       RETURNING id, test_result, test_notes, updated_at`,
+      [test_result, hasTestNotes, test_notes || null, req.params.id, req.user.organization_id]
+    );
+
+    // Log audit — resource_id uses the framework_control id (not the
+    // control_implementations id) to stay consistent with the /status route
+    // and assessments/procedures.js, so all three feed the same history feed.
+    await auditService.logFromRequest(req, {
+      eventType: 'test_result_changed',
+      resourceType: 'control',
+      resourceId: controlId,
+      details: { old_status: oldTestResult, status: test_result, notes: result.rows[0]?.test_notes }
+    });
+
+    let poamItem = null;
+    if (isComplianceChange && poamJustification) {
+      poamItem = await poamGate.inTransaction((client) =>
+        poamGate.recordComplianceTransition(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          controlId,
+          previousStatus: 'needs_review',
+          newStatus: 'verified',
+          justification: poamJustification,
+          frameworkSpecificType: req.body.framework_specific_type,
+          frameworkSpecificData: req.body.framework_specific_data
+        })
+      );
+      await poamGate.notifyComplianceTransition({
+        orgId: req.user.organization_id,
+        userId: req.user.id,
+        controlId,
+        previousStatus: oldTestResult,
+        newStatus: test_result,
+        poamItem
+      });
+    } else if (poamGate.isTestResultGap(test_result)) {
+      // swallowErrors: recording the test result is the user's action and must
+      // stand on its own. A failure to raise the follow-up POA&M is logged, not
+      // surfaced as a failed test submission.
+      poamItem = await poamGate.inTransaction(
+        (client) => poamGate.raiseFromGap(client, {
+          orgId: req.user.organization_id,
+          userId: req.user.id,
+          source: 'test_result',
+          sourceId: req.params.id,
+          controlId,
+          description: result.rows[0]?.test_notes
+            ? `Control test recorded as other than satisfied. Tester notes: ${result.rows[0].test_notes}`
+            : undefined
+        }),
+        { swallowErrors: true, context: 'poam_gate.raise_from_test_result' }
+      );
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      poam_item: poamItem,
+      requires_auditor_review: isComplianceChange
+    });
   } catch (error) {
     log('error', 'test_result_update_error', { error: error?.message || String(error) });
     res.status(500).json({ success: false, error: 'Failed to update test result' });

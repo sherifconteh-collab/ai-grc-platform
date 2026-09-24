@@ -295,8 +295,8 @@ function buildAgentAttempts({ feature, availableProviders, explicitProvider, exp
       attempts.push({ provider: explicitProvider, model: explicitModel || null });
 
       // Model downgrade fallback for Gemini Pro quota/rate-limit pressure
-      if (explicitProvider === 'gemini' && explicitModel === 'gemini-2.5-pro') {
-        attempts.push({ provider: 'gemini', model: 'gemini-2.5-flash' });
+      if (explicitProvider === 'gemini' && explicitModel === 'gemini-3.1-pro-preview') {
+        attempts.push({ provider: 'gemini', model: 'gemini-3.5-flash' });
       }
     }
   }
@@ -308,8 +308,8 @@ function buildAgentAttempts({ feature, availableProviders, explicitProvider, exp
   }
 
   // If routed to Gemini Pro, try Gemini Flash immediately before cross-provider fallback
-  if (route.provider === 'gemini' && route.model === 'gemini-2.5-pro' && availableProviders.gemini) {
-    attempts.push({ provider: 'gemini', model: 'gemini-2.5-flash' });
+  if (route.provider === 'gemini' && route.model === 'gemini-3.1-pro-preview' && availableProviders.gemini) {
+    attempts.push({ provider: 'gemini', model: 'gemini-3.5-flash' });
   }
 
   const chain = modelRouter.getFallbackChain(feature, availableProviders);
@@ -319,7 +319,7 @@ function buildAgentAttempts({ feature, availableProviders, explicitProvider, exp
 
   // Explicitly add Groq as a resilient final fallback where available
   if (availableProviders.groq) {
-    attempts.push({ provider: 'groq', model: 'llama-3.3-70b-versatile' });
+    attempts.push({ provider: 'groq', model: 'openai/gpt-oss-120b' });
   }
 
   return dedupeAttempts(attempts);

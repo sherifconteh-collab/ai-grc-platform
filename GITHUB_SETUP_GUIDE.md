@@ -396,7 +396,7 @@ Content: (gitignore content from above)
 ```
 
 ### 3. CONTRIBUTING.md
-```markdown
+````markdown
 # Contributing to ControlWeave
 
 Thank you for your interest in contributing! 
@@ -436,7 +436,7 @@ cd backend && npm install
 ## Questions?
 
 Open an issue or email: Contehconsulting@gmail.com
-```
+````
 
 ### 4. CODE_OF_CONDUCT.md
 ```markdown
@@ -464,7 +464,7 @@ This Code of Conduct is adapted from the Contributor Covenant, version 2.1.
 ```
 
 ### 5. INSTALLATION.md
-```markdown
+````markdown
 # Installation Guide
 
 ## Prerequisites
@@ -527,7 +527,7 @@ See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker or self-hosted deployment ins
 - GitHub Issues: [Report bugs]
 - Email: Contehconsulting@gmail.com
 - Documentation: [docs/](docs/)
-```
+````
 
 ### 6. CHANGELOG.md
 ```markdown

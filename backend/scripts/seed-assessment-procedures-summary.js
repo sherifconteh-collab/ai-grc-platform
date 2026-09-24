@@ -212,9 +212,17 @@ const FOCUS_GUIDANCE = {
   }
 };
 
+// Parentheses are preserved. The previous form replaced every non-alphanumeric
+// run with a hyphen, so the enhancement AU-6(3) became AU-6-3 and its
+// procedure id AU-6-3-SUM-01. That diverges from the NIST SP 800-53A house
+// style used everywhere else in this table (AC-01(a)[01], and the column
+// comment on migration 010 says as much), and it collides: AU-6(3) and a
+// hypothetical AU-6-3 normalize identically, on a column with no uniqueness
+// constraint. Now that the catalog contains 714 enhancements, this stopped
+// being hypothetical.
 function sanitizeProcedureId(controlId) {
   const normalized = String(controlId || 'CONTROL')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/[^a-zA-Z0-9()[\]]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .toUpperCase();
   return (normalized || 'CONTROL').slice(0, 84);

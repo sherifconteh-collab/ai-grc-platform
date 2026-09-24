@@ -6,8 +6,11 @@ const {
   parseJsonOutput,
   GAP_ANALYSIS_SCHEMA,
   EVIDENCE_SUGGESTION_SCHEMA,
-  FINDING_SCHEMA
+  FINDING_SCHEMA,
+  RBAC_ANALYSIS_SCHEMA,
+  FEATURE_SCHEMAS
 } = require('../../src/services/llmSchemas');
+const rbacAnalysisExemplars = require('../../src/services/aiExemplars/rbac_analysis.json');
 
 describe('llmSchemas.validate (recursive)', () => {
   test('flags missing top-level required property', () => {
@@ -114,5 +117,47 @@ describe('llmSchemas.FINDING_SCHEMA shape alignment', () => {
       repeat_finding: false
     });
     expect(r.valid).toBe(true);
+  });
+});
+
+describe('llmSchemas.RBAC_ANALYSIS_SCHEMA', () => {
+  test('is registered under the rbac_analysis feature key', () => {
+    expect(FEATURE_SCHEMAS.rbac_analysis).toBe(RBAC_ANALYSIS_SCHEMA);
+  });
+
+  test('both curated exemplars validate against the schema', () => {
+    expect(rbacAnalysisExemplars.length).toBeGreaterThanOrEqual(2);
+    rbacAnalysisExemplars.forEach((exemplar) => {
+      const r = validate(RBAC_ANALYSIS_SCHEMA, exemplar.output);
+      expect(r.errors).toEqual([]);
+      expect(r.valid).toBe(true);
+    });
+  });
+
+  test('flags a missing suggested_sod_rules array and an invalid severity enum', () => {
+    const r = validate(RBAC_ANALYSIS_SCHEMA, {
+      summary: 'x'.repeat(60),
+      roles: [{ name: 'Ops', duties: ['x'], mapped_permissions: ['dashboard.read'] }],
+      sod_conflicts: [
+        { title: 'Bad conflict', description: 'd', severity: 'catastrophic' }
+      ],
+      gaps_and_risks: []
+      // suggested_sod_rules intentionally omitted
+    });
+    expect(r.valid).toBe(false);
+    expect(r.errors.some(e => e.includes('suggested_sod_rules'))).toBe(true);
+    expect(r.errors.some(e => e.includes('severity'))).toBe(true);
+  });
+
+  test('requires mapped_permissions on each role', () => {
+    const r = validate(RBAC_ANALYSIS_SCHEMA, {
+      summary: 'x'.repeat(60),
+      roles: [{ name: 'Ops', duties: ['x'] }],
+      sod_conflicts: [],
+      suggested_sod_rules: [],
+      gaps_and_risks: []
+    });
+    expect(r.valid).toBe(false);
+    expect(r.errors.some(e => e.includes('mapped_permissions'))).toBe(true);
   });
 });

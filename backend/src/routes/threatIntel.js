@@ -4,7 +4,7 @@ const router = express.Router();
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const threatIntelService = require('../services/threatIntelService');
-const pool = require('../config/database');
+const auditService = require('../services/auditService');
 
 // Rate limiter for threat intelligence endpoints
 const threatIntelRateLimiter = createRateLimiter({
@@ -75,11 +75,12 @@ router.post('/feeds', requireTier('enterprise'), requirePermission('organization
     const feed = await threatIntelService.createThreatFeed(orgId, feedData);
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'threat_feed_created', 'threat_feed', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, feed.id, JSON.stringify({ feed_type: feed.feed_type, feed_name: feed.feed_name })]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'threat_feed_created',
+      resourceType: 'threat_feed',
+      resourceId: feed.id,
+      details: { feed_type: feed.feed_type, feed_name: feed.feed_name }
+    });
     
     res.status(201).json({ success: true, data: feed });
   } catch (error) {
@@ -102,11 +103,12 @@ router.patch('/feeds/:id', requireTier('enterprise'), requirePermission('organiz
     }
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'threat_feed_updated', 'threat_feed', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, feedId, JSON.stringify(updates)]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'threat_feed_updated',
+      resourceType: 'threat_feed',
+      resourceId: feedId,
+      details: updates
+    });
     
     res.json({ success: true, data: feed });
   } catch (error) {
@@ -128,11 +130,12 @@ router.delete('/feeds/:id', requireTier('enterprise'), requirePermission('organi
     }
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'threat_feed_deleted', 'threat_feed', $3, '{}'::jsonb, true)`,
-      [orgId, req.user.id, feedId]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'threat_feed_deleted',
+      resourceType: 'threat_feed',
+      resourceId: feedId,
+      details: '{}'
+    });
     
     res.json({ success: true, message: 'Threat feed deleted successfully' });
   } catch (error) {
@@ -150,22 +153,25 @@ router.post('/feeds/:id/sync', requireTier('enterprise'), requirePermission('org
     const result = await threatIntelService.syncFeed(orgId, feedId);
     
     // Log audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'threat_feed_synced', 'threat_feed', $3, $4::jsonb, true)`,
-      [orgId, req.user.id, feedId, JSON.stringify(result)]
-    );
+    await auditService.logFromRequest(req, {
+      eventType: 'threat_feed_synced',
+      resourceType: 'threat_feed',
+      resourceId: feedId,
+      details: result
+    });
     
     res.json({ success: true, data: result });
   } catch (error) {
     console.error('Sync threat feed error:', error);
     
     // Log failed audit event
-    await pool.query(
-      `INSERT INTO audit_logs (organization_id, user_id, event_type, resource_type, resource_id, details, success)
-       VALUES ($1, $2, 'threat_feed_sync_failed', 'threat_feed', $3, $4::jsonb, false)`,
-      [orgId, req.user.id, req.params.id, JSON.stringify({ error: error.message })]
-    ).catch(() => {});
+    await auditService.logFromRequest(req, {
+      eventType: 'threat_feed_sync_failed',
+      resourceType: 'threat_feed',
+      resourceId: req.params.id,
+      details: { error: error.message },
+      success: false
+    }).catch(() => {});
     
     res.status(500).json({ success: false, error: 'Failed to sync threat feed' });
   }
