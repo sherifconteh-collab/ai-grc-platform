@@ -2,7 +2,7 @@
 'use strict';
 
 const https = require('https');
-const { URL } = require('url');
+const { assertSafeUrl } = require('../utils/netGuard');
 
 function severityFromQualys(severity) {
   const s = parseInt(severity, 10);
@@ -14,14 +14,16 @@ function severityFromQualys(severity) {
 }
 
 async function qualysRequest(config, path) {
-  const baseUrl = new URL(config.baseUrl);
+  // The API URL is tenant-supplied: refuse private-network targets.
+  const baseUrl = await assertSafeUrl(config.baseUrl);
   const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
   return new Promise((resolve, reject) => {
     const options = {
       hostname: baseUrl.hostname,
+      port: baseUrl.port || undefined,
       path,
       method: 'GET',
-      timeout: 30000,
+      timeout: 60000,
       headers: {
         'Authorization': `Basic ${auth}`,
         'X-Requested-With': 'ControlWeave',
@@ -52,12 +54,14 @@ async function qualysRequest(config, path) {
 
 async function syncFindings(connectorConfig) {
   try {
-    const tagFilter = connectorConfig.tagIds ? `&tag_id=${connectorConfig.tagIds}` : '';
+    const tagFilter = connectorConfig.tagIds ? `&tag_id=${encodeURIComponent(String(connectorConfig.tagIds))}` : '';
     const data = await qualysRequest(
       connectorConfig,
       `/api/2.0/fo/asset/host/vm/detection/?action=list&output_format=JSON&status=Active${tagFilter}`
     );
-    const hostList = data?.HOST_LIST_VM_DETECTION_OUTPUT?.RESPONSE?.HOST_LIST?.HOST || [];
+    // A reply without the detection envelope is an error, not an empty sync.
+    if (!data || !data.HOST_LIST_VM_DETECTION_OUTPUT) throw new Error('Qualys response did not contain HOST_LIST_VM_DETECTION_OUTPUT');
+    const hostList = data.HOST_LIST_VM_DETECTION_OUTPUT.RESPONSE?.HOST_LIST?.HOST || [];
     const hosts = Array.isArray(hostList) ? hostList : [hostList];
     const findings = [];
     for (const host of hosts) {

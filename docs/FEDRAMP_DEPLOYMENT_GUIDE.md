@@ -259,6 +259,14 @@ The ITSM connector (connector type `servicenow`) can automatically pull incident
 records from your ITSM system and link them to control implementations in ControlWeaver,
 providing traceability between incidents and control status changes.
 
+The ITSM instance URL and the Qualys API URL are entered by organization
+administrators, so the backend only calls public `https` hosts; a name that
+resolves to a private address is refused. A self-hosted deployment whose ITSM
+or Qualys scanner appliance is on a private network sets
+`CONNECTOR_ALLOW_PRIVATE_HOSTS=true` on the backend. A failed call or an
+unexpected response is recorded as a failed run, never as a sync with zero
+findings.
+
 ---
 
 ## 9. Continuous Authorization (ConMon)
