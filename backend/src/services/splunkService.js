@@ -1,5 +1,6 @@
 // @tier: pro
 const pool = require('../config/database');
+const { safeFetch } = require('../utils/netGuard');
 
 const SPLUNK_SETTING_KEYS = {
   baseUrl: 'splunk_base_url',
@@ -121,7 +122,9 @@ async function splunkRequest(config, method, path, { query, formBody } = {}) {
       body = new URLSearchParams(formBody).toString();
     }
 
-    const response = await fetch(url.toString(), {
+    // The base URL is tenant-supplied: safeFetch refuses private-network
+    // targets and redirects, pinned to the checked address (utils/netGuard).
+    const response = await safeFetch(url.toString(), {
       method,
       headers,
       body,

@@ -1,6 +1,12 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
+
+// express-rate-limit router-wide, ahead of any auth or DB work, so every
+// handler below is covered (CodeQL js/missing-rate-limiting). Endpoint-specific
+// limiters further down stay the tighter controls.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { randomBytes } = require('crypto');
@@ -21,6 +27,7 @@ const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
 const { decrypt, encrypt, hashForLookup, hashToken, tokenHashCandidates } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
+const refreshCookie = require('../utils/refreshCookie');
 const { hasPublicColumn } = require('../utils/schema');
 const {
   MIN_PASSWORD_LENGTH,
@@ -254,7 +261,10 @@ function generateSessionTokens(userId, { isDemoAccount = false, sessionExpiresAt
   const resolvedSessionExpiresAt = resolveSessionExpiryTimestamp(isDemoAccount, sessionExpiresAt);
 
   const accessToken = buildAccessToken(userId, isDemoAccount ? resolvedSessionExpiresAt : null);
-  const refreshPayload = { userId, type: 'refresh' };
+  // jti makes every refresh token unique; without it two rotations inside the
+  // same second produced byte-identical tokens, so rotation (and replay
+  // detection) could not tell the old token from the new one.
+  const refreshPayload = { userId, type: 'refresh', jti: randomBytes(16).toString('hex') };
   const refreshExpiresIn = isDemoAccount
     ? Math.max(1, Math.floor((new Date(resolvedSessionExpiresAt).getTime() - Date.now()) / 1000))
     : REFRESH_EXPIRY_SECONDS;
@@ -716,7 +726,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
             framework_codes: selectedFrameworkCodes,
             information_types: selectedInformationTypes
           },
-          tokens: { accessToken, refreshToken }
+          tokens: { accessToken, refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken), sessionExpiresAt }
         }
       });
     } catch (err) {
@@ -760,13 +770,16 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
     const isPlatformAdmin = Boolean(user.is_platform_admin);
     const isDemoAccount = isDemoEmail(normalizedEmail);
 
-    if (!isPlatformAdmin && !user.is_active) {
+    if (!user.is_active) {
       return res.status(401).json({ success: false, error: 'Account is disabled' });
     }
 
-    // Check account lockout — exempt platform admins and shared demo accounts
+    // Check account lockout — only shared demo accounts are exempt (one
+    // prospect's typos must not lock every other prospect out). Platform
+    // admins are the highest-value accounts and get the same lockout as
+    // everyone else.
     const { lockoutMaxAttempts, lockoutDurationMs } = SECURITY_CONFIG;
-    const lockoutExempt = isPlatformAdmin || isDemoAccount;
+    const lockoutExempt = isDemoAccount;
     if (!lockoutExempt && user.locked_until && new Date(user.locked_until) > new Date()) {
       const retryAfterSeconds = Math.ceil((new Date(user.locked_until) - Date.now()) / 1000);
       res.setHeader('Retry-After', String(retryAfterSeconds));
@@ -867,8 +880,8 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
 
     // ─── TOTP verification ──────────────────────────────────────────────────
     // If the user has TOTP enabled, require a valid code before issuing tokens.
-    // Platform admins and shared demo accounts are exempt.
-    if (user.totp_enabled && !isPlatformAdmin && !isDemoAccount) {
+    // Shared demo accounts are exempt; platform admins are not.
+    if (user.totp_enabled && !isDemoAccount) {
       const { totp_code: totpCode } = req.body;
       if (!totpCode) {
         return res.status(200).json({
@@ -988,7 +1001,7 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
           trial_ends_at: user.organization_trial_ends_at,
           onboarding_completed: Boolean(user.onboarding_completed)
         },
-        tokens: { accessToken, refreshToken }
+        tokens: { accessToken, refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken), sessionExpiresAt }
       }
     });
   } catch (error) {
@@ -1131,10 +1144,47 @@ router.post('/reset-password', resetPasswordLimiter, validateBody((body) => requ
   }
 });
 
+// Grace window for a rotated refresh token being presented again. Two tabs
+// refreshing at the same moment is benign; a replay after this window means
+// the token was copied, so the whole session is revoked.
+const REFRESH_REUSE_GRACE_MS = 30 * 1000;
+
+async function handleRefreshTokenReuse(req, userId, candidateHashes) {
+  const reused = await pool.query(
+    `SELECT s.id, s.rotated_at, u.organization_id
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.user_id = $1 AND s.previous_refresh_token = ANY($2)`,
+    [userId, candidateHashes]
+  );
+  const row = reused.rows[0];
+  if (!row) return;
+  const rotatedAtMs = row.rotated_at ? new Date(row.rotated_at).getTime() : 0;
+  if (Date.now() - rotatedAtMs < REFRESH_REUSE_GRACE_MS) return;
+
+  await pool.query('DELETE FROM sessions WHERE id = $1', [row.id]);
+  log('warn', 'auth.refresh_token_reuse_detected', { userId, sessionId: row.id });
+  createAuditLog({
+    organizationId: row.organization_id,
+    userId,
+    eventType: 'user.refresh_token_reuse',
+    resourceType: 'session',
+    resourceId: row.id,
+    details: { action: 'session_revoked' },
+    ipAddress: extractIpFromRequest(req),
+    userAgent: req.headers['user-agent'],
+    success: false,
+    authenticationMethod: 'refresh_token'
+  }).catch(err => log('error', 'audit_log_error', { error: err?.message || String(err) }));
+}
+
 // POST /auth/refresh
-router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToken'])), async (req, res) => {
+router.post('/refresh', async (req, res) => {
+  const presented = refreshCookie.readRefreshToken(req);
+  if (presented.error) return res.status(403).json({ success: false, error: presented.error });
+  if (!presented.token) return res.status(400).json({ success: false, error: 'refreshToken is required' });
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = presented.token;
 
     const decoded = jwt.verify(refreshToken, JWT_SECRET, JWT_VERIFY_OPTIONS);
     if (decoded.type !== 'refresh') {
@@ -1151,27 +1201,26 @@ router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToke
       }
     }
 
-    const refreshTokenHash = hashRefreshToken(refreshToken);
+    const candidateHashes = tokenHashCandidates(refreshToken);
 
     const session = await pool.query(
-      `SELECT id, refresh_token
-       FROM sessions
-       WHERE user_id = $1
-         AND expires_at > NOW()
-         AND (refresh_token = ANY($2) OR refresh_token = $3)`,
-      [decoded.userId, tokenHashCandidates(refreshToken), refreshToken]
+      `SELECT s.id, s.refresh_token, u.is_active
+       FROM sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.user_id = $1
+         AND s.expires_at > NOW()
+         AND s.refresh_token = ANY($2)`,
+      [decoded.userId, candidateHashes]
     );
 
     if (session.rows.length === 0) {
+      await handleRefreshTokenReuse(req, decoded.userId, candidateHashes);
       return res.status(401).json({ success: false, error: 'Invalid or expired session' });
     }
 
-    // Backward compatibility for older plaintext refresh tokens.
-    if (session.rows[0].refresh_token !== refreshTokenHash) {
-      await pool.query(
-        'UPDATE sessions SET refresh_token = $1 WHERE id = $2',
-        [refreshTokenHash, session.rows[0].id]
-      );
+    if (!session.rows[0].is_active) {
+      await pool.query('DELETE FROM sessions WHERE user_id = $1', [decoded.userId]);
+      return res.status(401).json({ success: false, error: 'Account is disabled' });
     }
 
     // Rotate refresh token: issue new token and invalidate the old one.
@@ -1183,12 +1232,30 @@ router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToke
         sessionExpiresAt: demoSessionExpiresAt
       });
 
-    await pool.query(
-      'UPDATE sessions SET refresh_token = $1, expires_at = $2 WHERE id = $3',
-      [hashRefreshToken(newRefreshToken), newExpiresAt, session.rows[0].id]
+    // Compare-and-swap on the stored hash so two concurrent refreshes with the
+    // same token cannot both mint a new token for the session.
+    const rotated = await pool.query(
+      `UPDATE sessions
+       SET previous_refresh_token = refresh_token,
+           refresh_token = $1,
+           expires_at = $2,
+           rotated_at = NOW()
+       WHERE id = $3 AND refresh_token = $4
+       RETURNING id`,
+      [hashRefreshToken(newRefreshToken), newExpiresAt, session.rows[0].id, session.rows[0].refresh_token]
     );
+    if (rotated.rows.length === 0) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired session' });
+    }
 
-    res.json({ success: true, data: { accessToken, refreshToken: newRefreshToken } });
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+        refreshToken: refreshCookie.deliverRefreshToken(req, res, newRefreshToken, { viaCookie: presented.fromCookie }),
+        sessionExpiresAt: newExpiresAt
+      }
+    });
   } catch (error) {
     log('error', 'refresh_error', { error: error?.message || String(error) });
     res.status(401).json({ success: false, error: 'Token refresh failed' });
@@ -1199,8 +1266,9 @@ router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToke
 router.post('/logout', authenticate, async (req, res) => {
   try {
     // Demo accounts are shared — only delete the caller's session, not all sessions
+    const { token: refreshToken } = refreshCookie.readRefreshToken(req);
+    refreshCookie.clearRefreshCookie(req, res);
     if (isDemoEmail(req.user.email)) {
-      const refreshToken = req.body?.refreshToken;
       if (!refreshToken) {
         return res.status(400).json({
           success: false,
@@ -1493,7 +1561,7 @@ router.post('/accept-invite', validateBody((body) => {
             tier: org.tier,
             onboarding_completed: true
           },
-          tokens: { accessToken, refreshToken }
+          tokens: { accessToken, refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken), sessionExpiresAt }
         }
       });
     } catch (err) {
@@ -1568,6 +1636,10 @@ router.post('/switch-organization/:orgId', authenticate, switchOrgLimiter, async
       return res.status(403).json({ success: false, error: 'You are not a member of that organization' });
     }
 
+    // The caller's current refresh token: in the body, or the web app's cookie.
+    const presented = refreshCookie.readRefreshToken(req);
+    if (presented.error) return res.status(403).json({ success: false, error: presented.error });
+
     // Issue new tokens so every subsequent request carries the new org context
     const isDemoAccount = isDemoEmail(req.user.email);
     const { accessToken, refreshToken: newRefreshToken, sessionExpiresAt } =
@@ -1590,7 +1662,7 @@ router.post('/switch-organization/:orgId', authenticate, switchOrgLimiter, async
       // token sent in the request body).  If no token is supplied, insert a
       // new session without removing others — this avoids logging the user
       // out of other devices or shared demo accounts.
-      const currentRefreshToken = req.body?.refreshToken;
+      const { token: currentRefreshToken } = presented;
       if (currentRefreshToken) {
         await client.query(
           'DELETE FROM sessions WHERE user_id = $1 AND refresh_token = $2',
@@ -1622,7 +1694,11 @@ router.post('/switch-organization/:orgId', authenticate, switchOrgLimiter, async
       success: true,
       data: {
         organization: { id: org.id, name: org.name, tier: org.tier, billing_status: org.billing_status },
-        tokens: { accessToken, refreshToken: newRefreshToken }
+        tokens: {
+          accessToken,
+          refreshToken: refreshCookie.deliverRefreshToken(req, res, newRefreshToken, { viaCookie: presented.fromCookie }),
+          sessionExpiresAt
+        }
       }
     });
   } catch (error) {

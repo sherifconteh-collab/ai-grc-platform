@@ -1,7 +1,14 @@
 // @tier: community
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
+
+// express-rate-limit router-wide, ahead of any auth or DB work, so every
+// handler below is covered (CodeQL js/missing-rate-limiting). Endpoint-specific
+// limiters further down stay the tighter controls.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false }));
 const pool = require('../config/database');
+const { compliancePercentage: calcCompliance } = require('../services/complianceMetrics');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const { normalizeTier, tierLevel } = require('../config/tierPolicy');
 
@@ -41,7 +48,7 @@ async function queryDashboardStats(orgId) {
       COUNT(DISTINCT fc.id) as total_controls,
       COUNT(DISTINCT CASE WHEN ci.status IN ('implemented', 'verified') THEN ci.id END) as implemented,
       COUNT(DISTINCT CASE WHEN ci.status = 'satisfied_via_crosswalk' THEN ci.id END) as satisfied_via_crosswalk,
-      COUNT(DISTINCT fc.id) as total_applicable
+      COUNT(DISTINCT CASE WHEN ci.status = 'not_applicable' THEN ci.id END) as not_applicable
     FROM organization_frameworks of2
     JOIN framework_controls fc ON fc.framework_id = of2.framework_id
     ${baselineScopeJoin('$1')}
@@ -54,16 +61,16 @@ async function queryDashboardStats(orgId) {
   const totalControls = toInt(overall.total_controls);
   const implemented = toInt(overall.implemented);
   const crosswalked = toInt(overall.satisfied_via_crosswalk);
-  const compliancePercentage = totalControls > 0
-    ? Math.round(((implemented + crosswalked) / totalControls) * 1000) / 10
-    : 0;
+  const notApplicable = toInt(overall.not_applicable);
+  const compliancePercentage = calcCompliance(implemented + crosswalked, totalControls, notApplicable);
 
   const frameworkResult = await pool.query(`
     SELECT
       f.id, f.name, f.code,
       COUNT(DISTINCT fc.id) as total_controls,
       COUNT(DISTINCT CASE WHEN ci.status IN ('implemented', 'verified') THEN ci.id END) as implemented,
-      COUNT(DISTINCT CASE WHEN ci.status = 'satisfied_via_crosswalk' THEN ci.id END) as crosswalked
+      COUNT(DISTINCT CASE WHEN ci.status = 'satisfied_via_crosswalk' THEN ci.id END) as crosswalked,
+      COUNT(DISTINCT CASE WHEN ci.status = 'not_applicable' THEN ci.id END) as not_applicable
     FROM organization_frameworks of2
     JOIN frameworks f ON f.id = of2.framework_id
     JOIN framework_controls fc ON fc.framework_id = f.id
@@ -84,9 +91,8 @@ async function queryDashboardStats(orgId) {
       totalControls: total,
       implemented: implementedCount,
       crosswalked: crosswalkedCount,
-      compliancePercentage: total > 0
-        ? Math.round(((implementedCount + crosswalkedCount) / total) * 1000) / 10
-        : 0
+      notApplicable: toInt(fw.not_applicable),
+      compliancePercentage: calcCompliance(implementedCount + crosswalkedCount, total, toInt(fw.not_applicable))
     };
   });
 
@@ -95,7 +101,8 @@ async function queryDashboardStats(orgId) {
       totalControls,
       implemented,
       satisfiedViaCrosswalk: crosswalked,
-      totalApplicable: totalControls,
+      notApplicable,
+      totalApplicable: totalControls - notApplicable,
       compliancePercentage
     },
     frameworks

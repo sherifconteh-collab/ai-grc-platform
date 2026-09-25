@@ -1,9 +1,16 @@
 const express = require('express')
 const router = express.Router()
+const rateLimit = require('express-rate-limit')
+
+// express-rate-limit router-wide, ahead of any auth or DB work, so every
+// handler below is covered (CodeQL js/missing-rate-limiting). Endpoint-specific
+// limiters further down stay the tighter controls.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false }))
 const { validateBody, requireFields, sanitizeInput } = require('../middleware/validate')
 const {
   DEMO_ACCOUNT_BY_INDUSTRY,
   DEFAULT_DEMO_ACCOUNT_EMAIL,
+  isDemoModeEnabled,
   resolveDemoAccountPassword
 } = require('../../scripts/lib/demo-account-config')
 const {
@@ -12,6 +19,16 @@ const {
 } = require('../services/emailService')
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Demo credential delivery is opt-in: demo mode must be on, delivery must be
+// explicitly enabled, and a private password must be configured. Otherwise the
+// prospect gets the sales follow-up email -- working credentials are never
+// emailed based on the repository's published default password.
+function demoAccountDeliveryEnabled() {
+  return isDemoModeEnabled()
+    && String(process.env.DEMO_ACCOUNT_DELIVERY_ENABLED || '').toLowerCase() === 'true'
+    && String(process.env.DEMO_ACCOUNT_PASSWORD || '').trim().length > 0
+}
 
 // The demo roster is keyed by industry now that tiers are gone. Prospects who
 // still submit an old tier name are mapped onto the industry account that used
@@ -85,7 +102,7 @@ router.post(
       const selection = resolveDemoSelection(req.body.requestedIndustry || req.body.requestedTier)
       const requestedTier = selection.key
       const requestedTierLabel = formatIndustryLabel(selection.key)
-      const wantsDemoAccount = req.body.wantsDemoAccount !== false
+      const wantsDemoAccount = req.body.wantsDemoAccount !== false && demoAccountDeliveryEnabled()
 
       const demoAccountEmail = selection.email
       const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000'

@@ -35,6 +35,31 @@ const pool = new Pool(poolOptions);
 pool.isConfigured = isDatabaseConfigured;
 pool.missingConfig = useConnectionString ? [] : missingIndividualDbVars;
 
+// Routes and services that write audit_logs with raw SQL (rather than through
+// auditService.createAuditLog) must still count as "this request is audited",
+// or the baseline audit middleware would add a duplicate generic event.
+const { markRequestAudited } = require('../utils/auditContext');
+
+function noteAuditWrite(queryText) {
+  const text = typeof queryText === 'string' ? queryText : queryText && queryText.text;
+  if (typeof text === 'string' && text.includes('audit_logs') && /INSERT\s+INTO\s+audit_logs/i.test(text)) {
+    markRequestAudited();
+  }
+}
+
+const originalPoolQuery = pool.query.bind(pool);
+pool.query = (queryText, ...rest) => {
+  noteAuditWrite(queryText);
+  return originalPoolQuery(queryText, ...rest);
+};
+pool.on('connect', (client) => {
+  const originalClientQuery = client.query.bind(client);
+  client.query = (queryText, ...rest) => {
+    noteAuditWrite(queryText);
+    return originalClientQuery(queryText, ...rest);
+  };
+});
+
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
   // Don't exit on pool errors - let health checks handle it

@@ -43,7 +43,7 @@ const VALID_Q_STATUSES = ['draft', 'sent', 'in_progress', 'completed', 'overdue'
 // ==================== VENDORS ====================
 
 // GET /api/v1/tprm/vendors
-router.get('/vendors', requirePermission('organizations.read'), async (req, res) => {
+router.get('/vendors', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { risk_tier, review_status, search } = req.query;
@@ -87,7 +87,7 @@ router.get('/vendors', requirePermission('organizations.read'), async (req, res)
 });
 
 // GET /api/v1/tprm/vendors/:id
-router.get('/vendors/:id', requirePermission('organizations.read'), async (req, res) => {
+router.get('/vendors/:id', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -162,7 +162,7 @@ router.get('/vendors/:id', requirePermission('organizations.read'), async (req, 
 });
 
 // POST /api/v1/tprm/vendors
-router.post('/vendors', requirePermission('organizations.read'), async (req, res) => {
+router.post('/vendors', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const {
@@ -215,7 +215,7 @@ router.post('/vendors', requirePermission('organizations.read'), async (req, res
 });
 
 // PATCH /api/v1/tprm/vendors/:id
-router.patch('/vendors/:id', requirePermission('organizations.read'), async (req, res) => {
+router.patch('/vendors/:id', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -285,7 +285,7 @@ router.patch('/vendors/:id', requirePermission('organizations.read'), async (req
 });
 
 // DELETE /api/v1/tprm/vendors/:id
-router.delete('/vendors/:id', requirePermission('organizations.read'), async (req, res) => {
+router.delete('/vendors/:id', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -315,7 +315,7 @@ router.delete('/vendors/:id', requirePermission('organizations.read'), async (re
 // ==================== QUESTIONNAIRES ====================
 
 // GET /api/v1/tprm/questionnaires
-router.get('/questionnaires', requirePermission('organizations.read'), async (req, res) => {
+router.get('/questionnaires', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { vendor_id, status } = req.query;
@@ -351,7 +351,7 @@ router.get('/questionnaires', requirePermission('organizations.read'), async (re
 });
 
 // GET /api/v1/tprm/questionnaires/:id
-router.get('/questionnaires/:id', requirePermission('organizations.read'), async (req, res) => {
+router.get('/questionnaires/:id', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -376,7 +376,7 @@ router.get('/questionnaires/:id', requirePermission('organizations.read'), async
 });
 
 // POST /api/v1/tprm/questionnaires
-router.post('/questionnaires', requirePermission('organizations.read'), async (req, res) => {
+router.post('/questionnaires', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { vendor_id, title, description, due_date, questions, ai_generated } = req.body || {};
@@ -420,7 +420,7 @@ router.post('/questionnaires', requirePermission('organizations.read'), async (r
 });
 
 // PATCH /api/v1/tprm/questionnaires/:id
-router.patch('/questionnaires/:id', requirePermission('organizations.read'), async (req, res) => {
+router.patch('/questionnaires/:id', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -471,7 +471,7 @@ router.patch('/questionnaires/:id', requirePermission('organizations.read'), asy
 });
 
 // DELETE /api/v1/tprm/questionnaires/:id
-router.delete('/questionnaires/:id', requirePermission('organizations.read'), async (req, res) => {
+router.delete('/questionnaires/:id', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -494,7 +494,7 @@ router.delete('/questionnaires/:id', requirePermission('organizations.read'), as
 // ==================== DOCUMENTS ====================
 
 // GET /api/v1/tprm/documents
-router.get('/documents', requirePermission('organizations.read'), async (req, res) => {
+router.get('/documents', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { vendor_id, request_status } = req.query;
@@ -528,7 +528,7 @@ router.get('/documents', requirePermission('organizations.read'), async (req, re
 });
 
 // POST /api/v1/tprm/documents
-router.post('/documents', requirePermission('organizations.read'), async (req, res) => {
+router.post('/documents', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { vendor_id, document_type, document_name, expires_at, notes } = req.body || {};
@@ -572,7 +572,7 @@ router.post('/documents', requirePermission('organizations.read'), async (req, r
 });
 
 // PATCH /api/v1/tprm/documents/:id
-router.patch('/documents/:id', requirePermission('organizations.read'), async (req, res) => {
+router.patch('/documents/:id', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -611,7 +611,7 @@ router.patch('/documents/:id', requirePermission('organizations.read'), async (r
 });
 
 // DELETE /api/v1/tprm/documents/:id
-router.delete('/documents/:id', requirePermission('organizations.read'), async (req, res) => {
+router.delete('/documents/:id', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -634,7 +634,7 @@ router.delete('/documents/:id', requirePermission('organizations.read'), async (
 // ==================== SUMMARY ====================
 
 // GET /api/v1/tprm/summary
-router.get('/summary', requirePermission('organizations.read'), async (req, res) => {
+router.get('/summary', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
 
@@ -685,7 +685,7 @@ router.get('/summary', requirePermission('organizations.read'), async (req, res)
 });
 
 // POST /api/v1/tprm/vendors/:id/store-ai-assessment
-router.post('/vendors/:id/store-ai-assessment', requirePermission('organizations.read'), async (req, res) => {
+router.post('/vendors/:id/store-ai-assessment', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -718,7 +718,7 @@ router.post('/vendors/:id/store-ai-assessment', requirePermission('organizations
 });
 
 // GET /api/v1/tprm/cmdb-assets - Search CMDB assets for linking to vendors
-router.get('/cmdb-assets', requirePermission('organizations.read'), async (req, res) => {
+router.get('/cmdb-assets', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const search = req.query.search ? String(req.query.search) : null;
@@ -751,7 +751,7 @@ router.get('/cmdb-assets', requirePermission('organizations.read'), async (req, 
 });
 
 // GET /api/v1/tprm/cmdb-assets/:assetId/vendors - Get TPRM vendors linked to a CMDB asset
-router.get('/cmdb-assets/:assetId/vendors', requirePermission('organizations.read'), async (req, res) => {
+router.get('/cmdb-assets/:assetId/vendors', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { assetId } = req.params;
@@ -776,7 +776,7 @@ router.get('/cmdb-assets/:assetId/vendors', requirePermission('organizations.rea
 
 // POST /api/v1/tprm/questionnaires/:id/send
 // Sends the questionnaire to the vendor by email and records sent_at + access token
-router.post('/questionnaires/:id/send', requirePermission('organizations.read'), async (req, res) => {
+router.post('/questionnaires/:id/send', requirePermission('tprm.write'), async (req, res) => {
   const { randomBytes } = require('crypto');
   const { sendNotificationEmail } = require('../services/emailService');
   try {
@@ -876,7 +876,7 @@ router.post('/questionnaires/:id/send', requirePermission('organizations.read'),
 
 // POST /api/v1/tprm/questionnaires/:id/remind
 // Sends a reminder email to the vendor
-router.post('/questionnaires/:id/remind', requirePermission('organizations.read'), async (req, res) => {
+router.post('/questionnaires/:id/remind', requirePermission('tprm.write'), async (req, res) => {
   const { sendNotificationEmail } = require('../services/emailService');
   try {
     const orgId = req.user.organization_id;
@@ -926,7 +926,7 @@ router.post('/questionnaires/:id/remind', requirePermission('organizations.read'
 
 // GET /api/v1/tprm/questionnaires/:id/evidence
 // List all evidence files uploaded by a vendor for this questionnaire
-router.get('/questionnaires/:id/evidence', requirePermission('organizations.read'), async (req, res) => {
+router.get('/questionnaires/:id/evidence', requirePermission('tprm.read'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { id } = req.params;
@@ -958,7 +958,7 @@ router.get('/questionnaires/:id/evidence', requirePermission('organizations.read
 });
 
 // DELETE /api/v1/tprm/evidence/:evidenceId
-router.delete('/evidence/:evidenceId', requirePermission('organizations.write'), async (req, res) => {
+router.delete('/evidence/:evidenceId', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { evidenceId } = req.params;
@@ -981,7 +981,7 @@ router.delete('/evidence/:evidenceId', requirePermission('organizations.write'),
 
 // POST /api/v1/tprm/evidence/:evidenceId/store-ai-analysis
 // Persist AI evidence analysis results (called after the AI endpoint returns)
-router.post('/evidence/:evidenceId/store-ai-analysis', requirePermission('organizations.write'), async (req, res) => {
+router.post('/evidence/:evidenceId/store-ai-analysis', requirePermission('tprm.write'), async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const { evidenceId } = req.params;
