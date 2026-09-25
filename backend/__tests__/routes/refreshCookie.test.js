@@ -9,6 +9,7 @@ jest.mock('../../src/services/auditService', () => ({ createAuditLog: jest.fn().
 jest.mock('../../src/services/emailService', () => ({ sendPasswordResetEmail: jest.fn() }));
 jest.mock('../../src/utils/logger', () => ({ log: jest.fn() }));
 
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../../src/config/database');
 const { JWT_SECRET, JWT_ALGORITHM } = require('../../src/config/security');
@@ -17,7 +18,7 @@ const refreshCookie = require('../../src/utils/refreshCookie');
 const { invokeRoute, makeReq, makeRes } = require('./_testUtils');
 
 function refreshTokenFor(userId) {
-  return jwt.sign({ userId, type: 'refresh', jti: String(Math.random()) }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: '7d' });
+  return jwt.sign({ userId, type: 'refresh', jti: crypto.randomBytes(16).toString('hex') }, JWT_SECRET, { algorithm: JWT_ALGORITHM, expiresIn: '7d' });
 }
 
 function cookieRes() {
