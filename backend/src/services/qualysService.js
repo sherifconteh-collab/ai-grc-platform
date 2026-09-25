@@ -2,7 +2,7 @@
 'use strict';
 
 const https = require('https');
-const { assertSafeUrl } = require('../utils/netGuard');
+const { assertSafeUrl, guardedLookup } = require('../utils/netGuard');
 
 function severityFromQualys(severity) {
   const s = parseInt(severity, 10);
@@ -21,6 +21,9 @@ async function qualysRequest(config, path) {
     const options = {
       hostname: baseUrl.hostname,
       port: baseUrl.port || undefined,
+      // Resolve and check again at connect time, so the name cannot be
+      // re-pointed at a private address after assertSafeUrl (DNS rebinding).
+      lookup: guardedLookup,
       path,
       method: 'GET',
       timeout: 60000,

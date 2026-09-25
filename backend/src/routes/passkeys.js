@@ -19,6 +19,7 @@ const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
 const { validateBody, requireFields } = require('../middleware/validate');
 const { decrypt, hashToken } = require('../utils/encrypt');
 const { resolveExpiryTimestampFromNow } = require('../utils/sessionExpiry');
+const refreshCookie = require('../utils/refreshCookie');
 
 const ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
@@ -101,6 +102,10 @@ router.post(
       }
 
       const fullUser = userRow.rows[0];
+      // A deactivated user's passkey must not start a session.
+      if (!fullUser.is_active) {
+        return res.status(401).json({ error: 'Account is disabled' });
+      }
       const plainEmail = decrypt(fullUser.email);
       const { accessToken, refreshToken } = issueTokens(fullUser.id);
       const sessionExpiresAt = resolveExpiryTimestampFromNow(REFRESH_EXPIRY, 'JWT_REFRESH_EXPIRY');
@@ -112,7 +117,8 @@ router.post(
       return res.json({
         data: {
           accessToken,
-          refreshToken,
+          refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken),
+          sessionExpiresAt,
           user: {
             id: fullUser.id,
             email: plainEmail,

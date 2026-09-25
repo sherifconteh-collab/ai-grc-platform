@@ -27,6 +27,7 @@ const { isDemoEmail } = require('../../scripts/lib/demo-account-config');
 const { verifyTOTP } = require('../utils/totp');
 const { decrypt, encrypt, hashForLookup, hashToken, tokenHashCandidates } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
+const refreshCookie = require('../utils/refreshCookie');
 const { hasPublicColumn } = require('../utils/schema');
 const {
   MIN_PASSWORD_LENGTH,
@@ -725,7 +726,7 @@ router.post('/register', validateBody((body) => requireFields(body, ['email', 'p
             framework_codes: selectedFrameworkCodes,
             information_types: selectedInformationTypes
           },
-          tokens: { accessToken, refreshToken }
+          tokens: { accessToken, refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken), sessionExpiresAt }
         }
       });
     } catch (err) {
@@ -1000,7 +1001,7 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
           trial_ends_at: user.organization_trial_ends_at,
           onboarding_completed: Boolean(user.onboarding_completed)
         },
-        tokens: { accessToken, refreshToken }
+        tokens: { accessToken, refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken), sessionExpiresAt }
       }
     });
   } catch (error) {
@@ -1178,9 +1179,12 @@ async function handleRefreshTokenReuse(req, userId, candidateHashes) {
 }
 
 // POST /auth/refresh
-router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToken'])), async (req, res) => {
+router.post('/refresh', async (req, res) => {
+  const presented = refreshCookie.readRefreshToken(req);
+  if (presented.error) return res.status(403).json({ success: false, error: presented.error });
+  if (!presented.token) return res.status(400).json({ success: false, error: 'refreshToken is required' });
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = presented.token;
 
     const decoded = jwt.verify(refreshToken, JWT_SECRET, JWT_VERIFY_OPTIONS);
     if (decoded.type !== 'refresh') {
@@ -1244,7 +1248,14 @@ router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToke
       return res.status(401).json({ success: false, error: 'Invalid or expired session' });
     }
 
-    res.json({ success: true, data: { accessToken, refreshToken: newRefreshToken } });
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+        refreshToken: refreshCookie.deliverRefreshToken(req, res, newRefreshToken, { viaCookie: presented.fromCookie }),
+        sessionExpiresAt: newExpiresAt
+      }
+    });
   } catch (error) {
     log('error', 'refresh_error', { error: error?.message || String(error) });
     res.status(401).json({ success: false, error: 'Token refresh failed' });
@@ -1255,8 +1266,9 @@ router.post('/refresh', validateBody((body) => requireFields(body, ['refreshToke
 router.post('/logout', authenticate, async (req, res) => {
   try {
     // Demo accounts are shared — only delete the caller's session, not all sessions
+    const { token: refreshToken } = refreshCookie.readRefreshToken(req);
+    refreshCookie.clearRefreshCookie(req, res);
     if (isDemoEmail(req.user.email)) {
-      const refreshToken = req.body?.refreshToken;
       if (!refreshToken) {
         return res.status(400).json({
           success: false,
@@ -1549,7 +1561,7 @@ router.post('/accept-invite', validateBody((body) => {
             tier: org.tier,
             onboarding_completed: true
           },
-          tokens: { accessToken, refreshToken }
+          tokens: { accessToken, refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken), sessionExpiresAt }
         }
       });
     } catch (err) {
@@ -1624,6 +1636,10 @@ router.post('/switch-organization/:orgId', authenticate, switchOrgLimiter, async
       return res.status(403).json({ success: false, error: 'You are not a member of that organization' });
     }
 
+    // The caller's current refresh token: in the body, or the web app's cookie.
+    const presented = refreshCookie.readRefreshToken(req);
+    if (presented.error) return res.status(403).json({ success: false, error: presented.error });
+
     // Issue new tokens so every subsequent request carries the new org context
     const isDemoAccount = isDemoEmail(req.user.email);
     const { accessToken, refreshToken: newRefreshToken, sessionExpiresAt } =
@@ -1646,7 +1662,7 @@ router.post('/switch-organization/:orgId', authenticate, switchOrgLimiter, async
       // token sent in the request body).  If no token is supplied, insert a
       // new session without removing others — this avoids logging the user
       // out of other devices or shared demo accounts.
-      const currentRefreshToken = req.body?.refreshToken;
+      const { token: currentRefreshToken } = presented;
       if (currentRefreshToken) {
         await client.query(
           'DELETE FROM sessions WHERE user_id = $1 AND refresh_token = $2',
@@ -1678,7 +1694,11 @@ router.post('/switch-organization/:orgId', authenticate, switchOrgLimiter, async
       success: true,
       data: {
         organization: { id: org.id, name: org.name, tier: org.tier, billing_status: org.billing_status },
-        tokens: { accessToken, refreshToken: newRefreshToken }
+        tokens: {
+          accessToken,
+          refreshToken: refreshCookie.deliverRefreshToken(req, res, newRefreshToken, { viaCookie: presented.fromCookie }),
+          sessionExpiresAt
+        }
       }
     });
   } catch (error) {

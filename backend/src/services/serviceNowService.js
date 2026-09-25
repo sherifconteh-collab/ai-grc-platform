@@ -2,7 +2,7 @@
 'use strict';
 
 const https = require('https');
-const { assertSafeUrl } = require('../utils/netGuard');
+const { assertSafeUrl, guardedLookup } = require('../utils/netGuard');
 
 // Table names go into the request path.
 const TABLE_PATTERN = /^[a-z][a-z0-9_]{1,79}$/;
@@ -23,6 +23,9 @@ async function snowRequest(config, table, params) {
     const options = {
       hostname: base.hostname,
       port: base.port || undefined,
+      // Resolve and check again at connect time, so the name cannot be
+      // re-pointed at a private address after assertSafeUrl (DNS rebinding).
+      lookup: guardedLookup,
       path: `/api/now/table/${table}?${qs}`,
       method: 'GET',
       timeout: 30000,

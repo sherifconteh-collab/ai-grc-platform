@@ -22,6 +22,7 @@ const { hashForLookup, hashToken } = require('../utils/encrypt');
 const { verifyTotpOrBackupCode } = require('../services/secondFactorService');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
+const refreshCookie = require('../utils/refreshCookie');
 const { hasPublicColumn } = require('../utils/schema');
 const { resolveExpiryTimestampFromNow } = require('../utils/sessionExpiry');
 
@@ -571,7 +572,7 @@ router.post('/exchange', exchangeLimiter, async (req, res) => {
 
     const { accessToken, refreshToken } = issueTokens(user.user_id);
     await storeSession(user.user_id, refreshToken);
-    return res.json({ success: true, data: { accessToken, refreshToken } });
+    return res.json({ success: true, data: { accessToken, refreshToken: refreshCookie.deliverRefreshToken(req, res, refreshToken) } });
   } catch (err) {
     log('error', 'sso.exchange_failed', { error: err.message });
     return res.status(500).json({ success: false, error: 'Internal server error' });

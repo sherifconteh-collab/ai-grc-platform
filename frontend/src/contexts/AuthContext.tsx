@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { authAPI, refreshAccessToken } from '@/lib/api';
-import { setAccessToken, clearAccessToken, getAccessToken } from '@/lib/tokenStore';
+import { setAccessToken, getAccessToken, clearSession, markSession, hasSessionHint, getSessionExpiresAt, SESSION_EXPIRES_STORAGE_KEY } from '@/lib/tokenStore';
 import { useRouter } from 'next/navigation';
 import { requiresOrganizationOnboarding } from '@/lib/access';
 import { getStoredPendingBillingPlan, requiresBillingResolution } from '@/lib/billing';
@@ -18,36 +18,6 @@ const INACTIVITY_TIMEOUT_MS = parseInt(
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click',
 ];
-
-/**
- * Decode the payload segment from a JWT stored in the browser.
- * Returns the parsed payload object on success, or null if the token is
- * missing, malformed, or cannot be decoded safely.
- */
-function decodeJwtPayload(token: string | null) {
-  if (!token || typeof window === 'undefined') return null;
-
-  try {
-    const payloadSegment = token.split('.')[1];
-    if (!payloadSegment) return null;
-
-    const BASE64_PADDING_MULTIPLE = 4;
-    const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/');
-    const paddingNeeded = calculateBase64Padding(normalized.length, BASE64_PADDING_MULTIPLE);
-    const padded = normalized.padEnd(normalized.length + paddingNeeded, '=');
-    return JSON.parse(window.atob(padded));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Calculate how many "=" padding characters are needed for a Base64 string
- * so the decoded length is a clean multiple of the required block size.
- */
-function calculateBase64Padding(length: number, blockSize: number) {
-  return (blockSize - length % blockSize) % blockSize;
-}
 
 interface User {
   id: string;
@@ -76,7 +46,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string, totpCode?: string) => Promise<void>;
-  loginWithTokens: (accessToken: string, refreshToken: string, userData?: any) => Promise<void>;
+  loginWithTokens: (accessToken: string, sessionExpiresAt?: string | null) => Promise<void>;
   register: (
     email: string,
     password: string,
@@ -122,9 +92,9 @@ const mapCurrentUser = (userData: any): User => ({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshToken, setRefreshToken] = useState<string | null>(() => (
-    typeof window === 'undefined' ? null : localStorage.getItem('refreshToken')
-  ));
+  // When the session ends (the refresh cookie's expiry); the cookie itself is
+  // HttpOnly and never visible to this code.
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(() => getSessionExpiresAt());
   const router = useRouter();
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const demoSessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,18 +117,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const storeTokens = useCallback((accessToken: string, nextRefreshToken: string) => {
-    // Keep access token in memory only — never write it to localStorage to
-    // reduce the XSS attack surface (localStorage is readable by any JS on the page).
+  const storeTokens = useCallback((accessToken: string, nextSessionExpiresAt?: string | null) => {
+    // The access token stays in memory only; the refresh token was set by the
+    // API as an HttpOnly cookie, out of reach of any script on the page.
     setAccessToken(accessToken);
-    localStorage.setItem('refreshToken', nextRefreshToken);
-    setRefreshToken(nextRefreshToken);
+    markSession(nextSessionExpiresAt);
+    setSessionExpiresAt(getSessionExpiresAt());
   }, []);
 
   const clearStoredTokens = useCallback(() => {
-    clearAccessToken();
-    localStorage.removeItem('refreshToken');
-    setRefreshToken(null);
+    clearSession();
+    setSessionExpiresAt(null);
   }, []);
 
   const resetInactivityTimer = useCallback((doLogout: () => Promise<void>) => {
@@ -208,11 +177,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = useCallback(async () => {
     try {
       // The access token lives in memory and is lost on page refresh.
-      // Re-hydrate it silently using the persisted refresh token so the
-      // user stays logged in across hard reloads.
+      // Re-hydrate it silently through the refresh cookie so the user stays
+      // logged in across hard reloads.
       if (!getAccessToken()) {
-        const storedRefreshToken = localStorage.getItem('refreshToken');
-        if (!storedRefreshToken) {
+        if (!hasSessionHint()) {
           setLoading(false);
           return;
         }
@@ -222,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // refreshAccessToken persists the rotated refresh token and shares
           // one in-flight refresh with any concurrent 401 retries.
           await refreshAccessToken();
-          setRefreshToken(localStorage.getItem('refreshToken'));
+          setSessionExpiresAt(getSessionExpiresAt());
         } catch (refreshErr) {
           // Refresh token is expired or invalid — treat as logged out.
           console.warn('Silent token refresh on page load failed:', refreshErr instanceof Error ? refreshErr.message : String(refreshErr));
@@ -233,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const currentUser = await fetchCurrentUser();
-      setRefreshToken(localStorage.getItem('refreshToken'));
+      setSessionExpiresAt(getSessionExpiresAt());
       setUser(currentUser);
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -255,10 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchOrganization = useCallback(async (orgId: string) => {
-    const currentRefresh = localStorage.getItem('refreshToken') || undefined;
-    const response = await authAPI.switchOrganization(orgId, currentRefresh);
+    const response = await authAPI.switchOrganization(orgId);
     const { tokens } = response.data.data;
-    storeTokens(tokens.accessToken, tokens.refreshToken);
+    storeTokens(tokens.accessToken, tokens.sessionExpiresAt);
     const currentUser = await fetchCurrentUser();
     setUser(currentUser);
   }, [storeTokens, fetchCurrentUser]);
@@ -279,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { tokens } = response.data.data;
 
-      storeTokens(tokens.accessToken, tokens.refreshToken);
+      storeTokens(tokens.accessToken, tokens.sessionExpiresAt);
 
       const currentUser = await fetchCurrentUser();
       setUser(currentUser);
@@ -293,8 +260,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchCurrentUser, router, storeTokens]);
 
-  const loginWithTokens = useCallback(async (accessToken: string, refreshToken: string, _userData?: any) => {
-    storeTokens(accessToken, refreshToken);
+  const loginWithTokens = useCallback(async (accessToken: string, nextSessionExpiresAt?: string | null) => {
+    storeTokens(accessToken, nextSessionExpiresAt);
     const currentUser = await fetchCurrentUser();
     setUser(currentUser);
     router.push(resolvePostAuthRoute(currentUser));
@@ -321,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const { tokens } = response.data.data;
 
-      storeTokens(tokens.accessToken, tokens.refreshToken);
+      storeTokens(tokens.accessToken, tokens.sessionExpiresAt);
 
       const currentUser = await fetchCurrentUser();
       setUser(currentUser);
@@ -336,8 +303,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearInactivityTimer();
     clearDemoSessionTimer();
     try {
-      // localStorage holds the latest rotated token; state may lag behind it.
-      await authAPI.logout(localStorage.getItem('refreshToken') || refreshToken || undefined);
+      // The API revokes the session and clears the refresh cookie.
+      await authAPI.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -345,7 +312,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       router.push('/login');
     }
-  }, [clearDemoSessionTimer, clearInactivityTimer, clearStoredTokens, refreshToken, router]);
+  }, [clearDemoSessionTimer, clearInactivityTimer, clearStoredTokens, router]);
 
   // Start or stop the inactivity timer whenever the user's identity changes.
   // Using user?.id (a stable primitive) prevents the effect from re-running
@@ -376,15 +343,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const scheduleDemoLogout = () => {
-      const payload = decodeJwtPayload(refreshToken);
-      const exp = Number(payload?.exp || 0);
+      const expiresAtMs = sessionExpiresAt ? new Date(sessionExpiresAt).getTime() : NaN;
 
-      if (!exp) {
+      if (!Number.isFinite(expiresAtMs)) {
         clearDemoSessionTimer();
         return;
       }
 
-      const msUntilExpiry = (exp * 1000) - Date.now();
+      const msUntilExpiry = expiresAtMs - Date.now();
       if (msUntilExpiry <= 0) {
         clearDemoSessionTimer();
         logout();
@@ -398,8 +364,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === 'refreshToken') {
-        setRefreshToken(event.newValue);
+      if (event.key === SESSION_EXPIRES_STORAGE_KEY) {
+        setSessionExpiresAt(event.newValue);
       }
     };
 
@@ -410,7 +376,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('storage', handleStorage);
       clearDemoSessionTimer();
     };
-  }, [user?.isDemoAccount, userId, refreshToken, logout, clearDemoSessionTimer]);
+  }, [user?.isDemoAccount, userId, sessionExpiresAt, logout, clearDemoSessionTimer]);
 
   return (
     <AuthContext.Provider

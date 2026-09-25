@@ -2,7 +2,7 @@
 // @tier: community
 import axios from 'axios';
 import { getApiBaseUrl } from './apiBase';
-import { getAccessToken, setAccessToken, clearAccessToken } from './tokenStore';
+import { getAccessToken, setAccessToken, clearSession, markSession, takeLegacyRefreshToken } from './tokenStore';
 
 export const API_BASE_URL = getApiBaseUrl();
 
@@ -11,6 +11,9 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    // Opts into the HttpOnly refresh-token cookie; a custom header also means
+    // a cross-site page cannot send these requests without a CORS preflight.
+    'X-CW-Client': 'web',
   },
   withCredentials: true,
   timeout: 30_000, // 30s default timeout for non-AI requests
@@ -33,35 +36,49 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Refresh tokens rotate on every use (the backend returns a new one and treats
-// a replayed old one as theft), so every refresh must persist the rotated
-// token, and concurrent 401s must share a single refresh instead of racing
-// several refreshes with the same token.
+// The refresh token is an HttpOnly cookie that rotates on every use (a
+// replayed old one revokes the session), so tabs must not refresh in parallel:
+// concurrent callers in a tab share one request, and tabs take turns through a
+// Web Lock where the browser supports it.
 let refreshInFlight: Promise<string> | null = null;
 
-async function exchangeRefreshToken(token: string): Promise<string> {
+async function exchangeRefreshToken(): Promise<string> {
   // Raw axios, not the intercepted instance, so a 401 here cannot recurse.
-  const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken: token });
-  const { accessToken, refreshToken: rotated } = response.data.data as {
-    accessToken: string;
-    refreshToken?: string;
-  };
-  if (rotated) localStorage.setItem('refreshToken', rotated);
+  // A refresh token left in localStorage by an earlier release is sent once
+  // in the body; the API answers with the cookie and it is never stored again.
+  const legacy = takeLegacyRefreshToken();
+  const response = await axios.post(
+    `${API_BASE_URL}/auth/refresh`,
+    legacy ? { refreshToken: legacy } : {},
+    { withCredentials: true, headers: { 'X-CW-Client': 'web' } }
+  );
+  const { accessToken, sessionExpiresAt } = response.data.data as { accessToken: string; sessionExpiresAt?: string };
   setAccessToken(accessToken);
+  markSession(sessionExpiresAt);
   return accessToken;
 }
 
-async function performRefresh(): Promise<string> {
-  const used = localStorage.getItem('refreshToken');
-  if (!used) throw new Error('No refresh token');
+async function refreshWithRetry(): Promise<string> {
   try {
-    return await exchangeRefreshToken(used);
+    return await exchangeRefreshToken();
   } catch (err) {
-    // Another tab may have rotated the shared token while this one was using it.
-    const latest = localStorage.getItem('refreshToken');
-    if (latest && latest !== used) return exchangeRefreshToken(latest);
-    throw err;
+    // Another tab may have rotated the cookie while this request was in
+    // flight; the browser now holds the new one, so try once more.
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status !== 401) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return exchangeRefreshToken();
   }
+}
+
+async function performRefresh(): Promise<string> {
+  const locks = typeof navigator !== 'undefined' ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
+  if (!locks) return refreshWithRetry();
+  let token = '';
+  await locks.request('cw-refresh', async () => {
+    token = await refreshWithRetry();
+  });
+  return token;
 }
 
 /** Refreshes the access token once, sharing the result with concurrent callers. */
@@ -92,8 +109,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         // Refresh failed - clear tokens and redirect to login
-        clearAccessToken();
-        localStorage.removeItem('refreshToken');
+        clearSession();
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
@@ -164,18 +180,15 @@ export const authAPI = {
   resetPassword: (data: { token: string; password: string }) =>
     api.post('/auth/reset-password', data),
 
-  logout: (refreshToken?: string) =>
-    api.post('/auth/logout', refreshToken ? { refreshToken } : undefined),
+  logout: () => api.post('/auth/logout'),
 
   getCurrentUser: () => api.get('/auth/me'),
 
   getMyOrganizations: () => api.get('/auth/my-organizations'),
 
-  switchOrganization: (orgId: string, refreshToken?: string) =>
-    api.post(`/auth/switch-organization/${orgId}`, refreshToken ? { refreshToken } : undefined),
+  switchOrganization: (orgId: string) => api.post(`/auth/switch-organization/${orgId}`),
 
-  refreshToken: (refreshToken: string) =>
-    api.post('/auth/refresh', { refreshToken }),
+  refreshToken: () => refreshAccessToken(),
 
   validateInvite: (token: string) =>
     api.get(`/auth/invite/${token}`),

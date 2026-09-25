@@ -336,7 +336,10 @@ router.post('/llm/test', requirePermission('settings.manage'), validateBody((bod
       // For Ollama, apiKey field contains the base URL
       const baseURL = apiKey || process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
       const OpenAI = require('openai');
-      const client = new OpenAI.default({ apiKey: 'ollama', baseURL });
+      // An organization-supplied URL goes through safeFetch (private-network
+      // targets refused, connection pinned); the operator's OLLAMA_BASE_URL is trusted.
+      const { safeFetch } = require('../utils/netGuard');
+      const client = new OpenAI.default({ apiKey: 'ollama', baseURL, ...(apiKey ? { fetch: safeFetch } : {}) });
       const resp = await client.chat.completions.create({
         model: 'llama3.2',
         max_tokens: 50,

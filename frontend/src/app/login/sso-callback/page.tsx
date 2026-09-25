@@ -9,7 +9,7 @@ interface ExchangeResponse {
   success?: boolean;
   totp_required?: boolean;
   error?: string;
-  data?: { accessToken?: string; refreshToken?: string };
+  data?: { accessToken?: string; sessionExpiresAt?: string };
 }
 
 function readCallbackParams(searchParams: ReturnType<typeof useSearchParams>) {
@@ -60,13 +60,13 @@ function SsoCallbackInner() {
         setNeedsTotp(true);
         return;
       }
+      // The refresh token arrives as an HttpOnly cookie, never in the body.
       const at = body.data?.accessToken;
-      const rt = body.data?.refreshToken;
-      if (!at || !rt) {
+      if (!at) {
         failTo('token_exchange_failed');
         return;
       }
-      await loginWithTokens(at, rt);
+      await loginWithTokens(at, body.data?.sessionExpiresAt);
     } catch (err: unknown) {
       failTo(extractApiError(err) || 'token_exchange_failed');
     }

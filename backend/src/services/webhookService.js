@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const net = require('net');
 const pool = require('../config/database');
+const { safeFetch } = require('../utils/netGuard');
 
 // Outbound HMAC signature — HMAC-SHA-384 (CNSA Suite 1.0). The signature header
 // carries a `sha384=` prefix so receivers can identify the algorithm.
@@ -183,7 +184,10 @@ async function processPendingWebhookDeliveries({ organizationId = null, limit = 
       const timeoutMs = Math.max(1000, Number(process.env.WEBHOOK_DELIVERY_TIMEOUT_MS || 15000));
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetch(targetUrl, {
+        // safeFetch resolves the host and pins the connection to a public
+        // address (a name that resolves privately, or re-resolves privately
+        // after this check, is refused) and never follows redirects.
+        const response = await safeFetch(targetUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -193,6 +197,9 @@ async function processPendingWebhookDeliveries({ organizationId = null, limit = 
           },
           body,
           signal: controller.signal
+        }, {
+          allowPrivateHosts: String(process.env.WEBHOOK_ALLOW_PRIVATE_HOSTS || '').toLowerCase() === 'true',
+          allowHttp: String(process.env.WEBHOOK_ALLOW_HTTP || '').toLowerCase() === 'true'
         });
 
         const responseText = await response.text();

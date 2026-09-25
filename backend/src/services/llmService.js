@@ -1,6 +1,7 @@
 // @tier: community
 const Anthropic = require('@anthropic-ai/sdk');
 const OpenAI = require('openai');
+const { safeFetch } = require('../utils/netGuard');
 const crypto = require('crypto');
 const { AsyncLocalStorage } = require('async_hooks');
 const pool = require('../config/database');
@@ -383,8 +384,11 @@ function getClient(provider, orgApiKey) {
   }
   if (provider === 'ollama') {
     if (!orgApiKey) return null;
-    // orgApiKey is the base URL for Ollama; Ollama ignores the Authorization header
-    return new OpenAI.default({ apiKey: 'ollama', baseURL: orgApiKey, ...SDK_CLIENT_OPTIONS });
+    // orgApiKey is the organization's base URL for Ollama (Ollama ignores the
+    // Authorization header). safeFetch refuses private-network targets and pins
+    // each connection to a checked address; self-hosted installs running Ollama
+    // on a private network set CONNECTOR_ALLOW_PRIVATE_HOSTS=true.
+    return new OpenAI.default({ apiKey: 'ollama', baseURL: orgApiKey, fetch: safeFetch, ...SDK_CLIENT_OPTIONS });
   }
   return null;
 }
