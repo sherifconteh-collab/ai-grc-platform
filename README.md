@@ -53,7 +53,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-16 | PR #301: fix(security): explicit JWT algorithm allow-list on WebSocket auth -->
+<!-- LAST_UPDATED: 2026-09-26 | PR #315: security: port production-readiness auth hardening and integrity fixes -->
 
 ## 🎯 What is This?
 
@@ -1010,7 +1010,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 162 sequential, idempotent migrations
 - **API Routes**: 80+ route modules
-- **Services**: 62 service modules
+- **Services**: 64 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
