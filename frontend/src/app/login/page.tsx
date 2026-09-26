@@ -109,8 +109,8 @@ export default function LoginPage() {
       const { options, challengeId } = optRes.data?.data || {};
       const authResp = await startAuthentication({ optionsJSON: options });
       const verifyRes = await passkeyAPI.verifyAuth({ response: authResp, challengeId });
-      const { accessToken, refreshToken } = verifyRes.data?.data || {};
-      await loginWithTokens(accessToken, refreshToken);
+      const { accessToken, sessionExpiresAt } = verifyRes.data?.data || {};
+      await loginWithTokens(accessToken, sessionExpiresAt);
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Passkey authentication failed.';
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('abort')) {

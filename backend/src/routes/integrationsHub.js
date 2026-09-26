@@ -1,6 +1,12 @@
 // @tier: pro
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
+
+// express-rate-limit router-wide, ahead of any auth or DB work, so every
+// handler below is covered (CodeQL js/missing-rate-limiting). Endpoint-specific
+// limiters further down stay the tighter controls.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
 const pool = require('../config/database');
 const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
@@ -215,6 +221,30 @@ router.delete('/connectors/:id', async (req, res) => {
   }
 });
 
+// Connector types with a real client that can be run on demand. Every run
+// result recorded here comes from the external system -- a connector without
+// a client is reported as unavailable rather than given simulated counts,
+// which previously showed up in run history and audit logs as real syncs.
+const CONNECTOR_SYNC_HANDLERS = Object.freeze({
+  aws_security_hub: () => require('../services/awsSecurityHubService').syncFindings,
+  qualys_vmdr: () => require('../services/qualysService').syncFindings,
+  servicenow: () => require('../services/serviceNowService').syncFindings // ip-hygiene:ignore
+});
+
+function summarizeFindings(connectorType, findings) {
+  const bySeverity = {};
+  for (const finding of findings) {
+    const severity = finding.severity || 'informational';
+    bySeverity[severity] = (bySeverity[severity] || 0) + 1;
+  }
+  return {
+    connector_type: connectorType,
+    findings_retrieved: findings.length,
+    by_severity: bySeverity,
+    completed_at: new Date().toISOString()
+  };
+}
+
 // POST /api/v1/integrations-hub/connectors/:id/run
 router.post('/connectors/:id/run', async (req, res) => {
   try {
@@ -232,6 +262,16 @@ router.post('/connectors/:id/run', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Integration connector not found' });
     }
 
+    const row = connector.rows[0];
+    const handlerFactory = CONNECTOR_SYNC_HANDLERS[row.connector_type];
+    if (!handlerFactory) {
+      return res.status(422).json({
+        success: false,
+        error: `On-demand sync is not available yet for ${row.connector_type} connectors.`,
+        code: 'connector_sync_unavailable'
+      });
+    }
+
     const runStart = await pool.query(
       `INSERT INTO integration_connector_runs (
          organization_id, connector_id, run_type, status, started_at, created_by
@@ -241,46 +281,59 @@ router.post('/connectors/:id/run', async (req, res) => {
       [orgId, id, req.user.id]
     );
 
-    const row = connector.rows[0];
-    const simulatedResult = {
-      connector_type: row.connector_type,
-      synced_assets: row.connector_type.includes('scanner') ? 12 : 5,
-      findings_ingested: row.connector_type.includes('acas') ? 31 : 9,
-      completed_at: new Date().toISOString()
-    };
+    const syncFindings = handlerFactory();
+    let outcome;
+    try {
+      outcome = await syncFindings({ ...(row.connector_config || {}), ...(row.auth_config || {}) });
+    } catch (syncError) {
+      outcome = { error: syncError.message, findings: [] };
+    }
+    const failed = Boolean(outcome.error);
+    const summary = failed
+      ? { connector_type: row.connector_type, error: 'Connector sync failed' }
+      : summarizeFindings(row.connector_type, outcome.findings || []);
 
     const runFinish = await pool.query(
       `UPDATE integration_connector_runs
-       SET status = 'success',
-           result_summary = $2::jsonb,
+       SET status = $2,
+           result_summary = $3::jsonb,
+           error_message = $4,
            finished_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [runStart.rows[0].id, JSON.stringify(simulatedResult)]
+      [runStart.rows[0].id, failed ? 'failed' : 'success', JSON.stringify(summary), failed ? String(outcome.error).slice(0, 500) : null]
     );
 
     await pool.query(
       `UPDATE integration_connectors
-       SET status = 'active',
-           last_sync_at = NOW(),
+       SET status = $2::text,
+           last_sync_at = CASE WHEN $2::text = 'active' THEN NOW() ELSE last_sync_at END,
            updated_at = NOW()
-       WHERE id = $1`,
-      [id]
+       WHERE id = $1 AND organization_id = $3`,
+      [id, failed ? 'error' : 'active', orgId]
     );
 
     await auditService.logFromRequest(req, {
       eventType: 'integration_connector_run',
       resourceType: 'integration_connector',
       resourceId: id,
-      details: simulatedResult
+      details: { ...summary, status: failed ? 'failed' : 'success' },
+      success: !failed
     });
 
     await emitConnectorEvent(orgId, req.user.id, 'integration.connector.run', {
       connector_id: id,
       run_id: runFinish.rows[0].id,
-      result: simulatedResult
+      result: summary
     });
 
+    if (failed) {
+      return res.status(502).json({
+        success: false,
+        error: 'The connector could not reach the external system. Check its configuration and credentials.',
+        data: runFinish.rows[0]
+      });
+    }
     res.json({ success: true, data: runFinish.rows[0] });
   } catch (error) {
     console.error('Run connector error:', error);

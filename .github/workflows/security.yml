@@ -90,6 +90,11 @@ jobs:
           npm ci
           npm run check:syntax
 
+      - name: Backend - unit tests
+        run: |
+          cd backend
+          npx jest --ci
+
       - name: Check for new duplicate migration numbers
         run: |
           cd backend/migrations

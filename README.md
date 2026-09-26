@@ -131,7 +131,7 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 - ⚡ **Realtime** — Socket.IO-backed live dashboard updates and presence
 - 🔔 **Mobile Push Notifications** — iOS (APNs) and Android (FCM) device token lifecycle
 - 📧 **Forgot / Reset Password** — full self-service password recovery flow
-- 🔁 **Refresh Token Rotation** — single-use refresh tokens; concurrent session cap (configurable, default 10)
+- 🔁 **Refresh Token Rotation** — single-use refresh tokens, kept by the browser in an HttpOnly cookie that page scripts cannot read; concurrent session cap (configurable, default 10)
 - 🐛 **Sentry Integration** — optional error tracking via `SENTRY_DSN`
 - 🗄️ **Redis** — distributed rate limiting (Lua atomic INCR+EXPIRE) and response caching; falls back to in-memory when Redis is not configured
 - 🔒 **PostgreSQL Row-Level Security** — org-scoped RLS on core tables for defense-in-depth multi-tenant isolation

@@ -45,7 +45,8 @@ const ROLE_FALLBACK_PERMISSIONS = new Map([
     'ai.use',
     'ai.read',
     'compliance.read',
-    'compliance.manage'
+    'compliance.manage',
+    'tprm.read'
   ]],
   ['user', [
     'dashboard.read',
@@ -73,7 +74,9 @@ const ROLE_FALLBACK_PERMISSIONS = new Map([
     'reports.read',
     'reports.manage',
     'compliance.read',
-    'compliance.manage'
+    'compliance.manage',
+    'tprm.read',
+    'tprm.write'
   ]]
 ]);
 
@@ -168,7 +171,7 @@ const authenticate = async (req, res, next) => {
       req.user = userResult.rows[0];
       req.user.email = decrypt(req.user.email);
 
-      if (!Boolean(req.user.is_platform_admin) && !req.user.is_active) {
+      if (!req.user.is_active) {
         return res.status(401).json({ success: false, error: 'User not found or inactive' });
       }
 

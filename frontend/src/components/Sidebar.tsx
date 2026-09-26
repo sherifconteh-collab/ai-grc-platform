@@ -109,7 +109,7 @@ const navigationSections: NavigationSection[] = [
       {
         label: 'Third Party',
         items: [
-          { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['organizations.read'] },
+          { name: 'Third-Party Risk', href: '/dashboard/tprm', icon: '🔗', requiredPermissions: ['tprm.read'] },
           { name: 'Vendor Contracts', href: '/dashboard/vendor-risk', icon: '🤝', requiredPermissions: ['organizations.read'] },
         ],
       },

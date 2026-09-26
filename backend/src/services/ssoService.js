@@ -5,7 +5,8 @@ const { discovery, buildAuthorizationUrl, authorizationCodeGrant, fetchUserInfo 
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const pool = require('../config/database');
-const { encrypt, decrypt } = require('../utils/encrypt');
+const { encrypt, decrypt, hashForLookup } = require('../utils/encrypt');
+const { hasPublicColumn } = require('../utils/schema');
 
 // ─── Social provider base configs ────────────────────────────────────────────
 
@@ -166,11 +167,24 @@ async function provisionUser(organizationId, email, name, role, provider, provid
   try {
     await client.query('BEGIN');
 
-    // Look for existing user in the org
-    let userRow = await client.query(
-      `SELECT id, is_active FROM users WHERE email = $1 AND organization_id = $2 LIMIT 1`,
-      [email.toLowerCase(), organizationId]
-    );
+    // users.email is field-level encrypted; email_hash is the lookup key.
+    // Pre-encryption rows (email_hash IS NULL) still match on plaintext.
+    const normalizedEmail = email.toLowerCase();
+    const emailHash = (await hasPublicColumn('users', 'email_hash')) ? hashForLookup(normalizedEmail) : null;
+    let userRow = { rows: [] };
+    if (emailHash) {
+      userRow = await client.query(
+        `SELECT id, is_active FROM users WHERE email_hash = $1 AND organization_id = $2 LIMIT 1`,
+        [emailHash, organizationId]
+      );
+    }
+    if (userRow.rows.length === 0) {
+      userRow = await client.query(
+        `SELECT id, is_active FROM users
+         WHERE email = $1 AND organization_id = $2 AND email_hash IS NULL LIMIT 1`,
+        [normalizedEmail, organizationId]
+      );
+    }
 
     let userId;
     if (userRow.rows.length > 0) {
@@ -182,12 +196,19 @@ async function provisionUser(organizationId, email, name, role, provider, provid
       // Auto-provision new user
       const { firstName, lastName } = splitFullName(name, email);
       const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 14);
-      const newUser = await client.query(
-        `INSERT INTO users (email, first_name, last_name, organization_id, role, is_active, password_hash)
-         VALUES ($1, $2, $3, $4, $5, true, $6)
-         RETURNING id`,
-        [email.toLowerCase(), firstName, lastName, organizationId, role || 'user', passwordHash]
-      );
+      const newUser = emailHash
+        ? await client.query(
+          `INSERT INTO users (email, email_hash, first_name, last_name, organization_id, role, is_active, password_hash)
+           VALUES ($1, $2, $3, $4, $5, $6, true, $7)
+           RETURNING id`,
+          [encrypt(normalizedEmail), emailHash, firstName, lastName, organizationId, role || 'user', passwordHash]
+        )
+        : await client.query(
+          `INSERT INTO users (email, first_name, last_name, organization_id, role, is_active, password_hash)
+           VALUES ($1, $2, $3, $4, $5, true, $6)
+           RETURNING id`,
+          [normalizedEmail, firstName, lastName, organizationId, role || 'user', passwordHash]
+        );
       userId = newUser.rows[0].id;
     }
 
@@ -239,19 +260,23 @@ async function exchangeGitHubCode(code, redirectUri) {
   });
   const user = await userRes.json();
 
-  let email = user.email;
-  if (!email) {
-    const emailsRes = await fetch(cfg.emailUrl, {
-      headers: { Authorization: `Bearer ${tokenData.access_token}`, 'User-Agent': 'ControlWeave' },
-    });
-    const emails = await emailsRes.json();
-    const primary = Array.isArray(emails) ? emails.find(e => e.primary && e.verified) : null;
-    email = primary?.email || null;
-  }
+  // The profile email is user-editable and not necessarily verified, so the
+  // verified-address list is the source of truth for account linking.
+  const emailsRes = await fetch(cfg.emailUrl, {
+    headers: { Authorization: `Bearer ${tokenData.access_token}`, 'User-Agent': 'ControlWeave' },
+  });
+  const emailList = await emailsRes.json();
+  const verified = Array.isArray(emailList) ? emailList.filter((e) => e && e.verified) : [];
+  const profileMatch = user.email
+    ? verified.find((e) => String(e.email).toLowerCase() === String(user.email).toLowerCase())
+    : null;
+  const chosen = profileMatch || verified.find((e) => e.primary) || null;
+  const email = chosen?.email || user.email || null;
 
   return {
     providerUserId: String(user.id),
     email,
+    emailVerified: Boolean(chosen),
     name: user.name || user.login,
     accessToken: tokenData.access_token,
   };
