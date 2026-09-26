@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-26 | PR #317: docs: refresh README status header, cross-link ControlWeaver-Pro's editions and feature gates -->
+<!-- LAST_UPDATED: 2026-09-26 | PR #316: feat(ui): My Work home, Ctrl+K search, + New, and links that land on their screen -->
 
 ## 🎯 What is This?
 
