@@ -2472,4 +2472,75 @@ export const indicatorsAPI = {
   }) => api.post(`/indicators/${id}/measurements`, data),
 };
 
+// ---------------------------------------------------------------- My Work & search
+// Items and results carry record ids only; lib/deepLinks.ts turns them into links.
+
+export type MyWorkKind =
+  | 'control' | 'poam' | 'poam_approval' | 'risk' | 'exception_approval' | 'pbc';
+
+export interface MyWorkItem {
+  id: string;
+  kind: MyWorkKind;
+  record_id: string;
+  parent_id?: string | null;
+  ref: string | null;
+  title: string;
+  context: string | null;
+  due_date: string | null;
+  status: string | null;
+}
+
+export interface MyWorkSummary {
+  total: number;
+  overdue: number;
+  due_this_week: number;
+  approvals: number;
+}
+
+export interface GettingStartedFlags {
+  framework_selected: boolean;
+  control_updated: boolean;
+  evidence_uploaded: boolean;
+  teammate_invited: boolean;
+  risk_recorded: boolean;
+  integration_connected: boolean;
+}
+
+export interface AuditRequestDetail {
+  id: string;
+  engagement_id: string;
+  engagement_name: string;
+  title: string;
+  // JSONB column in this edition; almost always a plain string, but render defensively.
+  request_details: unknown;
+  priority: string;
+  status: string;
+  due_date: string | null;
+  response_notes: string | null;
+  can_respond: boolean;
+}
+
+export const myWorkAPI = {
+  list: () => api.get<{ success: boolean; data: { items: MyWorkItem[]; summary: MyWorkSummary } }>('/my-work'),
+  gettingStarted: () => api.get<{ success: boolean; data: GettingStartedFlags }>('/my-work/getting-started'),
+  getRequest: (id: string) => api.get<{ success: boolean; data: AuditRequestDetail }>(`/my-work/requests/${id}`),
+  respondToRequest: (id: string, responseNotes: string) =>
+    api.post(`/my-work/requests/${id}/respond`, { response_notes: responseNotes }),
+};
+
+export type SearchResultType = 'control' | 'risk' | 'poam' | 'vendor' | 'evidence' | 'asset' | 'incident';
+
+export interface SearchResult {
+  id: string;
+  type: SearchResultType;
+  ref: string | null;
+  title: string;
+  context: string | null;
+}
+
+export const searchAPI = {
+  query: (q: string, signal?: AbortSignal) =>
+    api.get<{ success: boolean; data: { query: string; results: SearchResult[] } }>('/search', { params: { q }, signal }),
+};
+
 export default api;

@@ -122,6 +122,9 @@ jobs:
           cd frontend
           npm ci
           npm run typecheck
+          # Every in-app link must resolve to a page, and every query parameter
+          # it passes must be read and handled by that page (scripts/check-ui-links.js).
+          npm run check:links
           # `tsc --noEmit` alone is not enough of a gate. PR #213 bumped
           # TypeScript to 7.0.2, passed typecheck, and still broke `npm run
           # build` and `npm run lint` -- it had to be reverted in #232. The

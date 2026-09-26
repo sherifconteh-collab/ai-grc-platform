@@ -23,6 +23,9 @@ import { remediationTerms } from '@/lib/poamTerminology';
 import {
   PoamItem, POAM_STATUSES, POAM_PRIORITIES, errorMessage,
 } from '@/lib/poamTypes';
+import PoamCreatePanel from '@/components/poam/PoamCreatePanel';
+import RecordDrawer from '@/components/shell/RecordDrawer';
+import { recordLinks } from '@/lib/deepLinks';
 
 interface PoamSummary {
   total: number;
@@ -60,6 +63,11 @@ function PoamListView() {
 
   const canWrite = hasPermission(user, 'controls.write');
   const terms = useMemo(() => remediationTerms(), []);
+  // ?new=1 opens the create panel ("+ New", or "POA&M item for this control/risk").
+  const wantsNew = searchParams.get('new') === '1';
+  const [creating, setCreating] = useState(wantsNew);
+  useEffect(() => { if (wantsNew) setCreating(true); }, [wantsNew]);
+  const [drawerIndex, setDrawerIndex] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -136,6 +144,15 @@ function PoamListView() {
             </p>
           </div>
           <div className="flex gap-2">
+            {canWrite && !creating && (
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="px-3 py-1.5 text-sm rounded-md bg-purple-700 text-white font-semibold hover:bg-purple-800"
+              >
+                New item
+              </button>
+            )}
             <button
               onClick={() => handleDownload('csv')}
               disabled={downloading !== null}
@@ -152,6 +169,10 @@ function PoamListView() {
             </button>
           </div>
         </div>
+
+        {creating && canWrite && (
+          <PoamCreatePanel controlId={controlId || undefined} riskId={riskId || undefined} onCancel={() => setCreating(false)} />
+        )}
 
         {(controlId || riskId) && (
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-900">
@@ -241,7 +262,13 @@ function PoamListView() {
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 max-w-xs">
                       <Link
-                        href={`/dashboard/poam/${item.id}`}
+                        href={recordLinks.poam(item.id)}
+                        onClick={(e) => {
+                          // A plain click previews in the drawer; Ctrl/Cmd/Shift-click still opens the page.
+                          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                          e.preventDefault();
+                          setDrawerIndex(filtered.findIndex((f) => f.id === item.id));
+                        }}
                         className="font-medium text-purple-700 hover:text-purple-900 hover:underline"
                       >
                         {item.title}
@@ -277,6 +304,31 @@ function PoamListView() {
           </div>
         )}
       </div>
+      {drawerIndex !== null && filtered[drawerIndex] ? (() => {
+        const p = filtered[drawerIndex];
+        return (
+          <RecordDrawer
+            eyebrow={p.control_code ? `POA&M · ${p.control_code}` : 'POA&M'}
+            title={p.title}
+            fields={[
+              { label: 'Status', value: String(p.status).replace(/_/g, ' ') },
+              { label: 'Priority', value: p.priority },
+              { label: 'Due', value: p.due_date ? new Date(p.due_date).toLocaleDateString() : '—' },
+              { label: 'Owner', value: p.owner_email || '—' },
+              { label: 'Milestones', value: p.milestone_count || 0 },
+              { label: 'Source', value: String(p.source_type || 'manual').replace(/_/g, ' ') },
+            ]}
+            actions={canWrite ? [{ label: 'Update status', href: recordLinks.poamUpdateStatus(p.id), primary: true }] : []}
+            fullPageHref={recordLinks.poam(p.id)}
+            position={{ index: drawerIndex, total: filtered.length }}
+            onPrev={() => setDrawerIndex((i) => (i === null ? i : Math.max(0, i - 1)))}
+            onNext={() => setDrawerIndex((i) => (i === null ? i : Math.min(filtered.length - 1, i + 1)))}
+            onClose={() => setDrawerIndex(null)}
+          >
+            {p.description ? <p className="whitespace-pre-wrap text-sm text-gray-700">{p.description}</p> : null}
+          </RecordDrawer>
+        );
+      })() : null}
     </DashboardLayout>
   );
 }

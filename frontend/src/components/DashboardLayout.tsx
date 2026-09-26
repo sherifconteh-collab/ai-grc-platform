@@ -2,12 +2,14 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { requiresOrganizationOnboarding, hasPermission } from '@/lib/access';
 import { getStoredPendingBillingPlan, requiresBillingResolution } from '@/lib/billing';
 import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import { WebSocketStatusIndicator } from './WebSocketStatusIndicator';
 import Sidebar from './Sidebar';
+import TopBar from './shell/TopBar';
+import CommandPalette from './shell/CommandPalette';
 import { getAccessToken } from '@/lib/tokenStore';
 import { licenseAPI } from '@/lib/api';
 import AiQuotaModal from './AiQuotaModal';
@@ -49,6 +51,23 @@ export default function DashboardLayout({
   const [setupModalOpen, setSetupModalOpen] = useState(false);
 
   const canManageSettings = hasPermission(user, 'settings.manage');
+
+  // App shell: the mobile menu drawer and the Ctrl+K palette.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   
   const mustCompleteOnboarding = Boolean(
     user && requiresOrganizationOnboarding(user) && !user.onboardingCompleted
@@ -170,7 +189,9 @@ export default function DashboardLayout({
   return (
     <WebSocketProvider token={token} enabled={isAuthenticated}>
       <div className="flex h-screen bg-gray-100">
-        <Sidebar />
+        <Sidebar mobileOpen={menuOpen} onClose={closeMenu} />
+        <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar onOpenMenu={() => setMenuOpen(true)} onOpenSearch={() => setPaletteOpen(true)} />
         <main className="flex-1 overflow-y-auto">
           {showBanner && (
             <div
@@ -208,10 +229,12 @@ export default function DashboardLayout({
               )}
             </div>
           )}
-          <div className="container mx-auto px-6 py-8">{children}</div>
+          <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">{children}</div>
         </main>
+        </div>
         <WebSocketStatusIndicator />
       </div>
+      <CommandPalette open={paletteOpen} onClose={closePalette} />
       <AiQuotaModal
         open={quotaModal.open}
         onClose={() => setQuotaModal((s) => ({ ...s, open: false }))}
