@@ -1,7 +1,8 @@
 // @tier: community
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { exceptionsAPI, implementationsAPI, usersAPI } from '@/lib/api';
@@ -91,7 +92,7 @@ function StatusBadge({ status }: { status: ExceptionStatus }) {
   );
 }
 
-export default function ExceptionsPage() {
+function ExceptionsPageInner() {
   const { user } = useAuth();
   const canWrite = hasPermission(user, 'controls.write');
 
@@ -107,6 +108,13 @@ export default function ExceptionsPage() {
   const [ownersLoaded, setOwnersLoaded] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
+  // Deep links: ?open=<id> highlights one exception (My Work "Approve or reject");
+  // ?new=1 opens the create form, with ?controlId=<id> pre-selecting the control.
+  const searchParams = useSearchParams();
+  const openId = searchParams.get('open');
+  const wantsNew = searchParams.get('new') === '1';
+  const presetControlId = searchParams.get('controlId') || '';
+  const deepLinkHandled = useRef(false);
   const [form, setForm] = useState<ExceptionFormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -195,6 +203,23 @@ export default function ExceptionsPage() {
     void loadControlOptions();
     void loadOwnerOptions();
   };
+
+  useEffect(() => {
+    if (deepLinkHandled.current) return;
+    if (wantsNew && canWrite) {
+      deepLinkHandled.current = true;
+      setForm({ ...EMPTY_FORM, control_id: presetControlId });
+      setFormError('');
+      setShowForm(true);
+      void loadControlOptions();
+      void loadOwnerOptions();
+      return;
+    }
+    if (openId && !loading && exceptions.some((e) => e.id === openId)) {
+      deepLinkHandled.current = true;
+      window.setTimeout(() => document.getElementById(`exception-${openId}`)?.scrollIntoView({ block: 'center' }), 50);
+    }
+  }, [wantsNew, canWrite, presetControlId, openId, loading, exceptions, loadControlOptions, loadOwnerOptions]);
 
   const submitForm = async () => {
     if (!form.control_id || !form.title.trim() || !form.reason.trim()) {
@@ -317,7 +342,9 @@ export default function ExceptionsPage() {
               <li
                 role="listitem"
                 key={exception.id}
-                className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500"
+                id={`exception-${exception.id}`}
+                aria-current={exception.id === openId ? 'true' : undefined}
+                className={`bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500 scroll-mt-20 ${exception.id === openId ? 'ring-2 ring-purple-600' : ''}`}
               >
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="flex-1 min-w-[240px]">
@@ -570,5 +597,13 @@ export default function ExceptionsPage() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+export default function ExceptionsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ExceptionsPageInner />
+    </Suspense>
   );
 }

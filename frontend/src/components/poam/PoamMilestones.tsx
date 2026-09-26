@@ -35,7 +35,14 @@ export default function PoamMilestones({ poamItemId, canWrite, onChange }: PoamM
     try {
       setLoading(true);
       const res = await poamMilestonesAPI.getAll(poamItemId);
-      setMilestones(res.data?.data || []);
+      // The API returns { milestones, total, completed, overdue }; older builds returned the bare list.
+      const data: unknown = res.data?.data;
+      const list = Array.isArray(data)
+        ? data
+        : (data && typeof data === 'object' && Array.isArray((data as { milestones?: unknown }).milestones)
+          ? (data as { milestones: PoamMilestone[] }).milestones
+          : []);
+      setMilestones(list as PoamMilestone[]);
     } catch (err: unknown) {
       setError(errorMessage(err, 'Failed to load milestones'));
     } finally {

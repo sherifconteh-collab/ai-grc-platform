@@ -1,12 +1,13 @@
 // @tier: community
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { organizationAPI, controlsAPI, implementationsAPI, controlHealthAPI } from '@/lib/api';
+import { createLinks, recordLinks } from '@/lib/deepLinks';
 import { groupByControlFamily } from '@/lib/controlFamilies';
 import { hasPermission } from '@/lib/access';
 
@@ -226,7 +227,7 @@ function ControlHealthPanel() {
   );
 }
 
-export default function ControlsPage() {
+function ControlsPageInner() {
   const { user } = useAuth();
   const router = useRouter();
   const canExport = hasPermission(user, 'implementations.read');
@@ -236,8 +237,11 @@ export default function ControlsPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'health'>('list');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFramework, setSelectedFramework] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  // Charts on the compliance overview link here pre-filtered:
+  // ?framework=<code> (framework bar) and ?status=<status> (status donut).
+  const searchParams = useSearchParams();
+  const [selectedFramework, setSelectedFramework] = useState<string>(searchParams.get('framework') || 'all');
+  const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') || 'all');
   const [expandedFamilies, setExpandedFamilies] = useState<Record<string, boolean>>({});
   const [exporting, setExporting] = useState<string | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -254,6 +258,7 @@ export default function ControlsPage() {
   const [testDrafts, setTestDrafts] = useState<Record<string, InlineTestDraft>>({});
   const testMessageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const canWrite = hasPermission(user, 'implementations.write');
+  const canWriteEvidence = hasPermission(user, 'evidence.write');
   const canWriteAssessments = hasPermission(user, 'assessments.write');
 
   useEffect(() => {
@@ -1060,13 +1065,13 @@ export default function ControlsPage() {
                                         {crosswalkBusy === control.id ? 'Running…' : '🔗 Crosswalk'}
                                       </button>
                                     ) : null}
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/controls/${control.id}`); }}
+                                    <Link
+                                      href={recordLinks.control(control.id)}
+                                      onClick={(e) => e.stopPropagation()}
                                       className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
                                     >
                                       Full Detail →
-                                    </button>
+                                    </Link>
                                   </div>
                                 </td>
                               </tr>
@@ -1079,6 +1084,27 @@ export default function ControlsPage() {
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <div className="space-y-3">
+                                      {/* Quick actions: do the common next step without leaving the list */}
+                                      <div className="flex flex-wrap gap-2" aria-label={`Actions for ${control.controlId}`}>
+                                        {canWriteEvidence && (
+                                          <Link href={recordLinks.controlUploadEvidence(control.id)} className="rounded-md bg-purple-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-800">
+                                            Upload evidence
+                                          </Link>
+                                        )}
+                                        {canWrite && (
+                                          <Link href={createLinks.poamForControl(control.id)} className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50">
+                                            Add POA&amp;M item
+                                          </Link>
+                                        )}
+                                        {canWrite && (
+                                          <Link href={createLinks.exceptionForControl(control.id)} className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50">
+                                            Request exception
+                                          </Link>
+                                        )}
+                                        <Link href={recordLinks.control(control.id)} className="px-2 py-1.5 text-xs font-semibold text-purple-800 hover:underline">
+                                          Open full page
+                                        </Link>
+                                      </div>
                                       {/* Description */}
                                       <div>
                                         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description</div>
@@ -1233,5 +1259,13 @@ export default function ControlsPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function ControlsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ControlsPageInner />
+    </Suspense>
   );
 }

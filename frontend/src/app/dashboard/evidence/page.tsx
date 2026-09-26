@@ -1,7 +1,8 @@
 // @tier: pro
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { evidenceAPI, implementationsAPI, integrationsAPI, autoEvidenceAPI, pendingEvidenceAPI } from '@/lib/api';
@@ -111,10 +112,31 @@ const DATA_SENS_BADGE: Record<string, string> = {
   public:       'bg-green-100 text-green-700'
 };
 
-export default function EvidencePage() {
+type EvidenceTab = 'library' | 'auto' | 'pending';
+const EVIDENCE_TABS: { id: EvidenceTab; label: string }[] = [
+  { id: 'library', label: 'Library' },
+  { id: 'auto', label: 'Automated collection' },
+  { id: 'pending', label: 'AI suggestions' },
+];
+
+function EvidencePageInner() {
   const { user } = useAuth();
   const canWriteEvidence = hasPermission(user, 'evidence.write');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Deep links: ?tab=auto|pending selects a tab (the old /evidence/auto and
+  // /evidence/pending pages redirect here); ?open=<id> opens one item's drawer
+  // (search results); ?new=1 goes straight to the upload form ("+ New").
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const openParam = searchParams.get('open');
+  const wantsNew = searchParams.get('new') === '1';
+  const activeTab: EvidenceTab = tabParam === 'auto' || tabParam === 'pending' ? tabParam : 'library';
+  const deepLinkHandled = useRef(false);
+  const selectTab = (tab: EvidenceTab) => {
+    router.replace(tab === 'library' ? pathname : `${pathname}?tab=${tab}`, { scroll: false });
+  };
 
   const [evidence, setEvidence] = useState<EvidenceFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -752,6 +774,26 @@ export default function EvidencePage() {
     { value: 'other', label: 'Other' },
   ];
 
+  useEffect(() => {
+    if (deepLinkHandled.current) return;
+    if (wantsNew && canWriteEvidence && activeTab === 'library') {
+      deepLinkHandled.current = true;
+      window.setTimeout(() => document.getElementById('evidence-upload')?.scrollIntoView({ block: 'start' }), 50);
+      return;
+    }
+    if (!openParam || loading) return;
+    deepLinkHandled.current = true;
+    const inList = evidence.find((e) => e.id === openParam);
+    if (inList) {
+      setDetailEvidence(inList);
+      return;
+    }
+    // Not on the loaded page of the library: fetch the one item.
+    evidenceAPI.getById(openParam)
+      .then((res) => { if (res.data?.data) setDetailEvidence(res.data.data as EvidenceFile); })
+      .catch(() => setError('That evidence item could not be found.'));
+  }, [wantsNew, canWriteEvidence, activeTab, openParam, loading, evidence]);
+
   const togglePiiType = (type: string) => {
     setUploadPiiTypes(prev =>
       prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
@@ -778,6 +820,26 @@ export default function EvidencePage() {
           <p className="text-gray-600 mt-2">Upload and manage evidence files, then link them to compliance controls</p>
         </div>
 
+        <div className="border-b border-gray-200" role="tablist" aria-label="Evidence views">
+          <div className="flex gap-1 overflow-x-auto">
+            {EVIDENCE_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t.id}
+                onClick={() => selectTab(t.id)}
+                className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium ${activeTab === t.id ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+              >
+                {t.label}
+                {t.id === 'pending' && pendingStats.pending > 0 && (
+                  <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-800">{pendingStats.pending}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Cross-feature navigation */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-800">
@@ -796,9 +858,11 @@ export default function EvidencePage() {
           </div>
         )}
 
+        {activeTab === 'library' && (
+        <>
         {/* Upload Area */}
         {canWriteEvidence && (
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div id="evidence-upload" className="bg-white rounded-lg shadow-md p-6 scroll-mt-20">
           <div className="flex items-center justify-between mb-4 gap-3">
             <h3 className="text-lg font-bold text-gray-900">Upload Evidence</h3>
             <button
@@ -1004,6 +1068,11 @@ export default function EvidencePage() {
           </div>
         )}
 
+        </>
+        )}
+
+        {activeTab === 'auto' && (
+        <>
         {/* Auto-Collection Rules */}
         {canWriteEvidence && (
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -1110,6 +1179,11 @@ export default function EvidencePage() {
           </div>
         )}
 
+        </>
+        )}
+
+        {activeTab === 'pending' && (
+        <>
         {/* AI-Powered Evidence Suggestions (Pending Evidence) */}
         {canWriteEvidence && (
           <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
@@ -1213,6 +1287,11 @@ export default function EvidencePage() {
           </div>
         )}
 
+        </>
+        )}
+
+        {activeTab === 'library' && (
+        <>
         {/* Evidence Library */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between mb-4">
@@ -1337,6 +1416,9 @@ export default function EvidencePage() {
             </div>
           )}
         </div>
+
+        </>
+        )}
 
         {detailEvidence && (
           <EvidenceDetailDrawer
@@ -1932,5 +2014,13 @@ export default function EvidencePage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function EvidencePage() {
+  return (
+    <Suspense fallback={null}>
+      <EvidencePageInner />
+    </Suspense>
   );
 }

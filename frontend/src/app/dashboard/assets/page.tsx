@@ -1,7 +1,7 @@
 // @tier: pro
 'use client';
 
-import { Suspense, useState, useEffect, useCallback, FormEvent } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -9,6 +9,7 @@ import { assetsAPI, Asset, AssetCategory, Environment } from '@/lib/assetsApi';
 import { vulnerabilitiesAPI } from '@/lib/api';
 import AssetControlLinks from '@/components/cmdb/AssetControlLinks';
 import AssetRiskLinks from '@/components/cmdb/AssetRiskLinks';
+import InventoryOverview from '@/components/cmdb/InventoryOverview';
 
 interface CreateAssetFormState {
   category_id: string;
@@ -214,6 +215,15 @@ function AssetsPageContent() {
     setCreateForm(DEFAULT_CREATE_FORM);
     setShowCreateModal(true);
   };
+
+  // Deep link from "+ New": ?new=1 opens Add Asset.
+  const wantsNew = searchParams.get('new') === '1';
+  const newHandled = useRef(false);
+  useEffect(() => {
+    if (!wantsNew || newHandled.current) return;
+    newHandled.current = true;
+    openCreateModal();
+  }, [wantsNew]);
 
   const closeCreateModal = () => {
     if (creatingAsset) return;
@@ -603,6 +613,10 @@ function AssetsPageContent() {
         </div>
       )}
 
+      <div className="mt-10">
+        <InventoryOverview />
+      </div>
+
       {showCreateModal && (
         <div className="fixed inset-0 z-50">
           <button
@@ -611,7 +625,7 @@ function AssetsPageContent() {
             className="absolute inset-0 bg-black/30"
             onClick={closeCreateModal}
           />
-          <div className="absolute left-1/2 top-10 w-[min(720px,95vw)] -translate-x-1/2 rounded-xl bg-white shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-label="Add Asset" className="absolute left-1/2 top-10 w-[min(720px,95vw)] -translate-x-1/2 rounded-xl bg-white shadow-2xl">
             <div className="border-b px-6 py-4">
               <h2 className="text-lg font-bold text-gray-900">Add Asset</h2>
               <p className="text-sm text-gray-600 mt-1">Capture a new CMDB asset for this organization.</p>

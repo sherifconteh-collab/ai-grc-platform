@@ -9,6 +9,7 @@
     "start": "node -e \"const fs=require('fs');if(fs.existsSync('server.js')){require('./server.js')}else{const c=require('child_process');const cmd=process.platform==='win32'?'npx.cmd':'npx';const p=c.spawn(cmd,['next','start'],{stdio:'inherit'});p.on('exit',code=>process.exit(code??1));}\"",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:links": "node scripts/check-ui-links.js",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "generate:api-types": "openapi-typescript ../docs/openapi.yaml -o src/lib/generated/api-types.ts",
