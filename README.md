@@ -8,6 +8,15 @@
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
+> **This is the community edition** — every feature on this page is free, self-hosted, AGPL v3, no tier gating, no license key, ever. A sibling commercial product,
+> [`ControlWeaver-Pro`](https://github.com/sherifconteh-collab/ControlWeaver-Pro), shares this
+> core and adds enterprise-only capabilities (SAML SSO + admin config UI, additional
+> connectors, SCIM provisioning, HIPAA security risk assessment, ERP access governance) on a
+> paid plan or self-hosted license key. `ControlWeaver-Pro`'s
+> [`FEATURE_GATES.md`](https://github.com/sherifconteh-collab/ControlWeaver-Pro/blob/main/FEATURE_GATES.md)
+> is the authoritative policy for what's free (and therefore ported here) versus what stays
+> exclusive to that repo.
+
 ---
 
 <a id="desktop-app"></a>
@@ -67,11 +76,11 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (21 tools)
 - **Enterprise-Grade**: PostgreSQL RLS, Redis caching, automated backups, SSO, Sentry
 
-## ✅ Current Status — v4.4.0 (All Features Shipped)
+## ✅ Current Status — v4.9.0 (All Features Shipped)
 
-The platform is **fully functional** with the complete v4.4.0 feature set. Every capability is available — no tier gating, no feature flags.
+The platform is **fully functional**. Every capability below is available — no tier gating, no feature flags, ever. For the exhaustive, versioned history of every change, see [`RELEASE_NOTES.md`](./RELEASE_NOTES.md); the sections below are a durable feature overview, not tied to any one release.
 
-### New in v4.4.0
+### Highlights since v4.3.0
 - 🩺 **Control Health scoring** — a deterministic 0–100 score per control (evidence freshness, latest assessment outcome, open vulnerabilities/POA&M items, active exceptions) with a fleet-wide KPI summary
 - 🚫 **Control Exceptions** — time-boxed, approvable exceptions with a status-filtered workspace
 - 🕒 **Scheduled Reports** — recurring report generation (cadence, format, recipients) with manual run-now
