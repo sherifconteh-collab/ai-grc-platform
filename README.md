@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-26 | PR #315: security: port production-readiness auth hardening and integrity fixes -->
+<!-- LAST_UPDATED: 2026-09-26 | PR #317: docs: refresh README status header, cross-link ControlWeaver-Pro's editions and feature gates -->
 
 ## 🎯 What is This?
 
