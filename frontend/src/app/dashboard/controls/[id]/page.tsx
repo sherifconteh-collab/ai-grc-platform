@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { controlsAPI, implementationsAPI, usersAPI, aiAPI, assessmentsAPI, evidenceAPI, poamAPI, vulnerabilitiesAPI } from '@/lib/api';
@@ -121,6 +121,10 @@ export default function ControlDetailPage() {
   const canWriteAssessments = hasPermission(user, 'assessments.write');
   const params = useParams();
   const id = params.id as string;
+  const searchParams = useSearchParams();
+  // Deep link from My Work / "+ New": ?action=upload-evidence opens the evidence panel for this control.
+  const deepLinkAction = searchParams.get('action');
+  const deepLinkHandled = useRef(false);
 
   const [controlData, setControlData] = useState<any>(null);
   const [implementation, setImplementation] = useState<Implementation | null>(null);
@@ -270,6 +274,16 @@ export default function ControlDetailPage() {
       loadRiskSummary();
     }
   }, [id, loadData, loadRiskSummary]);
+
+  useEffect(() => {
+    if (deepLinkHandled.current || loading || !controlData) return;
+    if (deepLinkAction === 'upload-evidence' && canWriteEvidence) {
+      deepLinkHandled.current = true;
+      openEvidenceModal();
+    }
+    // openEvidenceModal is recreated each render; the ref guards against re-running.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkAction, loading, controlData, canWriteEvidence]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -1231,10 +1245,10 @@ export default function ControlDetailPage() {
         {/* Evidence Modal */}
         {evidenceModalOpen && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] overflow-hidden">
+            <div role="dialog" aria-modal="true" aria-labelledby="evidence-modal-title" className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] overflow-hidden">
               <div className="p-4 border-b flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Link Evidence to This Control</h3>
+                  <h3 id="evidence-modal-title" className="text-lg font-bold text-gray-900">Link Evidence to {controlData?.control_id || 'This Control'}</h3>
                   <p className="text-xs text-gray-500 mt-1">
                     Upload new evidence or link existing evidence from your library.
                   </p>

@@ -9,9 +9,8 @@ function AuditRedirectPageInner() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', 'audit');
-    router.replace(`/dashboard/settings?${params.toString()}`);
+    const qs = searchParams.toString();
+    router.replace(`/dashboard/settings/audit-log${qs ? `?${qs}` : ''}`);
   }, [router, searchParams]);
 
   return null;

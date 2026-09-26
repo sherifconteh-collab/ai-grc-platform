@@ -44,7 +44,7 @@ export default function AiProviderSetupModal({ open, onClose }: AiProviderSetupM
 
   function handleGoToSettings() {
     onClose();
-    router.push('/dashboard/settings/ai-keys');
+    router.push('/dashboard/settings/ai-providers');
   }
 
   return (

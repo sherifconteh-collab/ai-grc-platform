@@ -10,8 +10,8 @@
  * API-only rather than building them; this is the screen.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { poamAPI, usersAPI } from '@/lib/api';
@@ -21,6 +21,7 @@ import { StatusBadge, PriorityBadge, SlippageIndicator, POAM_STATUS_COLORS } fro
 import PoamMilestones from '@/components/poam/PoamMilestones';
 import PoamReviewPanel from '@/components/poam/PoamReviewPanel';
 import { remediationTerms } from '@/lib/poamTerminology';
+import { focusTarget } from '@/lib/focusTarget';
 import {
   PoamItem, PoamUpdate, PoamLinkedControl, PoamLinkedRisk, PoamApprovalRequest,
   POAM_STATUSES, POAM_PRIORITIES, errorMessage,
@@ -37,6 +38,11 @@ export default function PoamDetailPage() {
   const params = useParams();
   const id = String(params?.id || '');
   const { user } = useAuth();
+  // Deep links from My Work: ?action=update-status opens the edit form on the
+  // status field; ?action=review scrolls to the auditor review panel.
+  const searchParams = useSearchParams();
+  const deepLinkAction = searchParams.get('action');
+  const deepLinkHandled = useRef(false);
 
   const [item, setItem] = useState<PoamItem | null>(null);
   const [updates, setUpdates] = useState<PoamUpdate[]>([]);
@@ -117,6 +123,18 @@ export default function PoamDetailPage() {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (deepLinkHandled.current || !item) return;
+    if (deepLinkAction === 'update-status' && canWrite) {
+      deepLinkHandled.current = true;
+      setEditing(true);
+      focusTarget('poam-status');
+    } else if (deepLinkAction === 'review') {
+      deepLinkHandled.current = true;
+      window.setTimeout(() => document.getElementById('poam-review')?.scrollIntoView({ block: 'start' }), 50);
+    }
+  }, [deepLinkAction, item, canWrite]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -269,12 +287,14 @@ export default function PoamDetailPage() {
         {error && <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
         {toast && <div role="status" className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">{toast}</div>}
 
+        <div id="poam-review" className="scroll-mt-20">
         <PoamReviewPanel
           item={item}
           currentUserId={user?.id ? String(user.id) : null}
           canReview={canReview}
           onReviewed={() => { setToast('Review decision recorded'); load(); }}
         />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">

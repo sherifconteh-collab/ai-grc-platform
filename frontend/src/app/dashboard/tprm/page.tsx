@@ -2,7 +2,9 @@
 
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { Suspense, useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
+import VendorContractsPanel from '@/components/tprm/VendorContractsPanel';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { tprmAPI, aiAPI, tprmPublicAPI, vendorSecurityAPI } from '@/lib/api';
@@ -168,7 +170,8 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
   other: 'Other',
 };
 
-type ActiveTab = 'vendors' | 'questionnaires' | 'documents' | 'security_ratings';
+type ActiveTab = 'vendors' | 'questionnaires' | 'documents' | 'security_ratings' | 'contracts';
+const TAB_IDS: ActiveTab[] = ['vendors', 'questionnaires', 'documents', 'security_ratings', 'contracts'];
 
 const emptyVendorForm = {
   vendor_name: '',
@@ -193,8 +196,17 @@ const emptyDocForm = {
   notes: '',
 };
 
-export default function TprmPage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('vendors');
+function TprmPageInner() {
+  // Deep links: ?tab=<id> selects a tab (the old Vendor Contracts page redirects to
+  // ?tab=contracts); ?vendor=<id> opens that vendor (search results); ?new=1 opens Add Vendor.
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const vendorParam = searchParams.get('vendor');
+  const wantsNew = searchParams.get('new') === '1';
+  const deepLinkHandled = useRef(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
+    tabParam && (TAB_IDS as string[]).includes(tabParam) ? (tabParam as ActiveTab) : 'vendors'
+  );
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
   const [documents, setDocuments] = useState<TprmDocument[]>([]);
@@ -271,6 +283,25 @@ export default function TprmPage() {
       setCmdbAssets([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (deepLinkHandled.current || loading) return;
+    if (wantsNew) {
+      deepLinkHandled.current = true;
+      setActiveTab('vendors');
+      setShowVendorModal(true);
+      loadCmdbAssets();
+      return;
+    }
+    if (vendorParam) {
+      const match = vendors.find((v) => v.id === vendorParam);
+      if (match) {
+        deepLinkHandled.current = true;
+        setActiveTab('vendors');
+        setSelectedVendor(match);
+      }
+    }
+  }, [loading, wantsNew, vendorParam, vendors, loadCmdbAssets]);
 
   const handleSendQuestionnaire = async (q: Questionnaire) => {
     const emailOverride = sendEmailOverride[q.id] || '';
@@ -542,14 +573,14 @@ export default function TprmPage() {
 
         {/* Cross-feature linkage */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Link href="/dashboard/vendor-risk"
-            className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
+          <button type="button" onClick={() => setActiveTab('contracts')}
+            className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors text-left">
             <span className="text-xl">🤝</span>
             <div>
               <div className="text-sm font-medium text-purple-800">Vendor Contracts</div>
               <div className="text-xs text-purple-600">Contracts, renewals, SLAs, quick scoring</div>
             </div>
-          </Link>
+          </button>
           <Link href="/dashboard/ai-insights"
             className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
             <span className="text-xl">🛡️</span>
@@ -604,7 +635,7 @@ export default function TprmPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
             <nav className="flex gap-0">
-              {(['vendors', 'questionnaires', 'documents', 'security_ratings'] as ActiveTab[]).map(tab => (
+              {TAB_IDS.map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -618,6 +649,7 @@ export default function TprmPage() {
                   {tab === 'questionnaires' && '📋 Questionnaires'}
                   {tab === 'documents' && '📄 Documents'}
                   {tab === 'security_ratings' && '🛡️ Security Ratings'}
+                  {tab === 'contracts' && '🤝 Contracts'}
                 </button>
               ))}
             </nav>
@@ -1099,6 +1131,7 @@ export default function TprmPage() {
 
                 {/* ===== SECURITY RATINGS TAB ===== */}
                 {activeTab === 'security_ratings' && <VendorSecurityRatingsPanel />}
+                {activeTab === 'contracts' && <VendorContractsPanel />}
               </>
             )}
           </div>
@@ -1989,5 +2022,13 @@ function VendorSecurityRatingsPanel() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TprmPage() {
+  return (
+    <Suspense fallback={null}>
+      <TprmPageInner />
+    </Suspense>
   );
 }

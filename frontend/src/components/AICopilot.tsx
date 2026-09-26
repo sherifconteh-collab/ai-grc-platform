@@ -261,7 +261,7 @@ export default function AICopilot() {
             <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg">
               {error}
               {error.includes('Settings') && (
-                <a href="/dashboard/settings?tab=llm" className="ml-1 underline font-medium">
+                <a href="/dashboard/settings/ai-providers" className="ml-1 underline font-medium">
                   Go to Settings
                 </a>
               )}

@@ -17,7 +17,7 @@ export default function AiQuotaModal({ open, onClose, used, limit }: AiQuotaModa
 
   function handleAddKey() {
     onClose();
-    router.push('/dashboard/settings/ai-keys');
+    router.push('/dashboard/settings/ai-providers');
   }
 
   return (
