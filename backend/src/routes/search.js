@@ -12,7 +12,16 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 const { log, serializeError } = require('../utils/logger');
+
+// express-rate-limit applied router-wide, ahead of authenticate, so a cheap
+// IP-based bound is in place before authenticate's own DB/JWT work runs, and
+// so static analysis (CodeQL) can trace a recognized rate-limiting
+// middleware covering every route below — the Redis-backed
+// createOrgRateLimiter below remains the real per-org production control.
+// Matches the pattern already established in audit.js/trustCenter.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 router.use(authenticate);
 router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 240, label: 'global-search' }));
