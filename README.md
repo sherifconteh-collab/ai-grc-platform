@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #319: fix(search): add express-rate-limit import so CodeQL recognizes coverage -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #311: chore(backend)(deps): bump @simplewebauthn/server from 13.3.2 to 14.0.2 in /backend -->
 
 ## 🎯 What is This?
 
