@@ -54,7 +54,7 @@ jobs:
       - name: Set up Node.js 20
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Compare package version to existing tags
         id: check
@@ -162,7 +162,7 @@ jobs:
       - name: Set up Node.js 20
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Check frontend/package-lock.json for missing platform variants
         run: node scripts/check-lockfile-platforms.js
@@ -189,7 +189,7 @@ jobs:
       - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: |
             backend/package-lock.json
@@ -375,7 +375,7 @@ jobs:
       - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: |
             backend/package-lock.json
@@ -509,7 +509,7 @@ jobs:
       - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: |
             backend/package-lock.json
@@ -637,7 +637,7 @@ jobs:
       - name: Set up Node.js 20 (with npm cache)
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: |
             backend/package-lock.json

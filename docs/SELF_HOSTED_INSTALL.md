@@ -14,7 +14,7 @@ you choose does not change which features you get — see the repository
 
 ## Prerequisites
 
-- Node.js 20.16+ and npm
+- Node.js 24+ and npm
 - PostgreSQL 17+
 - Git
 
