@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Backend - npm audit
         run: |
@@ -82,7 +82,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Backend - syntax check
         run: |
@@ -159,7 +159,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
-        with: { node-version: '20' }
+        with: { node-version: '24' }
       - name: Install backend dependencies
         run: cd backend && npm ci
       - name: Run all migrations against a fresh Postgres 16 instance
@@ -608,7 +608,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Verify supply chain integrity controls
         run: |
@@ -669,7 +669,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install license-checker
         run: npm install -g license-checker
