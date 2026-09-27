@@ -8,7 +8,7 @@
  *   DEMO_VERIFY_API_BASE=https://<host>/api/v1
  *   DEMO_VERIFY_PASSWORD=ControlWeave!2026
  */
-require('dotenv').config()
+require('dotenv').config({ quiet: true })
 const {
   DEMO_ADMIN_ACCOUNTS,
   DEMO_AUDITOR_ACCOUNTS,

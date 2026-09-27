@@ -29,7 +29,7 @@
  * Control ID prefix:     'HIPAA-164.xxx(y)(z)'   (matches seed-frameworks.js)
  */
 
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { Pool } = require('pg');
 
 const STRICT = process.argv.includes('--strict') || process.env.STRICT_SEEDING === 'true';

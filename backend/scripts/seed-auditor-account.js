@@ -9,7 +9,7 @@
  * Idempotent — safe to run repeatedly. Requires the organizations to exist
  * already (run seed-demo-accounts.js first).
  */
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const bcrypt = require('bcryptjs');
 const pool = require('../src/config/database');
 const { encrypt, hashForLookup } = require('../src/utils/encrypt');

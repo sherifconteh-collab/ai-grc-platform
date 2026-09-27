@@ -10,7 +10,7 @@
  * friends) is also seeded as an admin in the same organization, so links and
  * screenshots that predate the industry roster still log in.
  */
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const bcrypt = require('bcryptjs');
 const pool = require('../src/config/database');
 const { encrypt, hashForLookup } = require('../src/utils/encrypt');
