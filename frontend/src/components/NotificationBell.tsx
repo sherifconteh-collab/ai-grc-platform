@@ -121,7 +121,7 @@ export default function NotificationBell() {
     <div className="relative z-[70]" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-2 text-gray-300 hover:text-white transition-colors"
+        className="relative p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
         title="Notifications"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -168,7 +168,6 @@ function statusClass(value: string) {
 
 function buildAuditLink(finding: Finding) {
   const query = new URLSearchParams({
-    tab: 'audit',
     eventType: 'vulnerability_scan_imported',
     resourceType: 'vulnerability',
     resourceId: finding.id,
@@ -176,7 +175,7 @@ function buildAuditLink(finding: Finding) {
     vulnerabilityId: finding.vulnerability_id,
     source: finding.source,
   });
-  return `/dashboard/settings?${query.toString()}`;
+  return `/dashboard/settings/audit-log?${query.toString()}`;
 }
 
 function actionTypeLabel(actionType: WorkflowItem['action_type']) {

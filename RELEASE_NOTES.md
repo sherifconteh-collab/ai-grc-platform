@@ -9,7 +9,20 @@
 
 > Changes staged but not yet released to production.
 
+### Documentation
+- **README refresh.** The "Current Status" header was still pinned to v4.4.0 while the shipped
+  version had moved to v4.9.0; it now names the current version and points to this file for the
+  full versioned history instead of re-describing every release inline. Added an "editions" note
+  up top cross-linking `ControlWeaver-Pro` (the sibling commercial product built on the same
+  core) and its `FEATURE_GATES.md` — the authoritative policy for what stays free here versus
+  what's exclusive to the paid edition. No functional change; this repo's actual behavior (no
+  tier gating, every feature free) is unchanged and was already accurately described elsewhere
+  in the README.
+
 ### Changed
+- feat(ui): My Work home, Ctrl+K search, + New, and links that land on their screen ([#316](https://github.com/sherifconteh-collab/ai-grc-platform/pull/316)) — @sherifconteh-collab
+- docs: refresh README status header, cross-link ControlWeaver-Pro's editions and feature gates ([#317](https://github.com/sherifconteh-collab/ai-grc-platform/pull/317)) — @sherifconteh-collab
+- security: port production-readiness auth hardening and integrity fixes ([#315](https://github.com/sherifconteh-collab/ai-grc-platform/pull/315)) — @sherifconteh-collab
 - fix(security): explicit JWT algorithm allow-list on WebSocket auth ([#301](https://github.com/sherifconteh-collab/ai-grc-platform/pull/301)) — @sherifconteh-collab
 - chore(frontend)(deps): bump lucide-react from 1.24.0 to 1.31.0 in /frontend ([#279](https://github.com/sherifconteh-collab/ai-grc-platform/pull/279)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump eslint from 10.8.1 to 10.10.0 in /frontend ([#295](https://github.com/sherifconteh-collab/ai-grc-platform/pull/295)) — @dependabot[bot]

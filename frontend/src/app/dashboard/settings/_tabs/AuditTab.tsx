@@ -80,7 +80,7 @@ export default function AuditTab({
                   ))}
                 </div>
               </div>
-              <Link href="/dashboard/settings?tab=audit" className="font-medium underline hover:text-purple-700">
+              <Link href="/dashboard/settings/audit-log" className="font-medium underline hover:text-purple-700">
                 Clear filters
               </Link>
             </div>

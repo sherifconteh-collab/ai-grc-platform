@@ -8,6 +8,15 @@
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
+> **This is the community edition** — every feature on this page is free, self-hosted, AGPL v3, no tier gating, no license key, ever. A sibling commercial product,
+> [`ControlWeaver-Pro`](https://github.com/sherifconteh-collab/ControlWeaver-Pro), shares this
+> core and adds enterprise-only capabilities (SAML SSO + admin config UI, additional
+> connectors, SCIM provisioning, HIPAA security risk assessment, ERP access governance) on a
+> paid plan or self-hosted license key. `ControlWeaver-Pro`'s
+> [`FEATURE_GATES.md`](https://github.com/sherifconteh-collab/ControlWeaver-Pro/blob/main/FEATURE_GATES.md)
+> is the authoritative policy for what's free (and therefore ported here) versus what stays
+> exclusive to that repo.
+
 ---
 
 <a id="desktop-app"></a>
@@ -53,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-16 | PR #301: fix(security): explicit JWT algorithm allow-list on WebSocket auth -->
+<!-- LAST_UPDATED: 2026-09-26 | PR #316: feat(ui): My Work home, Ctrl+K search, + New, and links that land on their screen -->
 
 ## 🎯 What is This?
 
@@ -67,11 +76,11 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (21 tools)
 - **Enterprise-Grade**: PostgreSQL RLS, Redis caching, automated backups, SSO, Sentry
 
-## ✅ Current Status — v4.4.0 (All Features Shipped)
+## ✅ Current Status — v4.9.0 (All Features Shipped)
 
-The platform is **fully functional** with the complete v4.4.0 feature set. Every capability is available — no tier gating, no feature flags.
+The platform is **fully functional**. Every capability below is available — no tier gating, no feature flags, ever. For the exhaustive, versioned history of every change, see [`RELEASE_NOTES.md`](./RELEASE_NOTES.md); the sections below are a durable feature overview, not tied to any one release.
 
-### New in v4.4.0
+### Highlights since v4.3.0
 - 🩺 **Control Health scoring** — a deterministic 0–100 score per control (evidence freshness, latest assessment outcome, open vulnerabilities/POA&M items, active exceptions) with a fleet-wide KPI summary
 - 🚫 **Control Exceptions** — time-boxed, approvable exceptions with a status-filtered workspace
 - 🕒 **Scheduled Reports** — recurring report generation (cadence, format, recipients) with manual run-now
@@ -131,7 +140,7 @@ The platform is **fully functional** with the complete v4.4.0 feature set. Every
 - ⚡ **Realtime** — Socket.IO-backed live dashboard updates and presence
 - 🔔 **Mobile Push Notifications** — iOS (APNs) and Android (FCM) device token lifecycle
 - 📧 **Forgot / Reset Password** — full self-service password recovery flow
-- 🔁 **Refresh Token Rotation** — single-use refresh tokens; concurrent session cap (configurable, default 10)
+- 🔁 **Refresh Token Rotation** — single-use refresh tokens, kept by the browser in an HttpOnly cookie that page scripts cannot read; concurrent session cap (configurable, default 10)
 - 🐛 **Sentry Integration** — optional error tracking via `SENTRY_DSN`
 - 🗄️ **Redis** — distributed rate limiting (Lua atomic INCR+EXPIRE) and response caching; falls back to in-memory when Redis is not configured
 - 🔒 **PostgreSQL Row-Level Security** — org-scoped RLS on core tables for defense-in-depth multi-tenant isolation
@@ -678,7 +687,7 @@ See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup 
 ```mermaid
 graph TD
     Client(["Browser · Next.js 16.2.4 (React 19)<br/>or Desktop App (Electron, bundled PostgreSQL)"])
-    API["REST API<br/>83 route modules · Node.js 20+, Express 5"]
+    API["REST API<br/>85 route modules · Node.js 20+, Express 5"]
     MW["Middleware<br/>JWT auth · RBAC · Redis rate limiting · SoD"]
     JWTNode["JWT HS384<br/>refresh token rotation"]
     Bcrypt["bcrypt — cost 14"]
@@ -1041,7 +1050,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Models**: see the "Supported providers and models" table above — updated as providers ship new models
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 172 sequential, idempotent migration files (numbered through 160; a few historical duplicate numbers are documented and never renumbered)
-- **API Routes**: 83 route modules
+- **API Routes**: 85 route modules
 - **Services**: 64 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging

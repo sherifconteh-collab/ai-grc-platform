@@ -12,8 +12,8 @@
  * half a register.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import { risksAPI, poamAPI } from '@/lib/api';
@@ -155,6 +155,10 @@ export default function RiskDetailPage() {
   const params = useParams();
   const id = String(params?.id || '');
   const { user } = useAuth();
+  // Deep link from My Work: ?action=reassess jumps to the review form.
+  const searchParams = useSearchParams();
+  const deepLinkAction = searchParams.get('action');
+  const deepLinkHandled = useRef(false);
 
   const [risk, setRisk] = useState<RiskDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -216,6 +220,15 @@ export default function RiskDetailPage() {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (deepLinkHandled.current || !risk || deepLinkAction !== 'reassess') return;
+    deepLinkHandled.current = true;
+    window.setTimeout(() => {
+      document.getElementById('risk-review')?.scrollIntoView({ block: 'start' });
+      document.getElementById('review-notes')?.focus();
+    }, 50);
+  }, [deepLinkAction, risk]);
 
   const handleAddReview = async () => {
     try {
@@ -474,7 +487,7 @@ export default function RiskDetailPage() {
               )}
             </section>
 
-            <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-3">
+            <section id="risk-review" className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-3 scroll-mt-20">
               <h2 className="text-sm font-semibold text-gray-900">Review history</h2>
               {canWrite && (
                 <div className="flex flex-wrap gap-2 items-end">

@@ -9,8 +9,9 @@
  * overdue reviews, lapsed acceptances, and unowned risks.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import {
   risksAPI, departmentsAPI, usersAPI,
@@ -23,6 +24,8 @@ import {
   PageHeader, StatCard, SeverityChip, Pill, EmptyState, LoadingRow,
   ErrorBanner, SuccessBanner, Pagination, humanize, formatDate, severityForScore,
 } from '@/components/registers/RegisterUI';
+import RecordDrawer from '@/components/shell/RecordDrawer';
+import { createLinks, recordLinks } from '@/lib/deepLinks';
 
 interface RiskRow {
   id: string;
@@ -160,7 +163,7 @@ function HeatMap({ cells }: { cells: HeatMapCell[] }) {
   );
 }
 
-export default function RisksPage() {
+function RisksPageInner() {
   const { user } = useAuth();
   const canWrite = hasPermission(user, 'risks.write');
 
@@ -181,6 +184,16 @@ export default function RisksPage() {
   const [owners, setOwners] = useState<UserOption[]>([]);
 
   const [showForm, setShowForm] = useState(false);
+  const [drawerIndex, setDrawerIndex] = useState<number | null>(null);
+  // ?new=1 opens the create form ("+ New").
+  const searchParams = useSearchParams();
+  const wantsNew = searchParams.get('new') === '1';
+  const newHandled = useRef(false);
+  useEffect(() => {
+    if (!wantsNew || !canWrite || newHandled.current) return;
+    newHandled.current = true;
+    setShowForm(true);
+  }, [wantsNew, canWrite]);
   const [form, setForm] = useState<RiskFormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -383,7 +396,7 @@ export default function RisksPage() {
       </div>
 
       {showForm && canWrite ? (
-        <form onSubmit={submitRisk} className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+        <form aria-label="New risk" onSubmit={submitRisk} className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">New risk</h2>
           {formError ? <ErrorBanner message={formError} /> : null}
 
@@ -570,7 +583,13 @@ export default function RisksPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Link
-                        href={`/dashboard/risks/${risk.id}`}
+                        href={recordLinks.risk(risk.id)}
+                        onClick={(e) => {
+                          // A plain click previews in the drawer; Ctrl/Cmd/Shift-click still opens the page.
+                          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                          e.preventDefault();
+                          setDrawerIndex(risks.findIndex((r) => r.id === risk.id));
+                        }}
                         className="text-sm font-medium text-purple-700 hover:text-purple-900 hover:underline"
                       >
                         {risk.title}
@@ -689,6 +708,40 @@ export default function RisksPage() {
           </form>
         </div>
       ) : null}
+      {drawerIndex !== null && risks[drawerIndex] ? (() => {
+        const r = risks[drawerIndex];
+        return (
+          <RecordDrawer
+            eyebrow={r.reference ? `Risk ${r.reference}` : 'Risk'}
+            title={r.title}
+            fields={[
+              { label: 'Status', value: humanize(r.status) },
+              { label: 'Inherent', value: r.inherent_score ?? '—' },
+              { label: 'Residual', value: r.residual_score ?? '—' },
+              { label: 'Owner', value: r.owner_first_name ? `${r.owner_first_name} ${r.owner_last_name || ''}`.trim() : 'Unowned' },
+              { label: 'Next review', value: formatDate(r.next_review_date) },
+              { label: 'Open treatments', value: r.open_treatment_count },
+            ]}
+            actions={canWrite ? [
+              { label: 'Reassess', href: recordLinks.riskReassess(r.id), primary: true },
+              { label: 'Add POA&M item', href: createLinks.poamForRisk(r.id) },
+            ] : []}
+            fullPageHref={recordLinks.risk(r.id)}
+            position={{ index: drawerIndex, total: risks.length }}
+            onPrev={() => setDrawerIndex((i) => (i === null ? i : Math.max(0, i - 1)))}
+            onNext={() => setDrawerIndex((i) => (i === null ? i : Math.min(risks.length - 1, i + 1)))}
+            onClose={() => setDrawerIndex(null)}
+          />
+        );
+      })() : null}
     </DashboardLayout>
+  );
+}
+
+export default function RisksPage() {
+  return (
+    <Suspense fallback={null}>
+      <RisksPageInner />
+    </Suspense>
   );
 }

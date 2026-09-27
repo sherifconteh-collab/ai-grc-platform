@@ -289,19 +289,46 @@ const DEMO_EMAIL_DOMAINS = Object.freeze([
   'utilities.com'
 ]);
 
+// Local parts the demo seed scripts create on demo domains. Matching is done
+// on exact addresses (local part + domain), never on the whole domain: domains
+// like healthcare.com or enterprise.com belong to real companies, and a real
+// user on one of them must not inherit the demo-account exemptions.
+const DEMO_LOCAL_PARTS = Object.freeze([
+  'admin',
+  'auditor',
+  'auditor.lead',
+  'auditor.staff',
+  'analyst',
+  'leadership'
+]);
+
+/**
+ * Demo mode controls whether shared demo accounts are seeded and whether
+ * they get demo treatment at login. Opt-in in production: DEMO_AUTO_SEED must
+ * be explicitly "true". Outside production it defaults to on unless set to
+ * "false", so local development keeps working unchanged.
+ */
+function isDemoModeEnabled() {
+  const raw = String(process.env.DEMO_AUTO_SEED || '').trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
 /**
  * Returns true if the email belongs to a shared demo account.
  * Demo accounts are multi-user (shared by sales prospects) so
  * password resets must be blocked to prevent one user from
- * locking everyone else out.
+ * locking everyone else out. Always false when demo mode is off.
  */
 function isDemoEmail(email) {
-  if (!email) return false;
+  if (!email || !isDemoModeEnabled()) return false;
   const lower = String(email).trim().toLowerCase();
   const atIndex = lower.lastIndexOf('@');
   if (atIndex < 1) return false;
+  const localPart = lower.substring(0, atIndex);
   const domain = lower.substring(atIndex + 1);
-  return DEMO_EMAIL_DOMAINS.includes(domain);
+  return DEMO_LOCAL_PARTS.includes(localPart) && DEMO_EMAIL_DOMAINS.includes(domain);
 }
 
 function resolveDemoAccountPassword(...candidates) {
@@ -320,6 +347,12 @@ function resolveDemoAccountPassword(...candidates) {
 
   const provided = normalizedCandidates.find((candidate) => candidate.value.length > 0);
   const password = provided?.value || DEFAULT_DEMO_PASSWORD;
+  // The built-in default is published in the repository, so production demo
+  // instances must supply their own password (some callers pass the default
+  // explicitly as a fallback candidate, hence the value comparison).
+  if (password === DEFAULT_DEMO_PASSWORD && process.env.NODE_ENV === 'production') {
+    throw new Error('DEMO_ACCOUNT_PASSWORD must be set to a non-default value for demo accounts in production.');
+  }
   if (password.length < MIN_DEMO_PASSWORD_LENGTH) {
     throw new Error(`${provided?.label || 'Demo account password'} must be at least ${MIN_DEMO_PASSWORD_LENGTH} characters.`);
   }
@@ -344,6 +377,8 @@ module.exports = {
   HF_FINDINGS_BY_TIER,
   HF_DEMO_TARGET_ACCOUNTS,
   DEMO_EMAIL_DOMAINS,
+  DEMO_LOCAL_PARTS,
+  isDemoModeEnabled,
   isDemoEmail,
   resolveDemoAccountPassword
 };

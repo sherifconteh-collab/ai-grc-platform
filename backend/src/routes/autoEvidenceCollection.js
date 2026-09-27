@@ -1,6 +1,12 @@
 // @tier: pro
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
+
+// express-rate-limit router-wide, ahead of any auth or DB work, so every
+// handler below is covered (CodeQL js/missing-rate-limiting). Endpoint-specific
+// limiters further down stay the tighter controls.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
 const fs = require('fs');
 const path = require('path');
 const { createHash } = require('crypto');
@@ -250,81 +256,16 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
     return { evidence_id: evidenceRecord.id, result_count: searchResult.results.length };
   }
 
-  // Non-Splunk source types: create an evidence record with the rule configuration.
-  // Source metadata provides category context and evidence descriptions.
-  const meta = SOURCE_TYPE_META[rule.source_type] || { label: rule.source_type, category: 'custom' };
-  const sourceLabel = meta.label;
-  const sc = rule.source_config || {};
-
-  const importedAt = new Date().toISOString();
-
-  // Only include non-sensitive config fields in the stored evidence payload.
-  // Sensitive keys like auth_header, api_token, etc. are excluded.
-  const allowedConfigFields = new Set(meta.configFields || []);
-  const safeConfig = {};
-  for (const [key, val] of Object.entries(sc)) {
-    if (allowedConfigFields.has(key)) safeConfig[key] = val;
-  }
-
-  const evidencePayload = {
-    auto_collected: true,
-    rule_id: rule.id,
-    rule_name: rule.name,
-    source: rule.source_type,
-    source_label: sourceLabel,
-    source_category: meta.category,
-    imported_at: importedAt,
-    config: safeConfig,
-    summary: { status: 'collected', note: `Evidence collected via ${sourceLabel} integration` },
-    evidence_description: meta.description,
-    results: sc.results || []
-  };
-
-  const fileBody = Buffer.from(JSON.stringify(evidencePayload, null, 2), 'utf8');
-  const fileHash = createHash('sha384').update(fileBody).digest('hex');
-  const stamp = Date.now();
-  const safeName = sanitizeRuleName(rule.name);
-  const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
-  const diskName = `${stamp}-${Math.round(Math.random() * 1e9)}-auto.json`;
-  const filePath = path.join(uploadsDir, diskName);
-  await fs.promises.writeFile(filePath, fileBody);
-
-  const description = `Auto-collected from ${sourceLabel} by rule "${rule.name}"`;
-  const tags = Array.isArray(rule.tags) ? rule.tags : [];
-  const retentionUntil = getDefaultRetentionDate();
-
-  const ins = await pool.query(
-    `INSERT INTO evidence (
-       organization_id, uploaded_by, file_name, file_path, file_size, mime_type,
-       description, tags, integrity_hash_sha256, evidence_version, retention_until,
-       integrity_verified_at
-     )
-     VALUES ($1, $2, $3, $4, $5, 'application/json', $6, $7, $8, 1, $9, NOW())
-     RETURNING *`,
-    [orgId, triggeredByUserId, fileName, filePath, fileBody.length, description,
-     tags, fileHash, retentionUntil]
+  // No collector exists yet for the remaining source types. Refuse to run
+  // rather than store a placeholder as "collected" evidence: that record used
+  // to be hashed, stamped integrity-verified and auto-linked to controls, so an
+  // auditor would see evidence that no system ever produced.
+  const meta = SOURCE_TYPE_META[rule.source_type] || { label: rule.source_type };
+  const unavailable = new Error(
+    `Automated collection from ${meta.label} is not available yet. Upload this evidence manually or use a Splunk rule.`
   );
-  const evidenceRecord = ins.rows[0];
-
-  const controlIds = Array.isArray(rule.control_ids) ? rule.control_ids.filter((id) => isUuid(id)) : [];
-  if (controlIds.length > 0) {
-    const validRows = await pool.query(
-      'SELECT id FROM framework_controls WHERE id = ANY($1::uuid[])',
-      [controlIds]
-    );
-    const validControlIds = validRows.rows.map((row) => row.id);
-    if (validControlIds.length > 0) {
-      await pool.query(
-        `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
-         SELECT $1, unnest($2::uuid[]), $3, e.organization_id
-         FROM evidence e WHERE e.id = $1
-         ON CONFLICT DO NOTHING`,
-        [evidenceRecord.id, validControlIds, `Auto-linked by rule "${rule.name}"`]
-      );
-    }
-  }
-
-  return { evidence_id: evidenceRecord.id, result_count: evidencePayload.results.length };
+  unavailable.code = 'COLLECTOR_UNAVAILABLE';
+  throw unavailable;
 }
 
 // GET /api/v1/auto-evidence/sources — returns source type metadata (categories, labels, config fields)

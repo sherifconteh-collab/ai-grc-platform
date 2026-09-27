@@ -9,7 +9,8 @@
  * and the response duration metrics that come from the phase timestamps.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Suspense, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import {
   incidentsAPI, departmentsAPI,
@@ -130,7 +131,7 @@ function NotificationClock({ notification }: { notification: NotificationState }
   return <Pill tone={hours < 24 ? 'warn' : 'info'}>{`${Math.round(hours)}h left`}</Pill>;
 }
 
-export default function IncidentsPage() {
+function IncidentsPageInner() {
   const { user } = useAuth();
   const canWrite = hasPermission(user, 'incidents.write');
 
@@ -150,6 +151,23 @@ export default function IncidentsPage() {
   const [breachesOnly, setBreachesOnly] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
+  // Deep links: ?new=1 opens the create form ("+ New") ; ?open=<id> highlights one row (search results).
+  const searchParams = useSearchParams();
+  const wantsNew = searchParams.get('new') === '1';
+  const newHandled = useRef(false);
+  const openId = searchParams.get('open');
+  const openHandled = useRef(false);
+  useEffect(() => {
+    if (!openId || openHandled.current || !incidents.some((i) => i.id === openId)) return;
+    openHandled.current = true;
+    window.setTimeout(() => document.getElementById(`incident-${openId}`)?.scrollIntoView({ block: 'center' }), 50);
+  }, [openId, incidents]);
+
+  useEffect(() => {
+    if (!wantsNew || !canWrite || newHandled.current) return;
+    newHandled.current = true;
+    setShowForm(true);
+  }, [wantsNew, canWrite]);
   const [form, setForm] = useState<IncidentFormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -342,7 +360,7 @@ export default function IncidentsPage() {
       </div>
 
       {showForm && canWrite ? (
-        <form onSubmit={submitIncident} className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+        <form aria-label="Report an incident" onSubmit={submitIncident} className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">Report an incident</h2>
           {formError ? <ErrorBanner message={formError} /> : null}
 
@@ -473,7 +491,7 @@ export default function IncidentsPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {incidents.map((incident) => (
-                  <tr key={incident.id} className="hover:bg-gray-50">
+                  <tr key={incident.id} id={`incident-${incident.id}`} aria-current={incident.id === openId ? 'true' : undefined} className={`hover:bg-gray-50 scroll-mt-20 ${incident.id === openId ? 'bg-purple-50 ring-2 ring-inset ring-purple-600' : ''}`}>
                     <td className="px-4 py-3 text-sm font-mono text-gray-600 whitespace-nowrap">
                       {incident.reference || '—'}
                     </td>
@@ -547,5 +565,13 @@ export default function IncidentsPage() {
         <Pagination page={page} limit={PAGE_LIMIT} total={total} onChange={setPage} />
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function IncidentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <IncidentsPageInner />
+    </Suspense>
   );
 }
