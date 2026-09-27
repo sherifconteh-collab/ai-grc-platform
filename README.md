@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #311: chore(backend)(deps): bump @simplewebauthn/server from 13.3.2 to 14.0.2 in /backend -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #318: docs(readme): correct stale counts and add a mermaid architecture diagram -->
 
 ## 🎯 What is This?
 
@@ -1050,7 +1050,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Models**: see the "Supported providers and models" table above — updated as providers ship new models
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 172 sequential, idempotent migration files (numbered through 160; a few historical duplicate numbers are documented and never renumbered)
-- **API Routes**: 85 route modules
+- **API Routes**: 80+ route modules
 - **Services**: 64 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
