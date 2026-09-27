@@ -29,7 +29,7 @@ const https = require('https');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const BASE = (process.env.QA_BASE_URL || process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/+$/, '');
 const MAX_429_RETRIES = parseInt(process.env.QA_MAX_429_RETRIES || '3', 10);

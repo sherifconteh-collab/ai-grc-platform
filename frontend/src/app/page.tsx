@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { requiresOrganizationOnboarding } from '@/lib/access';
 import { getStoredPendingBillingPlan, requiresBillingResolution } from '@/lib/billing';
 import MarketingNav from '@/components/MarketingNav';
+import { FRAMEWORKS_COUNT, CONTROLS_COUNT_LABEL, CROSSWALKS_COUNT_LABEL, MCP_TOOLS_COUNT } from '@/lib/platformStats';
 
 const frameworks = [
   'NIST 800-53', 'ISO 27001', 'SOC 2 Type II', 'HIPAA', 'GDPR',
@@ -210,12 +211,12 @@ function LandingPage() {
       <section className="py-14 px-4 text-white" style={{background: 'linear-gradient(90deg, #7e22ce, #7c3aed, #4338ca)'}}>
         <div className="max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 text-center">
           {[
-            ['30+', 'Frameworks & Standards'],
-            ['670+', 'Security Controls'],
-            ['Built-in', 'Crosswalk Mappings'],
+            [`${FRAMEWORKS_COUNT}`, 'Frameworks & Standards'],
+            [CONTROLS_COUNT_LABEL, 'Security Controls'],
+            [CROSSWALKS_COUNT_LABEL, 'Crosswalk Mappings'],
             ['2,000+', 'Assessment Procedures'],
             ['Multi-tenant', 'Org Isolation'],
-            ['51', 'MCP Tools'],
+            [`${MCP_TOOLS_COUNT}`, 'MCP Tools'],
           ].map(([val, label]) => (
             <div key={label}>
               <div className="text-3xl font-bold">{val}</div>

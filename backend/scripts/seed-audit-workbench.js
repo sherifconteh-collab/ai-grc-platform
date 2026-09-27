@@ -17,7 +17,7 @@
  * Run:
  *   npm run seed:demo:audit-workbench
  */
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const pool = require('../src/config/database');
 const { hashForLookup } = require('../src/utils/encrypt');
 const { DEMO_AUDIT_FIRM_ACCOUNT } = require('./lib/demo-account-config');

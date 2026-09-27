@@ -6,7 +6,7 @@
  * Reference: https://genai.owasp.org/resource/a-practical-guide-for-secure-mcp-server-development/
  */
 
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
