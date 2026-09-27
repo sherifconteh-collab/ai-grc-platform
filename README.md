@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #307: chore(backend)(deps): bump pg from 8.22.0 to 8.23.0 in /backend -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #309: chore(backend)(deps-dev): bump eslint from 10.4.0 to 10.10.0 in /backend -->
 
 ## 🎯 What is This?
 
