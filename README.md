@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-26 | PR #316: feat(ui): My Work home, Ctrl+K search, + New, and links that land on their screen -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #307: chore(backend)(deps): bump pg from 8.22.0 to 8.23.0 in /backend -->
 
 ## 🎯 What is This?
 

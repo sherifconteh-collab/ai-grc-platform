@@ -20,6 +20,7 @@
   in the README.
 
 ### Changed
+- chore(backend)(deps): bump pg from 8.22.0 to 8.23.0 in /backend ([#307](https://github.com/sherifconteh-collab/ai-grc-platform/pull/307)) — @dependabot[bot]
 - feat(ui): My Work home, Ctrl+K search, + New, and links that land on their screen ([#316](https://github.com/sherifconteh-collab/ai-grc-platform/pull/316)) — @sherifconteh-collab
 - docs: refresh README status header, cross-link ControlWeaver-Pro's editions and feature gates ([#317](https://github.com/sherifconteh-collab/ai-grc-platform/pull/317)) — @sherifconteh-collab
 - security: port production-readiness auth hardening and integrity fixes ([#315](https://github.com/sherifconteh-collab/ai-grc-platform/pull/315)) — @sherifconteh-collab
