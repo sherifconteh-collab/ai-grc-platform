@@ -20,6 +20,7 @@
   in the README.
 
 ### Changed
+- chore(backend)(deps): bump @simplewebauthn/server from 13.3.2 to 14.0.2 in /backend ([#311](https://github.com/sherifconteh-collab/ai-grc-platform/pull/311)) — @dependabot[bot]
 - chore(frontend)(deps): bump @simplewebauthn/browser from 13.3.0 to 14.0.0 in /frontend ([#308](https://github.com/sherifconteh-collab/ai-grc-platform/pull/308)) — @dependabot[bot]
 - fix(search): add express-rate-limit import so CodeQL recognizes coverage ([#319](https://github.com/sherifconteh-collab/ai-grc-platform/pull/319)) — @sherifconteh-collab
 - chore(frontend)(deps): bump react-dom and @types/react-dom in /frontend ([#310](https://github.com/sherifconteh-collab/ai-grc-platform/pull/310)) — @dependabot[bot]
