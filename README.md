@@ -68,7 +68,7 @@ The resulting installer is in `electron/dist/`.
 
 A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 34 frameworks with 1,800+ controls. Built to be:
 
-- **Multi-Framework**: 30+ major compliance frameworks out of the box
+- **Multi-Framework**: 34 major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
 - **Threat-Intelligent**: Live feeds from NVD, CISA KEV, MITRE, and AlienVault OTX
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, MAESTRO, and AIUC-1
