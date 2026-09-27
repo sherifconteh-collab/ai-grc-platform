@@ -20,6 +20,7 @@
   in the README.
 
 ### Changed
+- fix(search): add express-rate-limit import so CodeQL recognizes coverage ([#319](https://github.com/sherifconteh-collab/ai-grc-platform/pull/319)) — @sherifconteh-collab
 - chore(frontend)(deps): bump react-dom and @types/react-dom in /frontend ([#310](https://github.com/sherifconteh-collab/ai-grc-platform/pull/310)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @playwright/test from 1.62.1 to 1.63.0 in /frontend ([#313](https://github.com/sherifconteh-collab/ai-grc-platform/pull/313)) — @dependabot[bot]
 - chore(backend)(deps-dev): bump eslint from 10.4.0 to 10.10.0 in /backend ([#309](https://github.com/sherifconteh-collab/ai-grc-platform/pull/309)) — @dependabot[bot]
