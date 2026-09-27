@@ -20,6 +20,7 @@
   in the README.
 
 ### Changed
+- docs: note the new architecture lifecycle tracking Routine ([#321](https://github.com/sherifconteh-collab/ai-grc-platform/pull/321)) — @sherifconteh-collab
 - chore(deps): bump Node.js baseline to 24 across CI and backend engines ([#320](https://github.com/sherifconteh-collab/ai-grc-platform/pull/320)) — @sherifconteh-collab
 - docs(readme): correct stale counts and add a mermaid architecture diagram ([#318](https://github.com/sherifconteh-collab/ai-grc-platform/pull/318)) — @sherifconteh-collab
 - chore(backend)(deps): bump @simplewebauthn/server from 13.3.2 to 14.0.2 in /backend ([#311](https://github.com/sherifconteh-collab/ai-grc-platform/pull/311)) — @dependabot[bot]

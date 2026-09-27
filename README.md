@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #320: chore(deps): bump Node.js baseline to 24 across CI and backend engines -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #321: docs: note the new architecture lifecycle tracking Routine -->
 
 ## 🎯 What is This?
 
