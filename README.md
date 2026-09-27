@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #309: chore(backend)(deps-dev): bump eslint from 10.4.0 to 10.10.0 in /backend -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #313: chore(frontend)(deps-dev): bump @playwright/test from 1.62.1 to 1.63.0 in /frontend -->
 
 ## 🎯 What is This?
 
