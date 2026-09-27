@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:links": "node scripts/check-ui-links.js",
+    "check:readme-sync": "node scripts/check-readme-website-sync.js",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "generate:api-types": "openapi-typescript ../docs/openapi.yaml -o src/lib/generated/api-types.ts",

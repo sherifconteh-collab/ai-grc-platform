@@ -62,13 +62,13 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #319: fix(search): add express-rate-limit import so CodeQL recognizes coverage -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #311: chore(backend)(deps): bump @simplewebauthn/server from 13.3.2 to 14.0.2 in /backend -->
 
 ## 🎯 What is This?
 
 A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 34 frameworks with 1,800+ controls. Built to be:
 
-- **Multi-Framework**: 30+ major compliance frameworks out of the box
+- **Multi-Framework**: 34 major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
 - **Threat-Intelligent**: Live feeds from NVD, CISA KEV, MITRE, and AlienVault OTX
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, MAESTRO, and AIUC-1
@@ -153,7 +153,7 @@ The platform is **fully functional**. Every capability below is available — no
 ### Prerequisites
 
 - **Node.js** 20+ — [download](https://nodejs.org)
-- **PostgreSQL** 14+ — [download](https://www.postgresql.org/download/) (or use `brew install postgresql` on macOS / `sudo apt install postgresql` on Ubuntu)
+- **PostgreSQL** 17+ — [download](https://www.postgresql.org/download/) (or use `brew install postgresql` on macOS / `sudo apt install postgresql` on Ubuntu)
 - **Redis** (optional) — enables distributed rate limiting and response caching
 
 ### 1. Create the database
@@ -382,7 +382,7 @@ Full RMF lifecycle management without leaving the platform:
 
 ### 📋 Multi-Framework Compliance Management
 - Track compliance across 34 frameworks simultaneously
-- **Cross-framework control mapping (Crosswalks)** — 80+ mappings showing control overlaps
+- **Cross-framework control mapping (Crosswalks)** — 3,100+ mappings showing control overlaps
 - Unified risk register with inherent/residual scoring, treatments and named acceptance
 - Gap analysis across standards
 - Framework-gated sidebar navigation
@@ -540,7 +540,7 @@ Full asset and configuration inventory:
    - 25+ org-aware analysis features including gap analysis, regulatory news, and AI threat library
    - RAG grounding for more accurate, context-specific compliance answers
    - Multi-agent orchestration for complex analysis tasks
-   - Latest models: Claude 4.x, GPT-4.1, o3/o4-mini, Gemini 2.0 Flash Lite
+   - Latest models: see the "Supported providers and models" table above
    - Local model support via Ollama (including quantized GGUF)
    - No separate AI tool subscription needed
 
@@ -591,8 +591,8 @@ Full asset and configuration inventory:
 | Cost | **Free** | $30K–200K/yr | $50K–150K/yr | $100K+/yr |
 | Open Source | ✅ | ❌ | ❌ | ❌ |
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
-| Frameworks | 35+ | 10–15 | 10–20 | 20+ |
-| Auto-Crosswalk | ✅ 280+ mappings | ❌ | ❌ | ❌ |
+| Frameworks | 34 | 10–15 | 10–20 | 20+ |
+| Auto-Crosswalk | ✅ 3,100+ mappings | ❌ | ❌ | ❌ |
 | Custom Framework Builder | ✅ | ❌ | Paid Add-on | ❌ |
 | Built-in AI Copilot | ✅ BYOK | ❌ | ❌ | ❌ |
 | RAG + Multi-Agent AI | ✅ | ❌ | ❌ | ❌ |
@@ -684,6 +684,38 @@ See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup 
 
 ## 🏗️ Architecture
 
+```mermaid
+graph TD
+    Client(["Browser · Next.js 16.2.4 (React 19)<br/>or Desktop App (Electron, bundled PostgreSQL)"])
+    API["REST API<br/>85 route modules · Node.js 20+, Express 5"]
+    MW["Middleware<br/>JWT auth · RBAC · Redis rate limiting · SoD"]
+    JWTNode["JWT HS384<br/>refresh token rotation"]
+    Bcrypt["bcrypt — cost 14"]
+    WebAuthn["WebAuthn / Passkeys<br/>ES384 preferred"]
+    OIDC["OpenID Connect SSO"]
+    DB[("PostgreSQL 17+<br/>Row-Level Security<br/>172 migration files")]
+    Cache[("Redis (optional)<br/>in-memory fallback")]
+    Copilot["AI Copilot + RAG<br/>25+ analysis features, BYOK"]
+    Providers["Anthropic · OpenAI · Gemini<br/>xAI Grok · Groq · Ollama (GGUF)"]
+    Feeds["Threat intel feeds<br/>NVD · CISA KEV · MITRE ATT&CK · AlienVault OTX"]
+    MCP["MCP Server<br/>21 tools"]
+    Connectors["15 connector templates<br/>Splunk · AWS Security Hub · Qualys · ITSM"]
+
+    Client -->|HTTPS / WSS or localhost| API
+    API --> MW
+    MW --> JWTNode
+    MW --> Bcrypt
+    MW --> WebAuthn
+    MW --> OIDC
+    MW --> DB
+    MW --> Cache
+    API --> Copilot
+    Copilot --> Providers
+    API --> Feeds
+    API --> MCP
+    API --> Connectors
+```
+
 ```
 controlweave/
 ├── backend/
@@ -700,7 +732,7 @@ controlweave/
 │   │   ├── config/          # Database, Redis, and security configuration
 │   │   └── utils/           # Logging, encryption, TOTP, AI security, password
 │   │                        #   policy, Redis cache, Sentry integration
-│   ├── migrations/          # Database migrations (162)
+│   ├── migrations/          # 172 sequential migration files, numbered through 160 (a few historical duplicate numbers are documented and never renumbered)
 │   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
@@ -853,11 +885,11 @@ controlweave/
 ## 🛠️ Technology Stack
 
 - **Backend**: Node.js / Express 5
-- **Database**: PostgreSQL 14+ with Row-Level Security (RLS)
+- **Database**: PostgreSQL 17+ with Row-Level Security (RLS)
 - **Cache / Rate Limiting**: Redis (optional; in-memory fallback)
 - **Frontend**: Next.js 16.2.4 (React 19) with TypeScript and Tailwind CSS
 - **Authentication**: JWT HS384 + OAuth 2.0, TOTP 2FA, WebAuthn/passkey (ES384), SSO/OIDC, refresh token rotation
-- **AI**: BYOK multi-provider (Anthropic Claude 4.x, OpenAI GPT-4.1/o3/o4-mini, Gemini 2.0, Grok, Groq, Ollama with GGUF); RAG; Multi-Agent Orchestration
+- **AI**: BYOK multi-provider (Anthropic Claude, OpenAI, Google Gemini, xAI Grok, Groq, Ollama with GGUF — see the "Supported providers and models" table above for current model names); RAG; Multi-Agent Orchestration
 - **Threat Intel**: NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX
 - **API**: REST with OpenAPI specification
 - **MCP**: Model Context Protocol server (21 tools)
@@ -900,7 +932,7 @@ controlweave/
 - ✅ AI Copilot with BYOK LLM support (25+ analysis features)
 - ✅ RAG (Retrieval-Augmented Generation) for grounded AI answers
 - ✅ Multi-agent orchestration for complex compliance tasks
-- ✅ Latest AI models: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0, Groq expansion
+- ✅ Multi-provider AI models — kept current as providers ship new releases (see the "Supported providers and models" table)
 - ✅ Quantized GGUF model support for Ollama
 - ✅ Schema-validated structured AI output with few-shot exemplars
 - ✅ RMF Lifecycle management (NIST SP 800-37)
@@ -1011,14 +1043,14 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 - **Frameworks**: 34 supported (including CIS Controls v8 and FedRAMP High added in v4.2.0)
 - **Controls**: 1,800+ controls in database
-- **Crosswalks**: 280+ cross-framework mappings (203 new mappings added in v4.2.0)
+- **Crosswalks**: 3,100+ cross-framework mappings
 - **Connector Templates**: 15 in the Integrations Hub (AWS Security Hub, Qualys VMDR, ServiceNow added in v4.2.0)
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
-- **AI Models**: Claude 4.x, GPT-4.1/o3/o4-mini, Gemini 2.0 Flash Lite, Groq expanded catalog
+- **AI Models**: see the "Supported providers and models" table above — updated as providers ship new models
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
-- **Migrations**: 162 sequential, idempotent migrations
-- **API Routes**: 80+ route modules
+- **Migrations**: 172 sequential, idempotent migration files (numbered through 160; a few historical duplicate numbers are documented and never renumbered)
+- **API Routes**: 85 route modules
 - **Services**: 64 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging

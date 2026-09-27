@@ -13,7 +13,7 @@
  * Run after: seed-frameworks.js, seed-missing-controls.js
  */
 
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { Pool } = require('pg');
 
 const pool = process.env.DATABASE_URL

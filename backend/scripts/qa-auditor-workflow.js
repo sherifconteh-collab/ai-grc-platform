@@ -19,7 +19,7 @@
 const http = require('http');
 const https = require('https');
 const { Pool } = require('pg');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const BASE = (process.env.QA_BASE_URL || process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/+$/, '');
 const QA_PASSWORD = 'AuditorQaPass123!';

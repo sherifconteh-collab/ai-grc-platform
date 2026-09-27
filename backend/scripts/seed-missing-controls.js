@@ -9,7 +9,7 @@
  * carries its own copy.
  */
 
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { Pool } = require('pg');
 const { addControlIfMissing } = require('./lib/frameworkControlUpsert');
 

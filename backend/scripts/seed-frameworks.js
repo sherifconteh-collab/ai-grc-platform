@@ -1,5 +1,5 @@
 // @tier: community
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { Pool } = require('pg');
 const frameworks = require('./lib/frameworks/index');
 const { verifyExpectedCounts } = require('./lib/frameworks/verifyCounts');

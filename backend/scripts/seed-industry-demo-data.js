@@ -16,7 +16,7 @@
  *   npm run seed:demo:industries
  *   node scripts/seed-industry-demo-data.js --orgs=energy,retail
  */
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const pool = require('../src/config/database');
 const {
   DEMO_ADMIN_ACCOUNTS,
