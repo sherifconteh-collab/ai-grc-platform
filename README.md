@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #318: docs(readme): correct stale counts and add a mermaid architecture diagram -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #320: chore(deps): bump Node.js baseline to 24 across CI and backend engines -->
 
 ## 🎯 What is This?
 
