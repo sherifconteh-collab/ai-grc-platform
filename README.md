@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-26 | PR #316: feat(ui): My Work home, Ctrl+K search, + New, and links that land on their screen -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #319: fix(search): add express-rate-limit import so CodeQL recognizes coverage -->
 
 ## 🎯 What is This?
 

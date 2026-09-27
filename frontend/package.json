@@ -18,23 +18,23 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.2.2",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.31.0",
     "next": "^16.3.5",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react-dom": "^19.3.0",
     "recharts": "^3.10.1",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
+    "@types/react-dom": "^19.3.0",
     "eslint": "^10.10.0",
-    "eslint-config-next": "^16.3.3",
+    "eslint-config-next": "^16.3.5",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.3"
