@@ -20,6 +20,7 @@
   in the README.
 
 ### Changed
+- chore(frontend)(deps): bump react-dom and @types/react-dom in /frontend ([#310](https://github.com/sherifconteh-collab/ai-grc-platform/pull/310)) — @dependabot[bot]
 - chore(frontend)(deps-dev): bump @playwright/test from 1.62.1 to 1.63.0 in /frontend ([#313](https://github.com/sherifconteh-collab/ai-grc-platform/pull/313)) — @dependabot[bot]
 - chore(backend)(deps-dev): bump eslint from 10.4.0 to 10.10.0 in /backend ([#309](https://github.com/sherifconteh-collab/ai-grc-platform/pull/309)) — @dependabot[bot]
 - chore(backend)(deps): bump pg from 8.22.0 to 8.23.0 in /backend ([#307](https://github.com/sherifconteh-collab/ai-grc-platform/pull/307)) — @dependabot[bot]

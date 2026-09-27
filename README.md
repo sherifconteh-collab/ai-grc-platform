@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #313: chore(frontend)(deps-dev): bump @playwright/test from 1.62.1 to 1.63.0 in /frontend -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #310: chore(frontend)(deps): bump react-dom and @types/react-dom in /frontend -->
 
 ## 🎯 What is This?
 
