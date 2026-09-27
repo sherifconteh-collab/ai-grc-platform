@@ -42,3 +42,12 @@ Skim this file before any non-trivial change. Detailed conventions live under
 - Migrations → `backend/migrations/NNN_<name>.sql` (sequential, never re-numbered)
 
 See `.claude/rules/*.md` for granular conventions.
+
+## Architecture lifecycle tracking
+
+A monthly, report-only, risk-based Routine audits dependency/runtime/
+security-stack drift across this repo and its sibling **ControlWeaver-Pro** (the flagship this
+repo forked from). It never pushes changes on its own — see the full spec
+in ControlWeaver-Pro's `.openclaw/agents/engineering/cw-architecture-lifecycle-tracker.md`
+(this repo has no `.openclaw/` framework of its own; that agent's mandate
+explicitly covers both repos).
