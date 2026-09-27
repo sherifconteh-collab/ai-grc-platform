@@ -9,7 +9,7 @@
 
 'use strict';
 
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const { deleteSession, getSessionFilePath, readSession } = require('./mcp-auth-session');
 

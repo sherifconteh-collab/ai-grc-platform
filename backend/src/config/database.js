@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { Pool } = require('pg');
 
 const useConnectionString = Boolean(String(process.env.DATABASE_URL || '').trim());

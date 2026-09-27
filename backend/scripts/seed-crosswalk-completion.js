@@ -24,7 +24,7 @@
  *              warning and continues.
  */
 
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { Pool } = require('pg');
 
 const STRICT = process.argv.includes('--strict') || process.env.STRICT_SEEDING === 'true';

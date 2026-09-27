@@ -677,47 +677,34 @@ See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup 
 
 ```mermaid
 graph TD
-    Browser["Browser<br/>Next.js 16.2.4 (React 19)"]
-    Desktop["Desktop App (Electron)<br/>bundled PostgreSQL, no setup"]
+    Client(["Browser · Next.js 16.2.4 (React 19)<br/>or Desktop App (Electron, bundled PostgreSQL)"])
+    API["REST API<br/>83 route modules · Node.js 20+, Express 5"]
+    MW["Middleware<br/>JWT auth · RBAC · Redis rate limiting · SoD"]
+    JWTNode["JWT HS384<br/>refresh token rotation"]
+    Bcrypt["bcrypt — cost 14"]
+    WebAuthn["WebAuthn / Passkeys<br/>ES384 preferred"]
+    OIDC["OpenID Connect SSO"]
+    DB[("PostgreSQL 17+<br/>Row-Level Security<br/>172 migration files")]
+    Cache[("Redis (optional)<br/>in-memory fallback")]
+    Copilot["AI Copilot + RAG<br/>25+ analysis features, BYOK"]
+    Providers["Anthropic · OpenAI · Gemini<br/>xAI Grok · Groq · Ollama (GGUF)"]
+    Feeds["Threat intel feeds<br/>NVD · CISA KEV · MITRE ATT&CK · AlienVault OTX"]
+    MCP["MCP Server<br/>21 tools"]
+    Connectors["15 connector templates<br/>Splunk · AWS Security Hub · Qualys · ITSM"]
 
-    subgraph API["API Layer — Node.js 20+, Express 5"]
-        Express["REST API<br/>83 route modules"]
-        MW["Middleware<br/>JWT auth · RBAC · Redis rate limiting · SoD"]
-    end
-
-    subgraph Auth["Authentication — CNSA Suite 1.0 + 2.0"]
-        JWTSvc["JWT HS384<br/>refresh token rotation"]
-        Bcrypt["bcrypt (cost 14)"]
-        WebAuthn["WebAuthn / Passkeys<br/>ES384 preferred"]
-        OIDC["OpenID Connect SSO"]
-    end
-
-    subgraph Data["Data Layer"]
-        PG["PostgreSQL 17+<br/>Row-Level Security<br/>172 migration files"]
-        Redis["Redis (optional)<br/>rate limiting + caching,\nin-memory fallback"]
-    end
-
-    subgraph AI["AI Layer (Optional, BYOK)"]
-        Copilot["AI Copilot + RAG<br/>25+ analysis features"]
-        Providers["Anthropic · OpenAI · Gemini<br/>xAI Grok · Groq · Ollama (GGUF)"]
-    end
-
-    subgraph Intel["Threat Intel & Ops"]
-        Feeds["NVD · CISA KEV<br/>MITRE ATT&CK · AlienVault OTX"]
-        MCP["MCP Server<br/>21 tools"]
-        Connectors["15 connector templates<br/>Splunk · AWS Security Hub · Qualys · ITSM"]
-    end
-
-    Browser -->|HTTPS / WSS| Express
-    Desktop -->|localhost| Express
-    Express --> MW
-    MW --> Auth
-    MW --> Data
-    Express --> AI
-    Express --> Intel
+    Client -->|HTTPS / WSS or localhost| API
+    API --> MW
+    MW --> JWTNode
+    MW --> Bcrypt
+    MW --> WebAuthn
+    MW --> OIDC
+    MW --> DB
+    MW --> Cache
+    API --> Copilot
     Copilot --> Providers
-    Data --> PG
-    Data --> Redis
+    API --> Feeds
+    API --> MCP
+    API --> Connectors
 ```
 
 ```

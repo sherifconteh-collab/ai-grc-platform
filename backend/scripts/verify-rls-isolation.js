@@ -25,7 +25,7 @@
 
 // Matches every other script in scripts/: pick up DATABASE_URL from .env so
 // `npm run verify:rls` works locally, while CI keeps passing it explicitly.
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const { Client } = require('pg');
 
 const PROBE_ROLE = 'rls_probe_ci';
