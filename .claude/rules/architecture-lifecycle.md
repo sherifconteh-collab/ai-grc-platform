@@ -1,9 +1,12 @@
 # Architecture lifecycle reports
 
-A weekly, report-only Routine audits dependency/runtime/security-stack
-drift and diagram staleness across this repo and its sibling
-**ControlWeaver-Pro** (the flagship this repo forked from). The persona and
-full mandate live in ControlWeaver-Pro's
+A monthly, report-only, risk-based Routine audits dependency/runtime/
+security-stack drift and diagram staleness across this repo and its
+sibling **ControlWeaver-Pro** (the flagship this repo forked from). It only
+raises a finding tied to a concrete risk signal (EOL, a real CVE, a
+documented compatibility break, undocumented cross-repo drift, or a stale
+diagram) — a stable version with no known issue is not itself a finding.
+The persona and full mandate live in ControlWeaver-Pro's
 `.openclaw/agents/engineering/cw-architecture-lifecycle-tracker.md` — this
 repo has no `.openclaw/` framework of its own, so there's no local copy.
 
