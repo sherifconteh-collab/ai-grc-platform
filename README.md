@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #310: chore(frontend)(deps): bump react-dom and @types/react-dom in /frontend -->
+<!-- LAST_UPDATED: 2026-09-27 | PR #319: fix(search): add express-rate-limit import so CodeQL recognizes coverage -->
 
 ## 🎯 What is This?
 
