@@ -9,6 +9,8 @@
 
 > Changes staged but not yet released to production.
 
+## [2026.9.0] — 2026-09-28
+
 ### Documentation
 - **README refresh.** The "Current Status" header was still pinned to v4.4.0 while the shipped
   version had moved to v4.9.0; it now names the current version and points to this file for the
@@ -20,6 +22,7 @@
   in the README.
 
 ### Changed
+- feat(release): switch to calendar versioning and automate release cutting ([#333](https://github.com/sherifconteh-collab/ai-grc-platform/pull/333)) — @sherifconteh-collab
 - docs(architecture-lifecycle): PR-review cross-reference to ControlWeaver-Pro's report ([#332](https://github.com/sherifconteh-collab/ai-grc-platform/pull/332)) — @sherifconteh-collab
 - docs: note the new architecture lifecycle tracking Routine ([#321](https://github.com/sherifconteh-collab/ai-grc-platform/pull/321)) — @sherifconteh-collab
 - chore(deps): bump Node.js baseline to 24 across CI and backend engines ([#320](https://github.com/sherifconteh-collab/ai-grc-platform/pull/320)) — @sherifconteh-collab
