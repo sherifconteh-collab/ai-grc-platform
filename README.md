@@ -62,7 +62,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-27 | PR #321: docs: note the new architecture lifecycle tracking Routine -->
+<!-- LAST_UPDATED: 2026-09-28 | PR #332: docs(architecture-lifecycle): PR-review cross-reference to ControlWeaver-Pro's report -->
 
 ## 🎯 What is This?
 

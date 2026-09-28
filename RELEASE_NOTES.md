@@ -20,6 +20,7 @@
   in the README.
 
 ### Changed
+- docs(architecture-lifecycle): PR-review cross-reference to ControlWeaver-Pro's report ([#332](https://github.com/sherifconteh-collab/ai-grc-platform/pull/332)) — @sherifconteh-collab
 - docs: note the new architecture lifecycle tracking Routine ([#321](https://github.com/sherifconteh-collab/ai-grc-platform/pull/321)) — @sherifconteh-collab
 - chore(deps): bump Node.js baseline to 24 across CI and backend engines ([#320](https://github.com/sherifconteh-collab/ai-grc-platform/pull/320)) — @sherifconteh-collab
 - docs(readme): correct stale counts and add a mermaid architecture diagram ([#318](https://github.com/sherifconteh-collab/ai-grc-platform/pull/318)) — @sherifconteh-collab
