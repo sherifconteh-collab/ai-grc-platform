@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: write
+  actions: write  # needed to dispatch build-release.yml after cutting a version
 
 jobs:
   cut-release:
@@ -213,6 +214,27 @@ jobs:
 
           echo "❌ Push failed after ${MAX_RETRIES} attempts."
           exit 1
+
+      # build-release.yml also listens for `push: branches: [main]`, but that
+      # trigger never fires for the commit above: GitHub does not start new
+      # workflow runs from refs pushed using the default GITHUB_TOKEN (to
+      # prevent trigger loops), and the "[skip ci]" in the commit message
+      # would suppress it a second time even if that restriction didn't
+      # apply. Root-caused 2026-09-28 after v2026.9.0's cut (PR #333) landed
+      # with no installer ever built — "Check if release needed" only ran
+      # against the merge commit itself, before the version bump existed,
+      # saw the already-tagged v4.9.0, and skipped; the follow-up bump
+      # commit never triggered a run at all. Dispatching explicitly here
+      # (a workflow_dispatch call, not a push event) sidesteps both.
+      - name: Dispatch build-release.yml for the newly cut version
+        if: steps.rotate.outputs.rotated == 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh workflow run build-release.yml --ref main -f "version=v${VERSION}" -f "upload_artifact=false"
+          echo "Dispatched build-release.yml for v${VERSION}"
 
       - name: Dry-run summary
         if: steps.rotate.outputs.rotated == 'true' && github.event.inputs.dry_run == 'true'
