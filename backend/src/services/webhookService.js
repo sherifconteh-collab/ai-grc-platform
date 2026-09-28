@@ -4,11 +4,20 @@ const net = require('net');
 const pool = require('../config/database');
 const { safeFetch } = require('../utils/netGuard');
 
-// Outbound HMAC signature — HMAC-SHA-384 (CNSA Suite 1.0). The signature header
-// carries a `sha384=` prefix so receivers can identify the algorithm.
-function createSignature(secret, payload) {
+// Outbound HMAC signatures: both HMAC-SHA256 (legacy, kept so existing
+// receivers checking the original header value keep working) and
+// HMAC-SHA384 (CNSA Suite 1.0) added alongside so new integrations can move
+// to the stronger algorithm without a breaking cutover. Bug fixed 2026-09:
+// this used to compute only a SHA-384 digest but send it under a header
+// literally named X-GRC-Signature-SHA256 — any receiver that read the
+// header name and verified with a real SHA-256 HMAC would get a mismatch
+// and reject every delivery.
+function createSignatures(secret, payload) {
   if (!secret) return null;
-  return crypto.createHmac('sha384', secret).update(payload).digest('hex');
+  return {
+    sha256: crypto.createHmac('sha256', secret).update(payload).digest('hex'),
+    sha384: crypto.createHmac('sha384', secret).update(payload).digest('hex'),
+  };
 }
 
 // verifyIncomingWebhook validates HMAC signatures on incoming webhook callbacks.
@@ -175,7 +184,7 @@ async function processPendingWebhookDeliveries({ organizationId = null, limit = 
       created_at: new Date().toISOString()
     });
 
-    const signature = createSignature(row.signing_secret, body);
+    const signatures = createSignatures(row.signing_secret, body);
     const attemptCount = Number(row.attempt_count || 0) + 1;
 
     try {
@@ -193,7 +202,10 @@ async function processPendingWebhookDeliveries({ organizationId = null, limit = 
             'Content-Type': 'application/json',
             'X-GRC-Event': row.event_type,
             'X-GRC-Delivery-ID': row.id,
-            ...(signature ? { 'X-GRC-Signature-SHA256': signature } : {})
+            ...(signatures ? {
+              'X-GRC-Signature-SHA256': signatures.sha256,
+              'X-GRC-Signature-SHA384': signatures.sha384,
+            } : {})
           },
           body,
           signal: controller.signal
