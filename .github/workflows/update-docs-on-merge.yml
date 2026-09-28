@@ -4,6 +4,15 @@ name: Update Docs on PR Merge
 # This ensures:
 #  1. The GITHUB_TOKEN always has write access (even for PRs merged from forks).
 #  2. We reliably identify the merged PR via the GitHub API using the push SHA.
+#
+# Also auto-cuts a release on every push (adopted 2026-09, matching
+# ControlWeaver-Pro's release-notes.yml): after appending the merged PR's
+# entry to RELEASE_NOTES.md's [Unreleased] section, that section is
+# immediately rotated into a dated ## [YYYY.M.N] entry (calendar
+# versioning — see .claude/rules/releases.md) and backend/frontend/electron
+# package.json are bumped to match. A push whose [Unreleased] content is
+# empty or only the placeholder blockquote skips the rotation and version
+# bump (idempotent — no-op release).
 on:
   push:
     branches: [main]
@@ -138,6 +147,115 @@ jobs:
 
           print(f"RELEASE_NOTES.md updated: [{section}] {entry}")
           PYEOF
+
+      # ── Calendar versioning (adopted 2026-09, matching ControlWeaver-Pro) ──
+      # YYYY.M.N: four-digit year, month with no leading zero, and a
+      # same-month release counter starting at 0. Always three numeric
+      # components so the version stays valid SemVer — required by
+      # electron/updater.js's electron-updater dependency, which compares
+      # versions via semver internally. See .claude/rules/releases.md.
+      - name: Resolve next calendar version
+        id: version
+        if: steps.pr.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          NOW_YEAR=$(date -u +%Y)
+          NOW_MONTH=$(date -u +%-m)
+          CURRENT=$(grep -oP '(?<=^## \[)[0-9]+\.[0-9]+\.[0-9]+(?=\])' RELEASE_NOTES.md | head -1 || true)
+          if [[ -n "${CURRENT}" ]]; then
+            IFS='.' read -r CUR_YEAR CUR_MONTH CUR_PATCH <<< "${CURRENT}"
+            if [[ "${CUR_YEAR}" == "${NOW_YEAR}" && "${CUR_MONTH}" == "${NOW_MONTH}" ]]; then
+              VERSION="${NOW_YEAR}.${NOW_MONTH}.$((CUR_PATCH + 1))"
+              echo "::notice::Another release this month — bumping to v${VERSION}."
+            else
+              VERSION="${NOW_YEAR}.${NOW_MONTH}.0"
+              echo "::notice::First release this month — v${VERSION}."
+            fi
+          else
+            VERSION="${NOW_YEAR}.${NOW_MONTH}.0"
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved next version: ${VERSION}"
+
+      - name: Rotate RELEASE_NOTES.md [Unreleased] into a dated version entry
+        id: rotate
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re
+          from datetime import datetime, timezone
+
+          version   = os.environ['VERSION']
+          today     = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+          gh_output = os.environ['GITHUB_OUTPUT']
+
+          def finish(rotated):
+              with open(gh_output, 'a') as f:
+                  f.write(f'rotated={"true" if rotated else "false"}\n')
+
+          with open('RELEASE_NOTES.md') as f:
+              content = f.read()
+
+          unreleased_header = '## [Unreleased]'
+          idx = content.find(unreleased_header)
+          if idx == -1:
+              print('No [Unreleased] section found — skipping rotation.')
+              finish(False)
+              raise SystemExit(0)
+
+          after = content[idx + len(unreleased_header):]
+          m = re.search(r'\n## \[', after)
+          end = idx + len(unreleased_header) + (m.start() + 1 if m else len(after))
+
+          body = content[idx + len(unreleased_header):end]
+
+          # Strip leading blank lines and the placeholder blockquote before
+          # checking for / archiving substantive content — "Changes staged
+          # but not yet released to production" is true of [Unreleased],
+          # not of a just-cut release, so it must not be copied into the
+          # dated entry.
+          lines = body.split('\n')
+          i = 0
+          while i < len(lines) and (lines[i].strip() == '' or lines[i].lstrip().startswith('>')):
+              i += 1
+          archived_body = '\n'.join(lines[i:]).strip('\n')
+
+          if not archived_body.strip():
+              print('No substantive [Unreleased] content — skipping rotation.')
+              finish(False)
+              raise SystemExit(0)
+
+          new_unreleased_block = (
+              f'{unreleased_header}\n\n'
+              f'> Changes staged but not yet released to production.\n'
+          )
+          new_version_block = f'## [{version}] — {today}\n\n{archived_body}\n'
+
+          content = content[:idx] + new_unreleased_block + '\n' + new_version_block + '\n' + content[end:]
+
+          with open('RELEASE_NOTES.md', 'w') as f:
+              f.write(content)
+
+          finish(True)
+          print(f'RELEASE_NOTES.md rotated: [Unreleased] → [{version}] — {today}')
+          PYEOF
+
+      - name: Bump package.json versions
+        if: steps.pr.outputs.skip != 'true' && steps.rotate.outputs.rotated == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for f in backend/package.json frontend/package.json electron/package.json; do
+            if [ -f "${f}" ] && grep -q '"version":' "${f}"; then
+              sed -i -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"${VERSION}\"/" "${f}"
+              echo "✅ ${f} → ${VERSION}"
+            else
+              echo "⚠️  ${f} not found or has no \"version\" field — skipped."
+            fi
+          done
 
       - name: Update README.md last-updated marker
         if: steps.pr.outputs.skip != 'true'
@@ -483,7 +601,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add RELEASE_NOTES.md README.md
+          git add RELEASE_NOTES.md README.md backend/package.json frontend/package.json electron/package.json
 
           # Skip commit if nothing changed
           if git diff --cached --quiet; then
