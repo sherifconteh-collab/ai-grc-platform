@@ -28,7 +28,9 @@ Desktop builds ship the full open-source feature set. All previously tier-gated 
 
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
-After installing, launch ControlWeave — the app opens directly into the self-hosted sign-in or account-creation flow, and organization invite links land on a dedicated acceptance page. Updates are delivered automatically on packaged release builds, and local unpacked validation runs skip updater checks cleanly when update metadata is absent. Releases are published automatically whenever a version bump is merged to `main`.
+After installing, launch ControlWeave — the app opens directly into the self-hosted sign-in or account-creation flow, and organization invite links land on a dedicated acceptance page. Updates are delivered automatically on packaged release builds, and local unpacked validation runs skip updater checks cleanly when update metadata is absent. Releases are cut automatically on a weekly schedule (see `.claude/rules/releases.md`) and built/published the same way.
+
+> **Windows note:** the `.exe` is not currently Authenticode-signed (no code-signing certificate is configured yet), so Windows SmartScreen may show an "unrecognized app" warning on first launch. This is expected — click **More info → Run anyway** to proceed. This will be resolved once a signing certificate is added.
 
 <details>
 <summary>Build from source</summary>

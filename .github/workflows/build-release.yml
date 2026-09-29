@@ -268,6 +268,14 @@ jobs:
           # electron-builder uses GH_TOKEN to publish directly to GitHub Releases
           # when the workflow is triggered by a release event.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Explicit CSC_LINK (set above when has_cert=true) always wins over
+          # auto-discovery regardless of this flag. Disabling auto-discovery
+          # just makes the no-cert path deterministic — electron-builder skips
+          # signing cleanly instead of probing the runner's cert store (which
+          # GitHub-hosted windows-latest runners don't populate anyway) —
+          # matching the CSC_IDENTITY_AUTO_DISCOVERY: false already set on the
+          # macOS jobs below.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Validate latest.yml Windows artifact reference
         shell: bash
