@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix(release): document unsigned Windows build, make no-cert path deterministic ([#336](https://github.com/sherifconteh-collab/ai-grc-platform/pull/336)) — @sherifconteh-collab
 
 - fix(security): send real dual HMAC signatures on outbound webhooks ([#335](https://github.com/sherifconteh-collab/ai-grc-platform/pull/335)) — @sherifconteh-collab
 

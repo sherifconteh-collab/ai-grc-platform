@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-29 | PR #335: fix(security): send real dual HMAC signatures on outbound webhooks -->
+<!-- LAST_UPDATED: 2026-09-29 | PR #336: fix(release): document unsigned Windows build, make no-cert path deterministic -->
 
 ## 🎯 What is This?
 
