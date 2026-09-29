@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-28 | PR #333: feat(release): switch to calendar versioning and automate release cutting -->
+<!-- LAST_UPDATED: 2026-09-29 | PR #335: fix(security): send real dual HMAC signatures on outbound webhooks -->
 
 ## 🎯 What is This?
 

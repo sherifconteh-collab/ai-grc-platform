@@ -9,6 +9,10 @@
 
 > Changes staged but not yet released to production.
 
+### Changed
+
+- fix(security): send real dual HMAC signatures on outbound webhooks ([#335](https://github.com/sherifconteh-collab/ai-grc-platform/pull/335)) — @sherifconteh-collab
+
 ## [2026.9.0] — 2026-09-28
 
 ### Documentation
