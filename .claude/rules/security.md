@@ -13,7 +13,7 @@ These thresholds are part of the v3.0.0 contract. Lowering any of them is a brea
 
 ## Sessions / cookies
 
-- HTTP-only, `Secure`, `SameSite=Strict` cookies in production.
+- Refresh-token cookie (`utils/refreshCookie.js`) is always `HttpOnly`. `Secure` is forced in production. `SameSite` defaults to `None` (frontend and API are typically on different origins, which requires `None`) when `Secure`, else `Lax`; override with `REFRESH_COOKIE_SAMESITE=strict|lax|none` for a same-site deployment. CSRF is covered instead by the `X-CW-Client: web` header gate plus an `Origin` allow-list check (`originAllowed()`) — not by `SameSite=Strict`.
 - Session TTL ≤ 24h; refresh token rotation on use.
 
 ## Inputs

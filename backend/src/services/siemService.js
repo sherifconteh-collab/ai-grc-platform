@@ -183,8 +183,13 @@ async function sendToWebhook(cfg, eventType, payload) {
     ...toPlainObject(cfg.webhook_headers),
   };
   if (cfg.webhook_secret) {
-    const sig = crypto.createHmac('sha384', cfg.webhook_secret).update(body).digest('hex');
-    headers['X-ControlWeave-Signature'] = `sha384=${sig}`;
+    // Send both algorithms: SHA-256 for existing receivers checking the
+    // original header value, SHA-384 (CNSA 1.0) added alongside so new
+    // integrations can move to it without a breaking cutover.
+    const sigSha256 = crypto.createHmac('sha256', cfg.webhook_secret).update(body).digest('hex');
+    const sigSha384 = crypto.createHmac('sha384', cfg.webhook_secret).update(body).digest('hex');
+    headers['X-ControlWeave-Signature'] = `sha256=${sigSha256}`;
+    headers['X-ControlWeave-Signature-SHA384'] = `sha384=${sigSha384}`;
   }
   return httpPost(cfg.endpoint_url, body, headers);
 }
