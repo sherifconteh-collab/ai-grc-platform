@@ -97,7 +97,7 @@
     "mammoth": "^1.12.1",
     "multer": "^2.4.0",
     "node-cron": "^4.2.1",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.0.2",
     "openai": "^7.5.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
@@ -125,7 +125,7 @@
   },
   "overrides": {
     "express-rate-limit": "$express-rate-limit",
-    "ip-address": ">=10.4.0",
+    "ip-address": ">=10.7.2",
     "minimatch": "^10.2.3",
     "glob": "^11.0.1",
     "hono": "^4.13.8",
