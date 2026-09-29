@@ -1,0 +1,245 @@
+name: Cut Release (Weekly)
+
+# Weekly scheduled batch release cut (adopted 2026-09, matching
+# ControlWeaver-Pro's same weekly cadence in release-notes.yml): rotates
+# whatever has accumulated in RELEASE_NOTES.md's [Unreleased] section since
+# the last cut into one dated ## [YYYY.M.N] entry (calendar versioning, see
+# .claude/rules/releases.md), and bumps backend/frontend/electron
+# package.json to match. Runs weekly rather than per-merge (update-docs-on-merge.yml
+# still appends every merged PR's entry to [Unreleased] on every push, same
+# as before) so routine PR volume, dependabot bumps included, doesn't
+# produce a release for every single merge. A run whose [Unreleased] content
+# is empty or only the placeholder blockquote skips the cut entirely — no
+# release, no commit.
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly, Monday 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — resolve the version and show what would change, but do not commit'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write  # needed to dispatch build-release.yml after cutting a version
+
+jobs:
+  cut-release:
+    name: Cut a batched release from accumulated [Unreleased] content
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          fetch-depth: 0
+
+      # ── Calendar versioning: YYYY.M.N ──
+      # Four-digit year, month with no leading zero, and a same-month
+      # release counter starting at 0. Always three numeric components so
+      # the version stays valid SemVer — required by electron/updater.js's
+      # electron-updater dependency, which compares versions via semver
+      # internally.
+      - name: Resolve next calendar version
+        id: version
+        run: |
+          set -euo pipefail
+          NOW_YEAR=$(date -u +%Y)
+          NOW_MONTH=$(date -u +%-m)
+          CURRENT=$(grep -oP '(?<=^## \[)[0-9]+\.[0-9]+\.[0-9]+(?=\])' RELEASE_NOTES.md | head -1 || true)
+          if [[ -n "${CURRENT}" ]]; then
+            IFS='.' read -r CUR_YEAR CUR_MONTH CUR_PATCH <<< "${CURRENT}"
+            if [[ "${CUR_YEAR}" == "${NOW_YEAR}" && "${CUR_MONTH}" == "${NOW_MONTH}" ]]; then
+              VERSION="${NOW_YEAR}.${NOW_MONTH}.$((CUR_PATCH + 1))"
+              echo "::notice::Another release this month — bumping to v${VERSION}."
+            else
+              VERSION="${NOW_YEAR}.${NOW_MONTH}.0"
+              echo "::notice::First release this month — v${VERSION}."
+            fi
+          else
+            VERSION="${NOW_YEAR}.${NOW_MONTH}.0"
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved next version: ${VERSION}"
+
+      - name: Rotate RELEASE_NOTES.md [Unreleased] into a dated version entry
+        id: rotate
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re
+          from datetime import datetime, timezone
+
+          version   = os.environ['VERSION']
+          today     = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+          gh_output = os.environ['GITHUB_OUTPUT']
+
+          def finish(rotated):
+              with open(gh_output, 'a') as f:
+                  f.write(f'rotated={"true" if rotated else "false"}\n')
+
+          with open('RELEASE_NOTES.md') as f:
+              content = f.read()
+
+          unreleased_header = '## [Unreleased]'
+          idx = content.find(unreleased_header)
+          if idx == -1:
+              print('No [Unreleased] section found — skipping rotation.')
+              finish(False)
+              raise SystemExit(0)
+
+          after = content[idx + len(unreleased_header):]
+          m = re.search(r'\n## \[', after)
+          end = idx + len(unreleased_header) + (m.start() + 1 if m else len(after))
+
+          body = content[idx + len(unreleased_header):end]
+
+          # Strip leading blank lines and the placeholder blockquote before
+          # checking for / archiving substantive content — "Changes staged
+          # but not yet released to production" is true of [Unreleased],
+          # not of a just-cut release, so it must not be copied into the
+          # dated entry.
+          lines = body.split('\n')
+          i = 0
+          while i < len(lines) and (lines[i].strip() == '' or lines[i].lstrip().startswith('>')):
+              i += 1
+          archived_body = '\n'.join(lines[i:]).strip('\n')
+
+          if not archived_body.strip():
+              print('No substantive [Unreleased] content — skipping rotation.')
+              finish(False)
+              raise SystemExit(0)
+
+          new_unreleased_block = (
+              f'{unreleased_header}\n\n'
+              f'> Changes staged but not yet released to production.\n'
+          )
+          new_version_block = f'## [{version}] — {today}\n\n{archived_body}\n'
+
+          content = content[:idx] + new_unreleased_block + '\n' + new_version_block + '\n' + content[end:]
+
+          with open('RELEASE_NOTES.md', 'w') as f:
+              f.write(content)
+
+          finish(True)
+          print(f'RELEASE_NOTES.md rotated: [Unreleased] → [{version}] — {today}')
+          PYEOF
+
+      - name: Bump package.json versions
+        if: steps.rotate.outputs.rotated == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for f in backend/package.json frontend/package.json electron/package.json; do
+            if [ -f "${f}" ] && grep -q '"version":' "${f}"; then
+              sed -i -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"${VERSION}\"/" "${f}"
+              echo "✅ ${f} → ${VERSION}"
+            else
+              echo "⚠️  ${f} not found or has no \"version\" field — skipped."
+            fi
+          done
+
+      - name: Sync README version badge from RELEASE_NOTES.md
+        if: steps.rotate.outputs.rotated == 'true'
+        run: |
+          python3 - <<'PYEOF'
+          import re
+
+          with open("RELEASE_NOTES.md", "r") as f:
+              release_notes = f.read()
+
+          # Match the first versioned header (skip [Unreleased])
+          match = re.search(r"^## \[(\d+\.\d+\.\d+)\]", release_notes, re.MULTILINE)
+          if not match:
+              print("No versioned release found in RELEASE_NOTES.md — skipping badge sync.")
+              exit(0)
+
+          latest_version = match.group(1)
+
+          with open("README.md", "r") as f:
+              readme = f.read()
+
+          badge_pattern = r"(!\[Version\]\(https://img\.shields\.io/badge/version-v)\d+\.\d+\.\d+(-green\.svg\))"
+          new_badge = rf"\g<1>{latest_version}\2"
+          updated, count = re.subn(badge_pattern, new_badge, readme)
+
+          if count == 0:
+              print("Version badge not found in README.md — skipping.")
+          elif updated == readme:
+              print(f"Badge already shows v{latest_version} — no change needed.")
+          else:
+              with open("README.md", "w") as f:
+                  f.write(updated)
+              print(f"README.md version badge updated → v{latest_version}")
+          PYEOF
+
+      - name: Commit and push release cut
+        if: steps.rotate.outputs.rotated == 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add RELEASE_NOTES.md README.md backend/package.json frontend/package.json electron/package.json
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "docs(release): cut v${VERSION} [skip ci]"
+
+          MAX_RETRIES=3
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "✅ Push succeeded on attempt $i"
+              exit 0
+            fi
+            echo "⚠️  Push failed (attempt $i/${MAX_RETRIES}) — rebasing on origin/main and retrying..."
+            git fetch origin main
+            git rebase origin/main || {
+              echo "❌ Rebase conflict — aborting."
+              git rebase --abort
+              exit 1
+            }
+          done
+
+          echo "❌ Push failed after ${MAX_RETRIES} attempts."
+          exit 1
+
+      # build-release.yml also listens for `push: branches: [main]`, but that
+      # trigger never fires for the commit above: GitHub does not start new
+      # workflow runs from refs pushed using the default GITHUB_TOKEN (to
+      # prevent trigger loops), and the "[skip ci]" in the commit message
+      # would suppress it a second time even if that restriction didn't
+      # apply. Root-caused 2026-09-28 after v2026.9.0's cut (PR #333) landed
+      # with no installer ever built — "Check if release needed" only ran
+      # against the merge commit itself, before the version bump existed,
+      # saw the already-tagged v4.9.0, and skipped; the follow-up bump
+      # commit never triggered a run at all. Dispatching explicitly here
+      # (a workflow_dispatch call, not a push event) sidesteps both.
+      - name: Dispatch build-release.yml for the newly cut version
+        if: steps.rotate.outputs.rotated == 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh workflow run build-release.yml --ref main -f "version=v${VERSION}" -f "upload_artifact=false"
+          echo "Dispatched build-release.yml for v${VERSION}"
+
+      - name: Dry-run summary
+        if: steps.rotate.outputs.rotated == 'true' && github.event.inputs.dry_run == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "Dry run — would cut v${VERSION} and commit RELEASE_NOTES.md, README.md, and the three package.json files."
+          git diff --stat
