@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-09-29 | PR #336: fix(release): document unsigned Windows build, make no-cert path deterministic -->
+<!-- LAST_UPDATED: 2026-10-01 | PR #339: security(deps): fix critical Next.js RCE and 3 high-severity CVEs -->
 
 ## 🎯 What is This?
 
