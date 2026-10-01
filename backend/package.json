@@ -88,7 +88,7 @@
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.5.2",
+    "express-rate-limit": "^8.7.0",
     "geoip-lite": "^2.0.3",
     "hono": "^4.13.8",
     "ioredis": "^5.11.0",
