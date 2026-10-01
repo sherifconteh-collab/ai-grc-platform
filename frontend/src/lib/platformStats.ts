@@ -12,7 +12,7 @@ export const FRAMEWORKS_COUNT = 34;
 export const CONTROLS_COUNT_LABEL = '1,800+';
 export const CROSSWALKS_COUNT_LABEL = '3,100+';
 
-export const NODE_VERSION_LABEL = '20+';
+export const NODE_VERSION_LABEL = '24+';
 export const POSTGRES_VERSION_LABEL = '17+';
 
 export const ROUTE_MODULES_COUNT = 85;

@@ -688,8 +688,8 @@ See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup 
 
 ```mermaid
 graph TD
-    Client(["Browser · Next.js 16.2.4 (React 19)<br/>or Desktop App (Electron, bundled PostgreSQL)"])
-    API["REST API<br/>85 route modules · Node.js 20+, Express 5"]
+    Client(["Browser · Next.js 16.3.8 (React 19)<br/>or Desktop App (Electron, bundled PostgreSQL)"])
+    API["REST API<br/>85 route modules · Node.js 24+, Express 5"]
     MW["Middleware<br/>JWT auth · RBAC · Redis rate limiting · SoD"]
     JWTNode["JWT HS384<br/>refresh token rotation"]
     Bcrypt["bcrypt — cost 14"]
@@ -889,7 +889,7 @@ controlweave/
 - **Backend**: Node.js / Express 5
 - **Database**: PostgreSQL 17+ with Row-Level Security (RLS)
 - **Cache / Rate Limiting**: Redis (optional; in-memory fallback)
-- **Frontend**: Next.js 16.2.4 (React 19) with TypeScript and Tailwind CSS
+- **Frontend**: Next.js 16.3.8 (React 19) with TypeScript and Tailwind CSS
 - **Authentication**: JWT HS384 + OAuth 2.0, TOTP 2FA, WebAuthn/passkey (ES384), SSO/OIDC, refresh token rotation
 - **AI**: BYOK multi-provider (Anthropic Claude, OpenAI, Google Gemini, xAI Grok, Groq, Ollama with GGUF — see the "Supported providers and models" table above for current model names); RAG; Multi-Agent Orchestration
 - **Threat Intel**: NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX
