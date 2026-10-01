@@ -82,7 +82,7 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.20.0",
     "bcryptjs": "^2.4.3",
-    "compression": "^1.8.1",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "esprima": "^4.0.1",
