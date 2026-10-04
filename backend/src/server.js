@@ -33,7 +33,24 @@ if (process.env.SENTRY_DSN) {
     _sentry = require('@sentry/node');
     _sentry.init({
       dsn: process.env.SENTRY_DSN,
-      environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development'
+      environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+      // @sentry/node 11 collects cookies, user info, request bodies and DB query
+      // data by default. Keep the restrictive v10 baseline: this platform handles
+      // compliance records and PII, so none of that may leave the process.
+      dataCollection: {
+        userInfo: false,
+        cookies: false,
+        httpHeaders: {
+          request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+          response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] }
+        },
+        httpBodies: [],
+        urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+        genAI: { inputs: false, outputs: false },
+        databaseQueryData: false,
+        queues: false,
+        graphQL: { document: false, variables: false }
+      }
     });
     setSentryClient(_sentry);
   } catch (_err) {
