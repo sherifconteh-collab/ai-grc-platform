@@ -2192,7 +2192,7 @@ export const internationalAiLawsAPI = {
   getSummary: () => api.get('/international-ai-laws/summary'),
 };
 
-// Push Tokens API — device push token registration for mobile apps (iOS APNs / Android FCM)
+// Push Tokens API — device push token registration for mobile apps (Android FCM; iOS delivery not implemented yet)
 export const pushTokensAPI = {
   register: (data: { token: string; platform: 'ios' | 'android' }) =>
     api.post('/push-tokens', data),
