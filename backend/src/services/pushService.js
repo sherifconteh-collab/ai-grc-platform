@@ -11,16 +11,10 @@
  *
  * Installation:
  *   firebase-admin is declared as an optionalDependency and installed by npm ci.
- *
- *   apn (iOS APNs) is NOT declared as a dependency because the published v2.x
- *   releases pin node-forge@^0.7.1 and jsonwebtoken@^8.x, both of which contain
- *   unfixed high-severity CVEs that would fail the CI audit gate. To enable iOS
- *   push in a production environment, install apn separately after auditing:
- *
- *     npm install --no-save apn
- *
- *   The service will automatically detect and use it at runtime once installed.
- *   Without apn, only Android (FCM) push is delivered.
+ *   iOS push talks to APNs directly over HTTP/2 using Node's built-in http2
+ *   module and a provider token signed with jsonwebtoken (ES256). It needs no
+ *   extra package: the old apn package pinned node-forge and jsonwebtoken
+ *   releases with unfixed high-severity CVEs, so it is no longer used.
  *
  * Environment variables required:
  *
@@ -43,10 +37,19 @@ const { log } = require('../utils/logger');
 
 // ── APNs client (lazy-initialised) ────────────────────────────────────────
 
-let _apnsProvider = null;
+const http2 = require('http2');
+const fs = require('fs');
+const jwt = require('jsonwebtoken');
 
-function getApnsProvider() {
-  if (_apnsProvider !== null) return _apnsProvider;
+const APNS_TOKEN_TTL_MS = 50 * 60 * 1000; // Apple rejects provider tokens older than 60 min
+const APNS_REQUEST_TIMEOUT_MS = 10000;
+
+let _apnsConfig = null;
+let _apnsSession = null;
+let _apnsToken = null;
+
+function getApnsConfig() {
+  if (_apnsConfig !== null) return _apnsConfig;
 
   const keyId = process.env.APNS_KEY_ID;
   const teamId = process.env.APNS_TEAM_ID;
@@ -57,24 +60,76 @@ function getApnsProvider() {
     log('info', 'push_service.apns.not_configured', {
       note: 'Set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_PATH, APNS_BUNDLE_ID to enable iOS push'
     });
-    _apnsProvider = false; // false = checked, unavailable
+    _apnsConfig = false; // false = checked, unavailable
     return false;
   }
 
   try {
-    const apn = require('apn');
     const production = process.env.APNS_PRODUCTION === 'true';
-    _apnsProvider = new apn.Provider({
-      token: { key: keyPath, keyId, teamId },
-      production
-    });
+    _apnsConfig = {
+      key: fs.readFileSync(keyPath, 'utf8'),
+      keyId,
+      teamId,
+      bundleId,
+      origin: production ? 'https://api.push.apple.com' : 'https://api.sandbox.push.apple.com'
+    };
     log('info', 'push_service.apns.initialised', { production, bundleId });
-    return _apnsProvider;
+    return _apnsConfig;
   } catch (err) {
     log('warn', 'push_service.apns.init_failed', { error: err.message });
-    _apnsProvider = false;
+    _apnsConfig = false;
     return false;
   }
+}
+
+function getApnsToken(config) {
+  const now = Date.now();
+  if (_apnsToken && now - _apnsToken.issuedAt < APNS_TOKEN_TTL_MS) return _apnsToken.value;
+  const value = jwt.sign({ iss: config.teamId }, config.key, {
+    algorithm: 'ES256',
+    header: { alg: 'ES256', kid: config.keyId }
+  });
+  _apnsToken = { value, issuedAt: now };
+  return value;
+}
+
+function getApnsSession(config) {
+  if (_apnsSession && !_apnsSession.closed && !_apnsSession.destroyed) return _apnsSession;
+  const session = http2.connect(config.origin);
+  session.on('error', () => { _apnsSession = null; });
+  session.on('close', () => { _apnsSession = null; });
+  session.unref();
+  _apnsSession = session;
+  return session;
+}
+
+// Resolves to { status, reason } for one device token.
+function postApns(config, deviceToken, payload) {
+  return new Promise((resolve, reject) => {
+    const session = getApnsSession(config);
+    const req = session.request({
+      ':method': 'POST',
+      ':path': `/3/device/${deviceToken}`,
+      authorization: `bearer ${getApnsToken(config)}`,
+      'apns-topic': config.bundleId,
+      'apns-push-type': 'alert',
+      'apns-expiration': String(Math.floor(Date.now() / 1000) + 86400), // 24 h
+      'content-type': 'application/json'
+    });
+    let status = 0;
+    let raw = '';
+    req.setEncoding('utf8');
+    req.setTimeout(APNS_REQUEST_TIMEOUT_MS, () => req.close(http2.constants.NGHTTP2_CANCEL));
+    req.on('response', (headers) => { status = headers[':status']; });
+    req.on('data', (chunk) => { raw += chunk; });
+    req.on('error', reject);
+    req.on('close', () => {
+      let reason;
+      try { reason = raw ? JSON.parse(raw).reason : undefined; } catch (_) { reason = undefined; }
+      resolve({ status, reason });
+    });
+    req.end(payload);
+  });
 }
 
 // ── FCM admin app (lazy-initialised) ──────────────────────────────────────
@@ -127,31 +182,30 @@ function getFirebaseApp() {
 // ── APNs delivery ─────────────────────────────────────────────────────────
 
 async function sendApns(tokens, title, body, data) {
-  const provider = getApnsProvider();
-  if (!provider) return;
+  const config = getApnsConfig();
+  if (!config) return;
 
-  const apn = require('apn');
-  const bundleId = process.env.APNS_BUNDLE_ID;
+  const payload = JSON.stringify({
+    ...(data || {}),
+    aps: { alert: { title, body }, sound: 'default' }
+  });
 
-  const notification = new apn.Notification();
-  notification.alert = { title, body };
-  notification.sound = 'default';
-  notification.topic = bundleId;
-  notification.payload = data || {};
-  notification.expiry = Math.floor(Date.now() / 1000) + 86400; // 24 h
-
-  try {
-    const result = await provider.send(notification, tokens);
-    if (result.failed && result.failed.length > 0) {
-      const expired = result.failed
-        .filter((f) => f.response && f.response.reason === 'BadDeviceToken')
-        .map((f) => f.device);
-      if (expired.length > 0) {
-        await pruneStaleTokens(expired);
+  const expired = [];
+  await Promise.all(tokens.map(async (deviceToken) => {
+    try {
+      const { status, reason } = await postApns(config, deviceToken, payload);
+      if (status === 410 || reason === 'BadDeviceToken' || reason === 'Unregistered') {
+        expired.push(deviceToken);
+      } else if (status !== 200) {
+        log('warn', 'push_service.apns.send_failed', { status, reason });
       }
+    } catch (err) {
+      log('warn', 'push_service.apns.send_failed', { error: err.message });
     }
-  } catch (err) {
-    log('warn', 'push_service.apns.send_failed', { error: err.message });
+  }));
+
+  if (expired.length > 0) {
+    await pruneStaleTokens(expired);
   }
 }
 
