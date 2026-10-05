@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(deps): make js-yaml override follow the direct dependency, raise electron floor to 4.3.2 ([#354](https://github.com/sherifconteh-collab/ai-grc-platform/pull/354)) — @sherifconteh-collab
 - security(auth): bind service account tokens to an owner in the caller's organization ([#355](https://github.com/sherifconteh-collab/ai-grc-platform/pull/355)) — @sherifconteh-collab
 - feat(policies): port the Policies UI and acknowledgments endpoint ([#360](https://github.com/sherifconteh-collab/ai-grc-platform/pull/360)) — @sherifconteh-collab
 - feat(stig): port Oracle DB 19c, Oracle Linux 9 and sunset WebLogic 12c STIGs ([#349](https://github.com/sherifconteh-collab/ai-grc-platform/pull/349)) — @sherifconteh-collab

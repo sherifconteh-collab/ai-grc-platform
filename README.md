@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #355: security(auth): bind service account tokens to an owner in the caller's organization -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #354: security(deps): make js-yaml override follow the direct dependency, raise electron floor to 4.3.2 -->
 
 ## 🎯 What is This?
 
