@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- feat(policies): port the Policies UI and acknowledgments endpoint ([#360](https://github.com/sherifconteh-collab/ai-grc-platform/pull/360)) — @sherifconteh-collab
 - feat(stig): port Oracle DB 19c, Oracle Linux 9 and sunset WebLogic 12c STIGs ([#349](https://github.com/sherifconteh-collab/ai-grc-platform/pull/349)) — @sherifconteh-collab
 - feat(financial-audit): port financial audit readiness from ControlWeaver-Pro ([#348](https://github.com/sherifconteh-collab/ai-grc-platform/pull/348)) — @sherifconteh-collab
 

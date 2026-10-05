@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #349: feat(stig): port Oracle DB 19c, Oracle Linux 9 and sunset WebLogic 12c STIGs -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #360: feat(policies): port the Policies UI and acknowledgments endpoint -->
 
 ## 🎯 What is This?
 
