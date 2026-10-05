@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-01 | PR #339: security(deps): fix critical Next.js RCE and 3 high-severity CVEs -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #340: chore(deps): weekly dependency batch 2026-10-04 -->
 
 ## 🎯 What is This?
 
