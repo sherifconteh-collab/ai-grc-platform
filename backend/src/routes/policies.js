@@ -10,6 +10,8 @@ const auditService = require('../services/auditService');
 const { decrypt } = require('../utils/encrypt');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
+const { createOrgRateLimiter } = require('../middleware/rateLimit');
+const rateLimit = require('express-rate-limit');
 const { generatePolicyFromFrameworks } = require('../services/policyService');
 const { createNotification } = require('../services/notificationService');
 const {
@@ -19,7 +21,11 @@ const {
   extractPolicyText
 } = require('../services/policyGapService');
 
+// Cheap per-IP bound ahead of authenticate, then a per-organization limit once the
+// caller is known. Same pattern as routes/search.js.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600 }));
 router.use(authenticate);
+router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 240, label: 'policies' }));
 
 const ALLOWED_POLICY_STATUSES = ['draft', 'under_review', 'approved', 'published', 'archived'];
 const ALLOWED_REVIEW_TYPES = ['annual', 'triggered', 'ad_hoc', 'change_driven'];
