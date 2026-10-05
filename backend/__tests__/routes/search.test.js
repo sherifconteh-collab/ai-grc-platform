@@ -36,7 +36,7 @@ describe('GET /search', () => {
 
   it('scopes every query to the organization and escapes LIKE wildcards', async () => {
     await invokeRoute(router, 'get', '/', makeReq({ user: userWith(['*']), query: { q: '100%_a' } }), makeRes());
-    expect(pool.query).toHaveBeenCalledTimes(7);
+    expect(pool.query).toHaveBeenCalledTimes(8);
     for (const [sql, params] of pool.query.mock.calls) {
       expect(sql).toMatch(/organization_id = \$1/);
       expect(params[0]).toBe('org-1');

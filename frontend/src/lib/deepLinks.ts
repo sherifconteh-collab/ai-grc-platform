@@ -8,8 +8,8 @@
  * A link that points at a missing page, or passes a parameter the page ignores,
  * fails the build instead of dropping the user on the wrong screen.
  *
- * This edition has no ERP module and no Policies frontend page yet, so it has
- * no erpReview/policy record links that ControlWeaver-Pro carries.
+ * This edition has no ERP module, so it has no erpReview record links that
+ * ControlWeaver-Pro carries.
  */
 import type { MyWorkItem, SearchResult, SearchResultType } from './api';
 
@@ -25,6 +25,8 @@ export const recordLinks = {
   poamReview: (id: string) => `/dashboard/poam/${enc(id)}?action=review`,
   poamList: (status: string) => `/dashboard/poam?status=${enc(status)}`,
   exception: (id: string) => `/dashboard/exceptions?open=${enc(id)}`,
+  policy: (id: string) => `/dashboard/policies/${enc(id)}`,
+  policyAcknowledge: (id: string) => `/dashboard/policies/${enc(id)}?action=acknowledge`,
   auditRequest: (id: string) => `/dashboard/requests/${enc(id)}`,
   vendor: (id: string) => `/dashboard/tprm?vendor=${enc(id)}`,
   evidence: (id: string) => `/dashboard/evidence?open=${enc(id)}`,
@@ -42,6 +44,7 @@ export const createLinks = {
   poamForRisk: (riskId: string) => `/dashboard/poam?new=1&riskId=${enc(riskId)}`,
   evidence: () => '/dashboard/evidence?new=1',
   exception: () => '/dashboard/exceptions?new=1',
+  policy: () => '/dashboard/policies?new=1',
   exceptionForControl: (controlId: string) => `/dashboard/exceptions?new=1&controlId=${enc(controlId)}`,
   vendor: () => '/dashboard/tprm?new=1',
   incident: () => '/dashboard/incidents?new=1',
@@ -67,6 +70,8 @@ export function workItemAction(item: MyWorkItem): WorkAction {
       return { href: recordLinks.riskReassess(item.record_id), label: 'Reassess', typeLabel: 'Risk' };
     case 'exception_approval':
       return { href: recordLinks.exception(item.record_id), label: 'Approve or reject', typeLabel: 'Exception' };
+    case 'policy':
+      return { href: recordLinks.policyAcknowledge(item.record_id), label: 'Acknowledge', typeLabel: 'Policy' };
     case 'pbc':
       return { href: recordLinks.auditRequest(item.record_id), label: 'Respond', typeLabel: 'Audit request' };
     default: {
@@ -81,6 +86,7 @@ const SEARCH_LINKS: Record<SearchResultType, (id: string) => string> = {
   risk: recordLinks.risk,
   poam: recordLinks.poam,
   vendor: recordLinks.vendor,
+  policy: recordLinks.policy,
   evidence: recordLinks.evidence,
   asset: recordLinks.asset,
   incident: recordLinks.incident,
@@ -91,6 +97,7 @@ export const SEARCH_TYPE_LABELS: Record<SearchResultType, string> = {
   risk: 'Risk',
   poam: 'POA&M',
   vendor: 'Vendor',
+  policy: 'Policy',
   evidence: 'Evidence',
   asset: 'Asset',
   incident: 'Incident',

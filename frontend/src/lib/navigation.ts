@@ -9,7 +9,7 @@ import {
   ArrowLeftRight, Bell, Bug, Building, Building2, ChartLine, CircleCheck,
   CircleHelp, ClipboardCheck, ClipboardList, Compass, Crosshair, Dices, FileChartColumn,
   FileText, FolderKanban, GraduationCap, House, Landmark, LayoutGrid, Layers, LifeBuoy, Link2, Lock, Network,
-  Newspaper, Package, Plug, RefreshCw, Satellite, Scale, Server, Settings, Shield,
+  Newspaper, Package, Plug, RefreshCw, Satellite, Scale, ScrollText, Server, Settings, Shield,
   ShieldAlert, ShieldCheck, Siren, ToggleLeft, TrendingDown, TriangleAlert, UserCheck,
   BookOpen, MessageSquareWarning, IdCard, HardDrive, Bot, Receipt,
 } from 'lucide-react';
@@ -59,9 +59,9 @@ export const HOME_ITEM: NavigationItem = {
  * Eight collapsible sections grouped by the GRC domains people already think in.
  * Merged pages (vendor contracts into Third-Party Risk, automated and pending
  * evidence into Evidence) keep their old URLs as redirects, so bookmarks still
- * land in the right place. This community edition has no Policies frontend
- * page, no ERP module and no financial-audit/HIPAA-SRA modules, so those items
- * that ControlWeaver-Pro carries are simply absent here.
+ * land in the right place. This community edition has no ERP module and no
+ * HIPAA-SRA module, so those items that ControlWeaver-Pro carries are simply
+ * absent here.
  */
 export const NAVIGATION_SECTIONS: NavigationSection[] = [
   {
@@ -73,6 +73,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
           { name: 'Controls', href: '/dashboard/controls', icon: ShieldCheck, requiredPermissions: ['organizations.read'] },
           { name: 'AI Control Assessments', href: '/dashboard/controls/pending-assessments', icon: Bot, requiredPermissions: ['implementations.read'] },
           { name: 'Exceptions', href: '/dashboard/exceptions', icon: TriangleAlert, requiredPermissions: ['controls.read'] },
+          { name: 'Policies', href: '/dashboard/policies', icon: ScrollText, requiredPermissions: ['controls.read'] },
           // POA&M sits at controls.read because that is what every POA&M endpoint requires.
           { name: 'POA&M', href: '/dashboard/poam', icon: ClipboardList, requiredPermissions: ['controls.read'], keywords: ['remediation', 'plan of action'] },
           { name: 'Frameworks', href: '/dashboard/frameworks', icon: Layers, requiredPermissions: ['organizations.read'] },

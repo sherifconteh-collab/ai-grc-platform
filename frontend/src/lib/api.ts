@@ -2476,7 +2476,7 @@ export const indicatorsAPI = {
 // Items and results carry record ids only; lib/deepLinks.ts turns them into links.
 
 export type MyWorkKind =
-  | 'control' | 'poam' | 'poam_approval' | 'risk' | 'exception_approval' | 'pbc';
+  | 'control' | 'poam' | 'poam_approval' | 'risk' | 'exception_approval' | 'pbc' | 'policy';
 
 export interface MyWorkItem {
   id: string;
@@ -2528,7 +2528,7 @@ export const myWorkAPI = {
     api.post(`/my-work/requests/${id}/respond`, { response_notes: responseNotes }),
 };
 
-export type SearchResultType = 'control' | 'risk' | 'poam' | 'vendor' | 'evidence' | 'asset' | 'incident';
+export type SearchResultType = 'control' | 'risk' | 'poam' | 'vendor' | 'policy' | 'evidence' | 'asset' | 'incident';
 
 export interface SearchResult {
   id: string;
@@ -2544,6 +2544,62 @@ export const searchAPI = {
 };
 
 export default api;
+
+// Policy management APIs (backend: routes/policies.js)
+export type PolicyStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
+
+export const policiesAPI = {
+  list: (params?: { status?: PolicyStatus; policy_type?: string; limit?: number; offset?: number }) =>
+    api.get('/policies', { params }),
+  get: (id: string) => api.get(`/policies/${id}`),
+  create: (data: {
+    policy_name: string;
+    policy_type: string;
+    description?: string;
+    version?: string;
+    status?: PolicyStatus;
+    effective_date?: string;
+    review_frequency_days?: number;
+  }) => api.post('/policies', data),
+  generate: (data: { policy_name: string; policy_type: string; framework_ids?: string[]; include_all_frameworks?: boolean }) =>
+    api.post('/policies/generate', data, { timeout: AI_REQUEST_TIMEOUT }),
+  update: (id: string, data: {
+    policy_name?: string;
+    policy_type?: string;
+    description?: string;
+    version?: string;
+    status?: PolicyStatus;
+    effective_date?: string;
+    review_frequency_days?: number;
+  }) => api.patch(`/policies/${id}`, data),
+  saveSection: (id: string, data: {
+    section_number: string;
+    section_title: string;
+    section_content: string;
+    display_order?: number;
+  }) => api.post(`/policies/${id}/sections`, data),
+  getSectionControls: (id: string, sectionId: string) => api.get(`/policies/${id}/sections/${sectionId}/controls`),
+  addReview: (id: string, data: {
+    review_type: 'annual' | 'triggered' | 'ad_hoc' | 'change_driven';
+    review_date?: string;
+    review_status: 'scheduled' | 'in_progress' | 'completed' | 'overdue';
+    review_notes?: string;
+    changes_made?: boolean;
+    requires_user_acknowledgment?: boolean;
+  }) => api.post(`/policies/${id}/reviews`, data),
+  acknowledge: (id: string, data?: { acknowledgment_notes?: string }) => api.post(`/policies/${id}/acknowledge`, data || {}),
+  getAcknowledgments: (id: string) => api.get(`/policies/${id}/acknowledgments`),
+  getAlerts: (id: string) => api.get(`/policies/${id}/monitoring-alerts`),
+  upload: (file: File) => {
+    const form = new FormData();
+    form.append('policy', file);
+    return api.post('/policies/upload', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: UPLOAD_TIMEOUT });
+  },
+  listUploads: () => api.get('/policies/uploads'),
+  analyzeUpload: (uploadId: string, frameworkIds: string[]) =>
+    api.post(`/policies/uploads/${uploadId}/analyze`, { framework_ids: frameworkIds }, { timeout: AI_REQUEST_TIMEOUT }),
+  getUploadGaps: (uploadId: string) => api.get(`/policies/uploads/${uploadId}/gaps`),
+};
 
 // Financial audit readiness (backend: routes/financialAudit.js)
 export type RcmProcess = 'procure_to_pay' | 'order_to_cash' | 'record_to_report' | 'hire_to_retire' | 'treasury' | 'fixed_assets' | 'inventory' | 'budget_execution' | 'it_general' | 'entity_level' | 'other';

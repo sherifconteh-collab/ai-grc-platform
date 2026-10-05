@@ -428,7 +428,11 @@ router.patch('/:id', requirePermission('controls.write'), async (req, res) => {
       details: {
         old_status: existing.status,
         new_status: updated.status,
-        policy_name: updated.policy_name
+        policy_name: updated.policy_name,
+        // Administrators may approve their own policy (see middleware/sod.js);
+        // record that the separation-of-duties override was used.
+        sod_override: nextStatus === 'approved' && existing.status !== 'approved' &&
+          String(existing.created_by) === String(req.user.id)
       }
     });
 
@@ -472,13 +476,23 @@ router.post('/:id/sections', requirePermission('controls.write'), async (req, re
     await client.query('BEGIN');
 
     const policyResult = await client.query(
-      `SELECT id FROM organization_policies WHERE organization_id = $1 AND id = $2 LIMIT 1`,
+      `SELECT id, status FROM organization_policies WHERE organization_id = $1 AND id = $2 LIMIT 1`,
       [orgId, policyId]
     );
 
     if (policyResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ success: false, error: 'Policy not found' });
+    }
+
+    // Published and archived text is what employees acknowledged; changing it
+    // in place would make those acknowledgments refer to different wording.
+    if (['published', 'archived'].includes(policyResult.rows[0].status)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false,
+        error: 'Published and archived policies are read-only. Return the policy to draft (a new version) to edit it.'
+      });
     }
 
     if (!section_number || !section_title || !section_content) {
@@ -827,6 +841,44 @@ router.post('/:id/acknowledge', requirePermission('controls.read'), async (req, 
   } catch (error) {
     console.error('Policy acknowledgment error:', error);
     res.status(500).json({ success: false, error: 'Failed to acknowledge policy' });
+  }
+});
+
+// GET /api/v1/policies/:id/acknowledgments
+// Attestation status for the current policy version: who has acknowledged it
+// and which active users still need to.
+router.get('/:id/acknowledgments', requirePermission('controls.read'), async (req, res) => {
+  try {
+    const orgId = req.user.organization_id;
+    const policyResult = await pool.query(
+      'SELECT version FROM organization_policies WHERE organization_id = $1 AND id = $2',
+      [orgId, req.params.id]
+    );
+    if (policyResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Policy not found' });
+    }
+    const version = policyResult.rows[0].version;
+    const result = await pool.query(
+      `SELECT u.id AS user_id, u.first_name, u.last_name, u.email, u.role,
+              ack.acknowledged_at, ack.acknowledgment_notes
+         FROM users u
+         LEFT JOIN LATERAL (
+           SELECT a.acknowledged_at, a.acknowledgment_notes
+             FROM policy_user_acknowledgments a
+            WHERE a.organization_id = $1 AND a.policy_id = $2 AND a.policy_version = $3 AND a.user_id = u.id
+            ORDER BY a.acknowledged_at DESC
+            LIMIT 1
+         ) ack ON true
+        WHERE u.organization_id = $1 AND u.is_active = true
+        ORDER BY ack.acknowledged_at IS NOT NULL, u.last_name NULLS LAST, u.first_name
+        LIMIT 1000`,
+      [orgId, req.params.id, version]
+    );
+    const rows = result.rows.map((row) => ({ ...row, email: row.email ? decrypt(row.email) : null }));
+    res.json({ success: true, data: { version, users: rows } });
+  } catch (error) {
+    console.error('List policy acknowledgments error:', error);
+    res.status(500).json({ success: false, error: 'Failed to list acknowledgments' });
   }
 });
 

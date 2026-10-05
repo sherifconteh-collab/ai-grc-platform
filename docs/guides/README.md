@@ -15,6 +15,7 @@ tables, but neither tells you how to use them. These guides close that.
 | [`RISK_REGISTER.md`](RISK_REGISTER.md) | Identifying, scoring, treating and reviewing risks, and the six things a risk can be linked to |
 | [`POAM.md`](POAM.md) | Plan of Action & Milestones: what raises one, the approval workflow, and export |
 | [`EVIDENCE.md`](EVIDENCE.md) | Uploading, classifying, versioning and verifying evidence, and linking it to controls and risks |
+| [`POLICIES.md`](POLICIES.md) | Policies: drafting, approval and publication, reviews, employee acknowledgments, and uploaded-document gap analysis |
 | [`FINANCIAL_AUDIT.md`](FINANCIAL_AUDIT.md) | Financial audit readiness: the risk-control matrix, control testing and sampling, notices of findings and corrective action plans, and the readiness report |
 
 ## What is deliberately not here
