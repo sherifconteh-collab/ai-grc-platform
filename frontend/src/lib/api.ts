@@ -2544,3 +2544,71 @@ export const searchAPI = {
 };
 
 export default api;
+
+// Financial audit readiness (backend: routes/financialAudit.js)
+export type RcmProcess = 'procure_to_pay' | 'order_to_cash' | 'record_to_report' | 'hire_to_retire' | 'treasury' | 'fixed_assets' | 'inventory' | 'budget_execution' | 'it_general' | 'entity_level' | 'other';
+export type ControlFrequency = 'annual' | 'quarterly' | 'monthly' | 'weekly' | 'daily' | 'recurring' | 'as_needed';
+export type ControlTestConclusion = 'effective' | 'effective_with_exceptions' | 'ineffective';
+export type SampleResult = 'pending' | 'pass' | 'exception' | 'not_applicable';
+export type DeficiencyLevel = 'control_deficiency' | 'significant_deficiency' | 'material_weakness';
+
+export interface RcmEntryInput {
+  control_ref?: string;
+  process?: RcmProcess;
+  sub_process?: string | null;
+  assessable_unit?: string | null;
+  risk_ref?: string | null;
+  risk_statement?: string;
+  control_description?: string;
+  assertions?: string[];
+  frequency?: ControlFrequency;
+  control_type?: 'manual' | 'automated' | 'it_dependent_manual';
+  control_nature?: 'preventive' | 'detective';
+  key_control?: boolean;
+  fraud_risk?: boolean;
+  risk_level?: 'low' | 'moderate' | 'high';
+  system_name?: string | null;
+  status?: 'draft' | 'active' | 'retired';
+}
+
+export const financialAuditAPI = {
+  listRcm: (params?: { process?: string; key_only?: boolean; search?: string; status?: string; limit?: number; offset?: number }) =>
+    api.get('/financial-audit/rcm', { params }),
+  createRcm: (data: RcmEntryInput) => api.post('/financial-audit/rcm', data),
+  importRcm: (csv: string) => api.post('/financial-audit/rcm/import', { csv }),
+  updateRcm: (id: string, data: RcmEntryInput) => api.patch(`/financial-audit/rcm/${id}`, data),
+  deleteRcm: (id: string) => api.delete(`/financial-audit/rcm/${id}`),
+  sampleSize: (params: { frequency: ControlFrequency; risk_level?: string; control_type?: string; population?: number }) =>
+    api.get('/financial-audit/sampling', { params }),
+  statisticalSampleSize: (data: { confidence_level: number; tolerable_rate: number; expected_rate?: number; population?: number }) =>
+    api.post('/financial-audit/sampling/statistical', data),
+  listTests: (params?: { rcm_entry_id?: string; fiscal_year?: number; status?: string }) => api.get('/financial-audit/tests', { params }),
+  createTest: (data: {
+    rcm_entry_id: string;
+    test_type: 'design' | 'operating_effectiveness';
+    fiscal_year?: number;
+    population_size?: number;
+    sample_method?: string;
+    sample_size?: number;
+    confidence_level?: number;
+    tolerable_rate?: number;
+    expected_rate?: number;
+    engagement_id?: string;
+    procedures?: string;
+  }) => api.post('/financial-audit/tests', data),
+  getTest: (id: string) => api.get(`/financial-audit/tests/${id}`),
+  recordSample: (id: string, n: number, data: { result?: SampleResult; exception_description?: string; item_reference?: string }) =>
+    api.put(`/financial-audit/tests/${id}/samples/${n}`, data),
+  completeTest: (id: string, data: { conclusion?: ControlTestConclusion; notes?: string }) => api.post(`/financial-audit/tests/${id}/complete`, data),
+  reviewTest: (id: string) => api.post(`/financial-audit/tests/${id}/review`, {}),
+  reopenTest: (id: string) => api.post(`/financial-audit/tests/${id}/reopen`, {}),
+  raiseFinding: (id: string, data: { engagement_id?: string; nfr_number?: string; deficiency_level?: DeficiencyLevel; auditor_organization?: string; recommendation?: string }) =>
+    api.post(`/financial-audit/tests/${id}/finding`, data),
+  updateNfr: (findingId: string, data: { nfr_number?: string | null; fiscal_year?: number | null; deficiency_level?: DeficiencyLevel | null; auditor_organization?: string | null; cap_poam_id?: string | null }) =>
+    api.patch(`/financial-audit/findings/${findingId}/nfr`, data),
+  createCap: (findingId: string, data: { due_date?: string; remediation_plan?: string; owner_id?: string }) =>
+    api.post(`/financial-audit/findings/${findingId}/cap`, data),
+  readiness: (fiscalYear?: number) => api.get('/financial-audit/readiness', { params: fiscalYear ? { fiscal_year: fiscalYear } : {} }),
+  exportMatrix: (fiscalYear?: number) =>
+    api.get('/financial-audit/readiness/export', { params: fiscalYear ? { fiscal_year: fiscalYear } : {}, responseType: 'blob' }),
+};

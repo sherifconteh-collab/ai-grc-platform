@@ -46,7 +46,9 @@ const ROLE_FALLBACK_PERMISSIONS = new Map([
     'ai.read',
     'compliance.read',
     'compliance.manage',
-    'tprm.read'
+    'tprm.read',
+    'financial_audit.read',
+    'financial_audit.write'
   ]],
   ['user', [
     'dashboard.read',
@@ -76,7 +78,9 @@ const ROLE_FALLBACK_PERMISSIONS = new Map([
     'compliance.read',
     'compliance.manage',
     'tprm.read',
-    'tprm.write'
+    'tprm.write',
+    'financial_audit.read',
+    'financial_audit.write'
   ]]
 ]);
 
