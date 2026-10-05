@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(deps): weekly dependency batch 2026-10-04 ([#340](https://github.com/sherifconteh-collab/ai-grc-platform/pull/340)) — @sherifconteh-collab
 - security(deps): fix critical Next.js RCE and 3 high-severity CVEs ([#339](https://github.com/sherifconteh-collab/ai-grc-platform/pull/339)) — @sherifconteh-collab
 - fix(release): document unsigned Windows build, make no-cert path deterministic ([#336](https://github.com/sherifconteh-collab/ai-grc-platform/pull/336)) — @sherifconteh-collab
 
