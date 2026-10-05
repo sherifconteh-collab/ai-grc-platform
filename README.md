@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #360: feat(policies): port the Policies UI and acknowledgments endpoint -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #355: security(auth): bind service account tokens to an owner in the caller's organization -->
 
 ## 🎯 What is This?
 
