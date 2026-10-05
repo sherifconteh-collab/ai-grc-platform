@@ -11,7 +11,7 @@
     "start": "node src/server.js",
     "start:prod": "node -e \"process.env.NODE_ENV = process.env.NODE_ENV || 'production'; require('./src/server.js')\"",
     "start:railway": "npm run start:prod",
-    "dev": "nodemon src/server.js",
+    "dev": "node --watch src/server.js",
     "mcp": "node scripts/mcp-server-secure.js",
     "mcp:secure": "node scripts/mcp-server-secure.js",
     "mcp:login": "node scripts/mcp-auth-login.js",
@@ -82,13 +82,13 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.20.0",
     "bcryptjs": "^2.4.3",
-    "compression": "^1.8.1",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "esprima": "^4.0.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.5.2",
+    "express-rate-limit": "^8.7.0",
     "geoip-lite": "^2.0.3",
     "hono": "^4.13.8",
     "ioredis": "^5.11.0",
@@ -98,7 +98,7 @@
     "multer": "^2.4.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^10.0.13",
-    "openai": "^7.5.0",
+    "openai": "^7.23.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1",
@@ -116,11 +116,9 @@
     "eslint": "^10.10.0",
     "eslint-plugin-security": "^4.0.1",
     "globals": "^17.11.0",
-    "jest": "^30.4.2",
-    "nodemon": "^3.0.1"
+    "jest": "^30.5.2"
   },
   "optionalDependencies": {
-    "apn": "^2.2.0",
     "firebase-admin": "^14.2.0"
   },
   "overrides": {
@@ -134,7 +132,6 @@
     "websocket-driver": ">=0.7.5",
     "yauzl": ">=3.2.1",
     "@xmldom/xmldom": ">=0.9.12",
-    "node-forge": ">=1.4.0",
     "fast-xml-builder": ">=1.2.0",
     "fast-uri": ">=4.1.5",
     "brace-expansion": ">=5.0.12",
@@ -148,9 +145,6 @@
     "form-data": ">=4.0.6",
     "@babel/core": "^7.29.7",
     "@opentelemetry/core": ">=2.8.0",
-    "apn": {
-      "jsonwebtoken": "^9.0.2"
-    },
     "express": {
       "path-to-regexp": "0.1.13"
     },
