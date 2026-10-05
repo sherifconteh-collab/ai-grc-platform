@@ -4,32 +4,20 @@
 /**
  * Push Notification Service
  *
- * Unified service for sending push notifications to iOS (APNs) and Android (FCM).
- * Both channels are optional and gracefully disabled when their credentials are
- * absent from the environment. The service looks up all registered device tokens
- * for a user and routes each to the appropriate provider.
+ * Service for sending push notifications to Android devices via FCM. The channel
+ * is optional and gracefully disabled when its credentials are absent from the
+ * environment. The service looks up all registered device tokens for a user
+ * and sends to the Android ones.
+ *
+ * iOS (APNs) delivery is not implemented. Device tokens registered with
+ * platform 'ios' are stored but skipped here until the iOS app can be built
+ * and tested end to end; the old apn package was removed because its
+ * node-forge dependency has an unpatched high-severity advisory.
  *
  * Installation:
  *   firebase-admin is declared as an optionalDependency and installed by npm ci.
  *
- *   apn (iOS APNs) is NOT declared as a dependency because the published v2.x
- *   releases pin node-forge@^0.7.1 and jsonwebtoken@^8.x, both of which contain
- *   unfixed high-severity CVEs that would fail the CI audit gate. To enable iOS
- *   push in a production environment, install apn separately after auditing:
- *
- *     npm install --no-save apn
- *
- *   The service will automatically detect and use it at runtime once installed.
- *   Without apn, only Android (FCM) push is delivered.
- *
  * Environment variables required:
- *
- *   APNs (iOS):
- *     APNS_KEY_ID       10-character key ID from Apple Developer portal
- *     APNS_TEAM_ID      10-character Apple Developer team ID
- *     APNS_KEY_PATH     Absolute path to the .p8 private key file
- *     APNS_BUNDLE_ID    App bundle ID (e.g. com.yourcompany.controlweave)
- *     APNS_PRODUCTION   'true' for production APNs, default is sandbox
  *
  *   FCM (Android):
  *     FIREBASE_SERVICE_ACCOUNT  JSON string of the Firebase Admin SDK service account
@@ -40,42 +28,6 @@
 
 const pool = require('../config/database');
 const { log } = require('../utils/logger');
-
-// ── APNs client (lazy-initialised) ────────────────────────────────────────
-
-let _apnsProvider = null;
-
-function getApnsProvider() {
-  if (_apnsProvider !== null) return _apnsProvider;
-
-  const keyId = process.env.APNS_KEY_ID;
-  const teamId = process.env.APNS_TEAM_ID;
-  const keyPath = process.env.APNS_KEY_PATH;
-  const bundleId = process.env.APNS_BUNDLE_ID;
-
-  if (!keyId || !teamId || !keyPath || !bundleId) {
-    log('info', 'push_service.apns.not_configured', {
-      note: 'Set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_PATH, APNS_BUNDLE_ID to enable iOS push'
-    });
-    _apnsProvider = false; // false = checked, unavailable
-    return false;
-  }
-
-  try {
-    const apn = require('apn');
-    const production = process.env.APNS_PRODUCTION === 'true';
-    _apnsProvider = new apn.Provider({
-      token: { key: keyPath, keyId, teamId },
-      production
-    });
-    log('info', 'push_service.apns.initialised', { production, bundleId });
-    return _apnsProvider;
-  } catch (err) {
-    log('warn', 'push_service.apns.init_failed', { error: err.message });
-    _apnsProvider = false;
-    return false;
-  }
-}
 
 // ── FCM admin app (lazy-initialised) ──────────────────────────────────────
 
@@ -121,37 +73,6 @@ function getFirebaseApp() {
     log('warn', 'push_service.fcm.init_failed', { error: err.message });
     _firebaseApp = false;
     return false;
-  }
-}
-
-// ── APNs delivery ─────────────────────────────────────────────────────────
-
-async function sendApns(tokens, title, body, data) {
-  const provider = getApnsProvider();
-  if (!provider) return;
-
-  const apn = require('apn');
-  const bundleId = process.env.APNS_BUNDLE_ID;
-
-  const notification = new apn.Notification();
-  notification.alert = { title, body };
-  notification.sound = 'default';
-  notification.topic = bundleId;
-  notification.payload = data || {};
-  notification.expiry = Math.floor(Date.now() / 1000) + 86400; // 24 h
-
-  try {
-    const result = await provider.send(notification, tokens);
-    if (result.failed && result.failed.length > 0) {
-      const expired = result.failed
-        .filter((f) => f.response && f.response.reason === 'BadDeviceToken')
-        .map((f) => f.device);
-      if (expired.length > 0) {
-        await pruneStaleTokens(expired);
-      }
-    }
-  } catch (err) {
-    log('warn', 'push_service.apns.send_failed', { error: err.message });
   }
 }
 
@@ -247,11 +168,9 @@ async function sendPush(userId, title, body, data) {
 
   if (!rows || rows.length === 0) return;
 
-  const iosTokens = rows.filter((r) => r.platform === 'ios').map((r) => r.token);
   const androidTokens = rows.filter((r) => r.platform === 'android').map((r) => r.token);
 
   const tasks = [];
-  if (iosTokens.length > 0) tasks.push(sendApns(iosTokens, title, body, data));
   if (androidTokens.length > 0) tasks.push(sendFcm(androidTokens, title, body, data));
 
   await Promise.allSettled(tasks);
