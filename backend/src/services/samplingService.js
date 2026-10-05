@@ -57,7 +57,7 @@ function frequencySampleSize({ frequency, riskLevel = 'moderate', controlType = 
   return {
     sample_size: size,
     method: 'frequency_table',
-    basis: `${frequency.replace('_', ' ')} control, ${riskLevel} risk of failure${size < base ? `, limited to a population of ${cap}` : ''}.`
+    basis: `${frequency.replace(/_/g, ' ')} control, ${riskLevel} risk of failure${size < base ? `, limited to a population of ${cap}` : ''}.`
   };
 }
 

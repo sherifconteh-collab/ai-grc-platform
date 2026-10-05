@@ -132,7 +132,7 @@ async function importCsv(organizationId, userId, csvText) {
       const row = rows[i];
       const key = row.framework_code && row.framework_control ? `${row.framework_code.trim()}|${row.framework_control.trim()}` : null;
       if (key && !fcMap.has(key)) {
-        errors.push({ line: i + 2, error: `Unknown framework control ${key.replace('|', ' ')}` });
+        errors.push({ line: i + 2, error: `Unknown framework control ${row.framework_code.trim()} ${row.framework_control.trim()}` });
         continue;
       }
       const { values, errors: rowErrors } = normalizeRcm({ ...row, framework_control_id: key ? fcMap.get(key) : undefined, owner_user_id: undefined });
