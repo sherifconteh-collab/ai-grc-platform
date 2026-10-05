@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #347: feat(stig): import DISA STIG XCCDF benchmarks crosswalked to 800-53 via CCIs (port of Pro #864) -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #348: feat(financial-audit): port financial audit readiness from ControlWeaver-Pro -->
 
 ## 🎯 What is This?
 
@@ -1056,7 +1056,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 172 sequential, idempotent migration files (numbered through 160; a few historical duplicate numbers are documented and never renumbered)
 - **API Routes**: 80+ route modules
-- **Services**: 64 service modules
+- **Services**: 65 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)

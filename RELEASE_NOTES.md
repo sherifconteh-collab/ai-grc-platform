@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- feat(financial-audit): port financial audit readiness from ControlWeaver-Pro ([#348](https://github.com/sherifconteh-collab/ai-grc-platform/pull/348)) — @sherifconteh-collab
 
 - feat(stig): import DISA STIG XCCDF benchmarks crosswalked to 800-53 via CCIs (port of Pro #864) ([#347](https://github.com/sherifconteh-collab/ai-grc-platform/pull/347)) — @sherifconteh-collab
 
