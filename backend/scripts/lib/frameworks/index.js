@@ -34,7 +34,7 @@ const nist_800_207 = require('./nist_800_207');
 const ccpa_cpra = require('./ccpa_cpra');
 const state_ai_governance = require('./state_ai_governance');
 const international_ai_governance = require('./international_ai_governance');
-const fedramp_high = require('./fedramp_high');
+const fedrampBaselines = require('./fedramp_baselines');
 const cis_controls_v8 = require('./cis_controls_v8');
 
 module.exports = [
@@ -70,6 +70,6 @@ module.exports = [
   ccpa_cpra,
   state_ai_governance,
   international_ai_governance,
-  fedramp_high,
+  ...fedrampBaselines.frameworks,
   cis_controls_v8,
 ];

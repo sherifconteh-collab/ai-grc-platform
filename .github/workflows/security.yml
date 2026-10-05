@@ -112,6 +112,11 @@ jobs:
           [ "$FAILED" -eq 0 ] && echo "No new duplicate migration numbers"
           exit $FAILED
 
+      - name: Check generated FedRAMP migration is current
+        run: |
+          cd backend
+          node scripts/generate-fedramp-migration.js --check
+
       - name: Check for migration schema drift
         run: |
           cd backend

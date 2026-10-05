@@ -68,9 +68,9 @@ The resulting installer is in `electron/dist/`.
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 34 frameworks with 1,800+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 36 frameworks with 2,700+ controls. Built to be:
 
-- **Multi-Framework**: 34 major compliance frameworks out of the box
+- **Multi-Framework**: 36 major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
 - **Threat-Intelligent**: Live feeds from NVD, CISA KEV, MITRE, and AlienVault OTX
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, MAESTRO, and AIUC-1
@@ -107,7 +107,7 @@ The platform is **fully functional**. Every capability below is available — no
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
 - 📊 Compliance dashboard with real-time metrics and custom dashboard builder
-- 🎯 Framework selection (34 frameworks, 1,800+ controls)
+- 🎯 Framework selection (36 frameworks, 2,700+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
 - 📜 Audit logging with 20 recorded fields per event
@@ -293,7 +293,8 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 
 ### Added in v4.2.0
 - **CIS Controls v8** (`cis_controls_v8`) — 18 Implementation Groups with crosswalk mappings to NIST 800-53 Rev 5 and NIST CSF 2.0
-- **FedRAMP High Baseline** (`fedramp_high`) — 25 High-only additions (AC, AU, IA, SC, SI, SA, CP, IR, PE, PS, RA, PL families) with crosswalk to NIST 800-53 Rev 5
+- **FedRAMP Rev 5 baselines** (`fedramp_low`, `fedramp_moderate`, `fedramp_high`) — the complete Low (156), Moderate (323) and High (410) control sets from the official FedRAMP Rev 5 baseline workbook, crosswalked to NIST 800-53 Rev 5
+- **NIST SP 800-171 Rev 3** (`nist_800_171`) — all 97 security requirements, imported from the NIST OSCAL catalog
 
 ### Added since
 - **PCI DSS v4.0** (`pci_dss_v4`) — 61 controls across the 12 requirement domains
@@ -383,7 +384,7 @@ Full RMF lifecycle management without leaving the platform:
 - **Reduce compliance burden by 40-60%** through control reuse
 
 ### 📋 Multi-Framework Compliance Management
-- Track compliance across 34 frameworks simultaneously
+- Track compliance across 36 frameworks simultaneously
 - **Cross-framework control mapping (Crosswalks)** — 3,100+ mappings showing control overlaps
 - Unified risk register with inherent/residual scoring, treatments and named acceptance
 - Gap analysis across standards
@@ -593,7 +594,7 @@ Full asset and configuration inventory:
 | Cost | **Free** | $30K–200K/yr | $50K–150K/yr | $100K+/yr |
 | Open Source | ✅ | ❌ | ❌ | ❌ |
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
-| Frameworks | 34 | 10–15 | 10–20 | 20+ |
+| Frameworks | 36 | 10–15 | 10–20 | 20+ |
 | Auto-Crosswalk | ✅ 3,100+ mappings | ❌ | ❌ | ❌ |
 | Custom Framework Builder | ✅ | ❌ | Paid Add-on | ❌ |
 | Built-in AI Copilot | ✅ BYOK | ❌ | ❌ | ❌ |
@@ -761,7 +762,7 @@ controlweave/
 ### Core Tables
 - `organizations` — Multi-tenant support
 - `users` — Authentication and profiles with AES-256-GCM PII encryption and HMAC-SHA-384 email hashing
-- `frameworks` — Framework catalog (34 frameworks)
+- `frameworks` — Framework catalog (36 frameworks)
 - `framework_controls` — Individual controls/requirements
 - `control_implementations` — Org-specific implementation status
 
@@ -843,7 +844,7 @@ controlweave/
 ## 🎯 Use Cases
 
 ### For Compliance Officers
-- Track compliance across 34 frameworks simultaneously
+- Track compliance across 36 frameworks simultaneously
 - Leverage auto-crosswalk to reduce compliance burden by 40-60%
 - Use AI Copilot with RAG for grounded gap analysis and compliance forecasting
 - Generate audit-ready reports and documentation
@@ -921,7 +922,7 @@ controlweave/
 
 ### Phase 1: Foundation ✅
 - ✅ Complete PostgreSQL schema (140+ tables)
-- ✅ 34 framework seed data (1,800+ controls)
+- ✅ 36 framework seed data (2,700+ controls)
 - ✅ Cross-framework crosswalk mappings (80+)
 - ✅ REST API with full CRUD operations
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA
@@ -1043,8 +1044,8 @@ This project aims to provide an **open, transparent, affordable** alternative th
 
 ## 📈 Stats
 
-- **Frameworks**: 34 supported (including CIS Controls v8 and FedRAMP High added in v4.2.0)
-- **Controls**: 1,800+ controls in database
+- **Frameworks**: 36 supported (including CIS Controls v8, the FedRAMP Rev 5 Low/Moderate/High baselines and the full NIST SP 800-171 Rev 3 set)
+- **Controls**: 2,700+ controls in database
 - **Crosswalks**: 3,100+ cross-framework mappings
 - **Connector Templates**: 15 in the Integrations Hub (AWS Security Hub, Qualys VMDR, ServiceNow added in v4.2.0)
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support

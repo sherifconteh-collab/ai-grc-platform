@@ -1,31 +1,39 @@
+'use strict';
+
+// All 97 SP 800-171 Rev 3 security requirements, generated from NIST's OSCAL
+// catalog by scripts/import-oscal-800171.js (lib/frameworks/nist_800_171_rev3.js).
+// Migration 156 installs the same rows on existing databases, so a fresh seed
+// and an upgraded deployment now carry the same requirement set.
+//
+// The 24 requirements the catalog shipped before keep their original priority
+// and control type: migration 156 refreshes only title and text, so deployed
+// databases still hold these values.
+
+const NIST_800_171_REV3 = require('./nist_800_171_rev3');
+
+const ORIGINAL_FIELDS = {
+  '03.01.01': ['1', 'technical'], '03.01.02': ['1', 'technical'], '03.01.03': ['1', 'technical'],
+  '03.01.05': ['1', 'technical'], '03.01.12': ['1', 'technical'], '03.01.20': ['2', 'technical'],
+  '03.03.01': ['1', 'technical'], '03.03.02': ['1', 'technical'], '03.04.01': ['1', 'technical'],
+  '03.04.02': ['1', 'technical'], '03.04.06': ['2', 'technical'], '03.05.01': ['1', 'technical'],
+  '03.05.02': ['2', 'technical'], '03.05.03': ['1', 'technical'], '03.06.01': ['1', 'organizational'],
+  '03.08.01': ['2', 'technical'], '03.11.01': ['1', 'strategic'], '03.11.02': ['1', 'technical'],
+  '03.12.01': ['1', 'organizational'], '03.13.01': ['1', 'technical'], '03.13.08': ['1', 'technical'],
+  '03.14.01': ['1', 'technical'], '03.14.02': ['1', 'technical'], '03.14.06': ['1', 'technical']
+};
+
 module.exports = {
-    code: 'nist_800_171', name: 'NIST SP 800-171 Rev 3', version: 'Rev 3',
-    category: 'CUI Protection', tier_required: 'pro',
-    description: 'Protecting Controlled Unclassified Information (CUI) in non-federal systems.',
-    controls: [
-      { control_id: '03.01.01', title: 'Account Management', description: 'Manage system accounts including defining account types, establishing conditions, and monitoring usage.', priority: '1', control_type: 'technical' },
-      { control_id: '03.01.02', title: 'Access Enforcement', description: 'Enforce approved authorizations for logical access to systems in accordance with applicable policy.', priority: '1', control_type: 'technical' },
-      { control_id: '03.01.03', title: 'Information Flow Enforcement', description: 'Control the flow of CUI in accordance with approved authorizations.', priority: '1', control_type: 'technical' },
-      { control_id: '03.01.05', title: 'Least Privilege', description: 'Employ the principle of least privilege including for specific security functions and accounts.', priority: '1', control_type: 'technical' },
-      { control_id: '03.01.12', title: 'Remote Access', description: 'Monitor and control remote access sessions and authorize remote execution of privileged commands.', priority: '1', control_type: 'technical' },
-      { control_id: '03.01.20', title: 'Use of External Systems', description: 'Verify and control connections to and use of external information systems.', priority: '2', control_type: 'technical' },
-      { control_id: '03.03.01', title: 'Event Logging', description: 'Create and retain system audit logs to enable monitoring, analysis, and reporting of unlawful activity.', priority: '1', control_type: 'technical' },
-      { control_id: '03.03.02', title: 'Audit Record Content', description: 'Ensure audit records contain information needed to establish what occurred and the outcomes.', priority: '1', control_type: 'technical' },
-      { control_id: '03.04.01', title: 'Baseline Configuration', description: 'Establish and maintain baseline configurations and inventories of organizational systems.', priority: '1', control_type: 'technical' },
-      { control_id: '03.04.02', title: 'Configuration Settings', description: 'Establish and enforce security configuration settings for IT products in organizational systems.', priority: '1', control_type: 'technical' },
-      { control_id: '03.04.06', title: 'Least Functionality', description: 'Configure systems to provide only mission-essential capabilities by restricting unnecessary functions.', priority: '2', control_type: 'technical' },
-      { control_id: '03.05.01', title: 'User Identification and Authentication', description: 'Identify and authenticate users, processes, or devices as a prerequisite to system access.', priority: '1', control_type: 'technical' },
-      { control_id: '03.05.02', title: 'Device Identification and Authentication', description: 'Authenticate devices before establishing connections to organizational systems.', priority: '2', control_type: 'technical' },
-      { control_id: '03.05.03', title: 'Multi-Factor Authentication', description: 'Use multifactor authentication for local and network access to privileged and non-privileged accounts.', priority: '1', control_type: 'technical' },
-      { control_id: '03.06.01', title: 'Incident Handling', description: 'Establish an operational incident-handling capability including preparation, detection, and response.', priority: '1', control_type: 'organizational' },
-      { control_id: '03.08.01', title: 'Media Storage', description: 'Protect system media containing CUI both paper and digital during transport and storage.', priority: '2', control_type: 'technical' },
-      { control_id: '03.11.01', title: 'Risk Assessment', description: 'Periodically assess risk to operations, assets, and individuals from system operation.', priority: '1', control_type: 'strategic' },
-      { control_id: '03.11.02', title: 'Vulnerability Scanning', description: 'Scan for vulnerabilities in organizational systems and applications periodically and when new flaws arise.', priority: '1', control_type: 'technical' },
-      { control_id: '03.12.01', title: 'Security Assessment', description: 'Periodically assess security controls to determine if they are effective in their application.', priority: '1', control_type: 'organizational' },
-      { control_id: '03.13.01', title: 'Boundary Protection', description: 'Monitor, control, and protect communications at external and key internal boundaries.', priority: '1', control_type: 'technical' },
-      { control_id: '03.13.08', title: 'CUI Transmission Confidentiality', description: 'Implement cryptographic mechanisms to prevent unauthorized disclosure of CUI during transmission.', priority: '1', control_type: 'technical' },
-      { control_id: '03.14.01', title: 'Flaw Remediation', description: 'Identify, report, and correct system flaws in a timely manner.', priority: '1', control_type: 'technical' },
-      { control_id: '03.14.02', title: 'Malicious Code Protection', description: 'Provide protection from malicious code at appropriate locations within organizational systems.', priority: '1', control_type: 'technical' },
-      { control_id: '03.14.06', title: 'System Monitoring', description: 'Monitor organizational systems including inbound and outbound communications for attacks.', priority: '1', control_type: 'technical' },
-    ]
-  };
+  code: 'nist_800_171', name: 'NIST SP 800-171 Rev 3', version: 'Rev 3',
+  category: 'CUI Protection', tier_required: 'pro',
+  description: 'Protecting Controlled Unclassified Information (CUI) in nonfederal systems and organizations: all 97 security requirements across 17 families.',
+  controls: NIST_800_171_REV3.controls.map((c) => {
+    const [priority, controlType] = ORIGINAL_FIELDS[c.control_id] || [c.priority, c.control_type];
+    return {
+      control_id: c.control_id,
+      title: c.title,
+      description: c.description,
+      priority,
+      control_type: controlType
+    };
+  })
+};

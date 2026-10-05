@@ -33,6 +33,12 @@ module.exports = {
     // standard and wrong about the data. Level 1's 17 practices are still
     // absent, so this is comprehensive for L2 only.
     'cmmc_2.0',
+    // All 97 SP 800-171 Rev 3 requirements (migration 161), and FedRAMP's
+    // Rev 5 Low, Moderate and High baselines (156 / 323 / 410).
+    'nist_800_171',
+    'fedramp_low',
+    'fedramp_moderate',
+    'fedramp_high',
   ],
   representative: [
     'nist_privacy',
