@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #341: feat(frameworks): seed FedRAMP Rev 5 baselines and the full SP 800-171 Rev 3 set (port of Pro #851) -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #347: feat(stig): import DISA STIG XCCDF benchmarks crosswalked to 800-53 via CCIs (port of Pro #864) -->
 
 ## 🎯 What is This?
 

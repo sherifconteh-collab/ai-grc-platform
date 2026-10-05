@@ -9,6 +9,10 @@
 
 > Changes staged but not yet released to production.
 
+### Changed
+
+- feat(stig): import DISA STIG XCCDF benchmarks crosswalked to 800-53 via CCIs (port of Pro #864) ([#347](https://github.com/sherifconteh-collab/ai-grc-platform/pull/347)) — @sherifconteh-collab
+
 ## [2026.10.0] — 2026-10-05
 
 ### Changed
