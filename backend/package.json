@@ -33,7 +33,7 @@
     "check:ip-hygiene": "node scripts/ip-hygiene-check.js",
     "import:stig": "node scripts/import-stig-xccdf.js",
     "seed:stig": "node scripts/seed-stig-benchmark.js",
-    "seed:stig:all": "for c in disa_stig_app disa_stig_app_server disa_stig_gpos disa_stig_postgresql disa_stig_web_server; do node scripts/seed-stig-benchmark.js $c || exit 1; done",
+    "seed:stig:all": "for c in disa_stig_app disa_stig_app_server disa_stig_gpos disa_stig_oracle_db_19c disa_stig_oracle_linux_9 disa_stig_postgresql disa_stig_web_server disa_stig_weblogic_12c; do node scripts/seed-stig-benchmark.js $c || exit 1; done",
     "seed:admin-demo-workspace": "node scripts/seed-admin-demo-workspace.js",
     "seed:platform-admin": "node scripts/create-platform-admin.js",
     "seed:demo-accounts": "node scripts/seed-demo-accounts.js",

@@ -57,7 +57,7 @@ source at implementation time.
 | SOC 2 TSC (`soc2`) | 27 | 61 criteria (33 CC + A/PI/C/P) | 2 |
 | PCI DSS v4.0 | *(absent)* | 12 requirements, ~270 testable sub-requirements | 3 |
 | CIS Controls v8 (`cis_controls_v8`) | 18 | 18 controls → 153 safeguards (IG1/2/3 tagged) | 3 |
-| DISA STIGs + CCI | 5 benchmarks, imported from DISA XCCDF (ASD V6R4 286, Web Server SRG V4R5 126, App Server SRG V4R5 137, GPOS SRG V3R3 202, Crunchy Postgres 16 V1R3 111) | importer-driven, per-benchmark | 4 |
+| DISA STIGs + CCI | 8 benchmarks, imported from DISA XCCDF (ASD V6R4 286, Web Server SRG V4R5 126, App Server SRG V4R5 137, GPOS SRG V3R3 202, Crunchy Postgres 16 V1R3 111, Oracle Database 19c V1R5 96, Oracle Linux 9 V1R6 448, WebLogic 12c V2R2 73, sunset) | importer-driven, per-benchmark | 4 |
 
 ### Frameworks already `comprehensive` (no work)
 
@@ -218,13 +218,17 @@ repo imports them from DISA's own benchmarks:
 - `npm run seed:stig -- <code>` seeds one module and writes `related` crosswalks
   to 800-53 (never `equivalent`: a STIG rule is one configuration check, so it
   must not auto-credit the control, and `crosswalkCreditService` credits only
-  `equivalent` and `exact`). `npm run seed:stig:all` seeds all five. CCIs that
+  `equivalent` and `exact`). `npm run seed:stig:all` seeds all eight. CCIs that
   DISA maps only to Rev 4 are listed by the importer and left uncrosswalked
   rather than guessed.
 - Imported benchmarks: Application Security and Development STIG V6R4 (286
   rules), Web Server SRG V4R5 (126), Application Server SRG V4R5 (137), General
-  Purpose OS SRG V3R3 (202) and Crunchy Data Postgres 16 STIG V1R3 (111): 862
-  controls and 858 crosswalks to 800-53.
+  Purpose OS SRG V3R3 (202), Crunchy Data Postgres 16 STIG V1R3 (111), Oracle
+  Database 19c STIG V1R5 (96), Oracle Linux 9 STIG V1R6 (448) and Oracle WebLogic
+  Server 12c STIG V2R2 (73): 1,479 controls.
+- WebLogic 12c is sunset: DISA has retired it and no longer updates it. It is
+  kept for legacy systems, imported with `--sunset`, so its description starts
+  with `SUNSET:` and `source.sunset` is true. Do not use it as a current baseline.
 - Some SRGs ship two rules under one requirement id (the GPOS SRG has
   `SRG-OS-000132-GPOS-00067` as V-203655 and V-278973). The control key allows one
   row per id, so the importer keeps the newest rule and prints what it dropped.

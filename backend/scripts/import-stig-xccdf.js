@@ -18,6 +18,10 @@ const path = require('path');
 const { parseBenchmark } = require('./lib/stig/xccdf');
 const CCI = require('./lib/frameworks/cci_nist_rev5');
 
+// Prefixed to the description of a benchmark DISA has retired, so it is never
+// mistaken for a current baseline. Pass --sunset to the importer for these.
+const SUNSET_NOTICE = 'SUNSET: DISA has retired this benchmark and no longer updates it. Kept for legacy systems only; do not use it as a current baseline.';
+
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
   return i > -1 ? process.argv[i + 1] : fallback;
@@ -35,7 +39,7 @@ async function main() {
   const source = process.argv[2];
   const code = arg('--code');
   if (!source || !code || !/^[a-z0-9_]+$/.test(code)) {
-    process.stderr.write('usage: node scripts/import-stig-xccdf.js <benchmark-xccdf.xml> --code <lowercase_code> [--tier community]\n');
+    process.stderr.write('usage: node scripts/import-stig-xccdf.js <benchmark-xccdf.xml> --code <lowercase_code> [--tier community] [--sunset]\n');
     process.exit(1);
   }
   const bench = await parseBenchmark(fs.readFileSync(path.resolve(source), 'utf8'), CCI.rev5);
@@ -45,11 +49,12 @@ async function main() {
     version: stigVersion(bench),
     category: 'Cybersecurity',
     tier_required: arg('--tier', 'community'),
-    description: bench.description,
+    description: process.argv.includes('--sunset') ? `${SUNSET_NOTICE} ${bench.description}` : bench.description,
     source: {
       benchmark: path.basename(source),
       status_date: bench.status_date,
-      cci_list: CCI.version
+      cci_list: CCI.version,
+      ...(process.argv.includes('--sunset') ? { sunset: true } : {})
     },
     controls: bench.controls
   };
