@@ -76,7 +76,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@noble/post-quantum": "^0.6.1",
+    "@noble/post-quantum": "^0.7.1",
     "@sentry/node": "^10.69.0",
     "@simplewebauthn/server": "^14.0.2",
     "@socket.io/redis-adapter": "^8.3.0",
