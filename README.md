@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #348: feat(financial-audit): port financial audit readiness from ControlWeaver-Pro -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #349: feat(stig): port Oracle DB 19c, Oracle Linux 9 and sunset WebLogic 12c STIGs -->
 
 ## 🎯 What is This?
 
