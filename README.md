@@ -297,6 +297,7 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 - **NIST SP 800-171 Rev 3** (`nist_800_171`) — all 97 security requirements, imported from the NIST OSCAL catalog
 
 ### Added since
+- **DISA STIG import** — `npm run import:stig` turns any DISA STIG or SRG XCCDF benchmark into a framework, crosswalked to NIST 800-53 Rev 5 through DISA's CCI list. Five current benchmarks ship (Application Security and Development, Web Server, Application Server, General Purpose OS, PostgreSQL); `npm run seed:stig:all` loads them
 - **PCI DSS v4.0** (`pci_dss_v4`) — 61 controls across the 12 requirement domains
 
 ### Roadmap (not yet seeded)
