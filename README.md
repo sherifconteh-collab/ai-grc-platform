@@ -298,7 +298,7 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 
 ### Added since
 - **Financial audit readiness** — a risk-control matrix with CSV import, design and operating-effectiveness testing with frequency-table and statistical sampling, notices of findings (NFRs) with corrective action plans tracked as POA&M items, and a readiness report by process and assertion. Adds ControlWeave-authored COSO 2013, SOX ITGC and OMB A-123 Appendix A libraries and expands FISCAM (see [`docs/guides/FINANCIAL_AUDIT.md`](docs/guides/FINANCIAL_AUDIT.md))
-- **DISA STIG import** — `npm run import:stig` turns any DISA STIG or SRG XCCDF benchmark into a framework, crosswalked to NIST 800-53 Rev 5 through DISA's CCI list. Five current benchmarks ship (Application Security and Development, Web Server, Application Server, General Purpose OS, PostgreSQL); `npm run seed:stig:all` loads them
+- **DISA STIG import** — `npm run import:stig` turns any DISA STIG or SRG XCCDF benchmark into a framework, crosswalked to NIST 800-53 Rev 5 through DISA's CCI list. Eight benchmarks ship (Application Security and Development, Web Server, Application Server, General Purpose OS, PostgreSQL, Oracle Database 19c, Oracle Linux 9, and the retired, sunset-marked Oracle WebLogic 12c); `npm run seed:stig:all` loads them
 - **PCI DSS v4.0** (`pci_dss_v4`) — 61 controls across the 12 requirement domains
 
 ### Roadmap (not yet seeded)

@@ -106,12 +106,28 @@ describe('repeated requirement ids', () => {
   });
 });
 
+describe('sunset benchmarks', () => {
+  it('flags the retired WebLogic 12c benchmark so it is never read as current', () => {
+    const fw = require('../../scripts/lib/frameworks/supplemental/disa_stig_weblogic_12c');
+    expect(fw.source.sunset).toBe(true);
+    expect(fw.description).toMatch(/^SUNSET:/);
+  });
+
+  it('does not flag the current benchmarks', () => {
+    for (const code of ['disa_stig_oracle_db_19c', 'disa_stig_oracle_linux_9', 'disa_stig_app']) {
+      const fw = require(`../../scripts/lib/frameworks/supplemental/${code}`);
+      expect(fw.source.sunset).toBeUndefined();
+      expect(fw.description).not.toMatch(/^SUNSET:/);
+    }
+  });
+});
+
 describe('imported DISA benchmark modules', () => {
   const dir = path.join(__dirname, '../../scripts/lib/frameworks/supplemental');
   const modules = fs.readdirSync(dir).filter((f) => /^disa_stig_.*\.js$/.test(f));
 
-  it('finds the five DISA modules', () => {
-    expect(modules.length).toBe(5);
+  it('finds the eight DISA modules', () => {
+    expect(modules.length).toBe(8);
   });
 
   it.each(modules)('%s has one control per id and crosswalks to 800-53 ids', (file) => {
