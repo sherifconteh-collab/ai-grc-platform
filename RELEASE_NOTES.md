@@ -9,6 +9,8 @@
 
 > Changes staged but not yet released to production.
 
+## [2026.10.0] — 2026-10-05
+
 ### Changed
 - feat(frameworks): seed FedRAMP Rev 5 baselines and the full SP 800-171 Rev 3 set (port of Pro #851) ([#341](https://github.com/sherifconteh-collab/ai-grc-platform/pull/341)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-04 ([#340](https://github.com/sherifconteh-collab/ai-grc-platform/pull/340)) — @sherifconteh-collab
