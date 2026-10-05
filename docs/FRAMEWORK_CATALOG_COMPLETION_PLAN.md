@@ -57,7 +57,7 @@ source at implementation time.
 | SOC 2 TSC (`soc2`) | 27 | 61 criteria (33 CC + A/PI/C/P) | 2 |
 | PCI DSS v4.0 | *(absent)* | 12 requirements, ~270 testable sub-requirements | 3 |
 | CIS Controls v8 (`cis_controls_v8`) | 18 | 18 controls → 153 safeguards (IG1/2/3 tagged) | 3 |
-| DISA STIGs + CCI | *(absent)* | importer-driven, per-benchmark | 4 |
+| DISA STIGs + CCI | 5 benchmarks, imported from DISA XCCDF (ASD V6R4 286, Web Server SRG V4R5 126, App Server SRG V4R5 137, GPOS SRG V3R3 202, Crunchy Postgres 16 V1R3 111) | importer-driven, per-benchmark | 4 |
 
 ### Frameworks already `comprehensive` (no work)
 
@@ -200,22 +200,37 @@ mapping (`1`/`2`/`3`) follows IG tiers for CIS.
 
 ## Wave 4 — DISA STIG + CCI import
 
-STIG catalogs are too large and too frequently revised to hand-author.
-Build an importer instead:
+**Status: done.** Ported from ControlWeaver-Pro (#566 Wave 4), where it was built
+and tested first.
 
-- `scripts/import-stig.js`: parses a DISA XCCDF benchmark XML → creates a
-  framework (`disa_stig_<benchmark>`) with one control per rule (V-key /
-  SV-key, severity → priority).
-- CCI list import: DISA's CCI XML maps rules → NIST 800-53 controls; emit
-  `control_mappings` rows so every imported STIG crosswalks to the (now
-  complete, Wave 1) 800-53 catalog automatically.
-- Ship at least one imported benchmark (recommend: PostgreSQL or a web-server
-  STIG) as the proof, with the importer documented for users to run against
-  any benchmark they need. Imported STIG frameworks register as
-  `comprehensive` (complete relative to their benchmark version).
-- The sibling ControlWeaver-Pro repo has five hand-authored
-  `seed-disa-stig-*.js` scripts; port the importer there and converge those
-  seeds onto importer output.
+STIG catalogs are too large and too frequently revised to hand-author, so the
+repo imports them from DISA's own benchmarks:
+
+- `scripts/import-disa-cci.js` generates `scripts/lib/frameworks/cci_nist_rev5.js`
+  from DISA's CCI list (2023-06-07; 3,814 CCIs with an 800-53 Rev 5 reference).
+  Statement-level references such as `AC-2 (3) (d)` reduce to the catalog id
+  `AC-2(3)`.
+- `npm run import:stig -- <U_..._Manual-xccdf.xml> --code <code>` turns any DISA
+  STIG or SRG XCCDF 1.1/1.2 benchmark into
+  `scripts/lib/frameworks/supplemental/<code>.js`: one control per rule, keyed by
+  the rule's requirement id, with severity (mapped to priority), Vuln and Rule
+  ids, CCIs, fix text and the 800-53 Rev 5 controls its CCIs reference.
+- `npm run seed:stig -- <code>` seeds one module and writes `related` crosswalks
+  to 800-53 (never `equivalent`: a STIG rule is one configuration check, so it
+  must not auto-credit the control, and `crosswalkCreditService` credits only
+  `equivalent` and `exact`). `npm run seed:stig:all` seeds all five. CCIs that
+  DISA maps only to Rev 4 are listed by the importer and left uncrosswalked
+  rather than guessed.
+- Imported benchmarks: Application Security and Development STIG V6R4 (286
+  rules), Web Server SRG V4R5 (126), Application Server SRG V4R5 (137), General
+  Purpose OS SRG V3R3 (202) and Crunchy Data Postgres 16 STIG V1R3 (111): 862
+  controls and 858 crosswalks to 800-53.
+- Some SRGs ship two rules under one requirement id (the GPOS SRG has
+  `SRG-OS-000132-GPOS-00067` as V-203655 and V-278973). The control key allows one
+  row per id, so the importer keeps the newest rule and prints what it dropped.
+- The STIG frameworks are standalone, like ControlWeaver-Pro's: they are seeded
+  on demand and are not part of the default catalog, so the framework count and
+  `expected-counts.js` do not change.
 
 **Acceptance:** importer round-trips a current DISA benchmark; CCI-derived
 mappings land in `control_mappings`; re-import of the same benchmark version
