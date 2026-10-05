@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #354: security(deps): make js-yaml override follow the direct dependency, raise electron floor to 4.3.2 -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #352: chore(deps): weekly dependency batch 2026-10-05 -->
 
 ## 🎯 What is This?
 

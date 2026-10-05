@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(deps): weekly dependency batch 2026-10-05 ([#352](https://github.com/sherifconteh-collab/ai-grc-platform/pull/352)) — @sherifconteh-collab
 - security(deps): make js-yaml override follow the direct dependency, raise electron floor to 4.3.2 ([#354](https://github.com/sherifconteh-collab/ai-grc-platform/pull/354)) — @sherifconteh-collab
 - security(auth): bind service account tokens to an owner in the caller's organization ([#355](https://github.com/sherifconteh-collab/ai-grc-platform/pull/355)) — @sherifconteh-collab
 - feat(policies): port the Policies UI and acknowledgments endpoint ([#360](https://github.com/sherifconteh-collab/ai-grc-platform/pull/360)) — @sherifconteh-collab
