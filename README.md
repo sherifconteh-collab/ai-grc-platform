@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #340: chore(deps): weekly dependency batch 2026-10-04 -->
+<!-- LAST_UPDATED: 2026-10-05 | PR #341: feat(frameworks): seed FedRAMP Rev 5 baselines and the full SP 800-171 Rev 3 set (port of Pro #851) -->
 
 ## 🎯 What is This?
 
