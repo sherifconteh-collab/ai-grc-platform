@@ -1,3 +1,5 @@
+const FINANCIAL_AUDIT = require('./financialAudit');
+
 module.exports = {
     code: 'fiscam', name: 'FISCAM', version: '2023',
     category: 'Financial Audit', tier_required: 'pro',
@@ -15,5 +17,6 @@ module.exports = {
       { control_id: 'CC-2', title: 'Configuration Control - Hardware/Software Config', description: 'Maintain and document hardware and software configurations for financial systems.', priority: '1', control_type: 'technical' },
       { control_id: 'SC-1', title: 'Segregation of Duties', description: 'Implement segregation of duties to prevent fraud and unauthorized modifications.', priority: '1', control_type: 'organizational' },
       { control_id: 'CP-FM-1', title: 'Contingency Planning', description: 'Develop and test contingency plans to ensure continuity of financial operations.', priority: '1', control_type: 'organizational' },
+      ...FINANCIAL_AUDIT.FISCAM_ADDITIONS
     ]
   };

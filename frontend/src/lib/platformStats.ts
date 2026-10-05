@@ -8,8 +8,8 @@
  * you what else moved.
  */
 
-export const FRAMEWORKS_COUNT = 36;
-export const CONTROLS_COUNT_LABEL = '2,700+';
+export const FRAMEWORKS_COUNT = 39;
+export const CONTROLS_COUNT_LABEL = '2,800+';
 export const CROSSWALKS_COUNT_LABEL = '3,100+';
 
 export const NODE_VERSION_LABEL = '24+';

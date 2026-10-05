@@ -418,6 +418,7 @@ const vulnerabilitiesRoutes = safeRequire('./routes/vulnerabilities');
 const sbomRoutes = safeRequire('./routes/sbom');
 const dynamicConfigRoutes = require('./routes/dynamicConfig');
 const poamRoutes = require('./routes/poam');
+const financialAuditRoutes = require('./routes/financialAudit');
 const poamMilestonesRoutes = require('./routes/poamMilestones');
 const exceptionsRoutes = require('./routes/exceptions');
 const myWorkRoutes = require('./routes/myWork');
@@ -524,6 +525,7 @@ app.use('/api/v1/config', dynamicConfigRoutes);
 // Milestones mount on the same base path; poamMilestones.js declares only
 // /:id/milestones routes, so ordering between the two does not collide.
 app.use('/api/v1/poam', poamRoutes);
+app.use('/api/v1/financial-audit', financialAuditRoutes);
 app.use('/api/v1/poam', poamMilestonesRoutes);
 app.use('/api/v1/exceptions', exceptionsRoutes);
 app.use('/api/v1/my-work', myWorkRoutes);

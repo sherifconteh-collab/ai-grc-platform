@@ -6,8 +6,8 @@ const frameworks = require('../../scripts/lib/frameworks');
 const byCode = (code) => frameworks.find((f) => f.code === code);
 
 describe('framework catalog wave 1', () => {
-  test('catalog holds 36 frameworks', () => {
-    expect(frameworks).toHaveLength(36);
+  test('catalog holds 39 frameworks', () => {
+    expect(frameworks).toHaveLength(39);
   });
 
   test.each([

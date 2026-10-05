@@ -34,6 +34,7 @@ const nist_800_207 = require('./nist_800_207');
 const ccpa_cpra = require('./ccpa_cpra');
 const state_ai_governance = require('./state_ai_governance');
 const international_ai_governance = require('./international_ai_governance');
+const FINANCIAL_AUDIT = require('./financialAudit');
 const fedrampBaselines = require('./fedramp_baselines');
 const cis_controls_v8 = require('./cis_controls_v8');
 
@@ -47,6 +48,8 @@ module.exports = [
   pci_dss_v4,
   nist_privacy,
   fiscam,
+  // FISCAM companions (COSO 2013, SOX ITGC, OMB A-123) from the financial audit module
+  ...FINANCIAL_AUDIT.NEW_FRAMEWORKS,
   nist_ai_rmf,
   gdpr,
   hipaa,

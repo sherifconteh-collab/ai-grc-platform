@@ -11,7 +11,7 @@ import {
   FileText, FolderKanban, GraduationCap, House, Landmark, LayoutGrid, Layers, LifeBuoy, Link2, Lock, Network,
   Newspaper, Package, Plug, RefreshCw, Satellite, Scale, Server, Settings, Shield,
   ShieldAlert, ShieldCheck, Siren, ToggleLeft, TrendingDown, TriangleAlert, UserCheck,
-  BookOpen, MessageSquareWarning, IdCard, HardDrive, Bot,
+  BookOpen, MessageSquareWarning, IdCard, HardDrive, Bot, Receipt,
 } from 'lucide-react';
 import { AccessUser, canAccessAuditorWorkspace, hasAnyPermission, hasPermission, hasRmfFramework } from './access';
 
@@ -92,6 +92,7 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         items: [
           { name: 'RMF Lifecycle', href: '/dashboard/rmf', icon: RefreshCw, requiredPermissions: ['assessments.read'], isVisible: (u) => hasRmfFramework(u) },
           { name: 'Cyber Resilience', href: '/dashboard/resilience', icon: LifeBuoy, requiredPermissions: ['assessments.read'] },
+          { name: 'Financial Audit Readiness', href: '/dashboard/financial-audit', icon: Receipt, requiredPermissions: ['financial_audit.read'], keywords: ['sox', 'rcm', 'fiscam', 'a-123', 'nfr', 'sampling'] },
         ],
       },
     ],
