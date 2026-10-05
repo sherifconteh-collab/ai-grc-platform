@@ -6,10 +6,28 @@ const pool = require('../config/database');
 const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
+const auditService = require('../services/auditService');
+const { log, serializeError } = require('../utils/logger');
 
 // All service account routes require Professional+ tier
 router.use(authenticate);
 router.use(requireTier('professional'));
+
+// A service account token authenticates as the account's owner, so the owner
+// must be an active user of the caller's own organization, and only the owner
+// or a user manager may mint a token that carries the owner's identity.
+async function isActiveOrgUser(orgId, userId) {
+  const { rows } = await pool.query(
+    'SELECT 1 FROM users WHERE id = $1 AND organization_id = $2 AND is_active = true',
+    [userId, orgId]
+  );
+  return rows.length > 0;
+}
+
+function canActAsOwner(req, ownerId) {
+  const permissions = req.user.permissions || [];
+  return req.user.id === ownerId || permissions.includes('*') || permissions.includes('users.manage');
+}
 
 /**
  * GET /api/service-accounts
@@ -210,6 +228,10 @@ router.post('/', requirePermission('service_accounts.write'), validateBody((body
       review_frequency_days, reviewer_id
     } = req.body;
 
+    if (!(await isActiveOrgUser(orgId, owner_id))) {
+      return res.status(400).json({ success: false, error: 'owner_id must be an active user in your organization' });
+    }
+
     // Calculate next rotation and review dates
     const rotationDays = rotation_frequency_days || 90;
     const reviewDays = review_frequency_days || 90;
@@ -273,6 +295,10 @@ router.put('/:id', requirePermission('service_accounts.write'), validateBody((bo
 
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Service account not found' });
+    }
+
+    if (req.body.owner_id && !(await isActiveOrgUser(orgId, req.body.owner_id))) {
+      return res.status(400).json({ success: false, error: 'owner_id must be an active user in your organization' });
     }
 
     const {
@@ -446,6 +472,13 @@ router.post('/:id/generate-token', requirePermission('service_accounts.write'), 
       return res.status(400).json({ success: false, error: 'Service account has no owner — assign an owner before generating a token' });
     }
 
+    if (!canActAsOwner(req, sa.owner_id)) {
+      return res.status(403).json({ success: false, error: 'Only the service account owner or a user manager can generate its token' });
+    }
+    if (!(await isActiveOrgUser(orgId, sa.owner_id))) {
+      return res.status(400).json({ success: false, error: 'Service account owner must be an active user in your organization' });
+    }
+
     // Generate a long-lived JWT scoped to the service account's owner
     const token = jwt.sign(
       {
@@ -473,6 +506,13 @@ router.post('/:id/generate-token', requirePermission('service_accounts.write'), 
       // token_hash/token_expires_at columns may not exist yet — token is still valid
       console.warn('Could not store token hash (migration pending):', hashErr.message);
     }
+
+    await auditService.logFromRequest(req, {
+      eventType: 'service_account.token_generated',
+      resourceType: 'service_account',
+      resourceId: sa.id,
+      details: { owner_id: sa.owner_id, scope: sa.scope || 'read-only', expires_in_days: expiresInDays }
+    }).catch((auditError) => log('error', 'service_account.token_audit_failed', { error: serializeError(auditError) }));
 
     res.json({
       success: true,
