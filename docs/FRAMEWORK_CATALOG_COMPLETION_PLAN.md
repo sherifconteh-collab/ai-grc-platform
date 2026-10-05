@@ -44,10 +44,10 @@ source at implementation time.
 |---|---:|---|---|
 | ~~NIST SP 800-53 Rev 5 (`nist_800_53`)~~ | ~~153~~ **300 (done)** | 300 base controls, 20 families (withdrawn excluded) | 1 |
 | NIST CSF 2.0 (`nist_csf_2.0`) | 76 | 106 subcategories | 1 |
-| NIST SP 800-171 Rev 3 (`nist_800_171`) | 24 | 97 requirements | 1 |
+| NIST SP 800-171 Rev 3 (`nist_800_171`) | 97 (done) | 97 requirements | 1 |
 | CMMC 2.0 (`cmmc_2.0`) | 50 | L1: 15 / L2: 110 practices (derived from 800-171) | 1 |
-| FedRAMP High (`fedramp_high`) | 25 | ~410 controls (Rev 5 baseline, derived from 800-53) | 1 |
-| FedRAMP Moderate | *(absent)* | ~323 controls (derived from 800-53) | 1 |
+| FedRAMP High (`fedramp_high`) | 410 (done) | ~410 controls (Rev 5 baseline, derived from 800-53) | 1 |
+| FedRAMP Moderate (`fedramp_moderate`) / Low (`fedramp_low`) | 323 / 156 (done) | official Rev 5 baseline workbook | 1 |
 | ISO/IEC 27001:2022 (`iso_27001`) | 82 | 93 Annex A controls | 2 |
 | ISO/IEC 27002:2022 (`iso_27002`) | 15 | 93 controls | 2 |
 | ISO/IEC 27017:2015 (`iso_27017`) | 12 | 37 cloud-specific controls + extensions | 2 |

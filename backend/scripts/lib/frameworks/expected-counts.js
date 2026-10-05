@@ -8,14 +8,14 @@
 //   node -e "const fs=require('fs'); const fw=require('./index.js'); const c={}; for (const f of fw) c[f.code]=f.controls.length; fs.writeFileSync('expected-counts.js', '// Manifest of expected framework/control counts.\\nmodule.exports = ' + JSON.stringify({totalFrameworks: fw.length, totalControls: fw.reduce((s,x)=>s+x.controls.length,0), perFramework: c}, null, 2) + ';\\n');"
 
 module.exports = {
-  "totalFrameworks": 34,
-  "totalControls": 1812,
+  "totalFrameworks": 36,
+  "totalControls": 2749,
   "perFramework": {
     "nist_csf_2.0": 57,
     "nist_800_53": 1014,
     "iso_27001": 39,
     "soc2": 27,
-    "nist_800_171": 24,
+    "nist_800_171": 97,
     "cmmc_2.0": 110,
     "pci_dss_v4": 61,
     "nist_privacy": 11,
@@ -43,7 +43,9 @@ module.exports = {
     "ccpa_cpra": 14,
     "state_ai_governance": 47,
     "international_ai_governance": 49,
-    "fedramp_high": 25,
+    "fedramp_low": 156,
+    "fedramp_moderate": 323,
+    "fedramp_high": 410,
     "cis_controls_v8": 18
   }
 };
