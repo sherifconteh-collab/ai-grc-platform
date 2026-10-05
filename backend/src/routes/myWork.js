@@ -1,7 +1,7 @@
 // @tier: community
 // My Work: one list of everything waiting on the signed-in user, gathered from
 // the modules that assign work (controls, POA&M, risks, exceptions, audit
-// requests).
+// requests, policy acknowledgments).
 //
 // Every source is filtered by organization_id and gated by the same permission
 // that guards the module's own list, so this endpoint never shows a record the
@@ -121,18 +121,35 @@ async function pbcItems(orgId, userId) {
   return rows.map((r) => ({ ...r, kind: 'pbc' }));
 }
 
+// Published policies whose current version I have not acknowledged.
+async function policyItems(orgId, userId) {
+  const { rows } = await pool.query(
+    `SELECT p.id, p.id AS record_id, p.version AS ref, p.policy_name AS title, p.policy_type AS context,
+            NULL::date AS due_date, p.status
+       FROM organization_policies p
+      WHERE p.organization_id = $1 AND p.status = 'published'
+        AND NOT EXISTS (
+          SELECT 1 FROM policy_user_acknowledgments a
+           WHERE a.organization_id = p.organization_id AND a.policy_id = p.id
+             AND a.user_id = $2 AND a.policy_version IS NOT DISTINCT FROM p.version)
+      ORDER BY p.published_at DESC NULLS LAST
+      LIMIT $3`,
+    [orgId, userId, PER_SOURCE_LIMIT]
+  );
+  return rows.map((r) => ({ ...r, kind: 'policy' }));
+}
+
 // Each source runs only when the user holds the permission its own module requires.
-// This edition has no ERP module and no Policies frontend page yet (the backend
-// tables exist, migration 021/061, but there is no /dashboard/policies screen to
-// deep-link into) -- so, unlike ControlWeaver-Pro, there are no erp_review or
-// policy sources here.
+// This edition has no ERP module, so unlike ControlWeaver-Pro there is no
+// erp_review source here.
 const SOURCES = [
   { permission: 'controls.read', load: controlItems },
   { permission: 'controls.read', load: poamItems },
   { permission: 'audit.write', load: poamApprovalItems },
   { permission: 'risks.read', load: riskItems },
   { permission: 'controls.write', load: exceptionApprovalItems },
-  { permission: 'assessments.read', load: pbcItems }
+  { permission: 'assessments.read', load: pbcItems },
+  { permission: 'controls.read', load: policyItems }
 ];
 
 const APPROVAL_KINDS = new Set(['poam_approval', 'exception_approval']);

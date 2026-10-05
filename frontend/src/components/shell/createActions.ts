@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { ClipboardList, Dices, FileText, Link2, Server, Siren, TriangleAlert } from 'lucide-react';
+import { ClipboardList, Dices, FileText, Link2, ScrollText, Server, Siren, TriangleAlert } from 'lucide-react';
 import { AccessUser, hasPermission } from '@/lib/access';
 import { createLinks, recordLinks } from '@/lib/deepLinks';
 
@@ -13,14 +13,14 @@ export interface CreateAction {
 /**
  * What "+ New" can create. Each href opens that module's own create form
  * (the page reads `new=1`), so the form, validation and permissions are the
- * ones the module already has. This edition has no Policies frontend page,
- * so there is no "New policy" entry here.
+ * ones the module already has.
  */
 export const CREATE_ACTIONS: CreateAction[] = [
   { label: 'Evidence', href: createLinks.evidence(), icon: FileText, permission: 'evidence.write' },
   { label: 'Risk', href: createLinks.risk(), icon: Dices, permission: 'risks.write' },
   { label: 'POA&M item', href: createLinks.poam(), icon: ClipboardList, permission: 'controls.write' },
   { label: 'Exception', href: createLinks.exception(), icon: TriangleAlert, permission: 'controls.write' },
+  { label: 'Policy', href: createLinks.policy(), icon: ScrollText, permission: 'controls.write' },
   { label: 'Vendor', href: createLinks.vendor(), icon: Link2, permission: 'tprm.write' },
   { label: 'Incident', href: createLinks.incident(), icon: Siren, permission: 'incidents.write' },
   { label: 'Asset', href: createLinks.asset(), icon: Server, permission: 'assets.write' },

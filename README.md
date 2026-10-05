@@ -462,7 +462,7 @@ Full asset and configuration inventory:
 - Notification system (in-app bell with unread tracking + email delivery)
 
 ### 📄 Policy Management
-- Policy creation and lifecycle tracking
+- Policy creation and lifecycle tracking, with a Policies page for drafting, approval, publication, reviews and employee acknowledgments ([guide](./docs/guides/POLICIES.md))
 - AI-powered policy gap analysis
 - Smart remediation suggestions
 - Exception management workflows

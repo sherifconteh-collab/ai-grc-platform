@@ -4,9 +4,8 @@
 // filtered by organization_id. Results carry ids only; the frontend turns them
 // into links with lib/deepLinks.ts so every result opens its own record.
 //
-// This edition has no ERP module and no Policies frontend page yet (the
-// policy tables exist, but there is no /dashboard/policies screen to link
-// into), so those two record types from ControlWeaver-Pro are not searched here.
+// This edition has no ERP module, so that record type from ControlWeaver-Pro is
+// not searched here.
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
@@ -73,6 +72,13 @@ const TYPES = [
     sql: `SELECT id, NULL AS ref, vendor_name AS title, risk_tier AS context, NULL::uuid AS parent_id FROM tprm_vendors
            WHERE organization_id = $1 AND vendor_name ILIKE $2
            ORDER BY vendor_name LIMIT $3`
+  },
+  {
+    type: 'policy',
+    permission: 'controls.read',
+    sql: `SELECT id, version AS ref, policy_name AS title, status AS context, NULL::uuid AS parent_id FROM organization_policies
+           WHERE organization_id = $1 AND policy_name ILIKE $2
+           ORDER BY policy_name LIMIT $3`
   },
   {
     type: 'evidence',

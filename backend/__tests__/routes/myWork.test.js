@@ -32,18 +32,19 @@ describe('GET /my-work', () => {
     await invokeRoute(router, 'get', '/', makeReq({ user: userWith(['controls.read']) }), res);
 
     expect(res.statusCode).toBe(200);
-    // controls.read covers controls and POA&M -- nothing else.
-    expect(pool.query).toHaveBeenCalledTimes(2);
+    // controls.read covers controls, POA&M and policy acknowledgments -- nothing else.
+    expect(pool.query).toHaveBeenCalledTimes(3);
     const sql = pool.query.mock.calls.map((c) => c[0]).join('\n');
     expect(sql).toMatch(/control_implementations/);
     expect(sql).toMatch(/poam_items/);
+    expect(sql).toMatch(/organization_policies/);
     expect(sql).not.toMatch(/audit_pbc_requests|FROM risks|control_exceptions/);
   });
 
   it('scopes every source query to the caller organization and user', async () => {
     await invokeRoute(router, 'get', '/', makeReq({ user: userWith(['*']) }), makeRes());
 
-    expect(pool.query).toHaveBeenCalledTimes(6);
+    expect(pool.query).toHaveBeenCalledTimes(7);
     for (const [sql, params] of pool.query.mock.calls) {
       expect(sql).toMatch(/organization_id = \$1/);
       expect(params[0]).toBe(ORG);
