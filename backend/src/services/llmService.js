@@ -79,6 +79,7 @@ const {
   TASK_PROFILES,
   FEATURE_TASK_PROFILE,
   resolveTaskModel,
+  claudeAcceptsSampling,
 } = require('./ai/providerConfig');
 const { sanitizePromptLabel } = require('./ai/promptSafety');
 
@@ -144,7 +145,7 @@ function markAISuccess(provider, model, requestedProvider) {
 }
 
 function getDefaultModelForProvider(provider) {
-  if (provider === 'claude') return 'claude-haiku-4-5-20251001';
+  if (provider === 'claude') return 'claude-haiku-5-5';
   if (provider === 'openai') return 'gpt-5.4-mini';
   if (provider === 'grok') return 'grok-4.1-fast';
   if (provider === 'gemini') return 'gemini-3.5-flash';
@@ -432,10 +433,11 @@ function buildNoKeyError(provider) {
 
 async function executeProviderChat({ provider, client, model, messages, systemPrompt, maxTokens, temperature, jsonMode = false }) {
   if (provider === 'claude') {
+    const claudeModel = model || getDefaultModelForProvider('claude');
     const resp = await client.messages.create({
-      model: model || getDefaultModelForProvider('claude'),
+      model: claudeModel,
       max_tokens: maxTokens,
-      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(typeof temperature === 'number' && claudeAcceptsSampling(claudeModel) ? { temperature } : {}),
       system: systemPrompt || 'You are an expert GRC (Governance, Risk, and Compliance) analyst.',
       messages
     });
@@ -884,10 +886,11 @@ async function* chatStream({ provider = 'claude', model, messages, systemPrompt,
   }
 
   if (provider === 'claude') {
+    const claudeModel = model || getDefaultModelForProvider('claude');
     const stream = client.messages.stream({
-      model: model || getDefaultModelForProvider('claude'),
+      model: claudeModel,
       max_tokens: maxTokens,
-      ...(typeof resolvedTemperature === 'number' ? { temperature: resolvedTemperature } : {}),
+      ...(typeof resolvedTemperature === 'number' && claudeAcceptsSampling(claudeModel) ? { temperature: resolvedTemperature } : {}),
       system: safeStreamSystemPrompt || 'You are an expert GRC (Governance, Risk, and Compliance) analyst.',
       messages: messagesToStream
     });

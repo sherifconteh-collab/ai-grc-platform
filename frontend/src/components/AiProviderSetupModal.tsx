@@ -32,7 +32,7 @@ const FREE_PROVIDERS = [
 ];
 
 const PAID_PROVIDERS = [
-  { id: 'claude', name: 'Anthropic Claude', description: 'claude-opus-4-8, claude-sonnet-5', signupUrl: 'https://console.anthropic.com/settings/keys' },
+  { id: 'claude', name: 'Anthropic Claude', description: 'claude-opus-5-5, claude-sonnet-5-5', signupUrl: 'https://console.anthropic.com/settings/keys' },
   { id: 'openai', name: 'OpenAI', description: 'gpt-5.5, gpt-5.4-mini, gpt-5.3-codex', signupUrl: 'https://platform.openai.com/api-keys' },
   { id: 'grok', name: 'xAI Grok', description: 'grok-4.5, grok-4.1-fast', signupUrl: 'https://console.x.ai/' },
 ];

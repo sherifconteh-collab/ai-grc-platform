@@ -31,14 +31,14 @@ const TASK_COMPLEXITY = {
 // Provider tiers for each complexity level (ordered by preference)
 const ROUTING_STRATEGY = {
   complex: [
-    { provider: 'claude', model: 'claude-sonnet-5' },
+    { provider: 'claude', model: 'claude-sonnet-5-5' },
     { provider: 'openai', model: 'gpt-5.5' },
     { provider: 'grok', model: 'grok-4.5' },
     { provider: 'gemini', model: 'gemini-3.1-pro-preview' }
   ],
   moderate: [
     { provider: 'gemini', model: 'gemini-3.5-flash' },
-    { provider: 'claude', model: 'claude-haiku-4-5-20251001' },
+    { provider: 'claude', model: 'claude-haiku-5-5' },
     { provider: 'openai', model: 'gpt-5.4-mini' },
     { provider: 'grok', model: 'grok-4.1-fast' },
     { provider: 'groq', model: 'openai/gpt-oss-120b' }
@@ -46,7 +46,7 @@ const ROUTING_STRATEGY = {
   simple: [
     { provider: 'groq', model: 'openai/gpt-oss-120b' },
     { provider: 'gemini', model: 'gemini-3.5-flash' },
-    { provider: 'claude', model: 'claude-haiku-4-5-20251001' },
+    { provider: 'claude', model: 'claude-haiku-5-5' },
     { provider: 'openai', model: 'gpt-5.4-mini' },
     { provider: 'ollama', model: 'llama3.2' }
   ]

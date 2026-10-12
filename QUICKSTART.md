@@ -87,11 +87,11 @@ Go to **Settings → LLM Configuration** and enter an API key for any supported 
 
 | Provider | Free tier available |
 |---|---|
-| Google Gemini | ✅ Yes (Gemini 2.0 Flash) |
+| Google Gemini | ✅ Yes (Gemini 3.5 Flash) |
 | Groq | ✅ Yes |
 | Ollama (local) | ✅ Yes (self-hosted) |
-| Anthropic (Claude 4.x) | Pay-as-you-go |
-| OpenAI (GPT-4.1 / o3 / o4-mini) | Pay-as-you-go |
+| Anthropic (Claude 5.x) | Pay-as-you-go |
+| OpenAI (GPT-5.x) | Pay-as-you-go |
 | Grok | Pay-as-you-go |
 
 Without a key, the AI Copilot, gap analysis, and policy generation features are unavailable. The rest of the platform works fine.

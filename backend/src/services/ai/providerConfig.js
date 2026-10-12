@@ -11,10 +11,10 @@
 
 const PROVIDERS = {
   claude:  { name: 'Claude (Anthropic)',  models: [
-    'claude-opus-4-8',
-    'claude-sonnet-5',
-    'claude-haiku-4-5-20251001',
-    'claude-fable-5'
+    'claude-opus-5-5',
+    'claude-sonnet-5-5',
+    'claude-haiku-5-5',
+    'claude-fable-5-1'
   ] },
   openai:  { name: 'OpenAI',              models: [
     'gpt-5.5',
@@ -60,7 +60,7 @@ const TASK_PROFILES = {
   reasoning: {
     temperature: 0.4,
     models: {
-      claude: 'claude-sonnet-5',
+      claude: 'claude-sonnet-5-5',
       openai: 'gpt-5.5',
       gemini: 'gemini-3.1-pro-preview',
       grok:   'grok-4.5',
@@ -71,7 +71,7 @@ const TASK_PROFILES = {
   extraction: {
     temperature: 0.2,
     models: {
-      claude: 'claude-haiku-4-5-20251001',
+      claude: 'claude-haiku-5-5',
       openai: 'gpt-5.4-mini',
       gemini: 'gemini-3.5-flash',
       grok:   'grok-4.1-fast',
@@ -82,7 +82,7 @@ const TASK_PROFILES = {
   chat: {
     temperature: 0.4,
     models: {
-      claude: 'claude-sonnet-5',
+      claude: 'claude-sonnet-5-5',
       openai: 'gpt-5.5',
       gemini: 'gemini-3.1-pro-preview',
       grok:   'grok-4.5',
@@ -93,7 +93,7 @@ const TASK_PROFILES = {
   ideation: {
     temperature: 0.7,
     models: {
-      claude: 'claude-sonnet-5',
+      claude: 'claude-sonnet-5-5',
       openai: 'gpt-5.5',
       gemini: 'gemini-3.1-pro-preview',
       grok:   'grok-4.5',
@@ -159,8 +159,21 @@ function resolveTaskModel(provider, feature, callerModel = null, orgModel = null
   };
 }
 
+// Claude 4.7 and later (claude-opus-4-7/4-8, claude-sonnet-5*, claude-fable-5*,
+// claude-haiku-5*, ...) return HTTP 400 when temperature, top_p or top_k is set
+// to a non-default value (platform.claude.com model-deprecations page, "API
+// parameter deprecations"). Only the known earlier families below accept a
+// temperature; any other ID, including a future or custom BYOK model, gets none
+// and runs at the model default. Omitting the parameter is always accepted.
+const CLAUDE_SAMPLING_MODEL_RE = /^claude-(3-|haiku-4-5|sonnet-4(-[56])?($|-\d{8}$)|opus-4(-[156])?($|-\d{8}$))/;
+
+function claudeAcceptsSampling(model) {
+  return typeof model === 'string' && CLAUDE_SAMPLING_MODEL_RE.test(model);
+}
+
 module.exports = {
   PROVIDERS,
+  claudeAcceptsSampling,
   TASK_PROFILES,
   FEATURE_TASK_PROFILE,
   resolveTaskModel,
