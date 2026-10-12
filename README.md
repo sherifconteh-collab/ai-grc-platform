@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-12 | PR #363: fix(ai): omit temperature for Claude 4.7+ models and refresh stale model IDs -->
+<!-- LAST_UPDATED: 2026-10-12 | PR #364: fix(ai): retry and fall back on provider HTTP status, not message text -->
 
 ## 🎯 What is This?
 
