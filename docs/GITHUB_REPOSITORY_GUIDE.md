@@ -393,7 +393,7 @@ async function askClaudeAboutCompliance(question) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 1024,
       system: `You are a compliance expert. You have access to this organization's 
                GRC data: ${JSON.stringify(context)}`,

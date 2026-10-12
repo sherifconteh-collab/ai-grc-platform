@@ -2045,7 +2045,7 @@ function SettingsPageInner({ section }: SettingsScreenProps) {
                     <span className="text-2xl">🟣</span>
                     <div>
                       <h3 className="font-semibold text-gray-900">Anthropic (Claude)</h3>
-                      <p className="text-xs text-gray-500">claude-sonnet-4-5, claude-haiku-4-5</p>
+                      <p className="text-xs text-gray-500">claude-sonnet-5, claude-haiku-4-5-20251001</p>
                     </div>
                   </div>
                   {llmSettings?.hasAnthropicKey ? (
@@ -2083,7 +2083,7 @@ function SettingsPageInner({ section }: SettingsScreenProps) {
                     <span className="text-2xl">🟢</span>
                     <div>
                       <h3 className="font-semibold text-gray-900">OpenAI</h3>
-                      <p className="text-xs text-gray-500">GPT-4o, GPT-4o-mini</p>
+                      <p className="text-xs text-gray-500">gpt-5.5, gpt-5.4-mini</p>
                     </div>
                   </div>
                   {llmSettings?.hasOpenAIKey ? (
