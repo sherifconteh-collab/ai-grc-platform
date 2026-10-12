@@ -9,6 +9,8 @@
 
 > Changes staged but not yet released to production.
 
+## [2026.10.1] — 2026-10-12
+
 ### Changed
 - chore(deps): bump dotenv to 18 and ioredis to 6 ([#353](https://github.com/sherifconteh-collab/ai-grc-platform/pull/353)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-05 ([#352](https://github.com/sherifconteh-collab/ai-grc-platform/pull/352)) — @sherifconteh-collab
