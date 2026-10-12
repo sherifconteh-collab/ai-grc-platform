@@ -9,6 +9,10 @@
 
 > Changes staged but not yet released to production.
 
+### Changed
+
+- chore(deps): weekly dependency batch 2026-10-12 ([#361](https://github.com/sherifconteh-collab/ai-grc-platform/pull/361)) — @sherifconteh-collab
+
 ## [2026.10.1] — 2026-10-12
 
 ### Changed

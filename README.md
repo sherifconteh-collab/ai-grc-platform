@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-05 | PR #353: chore(deps): bump dotenv to 18 and ioredis to 6 -->
+<!-- LAST_UPDATED: 2026-10-12 | PR #361: chore(deps): weekly dependency batch 2026-10-12 -->
 
 ## 🎯 What is This?
 
