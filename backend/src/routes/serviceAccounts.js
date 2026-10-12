@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
@@ -8,6 +9,11 @@ const { validateBody, requireFields, isUuid } = require('../middleware/validate'
 const auditService = require('../services/auditService');
 const { hashToken } = require('../utils/encrypt');
 const { log, serializeError } = require('../utils/logger');
+
+// IP-based bound ahead of authenticate, so it applies before any JWT or database
+// work, including on the legacy /api/service-accounts mount that the /api/v1
+// limiter does not cover. Token generation lives in this router.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
 // All service account routes require Professional+ tier
 router.use(authenticate);
