@@ -11,10 +11,10 @@
 
 const PROVIDERS = {
   claude:  { name: 'Claude (Anthropic)',  models: [
-    'claude-opus-4-8',
-    'claude-sonnet-5',
-    'claude-haiku-4-5-20251001',
-    'claude-fable-5'
+    'claude-opus-5-5',
+    'claude-sonnet-5-5',
+    'claude-haiku-5-5',
+    'claude-fable-5-1'
   ] },
   openai:  { name: 'OpenAI',              models: [
     'gpt-5.5',
@@ -60,7 +60,7 @@ const TASK_PROFILES = {
   reasoning: {
     temperature: 0.4,
     models: {
-      claude: 'claude-sonnet-5',
+      claude: 'claude-sonnet-5-5',
       openai: 'gpt-5.5',
       gemini: 'gemini-3.1-pro-preview',
       grok:   'grok-4.5',
@@ -71,7 +71,7 @@ const TASK_PROFILES = {
   extraction: {
     temperature: 0.2,
     models: {
-      claude: 'claude-haiku-4-5-20251001',
+      claude: 'claude-haiku-5-5',
       openai: 'gpt-5.4-mini',
       gemini: 'gemini-3.5-flash',
       grok:   'grok-4.1-fast',
@@ -82,7 +82,7 @@ const TASK_PROFILES = {
   chat: {
     temperature: 0.4,
     models: {
-      claude: 'claude-sonnet-5',
+      claude: 'claude-sonnet-5-5',
       openai: 'gpt-5.5',
       gemini: 'gemini-3.1-pro-preview',
       grok:   'grok-4.5',
@@ -93,7 +93,7 @@ const TASK_PROFILES = {
   ideation: {
     temperature: 0.7,
     models: {
-      claude: 'claude-sonnet-5',
+      claude: 'claude-sonnet-5-5',
       openai: 'gpt-5.5',
       gemini: 'gemini-3.1-pro-preview',
       grok:   'grok-4.5',

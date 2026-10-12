@@ -171,7 +171,7 @@ interface PlatformOverview {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROVIDER_MODEL_OPTIONS: Record<string, string[]> = {
-  claude: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-fable-5'],
+  claude: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'],
   openai: ['gpt-5.5', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.3-codex'],
   gemini: ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'],
   grok: ['grok-4.5', 'grok-4.3', 'grok-4.1-fast'],
@@ -2045,7 +2045,7 @@ function SettingsPageInner({ section }: SettingsScreenProps) {
                     <span className="text-2xl">🟣</span>
                     <div>
                       <h3 className="font-semibold text-gray-900">Anthropic (Claude)</h3>
-                      <p className="text-xs text-gray-500">claude-sonnet-5, claude-haiku-4-5-20251001</p>
+                      <p className="text-xs text-gray-500">claude-sonnet-5-5, claude-haiku-5-5</p>
                     </div>
                   </div>
                   {llmSettings?.hasAnthropicKey ? (

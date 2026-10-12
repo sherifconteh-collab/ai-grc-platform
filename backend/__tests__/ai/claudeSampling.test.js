@@ -52,6 +52,6 @@ describe('claudeAcceptsSampling', () => {
       ...Object.values(TASK_PROFILES).map(p => p.models.claude)
     ]);
     const accepting = [...ids].filter(claudeAcceptsSampling).sort();
-    expect(accepting).toEqual(['claude-haiku-4-5-20251001']);
+    expect(accepting).toEqual([]);
   });
 });

@@ -34,7 +34,7 @@
 - ✅ AI Copilot — 25+ org-aware analysis features (BYOK)
 - ✅ RAG (Retrieval-Augmented Generation)
 - ✅ Multi-agent orchestration
-- ✅ Supported providers: Anthropic Claude (Opus 4.8, Sonnet 5, Haiku 4.5, Fable 5), OpenAI GPT-5.x, Gemini 3.x, Grok 4.x, Groq, Ollama (GGUF)
+- ✅ Supported providers: Anthropic Claude (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1), OpenAI GPT-5.x, Gemini 3.x, Grok 4.x, Groq, Ollama (GGUF)
 - ✅ Schema-validated structured AI output with few-shot exemplars and one-shot retry
 - ✅ AI Monitoring compliance layer (NIST AI 800-4)
 - ✅ AI Governance module

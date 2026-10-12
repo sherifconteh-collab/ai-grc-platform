@@ -90,7 +90,7 @@ Go to **Settings → LLM Configuration** and enter an API key for any supported 
 | Google Gemini | ✅ Yes (Gemini 2.0 Flash) |
 | Groq | ✅ Yes |
 | Ollama (local) | ✅ Yes (self-hosted) |
-| Anthropic (Claude 4.x) | Pay-as-you-go |
+| Anthropic (Claude 5.x) | Pay-as-you-go |
 | OpenAI (GPT-5.x) | Pay-as-you-go |
 | Grok | Pay-as-you-go |
 

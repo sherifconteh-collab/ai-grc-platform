@@ -268,7 +268,7 @@ router.post('/llm/test', requirePermission('settings.manage'), validateBody((bod
       const Anthropic = require('@anthropic-ai/sdk');
       const client = new Anthropic.default({ apiKey });
       const resp = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-5-5',
         max_tokens: 50,
         messages: [{ role: 'user', content: 'Say "API key verified" in exactly those words.' }]
       });

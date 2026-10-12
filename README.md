@@ -328,7 +328,7 @@ The platform ships with a **built-in AI layer** that any user can activate with 
 
 | Provider | Models |
 |---|---|
-| Anthropic (Claude) | `claude-opus-4-8`, `claude-sonnet-5`, `claude-haiku-4-5-20251001`, `claude-fable-5` |
+| Anthropic (Claude) | `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1` |
 | OpenAI | `gpt-5.5`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.3-codex` |
 | Google Gemini | `gemini-3.1-pro-preview`, `gemini-3.5-flash`, `gemini-3.1-flash-lite` |
 | xAI Grok | `grok-4.5`, `grok-4.3`, `grok-4.1-fast` |
