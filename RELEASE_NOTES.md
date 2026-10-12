@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- fix(ai): omit temperature for Claude 4.7+ models and refresh stale model IDs ([#363](https://github.com/sherifconteh-collab/ai-grc-platform/pull/363)) — @sherifconteh-collab
 
 - chore(deps): weekly dependency batch 2026-10-12 ([#361](https://github.com/sherifconteh-collab/ai-grc-platform/pull/361)) — @sherifconteh-collab
 

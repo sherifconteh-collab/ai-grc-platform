@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-12 | PR #361: chore(deps): weekly dependency batch 2026-10-12 -->
+<!-- LAST_UPDATED: 2026-10-12 | PR #363: fix(ai): omit temperature for Claude 4.7+ models and refresh stale model IDs -->
 
 ## 🎯 What is This?
 
