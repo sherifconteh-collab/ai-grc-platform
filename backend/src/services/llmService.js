@@ -79,6 +79,7 @@ const {
   TASK_PROFILES,
   FEATURE_TASK_PROFILE,
   resolveTaskModel,
+  claudeAcceptsSampling,
 } = require('./ai/providerConfig');
 const { sanitizePromptLabel } = require('./ai/promptSafety');
 
@@ -432,10 +433,11 @@ function buildNoKeyError(provider) {
 
 async function executeProviderChat({ provider, client, model, messages, systemPrompt, maxTokens, temperature, jsonMode = false }) {
   if (provider === 'claude') {
+    const claudeModel = model || getDefaultModelForProvider('claude');
     const resp = await client.messages.create({
-      model: model || getDefaultModelForProvider('claude'),
+      model: claudeModel,
       max_tokens: maxTokens,
-      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(typeof temperature === 'number' && claudeAcceptsSampling(claudeModel) ? { temperature } : {}),
       system: systemPrompt || 'You are an expert GRC (Governance, Risk, and Compliance) analyst.',
       messages
     });
@@ -884,10 +886,11 @@ async function* chatStream({ provider = 'claude', model, messages, systemPrompt,
   }
 
   if (provider === 'claude') {
+    const claudeModel = model || getDefaultModelForProvider('claude');
     const stream = client.messages.stream({
-      model: model || getDefaultModelForProvider('claude'),
+      model: claudeModel,
       max_tokens: maxTokens,
-      ...(typeof resolvedTemperature === 'number' ? { temperature: resolvedTemperature } : {}),
+      ...(typeof resolvedTemperature === 'number' && claudeAcceptsSampling(claudeModel) ? { temperature: resolvedTemperature } : {}),
       system: safeStreamSystemPrompt || 'You are an expert GRC (Governance, Risk, and Compliance) analyst.',
       messages: messagesToStream
     });
