@@ -41,6 +41,8 @@ Response body (always returned, even on failure):
 
 Use a **service account token** rather than a personal login. Create one under **Settings → Service Accounts** (or `POST /api/v1/service-accounts`, then `POST /api/v1/service-accounts/:id/generate-token`), store it as a CI secret (e.g. `CONTROLWEAVE_TOKEN`), and send it as a bearer token.
 
+A service account token is checked against its service account on every request. It stops working when you regenerate the token (only the newest token is valid), deactivate or delete the account, or change its owner. A token whose scope is `read-only` (the default when the scope is empty) can only make `GET`, `HEAD` and `OPTIONS` requests, which is all the compliance gate needs.
+
 ## Example: plain curl
 
 ```bash

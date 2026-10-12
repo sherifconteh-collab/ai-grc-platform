@@ -2,7 +2,8 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 const { JWT_SECRET, JWT_VERIFY_OPTIONS } = require('../config/security');
-const { decrypt } = require('../utils/encrypt');
+const { decrypt, tokenHashCandidates } = require('../utils/encrypt');
+const { log } = require('../utils/logger');
 const {
   TIER_LEVELS,
   normalizeTier,
@@ -130,6 +131,59 @@ async function hasOrgFeatureOverridesColumn() {
   return _hasOrgFeatureOverridesColumn;
 }
 
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+function isReadOnlyScope(scope) {
+  // A null scope is minted as 'read-only' (routes/serviceAccounts.js), so it is read-only here too.
+  return String(scope || 'read-only').trim().toLowerCase() === 'read-only';
+}
+
+/**
+ * Validate a service account token against its service_accounts row. The JWT
+ * signature alone is not enough: the account must still exist in the caller's
+ * organization, be active, be owned by the token's user, and the presented
+ * token must be the one most recently issued (token_hash), so regenerating,
+ * deactivating, reassigning or deleting the account revokes earlier tokens.
+ * Fails closed (including when the revocation columns are missing).
+ * Returns { account } on success or { status, error, reason } on rejection.
+ */
+async function checkServiceAccountToken(decoded, token, user, method) {
+  const deny = (status, error, reason) => ({ status, error, reason });
+  if (!decoded.serviceAccountId || !user.organization_id) {
+    return deny(401, 'Invalid token', 'missing_claims');
+  }
+
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      `SELECT id, scope
+         FROM service_accounts
+        WHERE id = $1
+          AND organization_id = $2
+          AND owner_id = $3
+          AND is_active = true
+          AND token_hash = ANY($4)
+          AND token_expires_at >= CURRENT_DATE`,
+      [decoded.serviceAccountId, user.organization_id, user.id, tokenHashCandidates(token)]
+    ));
+  } catch (error) {
+    log('error', 'service_account.token_check_failed', { error: error.message });
+    return deny(401, 'Invalid token', 'lookup_failed');
+  }
+
+  if (rows.length === 0) {
+    return deny(401, 'Invalid token', 'revoked_or_unknown');
+  }
+
+  const readOnly = isReadOnlyScope(decoded.scope) || isReadOnlyScope(rows[0].scope);
+  if (readOnly && !SAFE_METHODS.has(String(method || '').toUpperCase())) {
+    return deny(403, 'Service account token is read-only', 'read_only_scope');
+  }
+
+  return { account: { id: rows[0].id, scope: readOnly ? 'read-only' : rows[0].scope } };
+}
+
 /**
  * Authenticate JWT token and attach user/org to request
  */
@@ -181,6 +235,19 @@ const authenticate = async (req, res, next) => {
 
       if (!Boolean(req.user.is_platform_admin) && !req.user.organization_id) {
         return res.status(401).json({ success: false, error: 'User organization is missing' });
+      }
+
+      if (decoded.type === 'service_account') {
+        const check = await checkServiceAccountToken(decoded, token, req.user, req.method);
+        if (!check.account) {
+          log('warn', 'service_account.token_rejected', {
+            reason: check.reason,
+            serviceAccountId: decoded.serviceAccountId || null,
+            organizationId: req.user.organization_id || null
+          });
+          return res.status(check.status).json({ success: false, error: check.error });
+        }
+        req.serviceAccount = check.account;
       }
 
       // Open source: no trial expiry demotion
