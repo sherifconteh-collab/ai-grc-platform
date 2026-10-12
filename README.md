@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-12 | PR #364: fix(ai): retry and fall back on provider HTTP status, not message text -->
+<!-- LAST_UPDATED: 2026-10-12 | PR #362: security(auth): enforce scope and revocation for service account tokens -->
 
 ## 🎯 What is This?
 

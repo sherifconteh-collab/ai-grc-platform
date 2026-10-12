@@ -15,6 +15,10 @@
 
 - chore(deps): weekly dependency batch 2026-10-12 ([#361](https://github.com/sherifconteh-collab/ai-grc-platform/pull/361)) — @sherifconteh-collab
 
+### Security
+
+- security(auth): enforce scope and revocation for service account tokens ([#362](https://github.com/sherifconteh-collab/ai-grc-platform/pull/362)) — @sherifconteh-collab
+
 ## [2026.10.1] — 2026-10-12
 
 ### Changed
