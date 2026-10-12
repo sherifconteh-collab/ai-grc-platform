@@ -412,7 +412,16 @@ function buildProviderAttemptChain(primaryProvider) {
   return chain;
 }
 
+// HTTP statuses that mean "try again or use another provider": request timeout,
+// rate limit, and the 5xx family including Anthropic's 529 overloaded_error.
+// The Anthropic and OpenAI SDKs put the status on err.status, and their message
+// text ("529 {...overloaded_error...}", "429 You exceeded your current quota")
+// does not contain the phrases matched below.
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504, 529]);
+
 function isRetryableProviderError(err) {
+  if (err && RETRYABLE_STATUS.has(err.status)) return true;
+  if (err && err.name === 'APIConnectionError') return true;
   const message = (err && err.message ? String(err.message) : '').toLowerCase();
   return (
     message.includes('quota exceeded') ||
@@ -526,7 +535,9 @@ async function executeProviderChat({ provider, client, model, messages, systemPr
         }
       } catch {
       }
-      throw new Error(errorText);
+      const geminiError = new Error(errorText);
+      geminiError.status = response.status;
+      throw geminiError;
     }
 
     const data = await response.json();
@@ -3054,6 +3065,7 @@ Format your response with clear sections. Be specific and cite the evidence file
 module.exports = {
   chat,
   chatStream,
+  isRetryableProviderError,
   generateGapAnalysis,
   optimizeCrosswalk,
   forecastCompliance,
