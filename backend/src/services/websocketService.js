@@ -182,6 +182,12 @@ function initializeWebSocket(httpServer) {
       // Verify JWT token
       const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
 
+      // Service account tokens are revocable and scoped by authenticate(), which
+      // sockets do not run; they are for REST/MCP only.
+      if (decoded.type === 'service_account') {
+        return next(new Error('Authentication failed'));
+      }
+
       // Fetch user from database
       const userResult = await pool.query(
         'SELECT id, email, organization_id, role FROM users WHERE id = $1 AND is_active = true',

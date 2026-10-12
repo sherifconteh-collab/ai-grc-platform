@@ -20,10 +20,15 @@ jest.mock('../../src/services/subscriptionService', () => ({
 }));
 
 // Mock encrypt (returns value as-is in tests)
-jest.mock('../../src/utils/encrypt', () => ({ decrypt: jest.fn(v => v) }));
+jest.mock('../../src/utils/encrypt', () => ({
+  ...jest.requireActual('../../src/utils/encrypt'),
+  decrypt: jest.fn(v => v)
+}));
 
 const { authenticate, requirePermission, requireTier } = require('../../src/middleware/auth');
 const pool = require('../../src/config/database');
+const crypto = require('crypto');
+const { hashToken } = require('../../src/utils/encrypt');
 
 // Expose permissions by also mocking the role-permissions map returned from DB
 function setupPoolForUser(userFields = {}) {
@@ -207,5 +212,134 @@ describe('requireTier', () => {
       requireTier(required)(req, res, next);
       expect(next).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// service account tokens (revocation, expiry, scope)
+// ---------------------------------------------------------------------------
+describe('authenticate: service account tokens', () => {
+  const SA_ID = 'sa-uuid-1';
+
+  function saToken(claims = {}) {
+    return makeValidToken({ serviceAccountId: SA_ID, scope: 'read-only', type: 'service_account', ...claims });
+  }
+
+  // Routes the mocked pool by SQL text. `account` is the service_accounts row the
+  // lookup returns (null = no row matched the WHERE clause).
+  function setupPool({ account = { id: SA_ID, scope: 'read-only' }, lookupError = null } = {}) {
+    const calls = [];
+    pool.query.mockImplementation(async (sql, params) => {
+      if (sql.includes('information_schema.columns')) return { rows: [{ column_name: 'feature_overrides' }] };
+      if (sql.includes('platform_settings')) return { rows: [] };
+      if (sql.includes('FROM service_accounts')) {
+        calls.push({ sql, params });
+        if (lookupError) throw lookupError;
+        return { rows: account ? [account] : [] };
+      }
+      if (sql.includes('FROM users u')) {
+        return { rows: [{
+          id: 'user-uuid-1', organization_id: 'org-uuid-1', email: 'test@example.com', first_name: 'T', last_name: 'U',
+          role: 'admin', is_active: true, is_platform_admin: false, organization_name: 'Org',
+          organization_tier: 'enterprise', feature_overrides: {}
+        }] };
+      }
+      return { rows: [] };
+    });
+    return calls;
+  }
+
+  async function run(token, method = 'GET') {
+    const req = { headers: { authorization: `Bearer ${token}` }, ip: '127.0.0.1', method };
+    const res = makeRes();
+    const next = jest.fn();
+    await authenticate(req, res, next);
+    return { req, res, next };
+  }
+
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  test('admits a token whose row matches, scoped to the owner and organization', async () => {
+    const calls = setupPool();
+    const token = saToken();
+    const { req, next } = await run(token);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.serviceAccount).toEqual({ id: SA_ID, scope: 'read-only' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].params.slice(0, 3)).toEqual([SA_ID, 'org-uuid-1', 'user-uuid-1']);
+    expect(calls[0].sql).toMatch(/is_active = true/);
+    expect(calls[0].sql).toMatch(/token_expires_at >= CURRENT_DATE/);
+  });
+
+  test('looks up by SHA-384 and by legacy SHA-256 of the presented token', async () => {
+    const calls = setupPool();
+    const token = saToken();
+    await run(token);
+    const candidates = calls[0].params[3];
+    expect(candidates).toContain(hashToken(token));
+    expect(candidates).toContain(crypto.createHash('sha256').update(token).digest('hex'));
+    expect(hashToken(token)).toHaveLength(96);
+  });
+
+  test('rejects a revoked, regenerated, deactivated, deleted, reassigned or expired token (no row matches)', async () => {
+    setupPool({ account: null });
+    const { res, next, req } = await run(saToken());
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(req.serviceAccount).toBeUndefined();
+  });
+
+  test('fails closed when the lookup errors (revocation columns missing)', async () => {
+    setupPool({ lookupError: new Error('column "token_hash" does not exist') });
+    const { res, next } = await run(saToken());
+    expect(res.statusCode).toBe(401);
+    expect(res._json.error).toBe('Invalid token');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('rejects a service account token with no serviceAccountId claim', async () => {
+    const calls = setupPool();
+    const { res, next } = await run(makeValidToken({ type: 'service_account', scope: 'admin' }));
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each(['POST', 'PUT', 'PATCH', 'DELETE'])('read-only scope rejects %s with 403', async (method) => {
+    setupPool();
+    const { res, next } = await run(saToken(), method);
+    expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test.each(['GET', 'HEAD', 'OPTIONS'])('read-only scope allows %s', async (method) => {
+    setupPool();
+    const { next } = await run(saToken(), method);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  test('the current row scope applies even when the token claim predates it', async () => {
+    setupPool({ account: { id: SA_ID, scope: 'read-only' } });
+    const { res } = await run(saToken({ scope: 'full' }), 'POST');
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('the token claim applies even when the row scope was widened afterwards', async () => {
+    setupPool({ account: { id: SA_ID, scope: 'full' } });
+    const { res } = await run(saToken({ scope: 'read-only' }), 'POST');
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('a non-read-only scope may write', async () => {
+    setupPool({ account: { id: SA_ID, scope: 'full' } });
+    const { next } = await run(saToken({ scope: 'full' }), 'POST');
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  test('ordinary user tokens never touch service_accounts', async () => {
+    const calls = setupPool();
+    const { next } = await run(makeValidToken());
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(0);
   });
 });

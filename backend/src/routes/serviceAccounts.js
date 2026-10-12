@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 const { JWT_SECRET, JWT_ALGORITHM } = require('../config/security');
 const { authenticate, requireTier, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields, isUuid } = require('../middleware/validate');
 const auditService = require('../services/auditService');
+const { hashToken } = require('../utils/encrypt');
 const { log, serializeError } = require('../utils/logger');
 
 // All service account routes require Professional+ tier
@@ -453,6 +453,11 @@ router.post('/:id/generate-token', requirePermission('service_accounts.write'), 
     const orgId = req.user.organization_id;
     const expiresInDays = req.body.expires_in_days || 90;
 
+    // A service account token must not mint or replace tokens, including its own.
+    if (req.serviceAccount) {
+      return res.status(403).json({ success: false, error: 'Service account tokens cannot generate tokens' });
+    }
+
     // Verify service account exists and belongs to org
     const saResult = await pool.query(
       'SELECT id, account_name, owner_id, scope, is_active FROM service_accounts WHERE id = $1 AND organization_id = $2',
@@ -491,21 +496,17 @@ router.post('/:id/generate-token', requirePermission('service_accounts.write'), 
       { expiresIn: `${expiresInDays}d`, algorithm: JWT_ALGORITHM }
     );
 
-    // Store token hash for revocation support (gracefully skip if columns don't exist yet)
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    try {
-      await pool.query(
-        `UPDATE service_accounts SET
-          token_hash = $1,
-          token_expires_at = CURRENT_DATE + $2,
-          updated_at = NOW()
-        WHERE id = $3 AND organization_id = $4`,
-        [tokenHash, expiresInDays, id, orgId]
-      );
-    } catch (hashErr) {
-      // token_hash/token_expires_at columns may not exist yet — token is still valid
-      console.warn('Could not store token hash (migration pending):', hashErr.message);
-    }
+    // Store the SHA-384 token hash. authenticate() requires it to match, so this
+    // replaces any earlier token (regeneration revokes the previous one). If the
+    // write fails the request fails and the token is never returned.
+    await pool.query(
+      `UPDATE service_accounts SET
+        token_hash = $1,
+        token_expires_at = CURRENT_DATE + $2,
+        updated_at = NOW()
+      WHERE id = $3 AND organization_id = $4`,
+      [hashToken(token), expiresInDays, id, orgId]
+    );
 
     await auditService.logFromRequest(req, {
       eventType: 'service_account.token_generated',

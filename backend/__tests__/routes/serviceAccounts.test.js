@@ -12,7 +12,9 @@ jest.mock('../../src/middleware/auth', () => ({
 jest.mock('../../src/services/auditService', () => ({ logFromRequest: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('../../src/utils/logger', () => ({ log: jest.fn(), serializeError: (e) => e }));
 
+const crypto = require('crypto');
 const pool = require('../../src/config/database');
+const { hashToken } = require('../../src/utils/encrypt');
 const auditService = require('../../src/services/auditService');
 const router = require('../../src/routes/serviceAccounts');
 const { invokeRoute, makeReq, makeRes } = require('./_testUtils');
@@ -140,5 +142,54 @@ describe('POST /:id/generate-token', () => {
 
     expect(res.statusCode).toBe(200);
     expect(typeof res._json.data.token).toBe('string');
+  });
+});
+
+describe('POST /:id/generate-token revocation support', () => {
+  const serviceAccount = { id: SA_ID, account_name: 'ci', owner_id: OWNER, scope: 'read-only', is_active: true };
+  const asOwner = () => ({ ...caller(), id: OWNER });
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('stores the SHA-384 hash of the issued token and its expiry, scoped to the organization', async () => {
+    mockDb({ serviceAccount });
+    const res = makeRes();
+    await invokeRoute(router, 'post', '/:id/generate-token', makeReq({
+      user: asOwner(), params: { id: SA_ID }, body: { expires_in_days: 30 }
+    }), res);
+
+    expect(res.statusCode).toBe(200);
+    const [sql, params] = writes().find(([q]) => /token_hash/.test(q));
+    expect(sql).toMatch(/organization_id = \$4/);
+    expect(params[0]).toBe(hashToken(res._json.data.token));
+    expect(params[0]).toHaveLength(96);
+    expect(params[0]).not.toBe(crypto.createHash('sha256').update(res._json.data.token).digest('hex'));
+    expect(params.slice(1)).toEqual([30, SA_ID, ORG]);
+  });
+
+  it('does not return a token when the hash cannot be stored', async () => {
+    pool.query.mockImplementation(async (sql) => {
+      if (/FROM users WHERE id/.test(sql)) return { rows: [{ '?column?': 1 }] };
+      if (/FROM service_accounts WHERE id/.test(sql)) return { rows: [serviceAccount] };
+      throw new Error('column "token_hash" does not exist');
+    });
+    const res = makeRes();
+    await invokeRoute(router, 'post', '/:id/generate-token', makeReq({ user: asOwner(), params: { id: SA_ID } }), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res._json.data).toBeUndefined();
+    expect(auditService.logFromRequest).not.toHaveBeenCalled();
+  });
+
+  it('refuses to mint a token when the caller authenticated with a service account token', async () => {
+    mockDb({ serviceAccount });
+    const res = makeRes();
+    const req = makeReq({ user: asOwner(), params: { id: SA_ID } });
+    req.serviceAccount = { id: SA_ID, scope: 'full' };
+    await invokeRoute(router, 'post', '/:id/generate-token', req, res);
+
+    expect(res.statusCode).toBe(403);
+    expect(res._json.data).toBeUndefined();
+    expect(writes()).toHaveLength(0);
   });
 });
