@@ -87,7 +87,7 @@ Go to **Settings → LLM Configuration** and enter an API key for any supported 
 
 | Provider | Free tier available |
 |---|---|
-| Google Gemini | ✅ Yes (Gemini 2.0 Flash) |
+| Google Gemini | ✅ Yes (Gemini 3.5 Flash) |
 | Groq | ✅ Yes |
 | Ollama (local) | ✅ Yes (self-hosted) |
 | Anthropic (Claude 5.x) | Pay-as-you-go |
