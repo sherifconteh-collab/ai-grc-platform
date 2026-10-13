@@ -6,6 +6,8 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { helpAPI, issueReportAPI } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasTierAtLeast } from '@/lib/access';
+import { separateMarkdownBlocks } from '@/lib/helpMarkdown';
+import MarkdownContent from '@/components/ai/MarkdownContent';
 
 interface HelpArticle {
   slug: string;
@@ -34,52 +36,6 @@ const TIER_COLORS: Record<string, string> = {
   enterprise: 'bg-purple-100 text-purple-700',
   govcloud: 'bg-amber-100 text-amber-700',
 };
-
-// Allowed HTML tags produced by renderMarkdown — strip any others before rendering
-const ALLOWED_TAGS = new Set([
-  'h1','h2','h3','h4','p','pre','code','strong','em','li','blockquote',
-  'a','br','hr','div','span'
-]);
-
-function sanitizeHtml(html: string): string {
-  // Remove any tags not in the allow-list (regex-based, matches opening and closing tags)
-  return html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (match, tag) => {
-    return ALLOWED_TAGS.has(tag.toLowerCase()) ? match : '';
-  });
-}
-
-// Simple Markdown renderer — handles headings, bold, code blocks, bullet lists,
-// and horizontal rules. No external dependency needed.
-function renderMarkdown(md: string): string {
-  const html = md
-    // Fenced code blocks
-    .replace(/```[\w]*\n([\s\S]*?)```/g, '<pre class="bg-gray-800 text-green-300 rounded p-4 overflow-x-auto text-sm my-4"><code>$1</code></pre>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-purple-700 rounded px-1 py-0.5 text-sm font-mono">$1</code>')
-    // Headings
-    .replace(/^#### (.+)$/gm, '<h4 class="text-base font-semibold text-gray-800 mt-4 mb-1">$1</h4>')
-    .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 mt-6 mb-2">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold text-gray-900 mt-8 mb-3 border-b pb-1">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold text-gray-900 mt-6 mb-4">$1</h1>')
-    // Horizontal rules
-    .replace(/^---$/gm, '<hr class="my-6 border-gray-200" />')
-    // Bold + italic
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Blockquote
-    .replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-purple-400 pl-4 italic text-gray-600 my-2">$1</blockquote>')
-    // Unordered lists (simple)
-    .replace(/^[-*] (.+)$/gm, '<li class="ml-4 list-disc text-gray-700">$1</li>')
-    // Ordered lists
-    .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal text-gray-700">$1</li>')
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-purple-600 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
-    // Paragraphs: double newlines become paragraph breaks
-    .replace(/\n\n/g, '</p><p class="mb-3 text-gray-700">')
-    .replace(/\n/g, '<br />');
-  return sanitizeHtml(html);
-}
 
 export default function HelpPage() {
   const { user } = useAuth();
@@ -444,10 +400,7 @@ export default function HelpPage() {
                       <p className="text-sm text-gray-400 mt-2">Upgrade your plan to access this content.</p>
                     </div>
                   ) : (
-                    <div
-                      className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: `<div>${renderMarkdown(articleContent)}</div>` }}
-                    />
+                    <MarkdownContent content={separateMarkdownBlocks(articleContent)} />
                   )}
                 </div>
               </div>

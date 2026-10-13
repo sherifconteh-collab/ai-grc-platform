@@ -139,7 +139,7 @@ security/GRC-88/fix-ilike-injection
 ## 💻 Development Setup
 
 ### Prerequisites
-- **Node.js 20+** (LTS recommended)
+- **Node.js 24+** (LTS recommended)
 - **PostgreSQL 14+**
 - **Git**
 

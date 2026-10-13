@@ -68,7 +68,7 @@ The resulting installer is in `electron/dist/`.
 
 ## 🎯 What is This?
 
-A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 39 frameworks with 2,800+ controls. Built to be:
+A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern organizations managing multiple compliance frameworks, with deep focus on AI governance and threat intelligence. Supports NIST 800-53, ISO 27001, SOC 2, NIST AI RMF, CIS Controls v8, FedRAMP, and 39 frameworks with 2,900+ controls. Built to be:
 
 - **Multi-Framework**: 39 major compliance frameworks out of the box
 - **AI-Powered**: Built-in AI Copilot with BYOK (Bring Your Own Key) LLM support across 6 providers and 8+ models
@@ -107,7 +107,7 @@ The platform is **fully functional**. Every capability below is available — no
 ### Core Platform
 - 🔐 User authentication (JWT HS384, OAuth 2.0, refresh token rotation, TOTP 2FA; WebAuthn/passkey endpoints present, ES384 preferred)
 - 📊 Compliance dashboard with real-time metrics and custom dashboard builder
-- 🎯 Framework selection (39 frameworks, 2,800+ controls)
+- 🎯 Framework selection (39 frameworks, 2,900+ controls)
 - 📋 Control management, filtering, and health tracking
 - 🔗 **Auto-crosswalk** (90%+ similarity auto-satisfies mapped controls across frameworks, with per-source provenance and automatic withdrawal when the source is no longer implemented)
 - 📜 Audit logging with 20 recorded fields per event
@@ -387,7 +387,7 @@ Full RMF lifecycle management without leaving the platform:
 
 ### 📋 Multi-Framework Compliance Management
 - Track compliance across 39 frameworks simultaneously
-- **Cross-framework control mapping (Crosswalks)** — 3,100+ mappings showing control overlaps
+- **Cross-framework control mapping (Crosswalks)** — 3,000+ mappings showing control overlaps
 - Unified risk register with inherent/residual scoring, treatments and named acceptance
 - Gap analysis across standards
 - Framework-gated sidebar navigation
@@ -597,7 +597,7 @@ Full asset and configuration inventory:
 | Open Source | ✅ | ❌ | ❌ | ❌ |
 | Self-Hosted | ✅ | ❌ | ❌ | ❌ |
 | Frameworks | 39 | 10–15 | 10–20 | 20+ |
-| Auto-Crosswalk | ✅ 3,100+ mappings | ❌ | ❌ | ❌ |
+| Auto-Crosswalk | ✅ 3,000+ mappings | ❌ | ❌ | ❌ |
 | Custom Framework Builder | ✅ | ❌ | Paid Add-on | ❌ |
 | Built-in AI Copilot | ✅ BYOK | ❌ | ❌ | ❌ |
 | RAG + Multi-Agent AI | ✅ | ❌ | ❌ | ❌ |
@@ -692,13 +692,13 @@ See [`controlweave-sdk/README.md`](./controlweave-sdk/README.md) for full setup 
 ```mermaid
 graph TD
     Client(["Browser · Next.js 16.3.8 (React 19)<br/>or Desktop App (Electron, bundled PostgreSQL)"])
-    API["REST API<br/>85 route modules · Node.js 24+, Express 5"]
+    API["REST API<br/>86 route modules · Node.js 24+, Express 5"]
     MW["Middleware<br/>JWT auth · RBAC · Redis rate limiting · SoD"]
     JWTNode["JWT HS384<br/>refresh token rotation"]
     Bcrypt["bcrypt — cost 14"]
     WebAuthn["WebAuthn / Passkeys<br/>ES384 preferred"]
     OIDC["OpenID Connect SSO"]
-    DB[("PostgreSQL 17+<br/>Row-Level Security<br/>172 migration files")]
+    DB[("PostgreSQL 17+<br/>Row-Level Security<br/>176 migration files")]
     Cache[("Redis (optional)<br/>in-memory fallback")]
     Copilot["AI Copilot + RAG<br/>25+ analysis features, BYOK"]
     Providers["Anthropic · OpenAI · Gemini<br/>xAI Grok · Groq · Ollama (GGUF)"]
@@ -737,7 +737,7 @@ controlweave/
 │   │   ├── config/          # Database, Redis, and security configuration
 │   │   └── utils/           # Logging, encryption, TOTP, AI security, password
 │   │                        #   policy, Redis cache, Sentry integration
-│   ├── migrations/          # 172 sequential migration files, numbered through 160 (a few historical duplicate numbers are documented and never renumbered)
+│   ├── migrations/          # 176 sequential migration files, numbered through 164 (a few historical duplicate numbers are documented and never renumbered)
 │   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
@@ -924,7 +924,7 @@ controlweave/
 
 ### Phase 1: Foundation ✅
 - ✅ Complete PostgreSQL schema (140+ tables)
-- ✅ 39 framework seed data (2,800+ controls)
+- ✅ 39 framework seed data (2,900+ controls)
 - ✅ Cross-framework crosswalk mappings (80+)
 - ✅ REST API with full CRUD operations
 - ✅ JWT + OAuth 2.0 authentication with TOTP 2FA
@@ -1047,15 +1047,15 @@ This project aims to provide an **open, transparent, affordable** alternative th
 ## 📈 Stats
 
 - **Frameworks**: 39 supported (including CIS Controls v8, the FedRAMP Rev 5 Low/Moderate/High baselines and the full NIST SP 800-171 Rev 3 set)
-- **Controls**: 2,800+ controls in database
-- **Crosswalks**: 3,100+ cross-framework mappings
+- **Controls**: 2,900+ controls in database
+- **Crosswalks**: 3,000+ cross-framework mappings
 - **Connector Templates**: 15 in the Integrations Hub (AWS Security Hub, Qualys VMDR, ServiceNow added in v4.2.0)
 - **AI Features**: 25+ analysis capabilities (BYOK) with RAG and multi-agent support
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: see the "Supported providers and models" table above — updated as providers ship new models
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
-- **Migrations**: 172 sequential, idempotent migration files (numbered through 160; a few historical duplicate numbers are documented and never renumbered)
-- **API Routes**: 80+ route modules
+- **Migrations**: 176 sequential, idempotent migration files (numbered through 164; a few historical duplicate numbers are documented and never renumbered)
+- **API Routes**: 86 route modules
 - **Services**: 65 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
