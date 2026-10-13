@@ -15,6 +15,7 @@ const ragService = require('../services/orgRagService');
 const evidenceVersions = require('../services/evidenceVersionService');
 const aiSecurity = require('../utils/aiSecurity');
 const { log, serializeError } = require('../utils/logger');
+const { isUuid } = require('../middleware/validate');
 
 // IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
 // can trace a recognized rate-limiting middleware covering every route below —
@@ -1186,10 +1187,24 @@ router.delete('/:evidenceId/unlink/:controlId',
   createRateLimiter({ label: 'evidence-unlink', windowMs: 60 * 1000, max: 60 }),
   requirePermission('evidence.write'), async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM evidence_control_links WHERE evidence_id = $1 AND control_id = $2',
-      [req.params.evidenceId, req.params.controlId]
+    if (!isUuid(req.params.evidenceId) || !isUuid(req.params.controlId)) {
+      return res.status(400).json({ success: false, error: 'Invalid evidence or control id' });
+    }
+    // Scope the delete to the caller's organization: the link row carries its own
+    // organization_id (migration 144), so ids from another tenant match nothing.
+    const removed = await pool.query(
+      'DELETE FROM evidence_control_links WHERE evidence_id = $1 AND control_id = $2 AND organization_id = $3',
+      [req.params.evidenceId, req.params.controlId, req.user.organization_id]
     );
+    if (removed.rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'Link not found' });
+    }
+    await auditService.logFromRequest(req, {
+      eventType: 'evidence.unlinked',
+      resourceType: 'evidence',
+      resourceId: req.params.evidenceId,
+      details: { control_id: req.params.controlId }
+    }).catch((auditError) => log('error', 'evidence.unlink_audit_failed', { error: serializeError(auditError) }));
     res.json({ success: true, message: 'Control unlinked' });
   } catch (error) {
     console.error('Unlink error:', error);
