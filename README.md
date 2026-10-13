@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-13 | PR #373: security(evidence): scope evidence unlink to the caller organization -->
+<!-- LAST_UPDATED: 2026-10-13 | PR #374: chore(deps): drop unused ioredis, follow hono in overrides, fix Node step names -->
 
 ## 🎯 What is This?
 
