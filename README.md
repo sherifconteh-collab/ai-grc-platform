@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-13 | PR #378: ci(release): retry the Windows installer build on transient failures -->
+<!-- LAST_UPDATED: 2026-10-13 | PR #379: chore(deps): bump stripe to 23.0.0 and js-yaml to 5.4.3 in backend -->
 
 ## 🎯 What is This?
 
