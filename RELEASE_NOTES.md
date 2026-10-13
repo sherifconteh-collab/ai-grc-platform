@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- ci(release): retry the Windows installer build on transient failures ([#378](https://github.com/sherifconteh-collab/ai-grc-platform/pull/378)) — @sherifconteh-collab
 - docs(ui): sync platform counts and Node floor, render help articles with MarkdownContent ([#377](https://github.com/sherifconteh-collab/ai-grc-platform/pull/377)) — @sherifconteh-collab
 - security(auth): closed service account scopes, reject suspended accounts, sanitize vendor prompt labels ([#376](https://github.com/sherifconteh-collab/ai-grc-platform/pull/376)) — @sherifconteh-collab
 - fix(api): put legacy /api mounts behind the API rate limiter ([#375](https://github.com/sherifconteh-collab/ai-grc-platform/pull/375)) — @sherifconteh-collab

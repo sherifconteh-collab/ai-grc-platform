@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-13 | PR #377: docs(ui): sync platform counts and Node floor, render help articles with MarkdownContent -->
+<!-- LAST_UPDATED: 2026-10-13 | PR #378: ci(release): retry the Windows installer build on transient failures -->
 
 ## 🎯 What is This?
 
