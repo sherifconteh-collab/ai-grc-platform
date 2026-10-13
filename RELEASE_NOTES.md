@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(auth): closed service account scopes, reject suspended accounts, sanitize vendor prompt labels ([#376](https://github.com/sherifconteh-collab/ai-grc-platform/pull/376)) — @sherifconteh-collab
 - fix(api): put legacy /api mounts behind the API rate limiter ([#375](https://github.com/sherifconteh-collab/ai-grc-platform/pull/375)) — @sherifconteh-collab
 - chore(deps): drop unused ioredis, follow hono in overrides, fix Node step names ([#374](https://github.com/sherifconteh-collab/ai-grc-platform/pull/374)) — @sherifconteh-collab
 - security(evidence): scope evidence unlink to the caller organization ([#373](https://github.com/sherifconteh-collab/ai-grc-platform/pull/373)) — @sherifconteh-collab

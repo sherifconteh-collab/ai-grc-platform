@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-13 | PR #375: fix(api): put legacy /api mounts behind the API rate limiter -->
+<!-- LAST_UPDATED: 2026-10-13 | PR #376: security(auth): closed service account scopes, reject suspended accounts, sanitize vendor prompt labels -->
 
 ## 🎯 What is This?
 
@@ -1055,7 +1055,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **AI Models**: see the "Supported providers and models" table above — updated as providers ship new models
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 176 sequential, idempotent migration files (numbered through 164; a few historical duplicate numbers are documented and never renumbered)
-- **API Routes**: 86 route modules
+- **API Routes**: 80+ route modules
 - **Services**: 65 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
