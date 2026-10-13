@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-13 | PR #376: security(auth): closed service account scopes, reject suspended accounts, sanitize vendor prompt labels -->
+<!-- LAST_UPDATED: 2026-10-13 | PR #377: docs(ui): sync platform counts and Node floor, render help articles with MarkdownContent -->
 
 ## 🎯 What is This?
 
