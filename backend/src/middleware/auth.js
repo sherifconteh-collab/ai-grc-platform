@@ -4,6 +4,7 @@ const pool = require('../config/database');
 const { JWT_SECRET, JWT_VERIFY_OPTIONS } = require('../config/security');
 const { decrypt, tokenHashCandidates } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
+const { isWriteScope } = require('../utils/serviceAccountScope');
 const {
   TIER_LEVELS,
   normalizeTier,
@@ -134,9 +135,14 @@ async function hasOrgFeatureOverridesColumn() {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+// Service account lifecycle states that must stop a token working even while
+// is_active is still true.
+const BLOCKED_SERVICE_ACCOUNT_STATUSES = new Set(['suspended', 'disabled']);
+
 function isReadOnlyScope(scope) {
-  // A null scope is minted as 'read-only' (routes/serviceAccounts.js), so it is read-only here too.
-  return String(scope || 'read-only').trim().toLowerCase() === 'read-only';
+  // Default-deny: only the exact 'full' scope may write. A null scope is minted
+  // as 'read-only' (routes/serviceAccounts.js); unknown legacy values are too.
+  return !isWriteScope(scope);
 }
 
 /**
@@ -157,7 +163,7 @@ async function checkServiceAccountToken(decoded, token, user, method) {
   let rows;
   try {
     ({ rows } = await pool.query(
-      `SELECT id, scope
+      `SELECT id, scope, status
          FROM service_accounts
         WHERE id = $1
           AND organization_id = $2
@@ -176,12 +182,16 @@ async function checkServiceAccountToken(decoded, token, user, method) {
     return deny(401, 'Invalid token', 'revoked_or_unknown');
   }
 
+  if (BLOCKED_SERVICE_ACCOUNT_STATUSES.has(String(rows[0].status || '').trim().toLowerCase())) {
+    return deny(401, 'Invalid token', 'account_not_in_service');
+  }
+
   const readOnly = isReadOnlyScope(decoded.scope) || isReadOnlyScope(rows[0].scope);
   if (readOnly && !SAFE_METHODS.has(String(method || '').toUpperCase())) {
     return deny(403, 'Service account token is read-only', 'read_only_scope');
   }
 
-  return { account: { id: rows[0].id, scope: readOnly ? 'read-only' : rows[0].scope } };
+  return { account: { id: rows[0].id, scope: readOnly ? 'read-only' : 'full' } };
 }
 
 /**

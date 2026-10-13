@@ -9,6 +9,7 @@ const { validateBody, requireFields, isUuid } = require('../middleware/validate'
 const auditService = require('../services/auditService');
 const { hashToken } = require('../utils/encrypt');
 const { log, serializeError } = require('../utils/logger');
+const { SERVICE_ACCOUNT_SCOPES, parseServiceAccountScope } = require('../utils/serviceAccountScope');
 
 // IP-based bound ahead of authenticate, so it applies before any JWT or database
 // work, including on the legacy /api/service-accounts mount that the /api/v1
@@ -28,6 +29,14 @@ async function isActiveOrgUser(orgId, userId) {
     [userId, orgId]
   );
   return rows.length > 0;
+}
+
+// Scope is a closed set; unknown values are rejected rather than stored, because
+// a stored scope decides what the account's token may do.
+function scopeErrors(body) {
+  return parseServiceAccountScope(body.scope).valid
+    ? []
+    : [`scope must be one of: ${SERVICE_ACCOUNT_SCOPES.join(', ')}`];
 }
 
 function canActAsOwner(req, ownerId) {
@@ -221,6 +230,7 @@ router.post('/', requirePermission('service_accounts.write'), validateBody((body
   if (body.owner_id && !isUuid(body.owner_id)) {
     errors.push('owner_id must be a valid UUID');
   }
+  errors.push(...scopeErrors(body));
   return errors;
 }), async (req, res) => {
   try {
@@ -230,9 +240,10 @@ router.post('/', requirePermission('service_accounts.write'), validateBody((body
       owner_id, business_justification,
       vault_id, vault_path,
       credential_type, rotation_frequency_days, auto_rotation_enabled,
-      privilege_level, scope,
+      privilege_level,
       review_frequency_days, reviewer_id
     } = req.body;
+    const { scope } = parseServiceAccountScope(req.body.scope);
 
     if (!(await isActiveOrgUser(orgId, owner_id))) {
       return res.status(400).json({ success: false, error: 'owner_id must be an active user in your organization' });
@@ -287,6 +298,7 @@ router.put('/:id', requirePermission('service_accounts.write'), validateBody((bo
   if (body.reviewer_id && !isUuid(body.reviewer_id)) {
     errors.push('reviewer_id must be a valid UUID');
   }
+  errors.push(...scopeErrors(body));
   return errors;
 }), async (req, res) => {
   try {
@@ -312,10 +324,11 @@ router.put('/:id', requirePermission('service_accounts.write'), validateBody((bo
       owner_id, business_justification,
       vault_id, vault_path,
       credential_type, rotation_frequency_days, auto_rotation_enabled,
-      privilege_level, scope,
+      privilege_level,
       review_frequency_days, reviewer_id,
       status, is_active
     } = req.body;
+    const { scope } = parseServiceAccountScope(req.body.scope);
 
     const result = await pool.query(`
       UPDATE service_accounts SET

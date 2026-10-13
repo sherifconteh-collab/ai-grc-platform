@@ -243,8 +243,15 @@ export default function ServiceAccountsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Scope</label>
-                  <input value={form.scope} onChange={e => set('scope', e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                  <select value={form.scope} onChange={e => set('scope', e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-purple-400">
+                    <option value="">Not set (read-only)</option>
+                    <option value="read-only">Read-only (GET requests only)</option>
+                    <option value="full">Full (all methods, within the owner&apos;s permissions)</option>
+                    {form.scope !== '' && form.scope !== 'read-only' && form.scope !== 'full' && (
+                      <option value={form.scope}>{form.scope} (unrecognized, treated as read-only)</option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
