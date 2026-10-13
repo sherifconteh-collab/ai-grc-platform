@@ -261,8 +261,23 @@ jobs:
           "CSC_KEY_PASSWORD=${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build Windows installer
-        timeout-minutes: 20
-        run: npm run dist:win
+        timeout-minutes: 30
+        # electron-builder downloads the NSIS toolset from GitHub at build time.
+        # A single transient 5xx there failed the whole job and left a release
+        # without its .exe (v2026.10.0, issue #350). Retry the build up to three
+        # times, then fail with the last exit code.
+        shell: pwsh
+        run: |
+          $attempts = 3
+          for ($i = 1; $i -le $attempts; $i++) {
+            npm run dist:win
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($i -lt $attempts) {
+              Write-Host "::warning::dist:win failed (attempt $i of $attempts, exit $LASTEXITCODE); retrying in 20s"
+              Start-Sleep -Seconds 20
+            }
+          }
+          exit $LASTEXITCODE
         working-directory: electron
         env:
           # electron-builder uses GH_TOKEN to publish directly to GitHub Releases
