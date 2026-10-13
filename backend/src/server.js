@@ -197,6 +197,10 @@ app.use('/api/v1/auth/refresh', refreshRateLimiter);
 app.use('/api/v1/auth/forgot-password', passwordRecoveryRateLimiter);
 app.use('/api/v1/auth/reset-password', passwordRecoveryRateLimiter);
 app.use('/api/v1', apiRateLimiter);
+// Unversioned legacy mounts (see the route registrations below) are reachable
+// without the /api/v1 prefix, so the limiter above never sees them. Put them
+// behind the same limiter instance (shared per-client budget).
+app.use(['/api/assets', '/api/environments', '/api/service-accounts'], apiRateLimiter);
 // Baseline audit trail for every state-changing request (AU-2 / AU-12)
 app.use('/api/v1', auditBaseline);
 
