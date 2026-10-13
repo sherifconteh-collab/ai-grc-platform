@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-13 | PR #374: chore(deps): drop unused ioredis, follow hono in overrides, fix Node step names -->
+<!-- LAST_UPDATED: 2026-10-13 | PR #375: fix(api): put legacy /api mounts behind the API rate limiter -->
 
 ## 🎯 What is This?
 
