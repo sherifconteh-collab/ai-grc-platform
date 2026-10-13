@@ -110,7 +110,7 @@
     "rss-parser": "^3.13.0",
     "sanitize-html": "2.18.0",
     "socket.io": "^4.8.1",
-    "stripe": "^22.6.2",
+    "stripe": "^23.0.0",
     "xml2js": "^0.6.2",
     "zod": "^4.6.6"
   },
