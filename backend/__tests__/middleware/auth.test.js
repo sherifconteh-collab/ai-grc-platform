@@ -342,4 +342,55 @@ describe('authenticate: service account tokens', () => {
     expect(next).toHaveBeenCalledTimes(1);
     expect(calls).toHaveLength(0);
   });
+  test.each(['suspended', 'disabled', ' Suspended ', 'DISABLED'])('rejects a token whose account status is %j even while is_active is true', async (status) => {
+    setupPool({ account: { id: SA_ID, scope: 'read-only', status } });
+    const { res, next, req } = await run(saToken());
+    expect(res.statusCode).toBe(401);
+    expect(res._json.error).toBe('Invalid token');
+    expect(next).not.toHaveBeenCalled();
+    expect(req.serviceAccount).toBeUndefined();
+  });
+
+  test.each(['active', null, undefined])('admits a token whose account status is %j', async (status) => {
+    setupPool({ account: { id: SA_ID, scope: 'read-only', status } });
+    const { next } = await run(saToken());
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  test('the lookup selects status so the check sees it', async () => {
+    const calls = setupPool();
+    await run(saToken());
+    expect(calls[0].sql).toMatch(/SELECT[^;]*\bstatus\b[^;]*FROM service_accounts/);
+  });
+
+  test.each(['admin', 'write', 'read-write', 'readonly', 'Read-only access to logs', 'FULL ACCESS'])(
+    'an unknown row scope %j is treated as read-only (default deny)',
+    async (scope) => {
+      setupPool({ account: { id: SA_ID, scope } });
+      const { res, next } = await run(saToken({ scope: 'full' }), 'POST');
+      expect(res.statusCode).toBe(403);
+      expect(next).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(['admin', 'write', 'Read-only access to logs'])('an unknown token claim scope %j is treated as read-only', async (claim) => {
+    setupPool({ account: { id: SA_ID, scope: 'full' } });
+    const { res, next } = await run(saToken({ scope: claim }), 'DELETE');
+    expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('an unknown scope still allows safe methods, reported as read-only', async () => {
+    setupPool({ account: { id: SA_ID, scope: 'admin' } });
+    const { req, next } = await run(saToken({ scope: 'admin' }), 'GET');
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.serviceAccount).toEqual({ id: SA_ID, scope: 'read-only' });
+  });
+
+  test('the full scope is matched case-insensitively and reported normalized', async () => {
+    setupPool({ account: { id: SA_ID, scope: ' Full ' } });
+    const { req, next } = await run(saToken({ scope: 'FULL' }), 'POST');
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.serviceAccount).toEqual({ id: SA_ID, scope: 'full' });
+  });
 });

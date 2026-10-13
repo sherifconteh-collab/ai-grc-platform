@@ -2996,7 +2996,7 @@ const MAX_CONTENT_PREVIEW_LENGTH = 1500;
 async function analyzeVendorEvidence({ organizationId, vendorInfo, questionnaireTitle, questions, responses, evidenceList, provider, model }) {
   // Build a concise summary of each evidence file for the prompt (avoid sending full file content for large files)
   const evidenceSummary = evidenceList.map((ev, i) => {
-    const parts = [`[Evidence ${i + 1}] "${ev.original_filename}" (${Math.round(ev.file_size_bytes / 1024)} KB)`];
+    const parts = [`[Evidence ${i + 1}] "${sanitizePromptLabel(ev.original_filename)}" (${Math.round(ev.file_size_bytes / 1024)} KB)`];
     if (ev.is_sbom && ev.sbom_summary) {
       let s = ev.sbom_summary;
       if (typeof s === 'string') {
@@ -3036,7 +3036,7 @@ async function analyzeVendorEvidence({ organizationId, vendorInfo, questionnaire
 Vendor Information:
 ${compactJSON(vendorInfo)}
 
-Questionnaire: "${questionnaireTitle}"
+Questionnaire: "${sanitizePromptLabel(questionnaireTitle)}"
 
 Questionnaire Responses Summary:
 ${compactJSON({ questions: (questions || []).slice(0, 10), responses: responses || {} })}

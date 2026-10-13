@@ -193,3 +193,71 @@ describe('POST /:id/generate-token revocation support', () => {
     expect(writes()).toHaveLength(0);
   });
 });
+
+describe('service account scope is a closed set', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const baseBody = { account_name: 'ci', account_type: 'application', owner_id: OWNER };
+  const insertParams = () => writes().find(([q]) => /^\s*INSERT INTO service_accounts/.test(q))[1];
+  const updateParams = () => writes().find(([q]) => /^\s*UPDATE service_accounts SET\s+account_name/.test(q))[1];
+  const SCOPE_INSERT_INDEX = 13; // privilege_level is 12, scope is 13
+  const SCOPE_UPDATE_INDEX = 11;
+
+  it.each(['admin', 'write', 'read-write', 'Read-only access to logs', 'readonly'])(
+    'POST / rejects scope %j with 400 and writes nothing', async (scope) => {
+      mockDb();
+      const res = makeRes();
+      await invokeRoute(router, 'post', '/', makeReq({ user: caller(), body: { ...baseBody, scope } }), res);
+      expect(res.statusCode).toBe(400);
+      expect(res._json.details.join(' ')).toMatch(/scope must be one of: read-only, full/);
+      expect(writes()).toHaveLength(0);
+    });
+
+  it.each([123, true, ['full'], { a: 1 }])('POST / rejects non-string scope %j', async (scope) => {
+    mockDb();
+    const res = makeRes();
+    await invokeRoute(router, 'post', '/', makeReq({ user: caller(), body: { ...baseBody, scope } }), res);
+    expect(res.statusCode).toBe(400);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it.each([['read-only', 'read-only'], ['full', 'full'], [' FULL ', 'full'], ['Read-Only', 'read-only']])(
+    'POST / accepts scope %j and stores %j', async (scope, stored) => {
+      mockDb();
+      const res = makeRes();
+      await invokeRoute(router, 'post', '/', makeReq({ user: caller(), body: { ...baseBody, scope } }), res);
+      expect(res.statusCode).toBe(201);
+      expect(insertParams()[SCOPE_INSERT_INDEX]).toBe(stored);
+    });
+
+  it.each([undefined, null, '', '  '])('POST / treats unset scope %j as null (minted read-only)', async (scope) => {
+    mockDb();
+    const res = makeRes();
+    await invokeRoute(router, 'post', '/', makeReq({ user: caller(), body: { ...baseBody, scope } }), res);
+    expect(res.statusCode).toBe(201);
+    expect(insertParams()[SCOPE_INSERT_INDEX]).toBeNull();
+  });
+
+  it('PUT /:id rejects an unknown scope with 400 and writes nothing', async () => {
+    mockDb({ serviceAccount: { id: SA_ID } });
+    const res = makeRes();
+    await invokeRoute(router, 'put', '/:id', makeReq({ user: caller(), params: { id: SA_ID }, body: { scope: 'admin' } }), res);
+    expect(res.statusCode).toBe(400);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('PUT /:id stores a valid scope normalized, and leaves scope alone when unset', async () => {
+    mockDb({ serviceAccount: { id: SA_ID } });
+    let res = makeRes();
+    await invokeRoute(router, 'put', '/:id', makeReq({ user: caller(), params: { id: SA_ID }, body: { scope: 'Full' } }), res);
+    expect(res.statusCode).toBe(200);
+    expect(updateParams()[SCOPE_UPDATE_INDEX]).toBe('full');
+
+    jest.clearAllMocks();
+    mockDb({ serviceAccount: { id: SA_ID } });
+    res = makeRes();
+    await invokeRoute(router, 'put', '/:id', makeReq({ user: caller(), params: { id: SA_ID }, body: { description: 'x' } }), res);
+    expect(res.statusCode).toBe(200);
+    expect(updateParams()[SCOPE_UPDATE_INDEX]).toBeNull();
+  });
+});
