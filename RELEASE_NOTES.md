@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(evidence): scope evidence unlink to the caller organization ([#373](https://github.com/sherifconteh-collab/ai-grc-platform/pull/373)) — @sherifconteh-collab
 - fix(ai): retry and fall back on provider HTTP status, not message text ([#364](https://github.com/sherifconteh-collab/ai-grc-platform/pull/364)) — @sherifconteh-collab
 - fix(ai): omit temperature for Claude 4.7+ models and refresh stale model IDs ([#363](https://github.com/sherifconteh-collab/ai-grc-platform/pull/363)) — @sherifconteh-collab
 

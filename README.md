@@ -64,7 +64,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-12 | PR #362: security(auth): enforce scope and revocation for service account tokens -->
+<!-- LAST_UPDATED: 2026-10-13 | PR #373: security(evidence): scope evidence unlink to the caller organization -->
 
 ## 🎯 What is This?
 
