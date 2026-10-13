@@ -51,7 +51,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -159,7 +159,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -186,7 +186,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js 20 (with npm cache)
+      - name: Set up Node.js 24 (with npm cache)
         uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -380,7 +380,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js 20 (with npm cache)
+      - name: Set up Node.js 24 (with npm cache)
         uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -514,7 +514,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js 20 (with npm cache)
+      - name: Set up Node.js 24 (with npm cache)
         uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -642,7 +642,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js 20 (with npm cache)
+      - name: Set up Node.js 24 (with npm cache)
         uses: actions/setup-node@v7
         with:
           node-version: '24'
