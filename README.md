@@ -70,7 +70,7 @@ The resulting installer is in `electron/dist/`.
 <summary>System requirements &amp; release notes</summary>
 
 - Windows 10+, macOS 10.13+, or Ubuntu 18.04+ (or equivalent)
-- 2 GB RAM · ~500 MB disk space
+- 2 GB RAM · ~1.5 GB disk space (about 1.1 GB installed, plus your data)
 - [All releases](https://github.com/sherifconteh-collab/ai-grc-platform/releases) · [Release notes](./RELEASE_NOTES.md)
 </details>
 
