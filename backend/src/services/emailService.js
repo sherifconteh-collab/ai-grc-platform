@@ -12,9 +12,16 @@ const nodemailer = require('nodemailer');
  * Gracefully disabled if none of the sources are configured.
  */
 
+// Settings saved on one backend instance only invalidate that instance's
+// cache; behind a load balancer the others would keep the old SMTP settings
+// until restarted. Entries therefore also expire after this long.
+const SMTP_CACHE_TTL_MS = 5 * 60 * 1000;
+const isFresh = (entry) => Boolean(entry) && Date.now() - entry.cachedAt < SMTP_CACHE_TTL_MS;
+
 // Global transporter cache (env vars / platform settings — no org context)
 let _globalTransporter = null;
 let _globalSmtpCacheValid = true;
+let _globalCachedAt = 0;
 
 // Per-org transporter cache: Map<orgId, { transporter, valid }>
 const _orgTransporterCache = new Map();
@@ -54,7 +61,7 @@ function _createTransporter({ host, port, user, pass }) {
  */
 async function _getTransporterForOrg(orgId) {
   const cached = _orgTransporterCache.get(orgId);
-  if (cached && cached.valid) return cached.transporter;
+  if (cached && cached.valid && isFresh(cached)) return cached.transporter;
 
   let transporter = null;
   let foundOrgConfig = false;
@@ -91,7 +98,7 @@ async function _getTransporterForOrg(orgId) {
   }
 
   // Cache the resolved transporter (org-specific or global fallback) to avoid repeated DB lookups.
-  _orgTransporterCache.set(orgId, { transporter, valid: true });
+  _orgTransporterCache.set(orgId, { transporter, valid: true, cachedAt: Date.now() });
   return transporter;
 }
 
@@ -100,7 +107,7 @@ async function _getTransporterForOrg(orgId) {
  * Priority: env vars → platform_settings table.
  */
 async function _getGlobalTransporter() {
-  if (_globalTransporter && _globalSmtpCacheValid) return _globalTransporter;
+  if (_globalTransporter && _globalSmtpCacheValid && isFresh({ cachedAt: _globalCachedAt })) return _globalTransporter;
 
   let host = process.env.SMTP_HOST;
   let port = process.env.SMTP_PORT;
@@ -138,6 +145,7 @@ async function _getGlobalTransporter() {
 
   _globalTransporter = _createTransporter({ host, port, user, pass });
   _globalSmtpCacheValid = true;
+  _globalCachedAt = Date.now();
   return _globalTransporter;
 }
 
@@ -152,7 +160,7 @@ async function _getFromEmailForOrg(orgId) {
   }
 
   const cached = _orgFromEmailCache.get(orgId);
-  if (cached) {
+  if (isFresh(cached)) {
     return cached.fromEmail;
   }
 
@@ -173,7 +181,7 @@ async function _getFromEmailForOrg(orgId) {
     fromEmail = await _getFromEmail();
   }
 
-  _orgFromEmailCache.set(orgId, { fromEmail });
+  _orgFromEmailCache.set(orgId, { fromEmail, cachedAt: Date.now() });
   return fromEmail;
 }
 

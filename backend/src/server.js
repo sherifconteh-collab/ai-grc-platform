@@ -385,6 +385,28 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Readiness for load balancers and failover monitors. /health stays 200 so a
+// platform keeps a container alive while the database blips; /ready answers
+// 503 instead, so a load balancer stops routing to an instance that cannot
+// reach the database (or the Redis adapter it was told it needs), and a
+// standby site whose database is still a read-only replica is not sent
+// traffic before it is promoted.
+app.get('/ready', async (req, res) => {
+  const redis = getRedisAdapterStatus();
+  const checks = { database: 'not_configured', writable: false, redis: redis.status };
+  try {
+    if (databaseConfigured) {
+      const { rows } = await pool.query('SELECT pg_is_in_recovery() AS replica');
+      checks.database = 'connected';
+      checks.writable = !rows[0].replica;
+    }
+  } catch (_) {
+    checks.database = 'disconnected';
+  }
+  const ready = checks.database === 'connected' && checks.writable && (!redis.required || redis.status === 'connected');
+  res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'not_ready', checks });
+});
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const dashboardRoutes = safeRequire('./routes/dashboard');
