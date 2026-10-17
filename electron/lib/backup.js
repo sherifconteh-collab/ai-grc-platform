@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 const FORMAT = 'controlweave-desktop-backup';
 const FORMAT_VERSION = 1;
@@ -61,6 +62,23 @@ function stamp(date = new Date()) {
 function makePrivateDir(dir) {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   if (process.platform !== 'win32') fs.chmodSync(dir, 0o700);
+}
+
+/**
+ * Windows: let the current user, not only the Administrators group, open the
+ * restored database. Run elevated, this process creates files owned by
+ * Administrators; pg_ctl starts PostgreSQL with a restricted token in which
+ * that group is deny-only, so the server could not open global/pg_control.
+ */
+function grantCurrentUser(dir) {
+  if (process.platform !== 'win32') return;
+  const who = spawnSync('whoami', ['/user', '/fo', 'csv', '/nh'], { windowsHide: true, encoding: 'utf8' });
+  const sid = /"(S-1-[\d-]+)"/.exec(who.stdout || '');
+  const account = sid ? `*${sid[1]}` : process.env.USERNAME;
+  const result = spawnSync('icacls', [dir, '/grant', `${account}:(OI)(CI)F`, '/T', '/Q'], { windowsHide: true, encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new BackupError(`The restored database could not be made accessible: ${(result.stderr || result.stdout || '').trim()}`);
+  }
 }
 
 /** Copy the restorable parts of a data folder (database stopped) into `dest`. */
@@ -215,6 +233,7 @@ function restoreBackup(dataDir, sourceDir, { bundledMajor }) {
     fs.cpSync(path.join(sourceDir, 'pgdata'), staged, { recursive: true });
     // PostgreSQL refuses to start on a data directory others can read.
     makePrivateDir(staged);
+    grantCurrentUser(staged);
     sanitise(staged, hasCurrent ? pgdata : null);
     fs.rmSync(pgdata, { recursive: true, force: true });
     fs.renameSync(staged, pgdata);
