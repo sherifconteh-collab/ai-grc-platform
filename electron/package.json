@@ -1,13 +1,15 @@
 {
   "name": "controlweave-desktop",
   "version": "2026.10.1",
-  "description": "ControlWeave AI GRC Platform \u2014 Desktop Edition",
+  "description": "ControlWeave AI GRC Platform — Desktop Edition",
   "author": "ControlWeave <contehconsulting@gmail.com>",
   "license": "AGPL-3.0",
   "main": "main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
+    "smoke": "node scripts/stack-smoke.js",
+    "test": "node --test \"test/**/*.test.js\"",
     "pack": "electron-builder --dir",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
@@ -19,14 +21,18 @@
   "build": {
     "appId": "com.controlweave.desktop",
     "productName": "ControlWeave",
-    "copyright": "Copyright \u00a9 2024-2026 ControlWeave",
+    "copyright": "Copyright © 2024-2026 ControlWeave",
     "directories": {
       "output": "dist"
     },
     "files": [
       "main.js",
       "preload.js",
+      "startup-preload.js",
+      "startup.html",
+      "startup.js",
       "updater.js",
+      "lib/**",
       "build/**"
     ],
     "asar": false,
@@ -138,7 +144,14 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
-    "embedded-postgres": "17.9.0-beta.16"
+    "pg": "^8.23.0"
+  },
+  "optionalDependencies": {
+    "@embedded-postgres/darwin-arm64": "17.9.0-beta.17",
+    "@embedded-postgres/darwin-x64": "17.9.0-beta.17",
+    "@embedded-postgres/linux-arm64": "17.9.0-beta.17",
+    "@embedded-postgres/linux-x64": "17.9.0-beta.17",
+    "@embedded-postgres/windows-x64": "17.9.0-beta.17"
   },
   "devDependencies": {
     "electron": "41.10.7",

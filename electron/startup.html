@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'">
+  <title>ControlWeave</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111c33;
+      --border: #1f2c47;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --ok: #34d399;
+      --bad: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 28px 32px;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+    }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+    header img { width: 40px; height: 40px; border-radius: 8px; }
+    h1 { font-size: 20px; margin: 0; font-weight: 600; }
+    .version { color: var(--muted); font-size: 12px; }
+    h2 { font-size: 16px; margin: 0 0 8px; font-weight: 600; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    ol { list-style: none; margin: 0; padding: 0; }
+    li { display: flex; align-items: center; gap: 12px; padding: 7px 0; color: var(--muted); }
+    li.active { color: var(--text); }
+    li.done { color: var(--text); }
+    li.failed { color: var(--bad); }
+    .dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); flex: none; }
+    li.active .dot { border-color: var(--accent); border-top-color: transparent; animation: spin 0.9s linear infinite; }
+    li.done .dot { background: var(--ok); border-color: var(--ok); }
+    li.failed .dot { background: var(--bad); border-color: var(--bad); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .note { margin-top: 18px; font-size: 12px; color: var(--muted); }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+    .label { color: var(--muted); font-size: 12px; }
+    code { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text); user-select: text; word-break: break-all; }
+    pre {
+      margin: 10px 0 0; max-height: 150px; overflow: auto; padding: 10px; border-radius: 6px;
+      background: #0b1222; border: 1px solid var(--border); color: #cbd5e1;
+      font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; user-select: text;
+    }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    button {
+      font: inherit; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+      border: 1px solid var(--border); background: transparent; color: var(--text);
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #0b1222; font-weight: 600; }
+    button.small { padding: 3px 10px; font-size: 12px; }
+    .error-title { color: var(--bad); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="build/icon.png" alt="">
+    <div>
+      <h1>ControlWeave</h1>
+      <div class="version" id="version"></div>
+    </div>
+  </header>
+
+  <section id="progress">
+    <ol id="steps"></ol>
+    <div class="note" id="first-launch-note">The first launch sets up a local database and can take a minute or two.</div>
+  </section>
+
+  <section id="first-run" hidden>
+    <h2>Your administrator account</h2>
+    <p>ControlWeave created an administrator account on this computer. Save this password now; you can see it again later under Help, Show First-Run Sign-In Details.</p>
+    <div class="panel">
+      <div class="row">
+        <div><div class="label">Email</div><code id="admin-email"></code></div>
+        <button class="small" data-copy="email">Copy</button>
+      </div>
+      <div class="row">
+        <div><div class="label">Password</div><code id="admin-password"></code></div>
+        <button class="small" data-copy="password">Copy</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="continue">Open ControlWeave</button>
+    </div>
+  </section>
+
+  <section id="error" hidden>
+    <h2 class="error-title" id="error-message"></h2>
+    <p id="error-hint"></p>
+    <pre id="error-output" hidden></pre>
+    <div class="actions">
+      <button class="primary" id="retry">Try again</button>
+      <button id="open-logs">Open logs folder</button>
+      <button data-copy="details">Copy details</button>
+      <button id="quit">Quit</button>
+    </div>
+    <div class="note" id="error-log"></div>
+  </section>
+
+  <script src="startup.js"></script>
+</body>
+</html>

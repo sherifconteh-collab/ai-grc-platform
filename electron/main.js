@@ -1,912 +1,418 @@
 'use strict';
 
 /**
- * ControlWeave Desktop — Electron Main Process
+ * ControlWeave Desktop - Electron main process.
  *
- * Responsibilities:
- *  1. Start an embedded PostgreSQL server (no external DB required)
- *  2. Run database migrations (idempotent, safe on every launch)
- *  3. Spawn the Node.js backend server (Express, port 3001)
- *  4. Spawn the Next.js frontend server (port 3000)
- *  5. Wait for both servers to be ready, then open a BrowserWindow
- *  6. Gracefully shut down child processes and PostgreSQL on quit
+ * The stack itself (database, migrations, API, interface) lives in
+ * lib/stack.js and has no Electron dependency, so CI boots exactly the same
+ * code with scripts/stack-smoke.js. This file only owns windows, menus,
+ * the single-instance lock and the app lifecycle.
+ *
+ * Flags:
+ *   --smoke-test               boot the full stack in a throwaway data folder,
+ *                              sign in, shut down, exit 0 or 1. No windows.
+ *   --smoke-data-dir <dir>     data folder for --smoke-test (default: temp).
  */
 
-const { app, BrowserWindow, dialog, ipcMain, shell, Menu } = require('electron');
-const path = require('path');
-const { spawn } = require('child_process');
-const http = require('http');
 const fs = require('fs');
-const crypto = require('crypto');
-const embeddedPostgresModule = require('embedded-postgres');
-if (!embeddedPostgresModule) {
-  throw new Error('Failed to load embedded-postgres module — ensure the dependency is installed.');
-}
-const EmbeddedPostgres = embeddedPostgresModule.default || embeddedPostgresModule;
-try {
-  const asyncExitHook = require('async-exit-hook');
-  if (asyncExitHook && typeof asyncExitHook.unhookEvent === 'function') {
-    // embedded-postgres registers an async exit hook, but async-exit-hook invokes
-    // async handlers synchronously for the raw exit event, which yields
-    // "done is not a function" during shutdown. Keep our explicit Electron
-    // cleanup and remove only the broken exit-event binding.
-    asyncExitHook.unhookEvent('exit');
-  }
-} catch (_) {
-  // Ignore: embedded-postgres can still be cleaned up via the explicit quit path.
-}
+const os = require('os');
+const path = require('path');
+const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, shell } = require('electron');
+const { createLogger } = require('./lib/log');
+const { createStack, startStack, STEPS } = require('./lib/stack');
+const { verifySignIn } = require('./lib/verify');
+const { loadAdminCredentials, saveAdminCredentials } = require('./lib/secrets');
 const { initAutoUpdater, checkForUpdatesManual } = require('./updater');
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Config
-// ──────────────────────────────────────────────────────────────────────────────
-const BACKEND_PORT = 3001;
-const FRONTEND_PORT = 3000;
-// Port for the embedded PostgreSQL instance.  Use 5433 to avoid clashing with
-// any system-wide PostgreSQL that might be running on the default 5432.
-const EMBEDDED_PG_PORT = 5433;
-const STARTUP_TIMEOUT_MS = 60_000; // 60 s — embedded PG init + migrations need headroom on slower machines
-const POLL_INTERVAL_MS = 500;
-const BACKEND_HEALTH_PATH = '/health';
-const FRONTEND_HEALTH_PATH = '/health';
 const IS_SMOKE_TEST = process.argv.includes('--smoke-test');
-const MIN_JWT_SECRET_LENGTH = 32;
-const JWT_SECRET_BYTES = 48;
-const GROUP_OTHER_PERMISSIONS_MASK = 0o077;
+const SMOKE_DEADLINE_MS = 8 * 60 * 1000;
+const REPO_URL = 'https://github.com/sherifconteh-collab/ai-grc-platform';
+const RESOURCES_ROOT = app.isPackaged ? process.resourcesPath : path.join(__dirname, '..');
 
-// When packaged, electron bundles node alongside the app.  process.execPath is
-// the electron binary itself, which *is* a Node.js runtime, so we can use it
-// to run plain .js scripts without an external Node installation.
-const NODE_BINARY = process.execPath;
-
-// Resources root differs between development (repo root) and production.
-const RESOURCES_ROOT = app.isPackaged
-  ? process.resourcesPath
-  : path.join(__dirname, '..');
-
-function getEmbeddedPostgresPlatformPackageName() {
-  switch (process.platform) {
-    case 'darwin':
-      switch (process.arch) {
-        case 'arm64':
-          return 'darwin-arm64';
-        case 'x64':
-          return 'darwin-x64';
-        default:
-          break;
-      }
-      break;
-    case 'linux':
-      switch (process.arch) {
-        case 'arm64':
-          return 'linux-arm64';
-        case 'arm':
-          return 'linux-arm';
-        case 'ia32':
-          return 'linux-ia32';
-        case 'ppc64':
-          return 'linux-ppc64';
-        case 'x64':
-          return 'linux-x64';
-        default:
-          break;
-      }
-      break;
-    case 'win32':
-      if (process.arch === 'x64') {
-        return 'windows-x64';
-      }
-      break;
-    default:
-      break;
-  }
-
-  throw new Error(`Unsupported embedded PostgreSQL platform: ${process.platform}/${process.arch}`);
-}
-
-function getEmbeddedPostgresBinaryPaths() {
-  const executableExtension = process.platform === 'win32' ? '.exe' : '';
-  const packageDir = path.join(
-    app.getAppPath(),
-    'node_modules',
-    '@embedded-postgres',
-    getEmbeddedPostgresPlatformPackageName(),
-    'native',
-    'bin'
-  );
-
-  return {
-    postgres: path.join(packageDir, `postgres${executableExtension}`),
-    initdb: path.join(packageDir, `initdb${executableExtension}`),
-  };
-}
-
-function validateEmbeddedPostgresRuntime() {
-  if (!app.isPackaged) {
-    return;
-  }
-
-  const binaries = getEmbeddedPostgresBinaryPaths();
-  const values = Object.values(binaries);
-  const missing = values.filter((filePath) => !fs.existsSync(filePath));
-
-  if (missing.length > 0) {
-    throw new Error(`Embedded PostgreSQL binaries are missing from the packaged app:\n  ${missing.join('\n  ')}`);
-  }
-
-  const asarPaths = values.filter((filePath) => filePath.includes('.asar'));
-  if (asarPaths.length > 0) {
-    throw new Error(
-      `Embedded PostgreSQL binaries resolve inside app.asar and cannot be spawned:\n  ${asarPaths.join('\n  ')}`
-    );
-  }
-}
-
-function validatePackagedBackendRuntime() {
-  if (!app.isPackaged) {
-    return;
-  }
-
-  const requiredPaths = [
-    path.join(RESOURCES_ROOT, 'backend', 'node_modules', 'dotenv', 'package.json'),
-  ];
-  const missing = requiredPaths.filter((filePath) => !fs.existsSync(filePath));
-
-  if (missing.length > 0) {
-    throw new Error(`Packaged backend runtime dependencies are missing:\n  ${missing.join('\n  ')}`);
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Globals
-// ──────────────────────────────────────────────────────────────────────────────
+let logger = null;
+let stack = null;          // running stack: { frontendUrl, admin, stop, children }
+let pending = null;        // stack still starting, so quit can stop it mid-start
+let startupWindow = null;
 let mainWindow = null;
-let backendProcess = null;
-let frontendProcess = null;
-let pgInstance = null;     // EmbeddedPostgres instance
-let isQuitting = false;    // guard against double-quit loop during async cleanup
-let startupLogPath = null;
+let isQuitting = false;
+let lastError = null;
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────────────────────────────────────
-
-/**
- * Poll http://localhost:<port><requestPath> until it responds (any status) or times out.
- */
-function waitForHttpEndpoint(port, requestPath = '/', timeoutMs = STARTUP_TIMEOUT_MS) {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + timeoutMs;
-
-    function attempt() {
-      const req = http.get({ host: '127.0.0.1', port, path: requestPath }, (res) => {
-        res.resume(); // drain the response body to release the socket
-        resolve();
-      });
-      req.setTimeout(1000);
-      req.on('error', () => {
-        if (Date.now() >= deadline) {
-          reject(new Error(`Server on port ${port} did not start within ${timeoutMs / 1000}s`));
-        } else {
-          setTimeout(attempt, POLL_INTERVAL_MS);
-        }
-      });
-      req.on('timeout', () => {
-        req.destroy();
-        if (Date.now() >= deadline) {
-          reject(new Error(`Server on port ${port} did not start within ${timeoutMs / 1000}s`));
-        } else {
-          setTimeout(attempt, POLL_INTERVAL_MS);
-        }
-      });
-    }
-
-    attempt();
-  });
+function argValue(name) {
+  const i = process.argv.indexOf(name);
+  return i === -1 ? null : process.argv[i + 1];
 }
 
-function appendStartupLog(line) {
-  if (!startupLogPath) return;
-  try {
-    fs.appendFileSync(startupLogPath, `${new Date().toISOString()} ${line}\n`);
-  } catch (error) {
-    console.error('[WARN] Failed to write startup log:', error && error.message ? error.message : error);
-  }
+if (IS_SMOKE_TEST) {
+  // Never touch the user's real data from a smoke test.
+  const dir = argValue('--smoke-data-dir') || fs.mkdtempSync(path.join(os.tmpdir(), 'cw-smoke-'));
+  app.setPath('userData', dir);
+  process.env.CW_DESKTOP_LOG_STDOUT = '1';
+} else if (!app.requestSingleInstanceLock()) {
+  // A second launch (double-click while starting is common) must not start a
+  // second stack on the same database and ports. The first instance focuses.
+  app.exit(0);
 }
 
-function logStartup(level, message) {
-  const line = `[${level.toUpperCase()}] ${message}`;
-  if (level === 'error') {
-    console.error(line);
-  } else if (level === 'warn') {
-    console.warn(line);
-  } else {
-    console.log(line);
-  }
-  appendStartupLog(line);
+function dataDir() {
+  return app.getPath('userData');
 }
 
-function logStartupError(message, error) {
-  const detail = error && error.stack ? error.stack : (error && error.message ? error.message : String(error));
-  logStartup('error', `${message}: ${detail}`);
-}
-
-function pipeProcessOutput(label, chunk, isError = false) {
-  const text = chunk.toString();
-  const prefixed = `[${label}] ${text}`;
-  if (isError) {
-    process.stderr.write(prefixed);
-  } else {
-    process.stdout.write(prefixed);
-  }
-
-  const normalized = text.replace(/\r\n/g, '\n').split('\n');
-  for (const line of normalized) {
-    if (!line) continue;
-    appendStartupLog(`[${label}] ${line}`);
-  }
-}
-
-function setupStartupLogging() {
-  const logsDir = path.join(app.getPath('userData'), 'logs');
-  fs.mkdirSync(logsDir, { recursive: true });
-  startupLogPath = path.join(logsDir, 'startup.log');
-  appendStartupLog('============================================================');
-  appendStartupLog(`Desktop startup initiated${IS_SMOKE_TEST ? ' (smoke-test mode)' : ''}`);
-  appendStartupLog('============================================================');
-}
-
-/**
- * Open a URL in the system browser.
- * Only http: and https: schemes are permitted to prevent a compromised renderer
- * from opening file:, javascript:, or other dangerous URI schemes.
- */
 function openSafeExternal(url) {
   try {
     const { protocol } = new URL(url);
-    if (protocol === 'http:' || protocol === 'https:') {
-      shell.openExternal(url).catch((err) => {
-        console.error(`Failed to open external URL: ${err.message}`);
-      });
-    }
+    if (protocol === 'http:' || protocol === 'https:') shell.openExternal(url);
   } catch (_) {
-    // ignore malformed URLs
+    // Ignore malformed URLs.
   }
 }
 
-/**
- * Spawn a Node.js child process and pipe its stdio to the Electron console.
- */
-function spawnNode(scriptPath, cwd, env = {}) {
-  const child = spawn(NODE_BINARY, [scriptPath], {
-    cwd,
-    env: {
-      ...process.env,
-      // Required so process.execPath (the Electron binary) behaves as a plain
-      // Node.js runtime instead of launching another Electron window.
-      ELECTRON_RUN_AS_NODE: '1',
-      ...env,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  const label = path.basename(cwd);
-  child.stdout.on('data', (d) => pipeProcessOutput(label, d));
-  child.stderr.on('data', (d) => pipeProcessOutput(label, d, true));
-  child.on('exit', (code, signal) => {
-    logStartup('info', `[${label}] exited — code=${code} signal=${signal}`);
-  });
-
-  return child;
-}
-
-/**
- * Run a Node.js script to completion and return a Promise that resolves when
- * the script exits with code 0, or rejects when it exits with a non-zero code.
- * Unlike spawnNode(), this is intended for one-shot scripts (e.g. migrations)
- * rather than long-running servers.
- */
-function runNodeScriptToCompletion(scriptPath, cwd, env = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(NODE_BINARY, [scriptPath], {
-      cwd,
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1',
-        ...env,
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    const label = path.basename(scriptPath, '.js');
-    child.stdout.on('data', (d) => pipeProcessOutput(label, d));
-    child.stderr.on('data', (d) => pipeProcessOutput(label, d, true));
-
-    child.on('error', (err) => reject(err));
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`${label} exited with code ${code}`));
-      }
-    });
-  });
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Embedded PostgreSQL
-// ──────────────────────────────────────────────────────────────────────────────
-
-/**
- * Load stored DB credentials from disk, or generate and persist fresh ones.
- * Credentials are kept in a JSON file inside app.getPath('userData') so they
- * survive app restarts without being stored in environment variables.
- */
-function loadOrCreateCredentials() {
-  const credFile = path.join(app.getPath('userData'), 'db-credentials.json');
-
-  if (fs.existsSync(credFile)) {
-    try {
-      return JSON.parse(fs.readFileSync(credFile, 'utf8'));
-    } catch (_) {
-      // File was corrupt — fall through to regenerate
-    }
-  }
-
-  const creds = {
-    user: 'postgres',
-    // 16 random bytes = 32 hex chars; 128 bits of entropy — more than enough
-    // for a local-only loopback database connection.
-    password: crypto.randomBytes(16).toString('hex'),
-  };
-
-  // mode 0o600: owner read/write only — credentials are sensitive
-  fs.writeFileSync(credFile, JSON.stringify(creds, null, 2), { mode: 0o600 });
-  return creds;
-}
-
-function loadOrCreateJwtSecret() {
-  const secretFile = path.join(app.getPath('userData'), 'jwt-secret');
-
-  if (fs.existsSync(secretFile)) {
-    try {
-      const stats = fs.statSync(secretFile);
-      if ((stats.mode & GROUP_OTHER_PERMISSIONS_MASK) !== 0) {
-        logStartup('warn', `Desktop JWT secret at ${secretFile} has permissions broader than 0600; tightening them.`);
-        fs.chmodSync(secretFile, 0o600);
-      }
-      const secret = fs.readFileSync(secretFile, 'utf8').trim();
-      if (secret.length >= MIN_JWT_SECRET_LENGTH) {
-        return secret;
-      }
-      logStartup('warn', `Desktop JWT secret at ${secretFile} is invalid; regenerating it.`);
-    } catch (error) {
-      logStartup('warn', `Desktop JWT secret at ${secretFile} could not be read (${error.message}); regenerating it.`);
-    }
-  }
-
-  const secret = crypto.randomBytes(JWT_SECRET_BYTES).toString('hex');
-  fs.writeFileSync(secretFile, `${secret}\n`, { mode: 0o600 });
-  // Ensure permissions are tightened even if the mode flag was ignored on overwrite
-  fs.chmodSync(secretFile, 0o600);
-  return secret;
-}
-
-function loadOrCreateHexSecret(fileName, byteLength, label) {
-  const secretFile = path.join(app.getPath('userData'), fileName);
-  const expectedLength = byteLength * 2;
-
-  if (fs.existsSync(secretFile)) {
-    try {
-      const stats = fs.statSync(secretFile);
-      if ((stats.mode & GROUP_OTHER_PERMISSIONS_MASK) !== 0) {
-        logStartup('warn', `${label} at ${secretFile} has permissions broader than 0600; tightening them.`);
-        fs.chmodSync(secretFile, 0o600);
-      }
-
-      const secret = fs.readFileSync(secretFile, 'utf8').trim();
-      if (/^[0-9a-f]+$/i.test(secret) && secret.length === expectedLength) {
-        return secret;
-      }
-
-      logStartup('warn', `${label} at ${secretFile} is invalid; regenerating it.`);
-    } catch (error) {
-      logStartup('warn', `${label} at ${secretFile} could not be read (${error.message}); regenerating it.`);
-    }
-  }
-
-  const secret = crypto.randomBytes(byteLength).toString('hex');
-  fs.writeFileSync(secretFile, `${secret}\n`, { mode: 0o600 });
-  fs.chmodSync(secretFile, 0o600);
-  return secret;
-}
-
-function getMaxFileMtime(dirPath) {
-  let maxMtime = 0;
+function isAppUrl(url) {
+  if (!stack) return false;
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        maxMtime = Math.max(maxMtime, getMaxFileMtime(fullPath));
-      } else if (entry.isFile()) {
-        const stat = fs.statSync(fullPath);
-        maxMtime = Math.max(maxMtime, stat.mtimeMs);
-      }
-    }
-  } catch (err) {
-    // Directory may not exist yet on first run; other errors are logged for debugging
-    if (err.code !== 'ENOENT') {
-      console.warn(`getMaxFileMtime: unexpected error reading ${dirPath}: ${err.message}`);
-    }
-  }
-  return maxMtime;
-}
-
-function syncLocalStandaloneAssets(frontendDir) {
-  const sourceBuildIdPath = path.join(RESOURCES_ROOT, 'frontend', 'build', 'BUILD_ID');
-  const sourcePublicDir = path.join(RESOURCES_ROOT, 'frontend', 'public');
-  const standaloneBuildDir = path.join(frontendDir, 'build');
-  const staticTargetDir = path.join(standaloneBuildDir, 'static');
-  const publicTargetDir = path.join(frontendDir, 'public');
-  const markerFile = path.join(frontendDir, '.asset-sync-marker');
-  const sourceBuildId = fs.readFileSync(sourceBuildIdPath, 'utf8').trim();
-  // Use max file mtime recursively for reliable change detection
-  const publicMtime = String(Math.trunc(getMaxFileMtime(sourcePublicDir)));
-  const markerValue = `${sourceBuildId}:${publicMtime}`;
-  const currentMarker = fs.existsSync(markerFile) ? fs.readFileSync(markerFile, 'utf8').trim() : '';
-
-  if (
-    currentMarker === markerValue &&
-    fs.existsSync(staticTargetDir) &&
-    fs.existsSync(publicTargetDir)
-  ) {
-    return;
-  }
-
-  fs.cpSync(path.join(RESOURCES_ROOT, 'frontend', 'build', 'static'), staticTargetDir, {
-    recursive: true,
-    force: true,
-  });
-  fs.cpSync(sourcePublicDir, publicTargetDir, {
-    recursive: true,
-    force: true,
-  });
-  fs.writeFileSync(markerFile, `${markerValue}\n`);
-}
-
-/**
- * Start the embedded PostgreSQL instance, initialise it on first run, and
- * ensure the 'controlweave' application database exists.
- *
- * @returns {Promise<string>} The DATABASE_URL to inject into the backend process.
- */
-function getCorruptDataDirPath(dataDir) {
-  const suffix = crypto.randomBytes(6).toString('hex');
-  const corruptDir = `${dataDir}-corrupt-${suffix}`;
-
-  if (fs.existsSync(corruptDir)) {
-    throw new Error(`Unable to allocate a backup directory for invalid embedded PostgreSQL data at ${dataDir}`);
-  }
-
-  return corruptDir;
-}
-
-function shouldInitialiseEmbeddedPostgres(dataDir) {
-  const versionFile = path.join(dataDir, 'PG_VERSION');
-
-  if (fs.existsSync(versionFile)) {
+    return new URL(url).origin === new URL(stack.frontendUrl).origin;
+  } catch (_) {
     return false;
   }
-
-  if (!fs.existsSync(dataDir)) {
-    return true;
-  }
-
-  let entries;
-  try {
-    entries = fs.readdirSync(dataDir);
-  } catch (err) {
-    throw new Error(`Unable to read embedded PostgreSQL data directory ${dataDir}: ${err.message}`);
-  }
-
-  if (entries.length === 0) {
-    return true;
-  }
-
-  const corruptDir = getCorruptDataDirPath(dataDir);
-  try {
-    fs.renameSync(dataDir, corruptDir);
-  } catch (err) {
-    throw new Error(
-      `Unable to move invalid embedded PostgreSQL data directory from ${dataDir} to ${corruptDir}: ${err.message}`
-    );
-  }
-  logStartup('warn', `Moved invalid embedded PostgreSQL data directory to ${corruptDir}`);
-  return true;
 }
 
-async function startEmbeddedPostgres() {
-  const dataDir = path.join(app.getPath('userData'), 'pgdata');
-  const creds = loadOrCreateCredentials();
-  const shouldInitialise = shouldInitialiseEmbeddedPostgres(dataDir);
+// ---------------------------------------------------------------------------
+// Startup window
+// ---------------------------------------------------------------------------
 
-  pgInstance = new EmbeddedPostgres({
-    databaseDir: dataDir,
-    user: creds.user,
-    password: creds.password,
-    port: EMBEDDED_PG_PORT,
-    initdbFlags: ['--encoding=UTF8'],
-    persistent: true,         // keep data between app restarts
+function sendStartup(event) {
+  if (startupWindow && !startupWindow.isDestroyed()) startupWindow.webContents.send('startup:event', event);
+}
+
+function createStartupWindow() {
+  startupWindow = new BrowserWindow({
+    width: 560,
+    height: 520,
+    resizable: false,
+    maximizable: false,
+    title: 'ControlWeave',
+    icon: path.join(__dirname, 'build', 'icon.png'),
+    backgroundColor: '#0f172a',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'startup-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
-
-  if (shouldInitialise) {
-    await pgInstance.initialise();
-  }
-  await pgInstance.start();
-
-  // Ensure the application database exists (first-run setup)
-  const client = pgInstance.getPgClient();
-  await client.connect();
-  try {
-    const res = await client.query(
-      "SELECT 1 FROM pg_database WHERE datname = 'controlweave'"
-    );
-    if (res.rows.length === 0) {
-      await client.query('CREATE DATABASE controlweave');
-      logStartup('info', 'Created application database: controlweave');
-    }
-  } finally {
-    await client.end();
-  }
-
-  // URL-encode the password in case it contains special characters
-  const encodedPassword = encodeURIComponent(creds.password);
-  return `postgresql://${creds.user}:${encodedPassword}@127.0.0.1:${EMBEDDED_PG_PORT}/controlweave`;
+  startupWindow.setMenuBarVisibility(false);
+  startupWindow.loadFile(path.join(__dirname, 'startup.html'));
+  startupWindow.once('ready-to-show', () => startupWindow.show());
+  startupWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  startupWindow.on('closed', () => {
+    startupWindow = null;
+    if (!mainWindow && !isQuitting) app.quit();
+  });
+  return new Promise((resolve) => startupWindow.webContents.once('did-finish-load', resolve));
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Server startup
-// ──────────────────────────────────────────────────────────────────────────────
+function fromStartupWindow(event) {
+  return startupWindow && event.sender === startupWindow.webContents;
+}
 
-/**
- * Run all pending database migrations against the embedded PostgreSQL instance.
- * Uses backend/scripts/migrate-all.js which is idempotent — already-applied
- * migrations are skipped, so this is safe to call on every app launch.
- */
-async function runMigrations(backendDir, databaseUrl) {
-  const migrateScript = path.join(backendDir, 'scripts', 'migrate-all.js');
-
-  if (!fs.existsSync(migrateScript)) {
-    throw new Error(`Migration script not found: ${migrateScript}`);
-  }
-
-  await runNodeScriptToCompletion(migrateScript, backendDir, {
-    NODE_ENV: 'production',
-    DATABASE_URL: databaseUrl,
-    DESKTOP_SCHEMA_RECONCILE_FIRST: 'true',
+function registerStartupIpc() {
+  ipcMain.handle('startup:info', (event) => {
+    if (!fromStartupWindow(event)) return null;
+    return { version: app.getVersion(), steps: STEPS, logPath: logger ? logger.filePath : null };
+  });
+  ipcMain.handle('startup:retry', (event) => {
+    if (fromStartupWindow(event)) launch();
+  });
+  ipcMain.handle('startup:open-logs', (event) => {
+    if (fromStartupWindow(event) && logger) shell.openPath(logger.logsDir);
+  });
+  ipcMain.handle('startup:copy', (event, what) => {
+    if (!fromStartupWindow(event)) return;
+    const admin = loadAdminCredentials(dataDir());
+    const values = {
+      email: admin.email,
+      password: admin.password,
+      details: lastError ? formatErrorReport(lastError) : '',
+    };
+    if (Object.prototype.hasOwnProperty.call(values, what)) clipboard.writeText(values[what]);
+  });
+  ipcMain.handle('startup:continue', (event) => {
+    if (!fromStartupWindow(event) || !stack) return;
+    const admin = loadAdminCredentials(dataDir());
+    saveAdminCredentials(dataDir(), { ...admin, shownToUser: true });
+    openMainWindow();
+  });
+  ipcMain.handle('startup:quit', (event) => {
+    if (fromStartupWindow(event)) app.quit();
   });
 }
 
-/**
- * Common logic for spawning a bundled server and waiting for it to be ready.
- * Returns the child process so the caller can track it for graceful shutdown.
- */
-function startServer(label, dirPath, scriptRelPath, port, extraEnv = {}) {
-  const serverScript = path.join(dirPath, scriptRelPath);
+function formatErrorReport(error) {
+  return [
+    `ControlWeave ${app.getVersion()} on ${process.platform}-${process.arch}`,
+    `Step: ${error.step || 'unknown'}`,
+    `Error: ${error.message}`,
+    error.hint ? `Hint: ${error.hint}` : null,
+    '',
+    ...(error.output || []),
+    '',
+    `Log: ${logger ? logger.filePath : 'unavailable'}`,
+  ].filter((line) => line !== null).join('\n');
+}
 
-  if (!fs.existsSync(serverScript)) {
-    throw new Error(`${label} entry point not found: ${serverScript}`);
+// ---------------------------------------------------------------------------
+// Main window
+// ---------------------------------------------------------------------------
+
+function openMainWindow() {
+  if (mainWindow) {
+    mainWindow.focus();
+    return;
   }
-
-  const proc = spawnNode(serverScript, dirPath, {
-    NODE_ENV: 'production',
-    PORT: String(port),
-    ...extraEnv,
-  });
-
-  return { proc, ready: waitForHttpEndpoint(port) };
-}
-
-function startBackend(backendDir, databaseUrl) {
-  // Generate a random password for the default platform admin to avoid
-  // shipping a known credential that is reachable on the network.
-  const generatedPassword = `CW-${crypto.randomBytes(12).toString('base64url')}!1`;
-  const jwtSecret = loadOrCreateJwtSecret();
-  const encryptionKey = loadOrCreateHexSecret('encryption-key', 32, 'Desktop encryption key');
-  const hmacKey = loadOrCreateHexSecret('hmac-key', 48, 'Desktop HMAC key');
-
-  const { proc, ready } = startServer('Backend', backendDir, path.join('src', 'server.js'), BACKEND_PORT, {
-    // Allow the frontend origin so CORS is satisfied
-    CORS_ORIGIN: `http://localhost:${FRONTEND_PORT}`,
-    // Inject the embedded-postgres connection string so the backend never
-    // needs an external DATABASE_URL in the environment or .env file.
-    DATABASE_URL: databaseUrl,
-    // Bind to loopback only — never expose the desktop backend on the LAN
-    HOST: '127.0.0.1',
-    // Frontend URL for CORS and email links
-    FRONTEND_URL: `http://localhost:${FRONTEND_PORT}`,
-    // Auto-provision a platform admin on first desktop launch so the user
-    // can sign in immediately without running any CLI seed scripts.
-    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || encryptionKey,
-    HMAC_KEY: process.env.HMAC_KEY || hmacKey,
-    JWT_SECRET: jwtSecret,
-    PLATFORM_ADMIN_EMAIL: process.env.PLATFORM_ADMIN_EMAIL || 'admin@controlweave.local',
-    PLATFORM_ADMIN_PASSWORD: process.env.PLATFORM_ADMIN_PASSWORD || generatedPassword,
-    PLATFORM_ADMIN_FIRST_NAME: process.env.PLATFORM_ADMIN_FIRST_NAME || 'Platform',
-    PLATFORM_ADMIN_LAST_NAME: process.env.PLATFORM_ADMIN_LAST_NAME || 'Admin',
-    PLATFORM_ADMIN_ORG: process.env.PLATFORM_ADMIN_ORG || 'ControlWeave Desktop',
-  });
-  backendProcess = proc;
-  return ready;
-}
-
-function startFrontend() {
-  const frontendDir = app.isPackaged
-    ? path.join(RESOURCES_ROOT, 'frontend-standalone')
-    : path.join(RESOURCES_ROOT, 'frontend', 'build', 'standalone');
-
-  if (!app.isPackaged) {
-    syncLocalStandaloneAssets(frontendDir);
-  }
-
-  const { proc, ready } = startServer('Frontend', frontendDir, 'server.js', FRONTEND_PORT, {
-    HOSTNAME: '127.0.0.1',
-    // Tell the Next.js rewrite where the backend lives
-    BACKEND_ORIGIN: `http://localhost:${BACKEND_PORT}`,
-  });
-  frontendProcess = proc;
-  return ready;
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Window creation
-// ──────────────────────────────────────────────────────────────────────────────
-
-function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 960,
     minHeight: 600,
-    title: 'ControlWeave — AI GRC Platform',
+    title: 'ControlWeave',
+    icon: path.join(__dirname, 'build', 'icon.png'),
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
       contextIsolation: true,
+      nodeIntegration: false,
       sandbox: true,
     },
-    icon: path.join(__dirname, 'build', 'icon.png'),
-    show: false, // shown only after ready-to-show
   });
 
-  mainWindow.loadURL(`http://localhost:${FRONTEND_PORT}`);
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
-
-  // Open external links in the system browser instead of a new Electron window.
-  // openSafeExternal() validates the scheme so only http:/https: URLs are opened.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://localhost')) return { action: 'allow' };
+    if (isAppUrl(url)) return { action: 'allow' };
     openSafeExternal(url);
     return { action: 'deny' };
   });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    openSafeExternal(url);
+  });
 
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    if (startupWindow && !startupWindow.isDestroyed()) startupWindow.destroy();
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+  // The site root is the marketing homepage; an installed app opens at sign-in.
+  mainWindow.loadURL(`${stack.frontendUrl}/login`);
+  initAutoUpdater(mainWindow);
+}
+
+// ---------------------------------------------------------------------------
+// Stack lifecycle
+// ---------------------------------------------------------------------------
+
+/** If the API or interface dies while the app is open, offer a restart. */
+function watchForCrashes(running) {
+  for (const child of running.children) {
+    child.exited.then(async ({ code }) => {
+      if (isQuitting || stack !== running || running.crashed) return;
+      running.crashed = true;
+      logger.log('error', `A server process exited unexpectedly (code ${code}).`);
+      const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+        type: 'error',
+        title: 'ControlWeave stopped',
+        message: 'Part of ControlWeave stopped unexpectedly.',
+        detail: `Your data is safe. Restart to continue.\n\nLog: ${logger.filePath}`,
+        buttons: ['Restart', 'Quit'],
+        defaultId: 0,
+      });
+      if (response !== 0) {
+        app.quit();
+        return;
+      }
+      const old = stack;
+      stack = null;
+      await old.stop();
+      // Open the startup window first: closing the last window quits the app.
+      await createStartupWindow();
+      if (mainWindow) mainWindow.destroy();
+      launch();
+    });
+  }
+}
+
+let launching = false;
+async function launch() {
+  if (launching || stack) return;
+  launching = true;
+  lastError = null;
+  logger = createLogger(path.join(dataDir(), 'logs'));
+  logger.log('info', `ControlWeave ${app.getVersion()} starting (${process.platform}-${process.arch}, packaged=${app.isPackaged})`);
+  sendStartup({ type: 'reset' });
+
+  try {
+    pending = createStack({
+      dataDir: dataDir(),
+      appRoot: __dirname,
+      resourcesRoot: RESOURCES_ROOT,
+      isPackaged: app.isPackaged,
+      nodeBinary: process.execPath,
+      logger,
+      onStep: (id, status) => sendStartup({ type: 'step', id, status }),
+    });
+    const info = await pending.start();
+    stack = { ...info, stop: pending.stop, children: pending.children };
+    logger.log('info', `Ready at ${stack.frontendUrl}`);
+    watchForCrashes(stack);
+
+    if (!stack.admin.shownToUser) {
+      sendStartup({ type: 'first-run', email: stack.admin.email, password: stack.admin.password });
+    } else {
+      openMainWindow();
+    }
+  } catch (error) {
+    lastError = error;
+    logger.log('error', formatErrorReport(error));
+    sendStartup({
+      type: 'error',
+      message: error.message,
+      hint: error.hint || null,
+      output: (error.output || []).slice(-12),
+      logPath: logger.filePath,
+    });
+  } finally {
+    pending = null;
+    launching = false;
+  }
+}
+
+async function runSmokeTest() {
+  const deadline = setTimeout(() => {
+    process.stderr.write(`Smoke test exceeded ${SMOKE_DEADLINE_MS / 60000} minutes\n`);
+    app.exit(1);
+  }, SMOKE_DEADLINE_MS);
+
+  logger = createLogger(path.join(dataDir(), 'logs'));
+  let code = 0;
+  let running = null;
+  try {
+    running = await startStack({
+      dataDir: dataDir(),
+      appRoot: __dirname,
+      resourcesRoot: RESOURCES_ROOT,
+      isPackaged: app.isPackaged,
+      nodeBinary: process.execPath,
+      logger,
+    });
+    await verifySignIn(running);
+    logger.log('info', 'Smoke test passed: stack started and the administrator signed in.');
+  } catch (error) {
+    code = 1;
+    logger.log('error', `Smoke test failed: ${error.message}`);
+    for (const line of error.output || []) logger.log('error', `  | ${line}`);
+  } finally {
+    if (running) await running.stop();
+    clearTimeout(deadline);
+  }
+  // app.quit() is asynchronous and can leave helper processes holding the CI
+  // step open; exit immediately with the result instead.
+  app.exit(code);
+}
+
+// ---------------------------------------------------------------------------
+// Menu
+// ---------------------------------------------------------------------------
+
+function showSignInDetails() {
+  const admin = loadAdminCredentials(dataDir());
+  dialog.showMessageBox(mainWindow || undefined, {
+    type: 'info',
+    title: 'First-run sign-in details',
+    message: 'The administrator account created on first launch',
+    detail: `Email: ${admin.email}\nInitial password: ${admin.password}\n\nIf you changed the password inside ControlWeave, use your new password instead.`,
+    buttons: ['Copy password', 'Close'],
+    defaultId: 1,
+  }).then(({ response }) => {
+    if (response === 0) clipboard.writeText(admin.password);
   });
 }
 
 function buildMenu() {
+  const viewItems = [
+    { role: 'reload' },
+    { type: 'separator' },
+    { role: 'resetZoom' },
+    { role: 'zoomIn' },
+    { role: 'zoomOut' },
+    { type: 'separator' },
+    { role: 'togglefullscreen' },
+  ];
+  if (!app.isPackaged) viewItems.push({ role: 'toggleDevTools' });
+
   const template = [
-    {
-      label: 'File',
-      submenu: [{ role: 'quit' }],
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+    { label: 'File', submenu: [{ role: process.platform === 'darwin' ? 'close' : 'quit' }] },
+    { role: 'editMenu' },
+    { label: 'View', submenu: viewItems },
     {
       label: 'Help',
       submenu: [
-        {
-          label: 'Check for Updates…',
-          click: () => checkForUpdatesManual(),
-        },
+        { label: 'Check for Updates...', click: () => checkForUpdatesManual() },
         { type: 'separator' },
-        {
-          label: 'Documentation',
-          click: () => openSafeExternal('https://github.com/sherifconteh-collab/ai-grc-platform'),
-        },
-        {
-          label: 'Report Issue',
-          click: () =>
-            openSafeExternal(
-              'https://github.com/sherifconteh-collab/ai-grc-platform/issues'
-            ),
-        },
+        { label: 'Show First-Run Sign-In Details', click: showSignInDetails },
+        { label: 'Open Logs Folder', click: () => shell.openPath(path.join(dataDir(), 'logs')) },
+        { type: 'separator' },
+        { label: 'Documentation', click: () => openSafeExternal(REPO_URL) },
+        { label: 'Report Issue', click: () => openSafeExternal(`${REPO_URL}/issues`) },
       ],
     },
   ];
-
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Lifecycle
-// ──────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// App lifecycle
+// ---------------------------------------------------------------------------
+
+app.on('second-instance', () => {
+  const win = mainWindow || startupWindow;
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
 
 app.whenReady().then(async () => {
-  setupStartupLogging();
-  logStartup('info', `Startup logging enabled at ${startupLogPath}`);
-  buildMenu();
-
-  // Respond to renderer requests for the app version.
-  ipcMain.handle('get-app-version', () => app.getVersion());
-
-  try {
-    // ── Smoke-test fast path ────────────────────────────────────────────────
-    // When launched with --smoke-test (CI build verification), validate that
-    // all critical bundled resources are present and exit immediately.  This
-    // avoids downloading / initialising embedded PostgreSQL and starting
-    // backend & frontend servers, which can easily exceed the CI timeout.
-    if (IS_SMOKE_TEST) {
-      logStartup('info', 'Smoke-test mode: validating bundled resources…');
-
-      validateEmbeddedPostgresRuntime();
-      logStartup('info', 'Embedded PostgreSQL binaries validated');
-      validatePackagedBackendRuntime();
-      logStartup('info', 'Packaged backend runtime validated');
-
-      const backendDir = path.join(RESOURCES_ROOT, 'backend');
-      const frontendDir = app.isPackaged
-        ? path.join(RESOURCES_ROOT, 'frontend-standalone')
-        : path.join(RESOURCES_ROOT, 'frontend', 'build', 'standalone');
-
-      const criticalPaths = [
-        path.join(backendDir, 'src', 'server.js'),
-        path.join(backendDir, 'scripts', 'migrate-all.js'),
-        path.join(backendDir, 'node_modules'),
-        path.join(frontendDir, 'server.js'),
-      ];
-
-      const missing = criticalPaths.filter((p) => !fs.existsSync(p));
-      if (missing.length > 0) {
-        throw new Error(`Missing bundled resources:\n  ${missing.join('\n  ')}`);
-      }
-
-      logStartup('info', 'All critical resources present — smoke test passed');
-      process.exitCode = 0;
-      // app.quit() is graceful/async and can leave GPU/zygote/crashpad helper
-      // processes running long enough to hang the CI smoke-test step; exit
-      // immediately instead since there is no user session to tear down.
-      app.exit(0);
-      return;
-    }
-
-    // ── Normal startup ──────────────────────────────────────────────────────
-  validateEmbeddedPostgresRuntime();
-  logStartup('info', 'Embedded PostgreSQL binaries validated');
-    validatePackagedBackendRuntime();
-    logStartup('info', 'Packaged backend runtime validated');
-
-    logStartup('info', 'Starting embedded PostgreSQL…');
-    const databaseUrl = await startEmbeddedPostgres();
-    logStartup('info', `Embedded PostgreSQL ready on port ${EMBEDDED_PG_PORT}`);
-
-    const backendDir = path.join(RESOURCES_ROOT, 'backend');
-
-    logStartup('info', 'Running database migrations…');
-    await runMigrations(backendDir, databaseUrl);
-    logStartup('info', 'Database migrations complete');
-
-    logStartup('info', 'Starting backend server…');
-    await startBackend(backendDir, databaseUrl);
-    logStartup('info', `Backend ready on port ${BACKEND_PORT}`);
-
-    logStartup('info', 'Starting frontend server…');
-    await startFrontend();
-    logStartup('info', `Frontend ready on port ${FRONTEND_PORT}`);
-
-    createWindow();
-
-    // Initialise the auto-updater after the window is ready so status
-    // events can be forwarded to the renderer.
-    initAutoUpdater(mainWindow);
-  } catch (err) {
-    logStartupError('Desktop startup failed', err);
-    process.exitCode = 1;
-    if (IS_SMOKE_TEST) {
-      // Same reasoning as the success path above: app.quit() is graceful/async
-      // and can let the process report exit code 0 to the CI shell regardless
-      // of process.exitCode, silently passing a smoke test that actually found
-      // a packaging defect. app.exit() forces the exit code immediately.
-      app.exit(1);
-      return;
-    }
-    dialog.showErrorBox(
-      'ControlWeave — Startup Error',
-      [
-        'Failed to start one or more internal servers.',
-        '',
-        err.message,
-        '',
-        `Startup log: ${startupLogPath || 'Unavailable'}`,
-        '',
-        'Please ensure:',
-        '  • No other application is using ports 3000, 3001, or 5433',
-        '  • You have write permission to the application data folder',
-      ].join('\n')
-    );
-    app.quit();
+  if (IS_SMOKE_TEST) {
+    await runSmokeTest();
+    return;
   }
+  if (process.platform === 'win32') app.setAppUserModelId('com.controlweave.desktop');
+  ipcMain.handle('get-app-version', () => app.getVersion());
+  registerStartupIpc();
+  buildMenu();
+  await createStartupWindow();
+  launch();
 });
 
 app.on('activate', () => {
   if (IS_SMOKE_TEST) return;
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (stack && !mainWindow) openMainWindow();
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin' || !stack) app.quit();
 });
 
-function killChildProcesses() {
-  [backendProcess, frontendProcess].forEach((child) => {
-    if (child && !child.killed) {
-      try {
-        child.kill(); // defaults to SIGTERM on Unix, forceful kill on Windows
-      } catch (_) {
-        // ignore
-      }
-    }
-  });
-}
-
-// before-quit fires before the app exits.  We prevent the default quit,
-// perform async cleanup (stop embedded PG), then re-trigger app.quit().
-// The isQuitting flag prevents infinite recursion.
-app.on('before-quit', async (event) => {
-  if (isQuitting) return;
+app.on('before-quit', (event) => {
+  if (isQuitting || IS_SMOKE_TEST) return;
   isQuitting = true;
+  const running = stack || pending;
+  if (!running) return;
   event.preventDefault();
-
-  killChildProcesses();
-
-  if (pgInstance) {
-    try {
-      await pgInstance.stop();
-    } catch (_) {
-      // ignore — we are shutting down regardless
-    }
-    pgInstance = null;
-  }
-
-  app.quit(); // re-trigger; isQuitting is now true so this path is skipped
+  stack = null;
+  pending = null;
+  running.stop()
+    .catch((error) => logger && logger.log('warn', `Shutdown error: ${error.message}`))
+    .finally(() => app.quit());
 });
-
-// Synchronous best-effort cleanup for process.exit (no async possible here).
-process.on('exit', killChildProcesses);
