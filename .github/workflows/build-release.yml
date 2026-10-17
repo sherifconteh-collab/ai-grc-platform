@@ -197,7 +197,9 @@ jobs:
 
       # ── Backend ─────────────────────────────────────────────────────────────
       - name: Install backend dependencies
-        run: npm ci --prefer-offline
+        # Production dependencies only: dev tooling (jest, eslint, babel)
+        # would otherwise be bundled into the installer.
+        run: npm ci --omit=dev --prefer-offline
         working-directory: backend
 
       # ── Frontend ─────────────────────────────────────────────────────────────
@@ -297,30 +299,35 @@ jobs:
         run: node electron/scripts/validate-latest-yml.js
 
       - name: Smoke-test Windows build
-        timeout-minutes: 3
+        # --smoke-test boots the real stack in a throwaway data folder (bundled
+        # PostgreSQL, migrations, API, interface), signs in, shuts down and
+        # exits 0 or 1. It used to only check that files existed, which let
+        # installers that could not start ship as green releases.
+        timeout-minutes: 12
         shell: pwsh
         run: |
-          # Use the unpacked build directly — the NSIS assisted installer
-          # (oneClick=false, perMachine=false) ignores the /D= directory
-          # override in silent mode, so we cannot reliably control where it
-          # installs.  The win-unpacked directory is the same content the
-          # installer would lay down.
+          # Use the unpacked build directly: the NSIS assisted installer
+          # (oneClick=false) ignores /D= in silent mode. win-unpacked is the
+          # same content the installer lays down.
           $exePath = Join-Path 'electron' 'dist' 'win-unpacked' 'ControlWeave.exe'
           if (-not (Test-Path $exePath)) {
             throw "ControlWeave.exe not found at $exePath after build."
           }
-
-          $process = Start-Process -FilePath $exePath -ArgumentList '--smoke-test' -PassThru
-          $process | Wait-Process -Timeout 120 -ErrorAction SilentlyContinue
+          $dataDir = Join-Path $env:RUNNER_TEMP 'cw-smoke'
+          $process = Start-Process -FilePath $exePath -ArgumentList '--smoke-test', '--smoke-data-dir', "`"$dataDir`"" -PassThru
+          $process | Wait-Process -Timeout 600 -ErrorAction SilentlyContinue
+          $log = Join-Path $dataDir 'logs' 'desktop.log'
 
           if (-not $process.HasExited) {
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-            throw "Smoke test timed out after 120 seconds — the application likely hung during startup."
+            if (Test-Path $log) { Get-Content $log -Tail 80 }
+            throw "Smoke test timed out after 10 minutes."
           }
-
           if ($process.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log -Tail 80 }
             throw "Smoke test failed with exit code $($process.ExitCode)."
           }
+          Get-Content $log | Select-String -Pattern '\[(INFO|WARN|ERROR)\]' | Select-Object -Last 15
 
       - name: Verify Windows installer Authenticode signature
         if: >-
@@ -405,7 +412,9 @@ jobs:
             frontend/package-lock.json
 
       - name: Install backend dependencies
-        run: npm ci --prefer-offline
+        # Production dependencies only: dev tooling (jest, eslint, babel)
+        # would otherwise be bundled into the installer.
+        run: npm ci --omit=dev --prefer-offline
         working-directory: backend
 
       - name: Install frontend dependencies
@@ -430,7 +439,7 @@ jobs:
         run: |
           # npm ci only installs the host-arch optionalDependencies. Explicitly
           # install the target arch so the packaged DMG contains postgres/initdb.
-          EP_SPEC=$(node -p "require('./node_modules/embedded-postgres/package.json').version")
+          EP_SPEC=$(node -p "require('./package.json').optionalDependencies['@embedded-postgres/darwin-arm64']")
           echo "Installing @embedded-postgres/darwin-arm64@${EP_SPEC}"
           npm install --no-save "@embedded-postgres/darwin-arm64@${EP_SPEC}"
           test -x node_modules/@embedded-postgres/darwin-arm64/native/bin/postgres
@@ -458,7 +467,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Smoke-test macOS arm64 build
-        timeout-minutes: 3
+        # Boots the real stack, signs in and exits; see the Windows job.
+        timeout-minutes: 12
         shell: bash
         run: |
           app_bins=()
@@ -472,7 +482,11 @@ jobs:
 
           for app_bin in "${app_bins[@]}"; do
             echo "Smoke testing $app_bin"
-            "$app_bin" --smoke-test
+            data_dir="$(mktemp -d)"
+            if ! "$app_bin" --smoke-test --smoke-data-dir "$data_dir"; then
+              tail -n 80 "$data_dir/logs/desktop.log" || true
+              exit 1
+            fi
           done
 
       - name: Upload arm64 DMG to GitHub Release
@@ -539,7 +553,9 @@ jobs:
             frontend/package-lock.json
 
       - name: Install backend dependencies
-        run: npm ci --prefer-offline
+        # Production dependencies only: dev tooling (jest, eslint, babel)
+        # would otherwise be bundled into the installer.
+        run: npm ci --omit=dev --prefer-offline
         working-directory: backend
 
       - name: Install frontend dependencies
@@ -570,7 +586,7 @@ jobs:
           # wanted cpu=x64, current host is arm64 (macos-latest). Force the
           # install with --force and explicit --os/--cpu so the x64 binaries
           # are fetched onto this arm64 runner for packaging.
-          EP_SPEC=$(node -p "require('./node_modules/embedded-postgres/package.json').version")
+          EP_SPEC=$(node -p "require('./package.json').optionalDependencies['@embedded-postgres/darwin-x64']")
           echo "Installing @embedded-postgres/darwin-x64@${EP_SPEC} (cross-arch, forced)"
           npm install --no-save --force --os=darwin --cpu=x64 "@embedded-postgres/darwin-x64@${EP_SPEC}"
           test -x node_modules/@embedded-postgres/darwin-x64/native/bin/postgres
@@ -595,7 +611,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Smoke-test macOS x64 build
-        timeout-minutes: 3
+        # Boots the real stack, signs in and exits; see the Windows job.
+        timeout-minutes: 12
         shell: bash
         run: |
           app_bins=()
@@ -609,7 +626,11 @@ jobs:
 
           for app_bin in "${app_bins[@]}"; do
             echo "Smoke testing $app_bin"
-            "$app_bin" --smoke-test
+            data_dir="$(mktemp -d)"
+            if ! "$app_bin" --smoke-test --smoke-data-dir "$data_dir"; then
+              tail -n 80 "$data_dir/logs/desktop.log" || true
+              exit 1
+            fi
           done
 
       - name: Upload x64 DMG to GitHub Release
@@ -667,7 +688,9 @@ jobs:
             frontend/package-lock.json
 
       - name: Install backend dependencies
-        run: npm ci --prefer-offline
+        # Production dependencies only: dev tooling (jest, eslint, babel)
+        # would otherwise be bundled into the installer.
+        run: npm ci --omit=dev --prefer-offline
         working-directory: backend
 
       - name: Install frontend dependencies
@@ -700,7 +723,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Smoke-test Linux build
-        timeout-minutes: 3
+        # Boots the real stack, signs in and exits; see the Windows job.
+        timeout-minutes: 12
         shell: bash
         run: |
           shopt -s nullglob
@@ -713,8 +737,12 @@ jobs:
           for appimage in "${appimages[@]}"; do
             echo "Smoke testing $appimage"
             chmod +x "$appimage"
-            APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a --server-args='-screen 0 1280x720x24' \
-              "$appimage" --no-sandbox --disable-gpu --smoke-test
+            data_dir="$(mktemp -d)"
+            if ! APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a --server-args='-screen 0 1280x720x24' \
+              "$appimage" --no-sandbox --disable-gpu --smoke-test --smoke-data-dir "$data_dir"; then
+              tail -n 80 "$data_dir/logs/desktop.log" || true
+              exit 1
+            fi
           done
 
       - name: Upload AppImage to GitHub Release

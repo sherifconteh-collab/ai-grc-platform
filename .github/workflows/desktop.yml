@@ -1,0 +1,93 @@
+name: Desktop App
+
+# Boots the desktop stack exactly as the installed app does (bundled
+# PostgreSQL, migrations, API, interface), then signs in through the
+# interface. Runs on every pull request that can change what the desktop app
+# ships, so a change that breaks the installed app fails review instead of a
+# release. The release workflow (build-release.yml) repeats the same check on
+# the packaged installers.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'electron/**'
+      - '.github/workflows/desktop.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'electron/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  stack:
+    name: Desktop stack (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      # The stack runs on plain Node here; the Electron binary is not needed.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      CW_SMOKE_DATA_DIR: ${{ github.workspace }}/desktop-smoke-data
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            electron/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --omit=dev --prefer-offline
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline
+        working-directory: frontend
+
+      - name: Build frontend (standalone)
+        run: npm run build
+        working-directory: frontend
+        env:
+          BACKEND_ORIGIN: http://localhost:3001
+
+      - name: Install launcher dependencies
+        run: npm ci
+        working-directory: electron
+
+      - name: Launcher unit tests
+        run: npm test
+        working-directory: electron
+
+      - name: Boot the stack twice and sign in
+        timeout-minutes: 15
+        run: node scripts/stack-smoke.js --data-dir "${{ env.CW_SMOKE_DATA_DIR }}"
+        working-directory: electron
+
+      - name: Upload launcher logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-logs-${{ matrix.os }}
+          path: ${{ env.CW_SMOKE_DATA_DIR }}/logs/
+          retention-days: 7
