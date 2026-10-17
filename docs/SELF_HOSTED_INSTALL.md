@@ -134,14 +134,76 @@ and the platform administrator manages who has access.
    server and offers no way to switch. In this mode the laptop keeps no
    ControlWeave data of its own: the server holds it and is what you back up.
 
-Scaling:
+## Load balancer and disaster recovery
 
-- **One backend instance** needs nothing more. Rate limits and caches are
-  kept in memory.
-- **More than one backend instance** behind a load balancer needs Redis
-  (`REDIS_URL`), so every instance shares the same rate limits and cache.
-  Without it each instance counts separately. Set `TRUST_PROXY=true` behind
-  any proxy (see `.env.example`).
+Assume a company runs several backend servers behind a load balancer, plus a
+standby copy in a second site. ControlWeave supports that as follows; each
+item is required unless marked otherwise.
+
+**Every backend server, in every site:**
+
+- **The same secrets.** `JWT_SECRET`, `ENCRYPTION_KEY` and `HMAC_KEY` must be
+  identical everywhere. A server with a different `JWT_SECRET` rejects
+  everyone's sign-in. Without the same `ENCRYPTION_KEY` and `HMAC_KEY`,
+  encrypted fields and email lookups can't be read after a failover. Keep
+  them in your secret manager, never in a single site.
+- **Redis** (`REDIS_URL`, plus `REDIS_REQUIRED=true`). Rate limits are then
+  shared rather than counted per server, and live notifications reach people
+  whichever server they are connected to. With `REDIS_REQUIRED=true` a server
+  that cannot reach Redis stops instead of running half-connected. Give the
+  DR site its own Redis; nothing in it needs to survive a failover.
+- **Shared uploads.** Evidence and policy files are written to `UPLOADS_DIR`.
+  Mount the same network share (NFS, EFS, Azure Files) at that path on every
+  server, and replicate it to the DR site. On a local disk, a file uploaded
+  through one server is missing on the others.
+- `TRUST_PROXY=true` (or the number of proxy hops), so rate limits and audit
+  logs see the user's address instead of the load balancer's.
+- `CORS_ORIGIN` and `FRONTEND_URL` set to the one public address
+  (for example `https://grc.yourcompany.com`), the same in both sites.
+
+**The load balancer:**
+
+- Put the public load balancer in front of the frontend servers. Each one
+  forwards `/api/v1` and `/socket.io` to `BACKEND_ORIGIN`, which is read when
+  the frontend is built. Build it with `BACKEND_ORIGIN` set to an internal
+  load balancer in front of the backend servers, using the same internal
+  name in both sites.
+- Health check: `GET /ready` on the backend (port 3001). It returns 503 when
+  that server cannot reach the database, when the database is a read-only
+  replica, or when Redis is required but down. `/health` always returns 200,
+  so use it only as a liveness check, never for routing.
+- Allow WebSocket upgrades on `/socket.io`. If your load balancer cannot,
+  enable sticky sessions instead, because the polling fallback needs them.
+- Sessions need no stickiness. Sign-in uses signed tokens, and refresh
+  tokens, passkey challenges and SSO state are kept in the database.
+
+**Nothing to configure (already safe with several servers):**
+
+- Migrations take a database lock, so servers starting together don't
+  migrate twice.
+- Background jobs (reminders, retention, scheduled reports and nightly
+  backups) run on every server, but each run is claimed in the database
+  (`scheduler_leases` table, using the database clock), so exactly one server
+  does it. `BACKUP_ENABLED=true` can be set everywhere.
+- Settings changed on one server (SMTP, feature flags) reach the others
+  within 5 minutes.
+
+**Disaster recovery:**
+
+- Replicate the database to the DR site (PostgreSQL streaming replication
+  or your provider's cross-region replica). Run the DR servers against that
+  replica. Until it is promoted, `/ready` returns 503 and the background
+  jobs skip themselves, so the standby takes no traffic and sends no
+  reminders.
+- Fail over by promoting the replica, then pointing the public address at
+  the DR load balancer (DNS failover or a global load balancer). Browsers and
+  desktop apps keep the same address, so nobody has to reconfigure anything.
+  The TLS certificate must be valid for that address in both sites.
+- Keep backups outside both sites: set `AWS_S3_BUCKET` (a bucket in a third
+  region, or with cross-region replication), and include the uploads share in
+  your file-level backups.
+- Test failover: promote the replica in a test environment, check `/ready`
+  returns 200 there, sign in, and open an uploaded file.
 
 ## Backups
 
