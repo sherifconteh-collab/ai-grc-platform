@@ -65,7 +65,7 @@ The resulting installer is in `electron/dist/`.
 - **Port 3001 in use:** ControlWeave's API needs local port 3001. Close the other program using it and click **Try again**. The database and interface pick another port automatically if their defaults are taken.
 - **After a crash:** the next launch stops any server the crashed session left running, then starts normally.
 - **Backups:** each time you quit, ControlWeave backs up its database, uploaded files and keys into the `backups` folder of its data folder (one per day, the last 7 kept). **File → Back Up Now** makes one immediately, **File → Export Latest Backup** copies the newest to another disk (do this: a backup on the same disk does not survive the disk), and **File → Restore from Backup** replaces the data of every account in the installation; the data it replaces is kept in `backups/pre-restore-…`. A backup contains the keys that decrypt your data and the first-run administrator password, so keep exports somewhere as protected as the computer.
-- **Several people:** the desktop app only accepts connections from the computer it runs on. For a team, run the server deployment instead ([Self-Hosted Install Guide](./docs/SELF_HOSTED_INSTALL.md)).
+- **Several people:** run the server deployment once for the organization with `REGISTRATION_MODE=invite_only`, invite people from **Settings → Users and roles**, and have them choose **Connect to my organization's server** when the desktop app first starts (or roll it out with `--server=https://your-server`). Each person signs in with their own account; the platform administrator manages them. See [Running for a team](./docs/SELF_HOSTED_INSTALL.md#running-for-a-team).
 </details>
 
 <details>
