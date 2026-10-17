@@ -393,7 +393,8 @@ app.get('/health', async (req, res) => {
 // traffic before it is promoted.
 // Probes come every few seconds from each load balancer node, so the limit
 // sits far above that and only stops a flood from exhausting the pool.
-const readinessRateLimiter = createRateLimiter({ label: 'readiness', windowMs: 60000, max: 600 });
+const expressRateLimit = require('express-rate-limit');
+const readinessRateLimiter = expressRateLimit({ windowMs: 60000, max: 600, standardHeaders: true, legacyHeaders: false });
 
 app.get('/ready', readinessRateLimiter, async (req, res) => {
   const redis = getRedisAdapterStatus();
