@@ -10,13 +10,20 @@
 #   smoke-installed.sh dmg <file.dmg>
 #       Mounts the DMG read-only and runs the app from the mounted volume,
 #       then copies it to /Applications as a user would and runs it there.
+#   smoke-installed.sh binary <app executable>
+#       Runs an app executable directly, e.g. an unpacked build.
 #
-# On failure the tail of the app's desktop.log is printed.
+# A run passes only when the app exits 0 AND its own desktop.log says the
+# smoke test passed, so a script error can never report success without the
+# app having been booted. On failure the tail of desktop.log is printed.
+# Written for bash 3.2, which macOS ships.
 set -euo pipefail
 
-mode="${1:?usage: smoke-installed.sh appimage|dmg <file>}"
-artifact="${2:?usage: smoke-installed.sh appimage|dmg <file>}"
+usage='usage: smoke-installed.sh appimage|dmg|binary <file>'
+mode="${1:?$usage}"
+artifact="${2:?$usage}"
 extra_args=()
+PASS_LINE='Smoke test passed'
 
 run_smoke() {
   local binary="$1" label="$2"
@@ -25,11 +32,17 @@ run_smoke() {
   echo "::group::Smoke test: ${label}"
   echo "binary: ${binary}"
   local status=0
-  "$binary" "${extra_args[@]}" --smoke-test --smoke-data-dir "$data_dir" || status=$?
+  # bash 3.2 treats an empty array as unset under set -u; expand it only when set.
+  "$binary" ${extra_args[@]+"${extra_args[@]}"} --smoke-test --smoke-data-dir "$data_dir" || status=$?
   echo "::endgroup::"
+  local log="$data_dir/logs/desktop.log"
+  if [ "$status" -eq 0 ] && ! grep -q "$PASS_LINE" "$log" 2>/dev/null; then
+    echo "::error::${label} exited 0 but its log does not say the smoke test passed"
+    status=1
+  fi
   if [ "$status" -ne 0 ]; then
     echo "::error::Smoke test failed for ${label} (exit ${status})"
-    tail -n 80 "$data_dir/logs/desktop.log" 2>/dev/null || echo "(no desktop.log was written)"
+    tail -n 80 "$log" 2>/dev/null || echo "(no desktop.log was written)"
     exit "$status"
   fi
   grep -E '\[(INFO|WARN|ERROR)\]' "$data_dir/logs/desktop.log" | grep -v 'exited code' | tail -n 10
@@ -50,7 +63,9 @@ case "$mode" in
   dmg)
     mount_point="$(mktemp -d)"
     hdiutil attach -nobrowse -readonly -mountpoint "$mount_point" "$artifact" >/dev/null
-    trap 'hdiutil detach "$mount_point" -force >/dev/null 2>&1 || true' EXIT
+    # Keep the script's exit code: bash 3.2 otherwise exits with the trap's
+    # last status, which turned a failed run into a pass.
+    trap 'rc=$?; hdiutil detach "$mount_point" -force >/dev/null 2>&1; exit $rc' EXIT
     app="$(find "$mount_point" -maxdepth 1 -name '*.app' -type d | head -n 1)"
     if [ -z "$app" ]; then
       echo "::error::No .app bundle found in ${artifact}"
@@ -65,6 +80,10 @@ case "$mode" in
     ditto "$app" "/Applications/${app_name}"
     run_smoke "/Applications/${app_name}/${executable}" "${app_name} installed in /Applications"
     rm -rf "/Applications/${app_name}"
+    ;;
+
+  binary)
+    run_smoke "$artifact" "$(basename "$artifact")"
     ;;
 
   *)
