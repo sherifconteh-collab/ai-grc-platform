@@ -5,12 +5,25 @@ frontend, and runs them on the user's machine. Electron only provides the
 windows; everything that starts and stops the stack is plain Node in `lib/`,
 so CI boots exactly the code users run.
 
+On first launch the app asks how it will be used:
+
+- **On this computer only** (local): it runs that stack, as above.
+- **Connect to my organization's server** (server): it opens the
+  organization's ControlWeave server (HTTPS only) in the app window and runs
+  nothing locally. Each person signs in with their own account. IT can fix
+  the server with `--server=<url>` or `CONTROLWEAVE_SERVER_URL`, which hides
+  the choice. Installations that already hold local data stay local.
+
+The choice is saved in `connection.json` in the data folder and can be
+changed from the File menu.
+
 ## Layout
 
 | File | Role |
 |---|---|
-| `main.js` | Electron main process: single-instance lock, startup window, app window, menu, quit. |
-| `startup.html`, `startup.js`, `startup-preload.js` | Startup window: step progress, first-run sign-in details, error screen with Try again / Open logs / Copy details. |
+| `main.js` | Electron main process: single-instance lock, connection choice, startup window, app window, menu, quit. |
+| `startup.html`, `startup.js`, `startup-preload.js` | Startup window: local or server choice, step progress, first-run sign-in details, error screen with Try again / Change connection / Open logs / Copy details. |
+| `lib/connection.js` | Local or server mode: address checks (HTTPS except loopback), the `/api/v1/auth/server-info` probe, the saved choice and the IT preset. |
 | `preload.js`, `updater.js` | App window bridge (`window.electronAPI`) and auto-updates. |
 | `lib/stack.js` | Starts database, migrations, API, admin check and interface in order; `stop()` works at any point. |
 | `lib/postgres.js` | Bundled PostgreSQL through its own `initdb` and `pg_ctl`; recovers a server left running by a crash. |
@@ -44,7 +57,8 @@ npm start         # run the app from source
 
 The packaged app accepts `--smoke-test [--smoke-data-dir <dir>]`: it boots
 the full stack in a throwaway data folder, signs in, shuts down and exits 0
-or 1.
+or 1. With `--server=<url>` it only checks that the server answers as a
+ControlWeave server.
 
 `scripts/smoke-installed.sh` (macOS, Linux) and `scripts/smoke-installed.ps1`
 (Windows) install a built artifact the way a user does and run that check from
