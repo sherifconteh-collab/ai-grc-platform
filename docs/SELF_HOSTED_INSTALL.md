@@ -92,6 +92,44 @@ npm start            # listens on port 3001
 
 ---
 
+## Running for a team
+
+The desktop app is for one person on one computer: it only accepts
+connections from that computer. For several people with their own logins,
+run this server deployment and invite them from **Settings → Users and roles**.
+
+- **One backend instance** needs nothing more. Rate limits and caches are
+  kept in memory.
+- **More than one backend instance** behind a load balancer needs Redis
+  (`REDIS_URL`), so every instance shares the same rate limits and cache.
+  Without it each instance counts separately. Set `TRUST_PROXY=true` behind
+  any proxy (see `.env.example`).
+
+## Backups
+
+Set these in the backend environment:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BACKUP_ENABLED` | unset | `true` runs `pg_dump` on a schedule; each run is recorded in `backup_logs` |
+| `BACKUP_CRON_SCHEDULE` | `0 2 * * *` | When to run (cron syntax, server time) |
+| `DB_BACKUP_DIR` | `backend/backups` | Where dumps are written; put it on another disk or volume |
+| `DB_BACKUP_RETENTION_DAYS` | `7` | Dumps older than this are deleted after each run |
+| `DB_BACKUP_FORMAT` | `custom` | `custom` (restore with `pg_restore`) or `plain` (SQL) |
+| `PG_DUMP_PATH` | `pg_dump` | Path to `pg_dump`; it must be installed and the same major version as the server |
+| `AWS_S3_BUCKET`, `AWS_REGION`, `AWS_S3_PREFIX` | unset | Also upload each dump to S3; needs `npm install @aws-sdk/client-s3` in `backend/` |
+
+Platform admins can also start a backup from **Platform Admin → Backups**.
+Test a restore before you need one:
+
+```bash
+createdb controlweave_restore_test
+pg_restore --no-owner --dbname=controlweave_restore_test backend/backups/grc_<stamp>.dump
+```
+
+A database dump does **not** include uploaded files. Back up the uploads
+directory too: `backend/uploads`, or the folder `UPLOADS_DIR` points to.
+
 ## Upgrading an existing deployment
 
 ```bash
