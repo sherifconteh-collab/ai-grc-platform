@@ -95,7 +95,13 @@ function inspectDataDir(dataDir, logger) {
 }
 
 async function initialise(bins, dataDir, creds, logger) {
-  fs.mkdirSync(dataDir, { recursive: true });
+  // initdb must create the data directory itself. Run from an administrator
+  // account on Windows, it restarts with a restricted token that cannot change
+  // permissions on a directory the full-rights process created ("could not
+  // change permissions of directory"). inspectDataDir() only reports
+  // 'missing' for an absent or empty directory, so removing it loses nothing.
+  fs.mkdirSync(path.dirname(dataDir), { recursive: true });
+  fs.rmSync(dataDir, { recursive: true, force: true });
   const pwFile = path.join(path.dirname(dataDir), `.pg-init-${crypto.randomBytes(6).toString('hex')}`);
   fs.writeFileSync(pwFile, `${creds.password}\n`, { mode: 0o600 });
   try {
