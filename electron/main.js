@@ -22,6 +22,8 @@ const { createLogger } = require('./lib/log');
 const { createStack, startStack, STEPS } = require('./lib/stack');
 const { verifySignIn } = require('./lib/verify');
 const { loadAdminCredentials, saveAdminCredentials } = require('./lib/secrets');
+const backup = require('./lib/backup');
+const { BUNDLED_MAJOR } = require('./lib/postgres');
 const { initAutoUpdater, checkForUpdatesManual } = require('./updater');
 
 const IS_SMOKE_TEST = process.argv.includes('--smoke-test');
@@ -35,6 +37,8 @@ let pending = null;        // stack still starting, so quit can stop it mid-star
 let startupWindow = null;
 let mainWindow = null;
 let isQuitting = false;
+let maintenance = false;   // a backup or restore holds the stack stopped
+let quitAfterMaintenance = false;
 let lastError = null;
 
 function argValue(name) {
@@ -321,6 +325,131 @@ async function runSmokeTest() {
 }
 
 // ---------------------------------------------------------------------------
+// Backups
+// ---------------------------------------------------------------------------
+
+/** Daily backup after the database has stopped cleanly. Never blocks quitting on failure. */
+function backupAfterStop(result) {
+  if (!result || !result.databaseStopped) return null;
+  try {
+    const dir = backup.createBackup(dataDir(), { appVersion: app.getVersion() });
+    if (logger) logger.log('info', `Backup saved to ${dir}`);
+    return dir;
+  } catch (error) {
+    if (logger) logger.log('warn', `Backup failed: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Stop the stack, run `work` while the database is down, then start again.
+ * The startup window shows `notice` meanwhile and the restarted progress after.
+ */
+async function withStackStopped(notice, work) {
+  if (!stack || maintenance) return;
+  maintenance = true;
+  const running = stack;
+  stack = null;
+  try {
+    // Open the startup window first: closing the last window quits the app.
+    await createStartupWindow();
+    if (mainWindow) mainWindow.destroy();
+    sendStartup({ type: 'notice', text: notice });
+    const result = await running.stop();
+    if (!result.databaseStopped) throw new Error('The database did not stop, so it was left untouched.');
+    await work();
+  } catch (error) {
+    if (logger) logger.log('error', `${notice} failed: ${error.message}`);
+    await dialog.showMessageBox(startupWindow || undefined, {
+      type: 'error',
+      title: 'ControlWeave',
+      message: `${notice.replace(/\.+$/, '')} failed`,
+      detail: error.message,
+    });
+  } finally {
+    maintenance = false;
+    if (quitAfterMaintenance) app.quit();
+    else launch();
+  }
+}
+
+function backUpNow() {
+  return withStackStopped('Backing up your data...', async () => {
+    const dir = backup.createBackup(dataDir(), { appVersion: app.getVersion() });
+    await dialog.showMessageBox(startupWindow || undefined, {
+      type: 'info',
+      title: 'Backup saved',
+      message: 'Your data is backed up.',
+      detail: `${dir}\n\nUse File > Export Latest Backup to copy it to another disk.`,
+    });
+  });
+}
+
+async function exportLatestBackup() {
+  const [latest] = backup.listBackups(dataDir());
+  if (!latest) {
+    await dialog.showMessageBox(mainWindow || undefined, {
+      type: 'info',
+      title: 'No backup yet',
+      message: 'There is no backup to export yet.',
+      detail: 'ControlWeave backs up when you quit. Use File > Back Up Now to make one immediately.',
+    });
+    return;
+  }
+  const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+    type: 'warning',
+    title: 'Export backup',
+    message: `Export the backup from ${latest.name}?`,
+    detail: 'The backup holds all of this installation\'s data, for every account, together with the keys that decrypt it and the first-run administrator password. Store it only somewhere as protected as this computer.',
+    buttons: ['Choose Folder...', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response !== 0) return;
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow || undefined, {
+    title: 'Export ControlWeave backup to',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (canceled || !filePaths[0]) return;
+  try {
+    const dest = backup.exportBackup(latest.dir, filePaths[0]);
+    await dialog.showMessageBox(mainWindow || undefined, { type: 'info', title: 'Backup exported', message: 'Backup exported.', detail: dest });
+  } catch (error) {
+    await dialog.showMessageBox(mainWindow || undefined, { type: 'error', title: 'Export failed', message: 'The backup could not be exported.', detail: error.message });
+  }
+}
+
+async function restoreFromBackup() {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow || undefined, {
+    title: 'Choose a ControlWeave backup folder',
+    defaultPath: backup.backupsDir(dataDir()),
+    properties: ['openDirectory'],
+  });
+  if (canceled || !filePaths[0]) return;
+  const source = filePaths[0];
+  let manifest;
+  try {
+    manifest = backup.readBackup(source, BUNDLED_MAJOR);
+  } catch (error) {
+    await dialog.showMessageBox(mainWindow || undefined, { type: 'error', title: 'Not a usable backup', message: 'This folder cannot be restored.', detail: error.message });
+    return;
+  }
+  const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+    type: 'warning',
+    title: 'Restore backup',
+    message: `Replace all data in this installation with the backup from ${new Date(manifest.createdAt).toLocaleString()}?`,
+    detail: 'This replaces the data of every account in this installation, and ControlWeave restarts. Your current data is kept in the backups folder (pre-restore), so the restore can be undone.',
+    buttons: ['Restore', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+  });
+  if (response !== 0) return;
+  await withStackStopped('Restoring your backup...', async () => {
+    backup.restoreBackup(dataDir(), source, { bundledMajor: BUNDLED_MAJOR });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Menu
 // ---------------------------------------------------------------------------
 
@@ -352,7 +481,17 @@ function buildMenu() {
 
   const template = [
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
-    { label: 'File', submenu: [{ role: process.platform === 'darwin' ? 'close' : 'quit' }] },
+    {
+      label: 'File',
+      submenu: [
+        { label: 'Back Up Now', click: () => backUpNow() },
+        { label: 'Export Latest Backup...', click: () => exportLatestBackup() },
+        { label: 'Restore from Backup...', click: () => restoreFromBackup() },
+        { label: 'Open Backups Folder', click: () => shell.openPath(backup.backupsDir(dataDir())) },
+        { type: 'separator' },
+        { role: process.platform === 'darwin' ? 'close' : 'quit' },
+      ],
+    },
     { role: 'editMenu' },
     { label: 'View', submenu: viewItems },
     {
@@ -405,14 +544,24 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
-  if (isQuitting || IS_SMOKE_TEST) return;
+  if (IS_SMOKE_TEST) return;
+  if (maintenance) {
+    // Never exit halfway through copying a backup or a restore.
+    event.preventDefault();
+    quitAfterMaintenance = true;
+    return;
+  }
+  if (isQuitting) return;
   isQuitting = true;
   const running = stack || pending;
   if (!running) return;
   event.preventDefault();
+  // Back up only a stack that finished starting, never one stopped mid-start.
+  const fullyStarted = running === stack;
   stack = null;
   pending = null;
   running.stop()
+    .then((result) => { if (fullyStarted) backupAfterStop(result); })
     .catch((error) => logger && logger.log('warn', `Shutdown error: ${error.message}`))
     .finally(() => app.quit());
 });

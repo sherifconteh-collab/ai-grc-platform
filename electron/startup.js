@@ -7,6 +7,7 @@
   let steps = [];
   let loaded = false;
   const queued = [];
+  const defaultNote = document.getElementById('first-launch-note').textContent;
 
   function show(id) {
     for (const name of sections) $(name).hidden = name !== id;
@@ -45,6 +46,12 @@
     if (event.type === 'reset') {
       steps = steps.map((step) => ({ ...step, status: '' }));
       renderSteps();
+      $('first-launch-note').textContent = defaultNote;
+      show('progress');
+    } else if (event.type === 'notice') {
+      // A backup or restore is running with the app stopped.
+      $('steps').replaceChildren();
+      $('first-launch-note').textContent = event.text;
       show('progress');
     } else if (event.type === 'step') {
       setStep(event.id, event.status);

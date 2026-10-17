@@ -16,10 +16,11 @@ so CI boots exactly the code users run.
 | `lib/postgres.js` | Bundled PostgreSQL through its own `initdb` and `pg_ctl`; recovers a server left running by a crash. |
 | `lib/orphans.js` | Stops API and interface processes a crashed launch left behind (they keep port 3001 on Windows). |
 | `lib/secrets.js` | Per-install secrets and the first-run administrator account, kept in the data folder. |
+| `lib/backup.js` | Daily backup on quit (database files, uploads, secrets) while the database is stopped; export; restore that keeps the replaced data in `backups/pre-restore-*` and never takes server configuration from a backup. |
 | `lib/processes.js`, `lib/ports.js`, `lib/log.js`, `lib/verify.js` | Child processes, port selection, `desktop.log`, sign-in check. |
 
 The data folder (`app.getPath('userData')`, named `controlweave-desktop`) holds
-`pgdata/`, `uploads/`, `logs/` and the secret files. Nothing is written to the
+`pgdata/`, `uploads/`, `logs/`, `backups/` and the secret files. Nothing is written to the
 install directory.
 
 ## Ports
@@ -37,6 +38,7 @@ cd frontend && npm run build && cd ../electron
 
 npm test          # launcher unit tests (node:test)
 npm run smoke     # boot the stack twice from plain Node and sign in; no Electron needed
+node scripts/backup-smoke.js   # back up, delete the data, restore, sign in with the original password
 npm start         # run the app from source
 ```
 

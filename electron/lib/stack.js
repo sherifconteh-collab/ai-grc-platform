@@ -129,6 +129,8 @@ function backendEnv(ctx) {
     HMAC_KEY: secrets.hmacKey,
     // The install directory is read-only and replaced on update.
     UPLOADS_DIR: path.join(ctx.dataDir, 'uploads'),
+    // Lets the backend point desktop users at the app's own backups.
+    CONTROLWEAVE_DESKTOP: 'true',
     PLATFORM_ADMIN_EMAIL: admin.email,
     // Only until the backend confirms it; afterwards the user owns the password.
     ...(admin.provisioned ? {} : { PLATFORM_ADMIN_PASSWORD: admin.password }),
@@ -215,15 +217,18 @@ function createStack(opts) {
     return child;
   };
 
+  /** Resolves { databaseStopped } — true when the database was running and is now down. */
   async function stop() {
     stopped = true;
     for (const child of [...children].reverse()) await stopChild(child);
+    let databaseStopped = false;
     if (pg) {
       const running = pg;
       pg = null;
-      await running.stop();
+      databaseStopped = await running.stop();
     }
     orphans.clear(opts.dataDir);
+    return { databaseStopped };
   }
 
   async function boot() {
