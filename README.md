@@ -28,7 +28,7 @@ Desktop builds ship the full open-source feature set. All previously tier-gated 
 
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
-After installing, launch ControlWeave — the app opens directly into the self-hosted sign-in or account-creation flow, and organization invite links land on a dedicated acceptance page. Updates are delivered automatically on packaged release builds, and local unpacked validation runs skip updater checks cleanly when update metadata is absent. Releases are cut automatically on a weekly schedule (see `.claude/rules/releases.md`) and built/published the same way.
+After installing, launch ControlWeave. A startup window shows each step (local database, schema, API server, administrator account, interface). On the first launch it then shows the administrator account it created, `admin@controlweave.local` with a generated password; copy it, click **Open ControlWeave**, and sign in. The password stays available under **Help → Show First-Run Sign-In Details**, and is never reset once the app has set it, so a password you change inside ControlWeave stays changed. Updates are delivered automatically on packaged release builds. Releases are cut automatically on a weekly schedule (see `.claude/rules/releases.md`), and every installer is booted end to end in CI (database, migrations, API, interface, sign-in) before it is published.
 
 > **Windows note:** the `.exe` is not currently Authenticode-signed (no code-signing certificate is configured yet), so Windows SmartScreen may show an "unrecognized app" warning on first launch. This is expected — click **More info → Run anyway** to proceed. This will be resolved once a signing certificate is added.
 
@@ -44,7 +44,10 @@ cd electron && npm install && cd ..
 # 2. Build the Next.js frontend
 cd frontend && npm run build && cd ..
 
-# 3. Build the desktop installer for your platform
+# 3. Boot the desktop stack without Electron and sign in (same code the app runs)
+cd electron && npm run smoke && cd ..
+
+# 4. Build the desktop installer for your platform
 cd electron
 npm run dist:win      # → .exe   (Windows)
 npm run dist:mac      # → .dmg   (macOS)
@@ -52,6 +55,15 @@ npm run dist:linux    # → .AppImage (Linux)
 ```
 
 The resulting installer is in `electron/dist/`.
+</details>
+
+<details>
+<summary>Troubleshooting the desktop app</summary>
+
+- **Startup failed:** the startup window names the step that failed and shows its last output. **Copy details** puts a report on the clipboard for an issue; **Open logs folder** opens `desktop.log` (this launch), `desktop.previous.log` and `postgres.log`.
+- **Data and logs** live in `%APPDATA%\controlweave-desktop` (Windows), `~/Library/Application Support/controlweave-desktop` (macOS) or `~/.config/controlweave-desktop` (Linux). Uploaded files are in its `uploads` folder, outside the install directory, so updates never touch them.
+- **Port 3001 in use:** ControlWeave's API needs local port 3001. Close the other program using it and click **Try again**. The database and interface pick another port automatically if their defaults are taken.
+- **After a crash:** the next launch stops any server the crashed session left running, then starts normally.
 </details>
 
 <details>
