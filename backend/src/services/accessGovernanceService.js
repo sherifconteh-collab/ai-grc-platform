@@ -14,8 +14,9 @@ const { createHash } = require('crypto');
 const pool = require('../config/database');
 const { getRoleFallbackPermissions } = require('../middleware/auth');
 const { decrypt } = require('../utils/encrypt');
+const { UPLOADS_DIR } = require('../config/paths');
 
-const uploadsDir = path.join(__dirname, '../../uploads');
+const uploadsDir = UPLOADS_DIR;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

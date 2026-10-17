@@ -15,11 +15,12 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const { isUuid } = require('../middleware/validate');
 const llm = require('../services/llmService');
 const splunk = require('../services/splunkService');
+const { UPLOADS_DIR } = require('../config/paths');
 
 router.use(authenticate);
 router.use(requireTier('pro'));
 
-const uploadsDir = path.join(__dirname, '../../uploads');
+const uploadsDir = UPLOADS_DIR;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

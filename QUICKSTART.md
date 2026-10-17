@@ -15,7 +15,9 @@ Download the installer for your platform. PostgreSQL is bundled — nothing else
 | macOS (Intel) | [ControlWeave-x64.dmg](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest) |
 | Linux | [ControlWeave.AppImage](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest) |
 
-Launch the app — it opens directly to the sign-in / registration page. Create your account and you're in.
+Launch the app. The first launch sets up a local database (a minute or two), then shows the administrator account it created: `admin@controlweave.local` and a generated password. Copy the password, click **Open ControlWeave**, and sign in. You can see the initial password again under **Help → Show First-Run Sign-In Details**.
+
+If startup fails, the window says which step failed and why, with **Try again**, **Open logs folder** and **Copy details** buttons. ControlWeave needs local port 3001 to be free.
 
 ---
 

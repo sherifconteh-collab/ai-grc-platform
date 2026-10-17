@@ -55,8 +55,14 @@ function canCheckForUpdates() {
  *
  * @param {Electron.BrowserWindow} win  The main application window.
  */
+let initialised = false;
+
 function initAutoUpdater(win) {
   mainWindow = win;
+  // The window can be recreated (restart after a crash, macOS re-activate);
+  // handlers and listeners must only be registered once.
+  if (initialised) return;
+  initialised = true;
 
   // ── IPC handlers (renderer → main) ──────────────────────────────────────
   ipcMain.handle('check-for-updates', async () => {
@@ -100,7 +106,6 @@ function initAutoUpdater(win) {
   });
 
   if (!canCheckForUpdates()) {
-    console.log('[Updater] Skipping auto-update initialization because app-update.yml is not present for this build.');
     return;
   }
 

@@ -14,6 +14,7 @@ const { authenticate, requireTier, requirePermission } = require('../middleware/
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
 const ragService = require('../services/orgRagService');
+const { UPLOADS_DIR } = require('../config/paths');
 
 router.use(authenticate);
 router.use(requireTier('enterprise'));
@@ -23,7 +24,7 @@ router.use(createRateLimiter({ label: 'rag', windowMs: 60 * 1000, max: 30 }));
 // ---------------------------------------------------------------------------
 // File upload config (reuse uploads dir)
 // ---------------------------------------------------------------------------
-const uploadsDir = path.join(__dirname, '../../uploads');
+const uploadsDir = UPLOADS_DIR;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

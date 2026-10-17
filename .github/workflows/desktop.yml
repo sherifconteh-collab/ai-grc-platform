@@ -1,0 +1,199 @@
+name: Desktop App
+
+# Two checks on every pull request that can change what the desktop app
+# ships, on Windows, macOS and Linux, so a change that breaks the installed
+# app fails review instead of a release:
+#
+#   stack      boots the desktop stack from plain Node (bundled PostgreSQL,
+#              migrations, API, interface) twice and signs in.
+#   installer  builds the real installer (.exe, .dmg, AppImage), installs it
+#              the way a user does and boots the installed app with
+#              --smoke-test (scripts/smoke-installed.*). The release workflow
+#              runs the same scripts on the published installers.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'electron/**'
+      - '.github/workflows/desktop.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'electron/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  stack:
+    name: Desktop stack (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      # The stack runs on plain Node here; the Electron binary is not needed.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      CW_SMOKE_DATA_DIR: ${{ github.workspace }}/desktop-smoke-data
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            electron/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --omit=dev --prefer-offline
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline
+        working-directory: frontend
+
+      - name: Build frontend (standalone)
+        run: npm run build
+        working-directory: frontend
+        env:
+          BACKEND_ORIGIN: http://localhost:3001
+
+      - name: Install launcher dependencies
+        run: npm ci
+        working-directory: electron
+
+      - name: Launcher unit tests
+        run: npm test
+        working-directory: electron
+
+      - name: Boot the stack twice and sign in
+        timeout-minutes: 15
+        run: node scripts/stack-smoke.js --data-dir "${{ env.CW_SMOKE_DATA_DIR }}"
+        working-directory: electron
+
+      - name: Upload launcher logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-logs-${{ matrix.os }}
+          path: ${{ env.CW_SMOKE_DATA_DIR }}/logs/
+          retention-days: 7
+
+  installer:
+    name: Installed app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: --linux AppImage
+          - os: windows-latest
+            target: --win nsis
+          - os: macos-latest
+            target: --mac dmg --arm64
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            electron/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --omit=dev --prefer-offline
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline
+        working-directory: frontend
+
+      - name: Build frontend (standalone)
+        run: npm run build
+        working-directory: frontend
+        env:
+          BACKEND_ORIGIN: http://localhost:3001
+
+      - name: Install launcher dependencies
+        run: npm ci
+        working-directory: electron
+
+      - name: Generate placeholder icons (if not present)
+        run: node scripts/generate-icons.js
+        working-directory: electron
+
+      - name: Build installer
+        # electron-builder downloads its NSIS/AppImage tooling from GitHub at
+        # build time; retry a transient failure (see issue #350).
+        shell: bash
+        working-directory: electron
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          # macOS signs thousands of unpacked files; the default open-file
+          # limit trips EMFILE.
+          if [ "$RUNNER_OS" = "macOS" ]; then ulimit -n 10240; fi
+          for attempt in 1 2 3; do
+            # shellcheck disable=SC2086
+            npx electron-builder $TARGET --publish never && exit 0
+            echo "::warning::electron-builder failed (attempt $attempt of 3)"
+            sleep 20
+          done
+          exit 1
+
+      - name: Install FUSE for AppImage
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q libfuse2t64
+
+      - name: Boot the installed AppImage
+        if: runner.os == 'Linux'
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          for appimage in electron/dist/*.AppImage; do
+            bash electron/scripts/smoke-installed.sh appimage "$appimage"
+          done
+
+      - name: Boot the app from the DMG and from /Applications
+        if: runner.os == 'macOS'
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          for dmg in electron/dist/*.dmg; do
+            bash electron/scripts/smoke-installed.sh dmg "$dmg"
+          done
+
+      - name: Install the .exe and boot the installed app
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path electron/dist -Filter 'ControlWeave.Setup.*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer not found in electron/dist.' }
+          ./electron/scripts/smoke-installed.ps1 -Installer $installer.FullName

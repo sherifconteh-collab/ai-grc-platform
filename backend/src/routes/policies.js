@@ -14,6 +14,7 @@ const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const rateLimit = require('express-rate-limit');
 const { generatePolicyFromFrameworks } = require('../services/policyService');
 const { createNotification } = require('../services/notificationService');
+const { UPLOADS_DIR } = require('../config/paths');
 const {
   performGapAnalysis,
   setAsBaseline,
@@ -918,7 +919,7 @@ router.get('/:id/monitoring-alerts', requirePermission('controls.read'), async (
 });
 
 // Configure multer for policy uploads
-const uploadsDir = path.join(__dirname, '../../uploads/policies');
+const uploadsDir = path.join(UPLOADS_DIR, 'policies');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

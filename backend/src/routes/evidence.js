@@ -16,6 +16,7 @@ const evidenceVersions = require('../services/evidenceVersionService');
 const aiSecurity = require('../utils/aiSecurity');
 const { log, serializeError } = require('../utils/logger');
 const { isUuid } = require('../middleware/validate');
+const { UPLOADS_DIR } = require('../config/paths');
 
 // IP-based bound in place before authenticate's DB/JWT work runs, and so CodeQL
 // can trace a recognized rate-limiting middleware covering every route below —
@@ -50,7 +51,7 @@ async function extractTextForRag(filePath, originalName) {
 }
 
 // Configure multer for file uploads
-const uploadsDir = path.join(__dirname, '../../uploads');
+const uploadsDir = UPLOADS_DIR;
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

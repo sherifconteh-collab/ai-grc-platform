@@ -113,7 +113,15 @@ async function runMigrations() {
     const files = getNumberedMigrationEntries(migrationsDir)
       .filter((file) => /^\d+.*\.sql$/.test(file));
 
-    const orderedFiles = reconcileFirst && files.includes(DESKTOP_RECONCILE_FILENAME)
+    // Reconciling first repairs an existing desktop schema before older
+    // migrations touch it. On an empty database there is nothing to repair and
+    // migration 100 references tables (organizations, users) that do not exist
+    // yet, so every fresh desktop install failed here. Run in order instead.
+    const schemaExists = reconcileFirst
+      ? (await client.query("SELECT to_regclass('public.organizations') IS NOT NULL AS present")).rows[0].present
+      : false;
+
+    const orderedFiles = reconcileFirst && schemaExists && files.includes(DESKTOP_RECONCILE_FILENAME)
       ? [DESKTOP_RECONCILE_FILENAME, ...files.filter((file) => file !== DESKTOP_RECONCILE_FILENAME)]
       : files;
 

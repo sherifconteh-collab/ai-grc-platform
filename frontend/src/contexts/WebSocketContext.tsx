@@ -48,6 +48,8 @@ export function WebSocketProvider({ children, token, enabled = true }: WebSocket
     // Create socket connection
     const newSocket = io(wsUrl, {
       auth: { token },
+      // Next.js redirects away a trailing slash; the backend accepts the bare path.
+      addTrailingSlash: false,
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,

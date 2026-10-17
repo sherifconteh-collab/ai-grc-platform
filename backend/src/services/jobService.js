@@ -8,6 +8,7 @@ const { generateReportFile } = require('./scheduledReportService');
 const { sendReportEmail } = require('./emailService');
 const { log, serializeError } = require('../utils/logger');
 const { BASELINE_SCOPE_PREDICATE } = require('./baselineScope');
+const { UPLOADS_DIR } = require('../config/paths');
 
 const SCHEDULE_INTERVAL_MS = Object.freeze({
   daily: 24 * 60 * 60 * 1000,
@@ -393,7 +394,7 @@ async function runScheduledReport({ scheduledReportId, organizationId }) {
 async function runScheduledEvidenceCollection({ organizationId }) {
   const splunkService = require('./splunkService');
 
-  const uploadsDir = path.join(__dirname, '../../uploads');
+  const uploadsDir = UPLOADS_DIR;
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
