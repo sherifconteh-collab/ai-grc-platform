@@ -75,6 +75,10 @@ function initializeWebSocket(httpServer) {
       credentials: true
     },
     path: '/socket.io/',
+    // Accept "/socket.io" as well as "/socket.io/". Behind the Next.js proxy
+    // (same-origin deployments and the desktop app) the client must use the
+    // bare path, because Next.js redirects away the trailing slash.
+    addTrailingSlash: false,
     transports: ['websocket', 'polling'],
     pingTimeout: 60000,
     pingInterval: 25000
