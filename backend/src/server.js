@@ -654,7 +654,7 @@ async function ensurePlatformAdmin() {
 
   const { randomBytes } = require('crypto');
   const bcrypt = require('bcryptjs');
-  const { encrypt } = require('./utils/encrypt');
+  const { encrypt, hashForLookup } = require('./utils/encrypt');
   const { hasPublicColumn } = require('./utils/schema');
   const firstName = String(process.env.PLATFORM_ADMIN_FIRST_NAME || 'Platform').trim();
   const lastName  = String(process.env.PLATFORM_ADMIN_LAST_NAME  || 'Admin').trim();
