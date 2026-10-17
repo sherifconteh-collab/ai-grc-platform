@@ -391,7 +391,11 @@ app.get('/health', async (req, res) => {
 // reach the database (or the Redis adapter it was told it needs), and a
 // standby site whose database is still a read-only replica is not sent
 // traffic before it is promoted.
-app.get('/ready', async (req, res) => {
+// Probes come every few seconds from each load balancer node, so the limit
+// sits far above that and only stops a flood from exhausting the pool.
+const readinessRateLimiter = createRateLimiter({ label: 'readiness', windowMs: 60000, max: 600 });
+
+app.get('/ready', readinessRateLimiter, async (req, res) => {
   const redis = getRedisAdapterStatus();
   const checks = { database: 'not_configured', writable: false, redis: redis.status };
   try {
