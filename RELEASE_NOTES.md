@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- refactor(desktop): rebuild the desktop launcher and boot it for real in CI ([#380](https://github.com/sherifconteh-collab/ai-grc-platform/pull/380)) — @sherifconteh-collab
 - chore(deps): bump stripe to 23.0.0 and js-yaml to 5.4.3 in backend ([#379](https://github.com/sherifconteh-collab/ai-grc-platform/pull/379)) — @sherifconteh-collab
 - ci(release): retry the Windows installer build on transient failures ([#378](https://github.com/sherifconteh-collab/ai-grc-platform/pull/378)) — @sherifconteh-collab
 - docs(ui): sync platform counts and Node floor, render help articles with MarkdownContent ([#377](https://github.com/sherifconteh-collab/ai-grc-platform/pull/377)) — @sherifconteh-collab

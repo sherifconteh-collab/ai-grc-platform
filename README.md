@@ -76,7 +76,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-13 | PR #379: chore(deps): bump stripe to 23.0.0 and js-yaml to 5.4.3 in backend -->
+<!-- LAST_UPDATED: 2026-10-17 | PR #380: refactor(desktop): rebuild the desktop launcher and boot it for real in CI -->
 
 ## 🎯 What is This?
 
