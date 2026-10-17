@@ -15,6 +15,7 @@
 const pool = require('../config/database');
 const { log } = require('../utils/logger');
 const { runRetentionCleanup, runAuditLogRetention } = require('./jobService');
+const { claimJobRun } = require('./jobLease');
 
 let schedulerHandle = null;
 
@@ -97,8 +98,12 @@ function startRetentionScheduler() {
   const intervalHours = Number.isFinite(parsedInterval) ? Math.max(1, parsedInterval) : 24;
   const intervalMs = intervalHours * 60 * 60 * 1000;
 
-  runRetentionSweep();
-  schedulerHandle = setInterval(runRetentionSweep, intervalMs);
+  // Every backend instance runs this timer; the lease lets one of them sweep.
+  const sweep = async () => {
+    if (await claimJobRun('retention', intervalMs / 2)) await runRetentionSweep();
+  };
+  sweep();
+  schedulerHandle = setInterval(sweep, intervalMs);
 
   log('info', 'retention.scheduler.started', { intervalHours });
 

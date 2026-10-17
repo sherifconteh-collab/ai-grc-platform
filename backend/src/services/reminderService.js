@@ -2,6 +2,7 @@
 const pool = require('../config/database');
 const { log } = require('../utils/logger');
 const { expireAllTrials } = require('./subscriptionService');
+const { claimJobRun } = require('./jobLease');
 
 let schedulerHandle = null;
 
@@ -169,8 +170,12 @@ function startReminderScheduler() {
   const intervalMinutes = Number(process.env.REMINDER_INTERVAL_MINUTES || 60);
   const intervalMs = Math.max(1, intervalMinutes) * 60 * 1000;
 
-  runReminderSweep();
-  schedulerHandle = setInterval(runReminderSweep, intervalMs);
+  // Every backend instance runs this timer; the lease lets one of them sweep.
+  const sweep = async () => {
+    if (await claimJobRun('reminders', intervalMs / 2)) await runReminderSweep();
+  };
+  sweep();
+  schedulerHandle = setInterval(sweep, intervalMs);
 
   log('info', 'reminders.scheduler.started', { intervalMinutes: Math.max(1, intervalMinutes) });
 
