@@ -454,7 +454,7 @@ async function generatePolicy(framework: "nist_csf_2", control: "RS.MA-01") {
 ## Getting Started
 
 ### Prerequisites:
-- PostgreSQL 12+ with UUID extension
+- PostgreSQL 17+ with UUID extension
 - 500MB disk space (for full control library)
 - (Optional) Python 3.9+ for data analysis
 

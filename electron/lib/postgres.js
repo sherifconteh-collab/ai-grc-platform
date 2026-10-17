@@ -198,12 +198,16 @@ async function start({ appRoot, dataDir, port, creds, logsDir, logger }) {
 
   return {
     created: state === 'missing',
+    /** Resolves true once the server is down (its files are then safe to copy). */
     async stop() {
       const opts = { env: pgEnv(), logger, source: 'pg_ctl' };
       try {
         await runToCompletion(bins.pgCtl, ['stop', '-D', dataDir, '-m', 'fast', '-w', '-t', '20'], opts);
+        return true;
       } catch (_) {
-        await runToCompletion(bins.pgCtl, ['stop', '-D', dataDir, '-m', 'immediate', '-w', '-t', '10'], opts).catch(() => {});
+        // An immediate stop leaves the files crash-consistent, which a copy may also take.
+        return runToCompletion(bins.pgCtl, ['stop', '-D', dataDir, '-m', 'immediate', '-w', '-t', '10'], opts)
+          .then(() => true, () => false);
       }
     },
   };

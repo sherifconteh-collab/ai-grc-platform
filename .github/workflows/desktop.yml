@@ -5,7 +5,8 @@ name: Desktop App
 # app fails review instead of a release:
 #
 #   stack      boots the desktop stack from plain Node (bundled PostgreSQL,
-#              migrations, API, interface) twice and signs in.
+#              migrations, API, interface) twice and signs in, then backs up,
+#              deletes the data and proves the backup restores.
 #   installer  builds the real installer (.exe, .dmg, AppImage), installs it
 #              the way a user does and boots the installed app with
 #              --smoke-test (scripts/smoke-installed.*). The release workflow
@@ -88,12 +89,19 @@ jobs:
         run: node scripts/stack-smoke.js --data-dir "${{ env.CW_SMOKE_DATA_DIR }}"
         working-directory: electron
 
+      - name: Back up, lose the data, restore and sign in
+        timeout-minutes: 15
+        run: node scripts/backup-smoke.js --data-dir "${{ env.CW_SMOKE_DATA_DIR }}-backup"
+        working-directory: electron
+
       - name: Upload launcher logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: desktop-logs-${{ matrix.os }}
-          path: ${{ env.CW_SMOKE_DATA_DIR }}/logs/
+          path: |
+            ${{ env.CW_SMOKE_DATA_DIR }}/logs/
+            ${{ env.CW_SMOKE_DATA_DIR }}-backup/logs/
           retention-days: 7
 
   installer:

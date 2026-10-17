@@ -24,7 +24,7 @@
 
 Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 
-Desktop builds ship the full open-source feature set. All previously tier-gated capabilities — CMDB, Service Accounts, AI Governance, Threat Intelligence, SSO, Data Governance, Vulnerability Management, State/International AI Laws, Realtime, Reports — are unlocked. Includes the **CNSA Suite 1.0 + 2.0** cryptographic stack (HS384 JWTs, SHA-384 hashing, RSA-3072 key exchange, hybrid ML-DSA-65 post-quantum license signing), PostgreSQL Row-Level Security, Redis-backed rate limiting and caching, automated database backups, refresh token rotation, and bundled backend/Next.js runtime dependencies.
+Desktop builds ship the full open-source feature set. All previously tier-gated capabilities — CMDB, Service Accounts, AI Governance, Threat Intelligence, SSO, Data Governance, Vulnerability Management, State/International AI Laws, Realtime, Reports — are unlocked. Includes the **CNSA Suite 1.0 + 2.0** cryptographic stack (HS384 JWTs, SHA-384 hashing, RSA-3072 key exchange, hybrid ML-DSA-65 post-quantum license signing), PostgreSQL Row-Level Security, rate limiting and caching (in memory; the Redis-backed versions are for server deployments), daily backups with export and restore, refresh token rotation, and bundled backend/Next.js runtime dependencies.
 
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
@@ -64,6 +64,8 @@ The resulting installer is in `electron/dist/`.
 - **Data and logs** live in `%APPDATA%\controlweave-desktop` (Windows), `~/Library/Application Support/controlweave-desktop` (macOS) or `~/.config/controlweave-desktop` (Linux). Uploaded files are in its `uploads` folder, outside the install directory, so updates never touch them.
 - **Port 3001 in use:** ControlWeave's API needs local port 3001. Close the other program using it and click **Try again**. The database and interface pick another port automatically if their defaults are taken.
 - **After a crash:** the next launch stops any server the crashed session left running, then starts normally.
+- **Backups:** each time you quit, ControlWeave backs up its database, uploaded files and keys into the `backups` folder of its data folder (one per day, the last 7 kept). **File → Back Up Now** makes one immediately, **File → Export Latest Backup** copies the newest to another disk (do this: a backup on the same disk does not survive the disk), and **File → Restore from Backup** replaces the data of every account in the installation; the data it replaces is kept in `backups/pre-restore-…`. A backup contains the keys that decrypt your data and the first-run administrator password, so keep exports somewhere as protected as the computer.
+- **Several people:** run the server deployment once for the organization with `REGISTRATION_MODE=invite_only`, invite people from **Settings → Users and roles**, and have them choose **Connect to my organization's server** when the desktop app first starts (or roll it out with `--server=https://your-server`). Each person signs in with their own account; the platform administrator manages them. See [Running for a team](./docs/SELF_HOSTED_INSTALL.md#running-for-a-team).
 </details>
 
 <details>
@@ -158,7 +160,7 @@ The platform is **fully functional**. Every capability below is available — no
 - 🐛 **Sentry Integration** — optional error tracking via `SENTRY_DSN`
 - 🗄️ **Redis** — distributed rate limiting (Lua atomic INCR+EXPIRE) and response caching; falls back to in-memory when Redis is not configured
 - 🔒 **PostgreSQL Row-Level Security** — org-scoped RLS on core tables for defense-in-depth multi-tenant isolation
-- 💾 **Automated DB Backups** — cron-scheduled `pg_dump` with audit trail in `backup_logs`
+- 💾 **Automated DB Backups** — server: cron-scheduled `pg_dump` with audit trail in `backup_logs` (`BACKUP_ENABLED=true`); desktop: a backup on every quit, with export and restore
 
 ## 🚀 Quick Start (Development)
 
@@ -166,7 +168,7 @@ The platform is **fully functional**. Every capability below is available — no
 
 ### Prerequisites
 
-- **Node.js** 20+ — [download](https://nodejs.org)
+- **Node.js** 24+ — [download](https://nodejs.org)
 - **PostgreSQL** 17+ — [download](https://www.postgresql.org/download/) (or use `brew install postgresql` on macOS / `sudo apt install postgresql` on Ubuntu)
 - **Redis** (optional) — enables distributed rate limiting and response caching
 

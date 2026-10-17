@@ -59,6 +59,17 @@
     button.primary { background: var(--accent); border-color: var(--accent); color: #0b1222; font-weight: 600; }
     button.small { padding: 3px 10px; font-size: 12px; }
     .error-title { color: var(--bad); }
+    .choice { display: block; width: 100%; text-align: left; padding: 14px 16px; margin-bottom: 10px; }
+    .choice strong { display: block; font-weight: 600; margin-bottom: 2px; }
+    .choice span { color: var(--muted); font-size: 13px; }
+    .choice.selected { border-color: var(--accent); }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 4px 0 6px; }
+    input {
+      width: 100%; font: inherit; padding: 8px 10px; border-radius: 6px; user-select: text;
+      border: 1px solid var(--border); background: #0b1222; color: var(--text);
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .inline-error { color: var(--bad); font-size: 13px; margin-top: 8px; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -74,6 +85,27 @@
   <section id="progress">
     <ol id="steps"></ol>
     <div class="note" id="first-launch-note">The first launch sets up a local database and can take a minute or two.</div>
+  </section>
+
+  <section id="choose" hidden>
+    <h2>How will you use ControlWeave?</h2>
+    <p>You can change this later from the File menu.</p>
+    <button class="choice" id="choose-local">
+      <strong>On this computer only</strong>
+      <span>Your data stays on this computer. You get an administrator account and can add colleagues who use this computer.</span>
+    </button>
+    <button class="choice" id="choose-server">
+      <strong>Connect to my organization's server</strong>
+      <span>Sign in with your own account on the server your organization runs. Its administrators manage your access.</span>
+    </button>
+    <form id="server-form" hidden>
+      <label for="server-url">Server address (from your administrator)</label>
+      <input id="server-url" type="text" placeholder="https://grc.example.com" autocomplete="url" spellcheck="false">
+      <div class="inline-error" id="server-error" hidden></div>
+      <div class="actions">
+        <button class="primary" id="connect" type="submit">Connect</button>
+      </div>
+    </form>
   </section>
 
   <section id="first-run" hidden>
@@ -100,6 +132,7 @@
     <pre id="error-output" hidden></pre>
     <div class="actions">
       <button class="primary" id="retry">Try again</button>
+      <button id="change-connection" hidden>Change connection</button>
       <button id="open-logs">Open logs folder</button>
       <button data-copy="details">Copy details</button>
       <button id="quit">Quit</button>

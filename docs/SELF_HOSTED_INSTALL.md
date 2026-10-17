@@ -92,6 +92,82 @@ npm start            # listens on port 3001
 
 ---
 
+## Running for a team
+
+For several people with their own logins, run this server deployment once
+for the organization. People then use it from a browser or from the desktop
+app on their own laptops; either way they sign in with their own account,
+and the platform administrator manages who has access.
+
+1. **Set the administrator and close sign-up.** In the backend environment:
+
+   ```bash
+   REGISTRATION_MODE=invite_only      # nobody can create an account or organization on their own
+   PLATFORM_ADMIN_EMAIL=it-admin@yourcompany.com
+   PLATFORM_ADMIN_PASSWORD=...        # first boot only; remove it afterwards
+   PLATFORM_ADMIN_ORG=Your Company    # the organization everyone is invited into
+   ```
+
+   The administrator account is created on first boot. While
+   `PLATFORM_ADMIN_PASSWORD` stays set, every restart resets that account to
+   it, so remove it once you have signed in and changed the password. Any
+   value of `REGISTRATION_MODE` other than `open` (the default, for a public
+   service) is treated as `invite_only`.
+
+2. **Serve it over HTTPS.** Put the frontend behind TLS (a reverse proxy or
+   your platform's certificate) and set `CORS_ORIGIN` and `FRONTEND_URL` to
+   that address. The desktop app refuses plain `http://` servers, and browsers
+   do not send the secure sign-in cookie over them.
+
+3. **Add people.** Signed in as the administrator, open **Settings → Users and
+   roles** and either invite someone (they get a link, valid for 7 days, to
+   choose their own password) or create the account directly. Roles set what
+   each person can see and change; deactivating an account there ends that
+   person's access.
+
+4. **Point the desktop app at the server.** On first launch the app asks how
+   it will be used; people choose **Connect to my organization's server** and
+   enter the address, for example `https://grc.yourcompany.com`. To skip the
+   question when you roll the app out, start it with
+   `--server=https://grc.yourcompany.com` on the shortcut or set
+   `CONTROLWEAVE_SERVER_URL` for the user; the app then always uses that
+   server and offers no way to switch. In this mode the laptop keeps no
+   ControlWeave data of its own: the server holds it and is what you back up.
+
+Scaling:
+
+- **One backend instance** needs nothing more. Rate limits and caches are
+  kept in memory.
+- **More than one backend instance** behind a load balancer needs Redis
+  (`REDIS_URL`), so every instance shares the same rate limits and cache.
+  Without it each instance counts separately. Set `TRUST_PROXY=true` behind
+  any proxy (see `.env.example`).
+
+## Backups
+
+Set these in the backend environment:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BACKUP_ENABLED` | unset | `true` runs `pg_dump` on a schedule; each run is recorded in `backup_logs` |
+| `BACKUP_CRON_SCHEDULE` | `0 2 * * *` | When to run (cron syntax, server time) |
+| `DB_BACKUP_DIR` | `backend/backups` | Where dumps are written; put it on another disk or volume |
+| `DB_BACKUP_RETENTION_DAYS` | `7` | Dumps older than this are deleted after each run |
+| `DB_BACKUP_FORMAT` | `custom` | `custom` (restore with `pg_restore`) or `plain` (SQL) |
+| `PG_DUMP_PATH` | `pg_dump` | Path to `pg_dump`; it must be installed and the same major version as the server |
+| `AWS_S3_BUCKET`, `AWS_REGION`, `AWS_S3_PREFIX` | unset | Also upload each dump to S3; needs `npm install @aws-sdk/client-s3` in `backend/` |
+
+Platform admins can also start a backup from **Platform Admin → Backups**.
+Test a restore before you need one:
+
+```bash
+createdb controlweave_restore_test
+pg_restore --no-owner --dbname=controlweave_restore_test backend/backups/grc_<stamp>.dump
+```
+
+A database dump does **not** include uploaded files. Back up the uploads
+directory too: `backend/uploads`, or the folder `UPLOADS_DIR` points to.
+
 ## Upgrading an existing deployment
 
 ```bash

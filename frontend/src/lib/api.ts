@@ -182,6 +182,9 @@ export const authAPI = {
 
   logout: () => api.post('/auth/logout'),
 
+  // Public: server identity and whether self-registration is open.
+  getServerInfo: () => api.get('/auth/server-info'),
+
   getCurrentUser: () => api.get('/auth/me'),
 
   getMyOrganizations: () => api.get('/auth/my-organizations'),
