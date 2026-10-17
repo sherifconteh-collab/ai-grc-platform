@@ -42,4 +42,24 @@ npm start         # run the app from source
 
 The packaged app accepts `--smoke-test [--smoke-data-dir <dir>]`: it boots
 the full stack in a throwaway data folder, signs in, shuts down and exits 0
-or 1. The release workflow runs it on every installer.
+or 1.
+
+`scripts/smoke-installed.sh` (macOS, Linux) and `scripts/smoke-installed.ps1`
+(Windows) install a built artifact the way a user does and run that check from
+the installed location:
+
+| Platform | What is booted |
+|---|---|
+| Windows | The `.exe` installed silently into `%LOCALAPPDATA%\Programs` (the default per-user install). |
+| macOS | The app on the mounted DMG (read-only), then a copy in `/Applications`. |
+| Linux | The AppImage through its FUSE mount (read-only), not extracted. |
+
+The read-only runs fail if the app writes into its own install folder. CI runs
+these on every pull request that touches the app (`.github/workflows/desktop.yml`)
+and on every release installer (`build-release.yml`).
+
+```bash
+bash scripts/smoke-installed.sh appimage dist/ControlWeave-<version>.AppImage
+bash scripts/smoke-installed.sh dmg dist/ControlWeave-<version>-arm64.dmg
+pwsh scripts/smoke-installed.ps1 -Installer dist/ControlWeave.Setup.<version>.exe
+```

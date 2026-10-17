@@ -298,36 +298,17 @@ jobs:
         shell: bash
         run: node electron/scripts/validate-latest-yml.js
 
-      - name: Smoke-test Windows build
-        # --smoke-test boots the real stack in a throwaway data folder (bundled
-        # PostgreSQL, migrations, API, interface), signs in, shuts down and
-        # exits 0 or 1. It used to only check that files existed, which let
-        # installers that could not start ship as green releases.
-        timeout-minutes: 12
+      - name: Smoke-test the installed Windows app
+        # Installs the real installer silently (per-user, the default for
+        # users), then boots the installed ControlWeave.exe with --smoke-test:
+        # bundled PostgreSQL, migrations, API, interface, sign-in, shutdown.
+        # The step used to run win-unpacked and only check files existed.
+        timeout-minutes: 15
         shell: pwsh
         run: |
-          # Use the unpacked build directly: the NSIS assisted installer
-          # (oneClick=false) ignores /D= in silent mode. win-unpacked is the
-          # same content the installer lays down.
-          $exePath = Join-Path 'electron' 'dist' 'win-unpacked' 'ControlWeave.exe'
-          if (-not (Test-Path $exePath)) {
-            throw "ControlWeave.exe not found at $exePath after build."
-          }
-          $dataDir = Join-Path $env:RUNNER_TEMP 'cw-smoke'
-          $process = Start-Process -FilePath $exePath -ArgumentList '--smoke-test', '--smoke-data-dir', "`"$dataDir`"" -PassThru
-          $process | Wait-Process -Timeout 600 -ErrorAction SilentlyContinue
-          $log = Join-Path $dataDir 'logs' 'desktop.log'
-
-          if (-not $process.HasExited) {
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-            if (Test-Path $log) { Get-Content $log -Tail 80 }
-            throw "Smoke test timed out after 10 minutes."
-          }
-          if ($process.ExitCode -ne 0) {
-            if (Test-Path $log) { Get-Content $log -Tail 80 }
-            throw "Smoke test failed with exit code $($process.ExitCode)."
-          }
-          Get-Content $log | Select-String -Pattern '\[(INFO|WARN|ERROR)\]' | Select-Object -Last 15
+          $installer = Get-ChildItem -Path electron/dist -Filter 'ControlWeave.Setup.*.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer not found in electron/dist.' }
+          ./electron/scripts/smoke-installed.ps1 -Installer $installer.FullName
 
       - name: Verify Windows installer Authenticode signature
         if: >-
@@ -466,27 +447,22 @@ jobs:
           # Disable code-signing auto-discovery when no certificate is present.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Smoke-test macOS arm64 build
-        # Boots the real stack, signs in and exits; see the Windows job.
-        timeout-minutes: 12
+      - name: Smoke-test macOS arm64 app installed from the DMG
+        # Mounts the DMG read-only and boots the app from it, then copies it to
+        # /Applications and boots it there, with --smoke-test each time (full
+        # stack, sign-in, shutdown). Running from the read-only volume fails
+        # if the app writes into its own bundle.
+        timeout-minutes: 20
         shell: bash
         run: |
-          app_bins=()
-          while IFS= read -r line; do
-            app_bins+=("$line")
-          done < <(find electron/dist -path '*/ControlWeave.app/Contents/MacOS/ControlWeave' -type f | sort)
-          if [ ${#app_bins[@]} -eq 0 ]; then
-            echo "No ControlWeave.app binary found under electron/dist" >&2
+          shopt -s nullglob
+          dmgs=(electron/dist/*.dmg)
+          if [ ${#dmgs[@]} -eq 0 ]; then
+            echo "No DMG found under electron/dist" >&2
             exit 1
           fi
-
-          for app_bin in "${app_bins[@]}"; do
-            echo "Smoke testing $app_bin"
-            data_dir="$(mktemp -d)"
-            if ! "$app_bin" --smoke-test --smoke-data-dir "$data_dir"; then
-              tail -n 80 "$data_dir/logs/desktop.log" || true
-              exit 1
-            fi
+          for dmg in "${dmgs[@]}"; do
+            bash electron/scripts/smoke-installed.sh dmg "$dmg"
           done
 
       - name: Upload arm64 DMG to GitHub Release
@@ -610,27 +586,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Smoke-test macOS x64 build
-        # Boots the real stack, signs in and exits; see the Windows job.
-        timeout-minutes: 12
+      - name: Smoke-test macOS x64 app installed from the DMG
+        # Mounts the DMG read-only and boots the app from it, then copies it to
+        # /Applications and boots it there, with --smoke-test each time (full
+        # stack, sign-in, shutdown). Running from the read-only volume fails
+        # if the app writes into its own bundle.
+        timeout-minutes: 20
         shell: bash
         run: |
-          app_bins=()
-          while IFS= read -r line; do
-            app_bins+=("$line")
-          done < <(find electron/dist -path '*/ControlWeave.app/Contents/MacOS/ControlWeave' -type f | sort)
-          if [ ${#app_bins[@]} -eq 0 ]; then
-            echo "No ControlWeave.app binary found under electron/dist" >&2
+          shopt -s nullglob
+          dmgs=(electron/dist/*.dmg)
+          if [ ${#dmgs[@]} -eq 0 ]; then
+            echo "No DMG found under electron/dist" >&2
             exit 1
           fi
-
-          for app_bin in "${app_bins[@]}"; do
-            echo "Smoke testing $app_bin"
-            data_dir="$(mktemp -d)"
-            if ! "$app_bin" --smoke-test --smoke-data-dir "$data_dir"; then
-              tail -n 80 "$data_dir/logs/desktop.log" || true
-              exit 1
-            fi
+          for dmg in "${dmgs[@]}"; do
+            bash electron/scripts/smoke-installed.sh dmg "$dmg"
           done
 
       - name: Upload x64 DMG to GitHub Release
@@ -722,9 +693,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Smoke-test Linux build
-        # Boots the real stack, signs in and exits; see the Windows job.
-        timeout-minutes: 12
+      - name: Install FUSE for AppImage
+        # ubuntu-24.04 ships without libfuse2, which AppImages need to mount.
+        run: sudo apt-get update -q && sudo apt-get install -y -q libfuse2t64
+
+      - name: Smoke-test the AppImage as users run it
+        # Runs the AppImage through its FUSE mount (read-only, like a user's
+        # launch) with --smoke-test: full stack, sign-in, shutdown. It used to
+        # extract the image first, which gave the app a writable install
+        # folder and hid writes into it.
+        timeout-minutes: 15
         shell: bash
         run: |
           shopt -s nullglob
@@ -733,16 +711,8 @@ jobs:
             echo "No AppImage found under electron/dist" >&2
             exit 1
           fi
-
           for appimage in "${appimages[@]}"; do
-            echo "Smoke testing $appimage"
-            chmod +x "$appimage"
-            data_dir="$(mktemp -d)"
-            if ! APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a --server-args='-screen 0 1280x720x24' \
-              "$appimage" --no-sandbox --disable-gpu --smoke-test --smoke-data-dir "$data_dir"; then
-              tail -n 80 "$data_dir/logs/desktop.log" || true
-              exit 1
-            fi
+            bash electron/scripts/smoke-installed.sh appimage "$appimage"
           done
 
       - name: Upload AppImage to GitHub Release
