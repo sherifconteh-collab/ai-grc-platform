@@ -24,7 +24,7 @@
 
 Everything is bundled — PostgreSQL included. No setup required. Just install and run.
 
-Desktop builds ship the full open-source feature set. All previously tier-gated capabilities — CMDB, Service Accounts, AI Governance, Threat Intelligence, SSO, Data Governance, Vulnerability Management, State/International AI Laws, Realtime, Reports — are unlocked. Includes the **CNSA Suite 1.0 + 2.0** cryptographic stack (HS384 JWTs, SHA-384 hashing, RSA-3072 key exchange, hybrid ML-DSA-65 post-quantum license signing), PostgreSQL Row-Level Security, Redis-backed rate limiting and caching, automated database backups, refresh token rotation, and bundled backend/Next.js runtime dependencies.
+Desktop builds ship the full open-source feature set. All previously tier-gated capabilities — CMDB, Service Accounts, AI Governance, Threat Intelligence, SSO, Data Governance, Vulnerability Management, State/International AI Laws, Realtime, Reports — are unlocked. Includes the **CNSA Suite 1.0 + 2.0** cryptographic stack (HS384 JWTs, SHA-384 hashing, RSA-3072 key exchange, hybrid ML-DSA-65 post-quantum license signing), PostgreSQL Row-Level Security, rate limiting and caching (in memory; the Redis-backed versions and scheduled `pg_dump` backups are server-deployment features the desktop app does not include), refresh token rotation, and bundled backend/Next.js runtime dependencies.
 
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
@@ -64,6 +64,7 @@ The resulting installer is in `electron/dist/`.
 - **Data and logs** live in `%APPDATA%\controlweave-desktop` (Windows), `~/Library/Application Support/controlweave-desktop` (macOS) or `~/.config/controlweave-desktop` (Linux). Uploaded files are in its `uploads` folder, outside the install directory, so updates never touch them.
 - **Port 3001 in use:** ControlWeave's API needs local port 3001. Close the other program using it and click **Try again**. The database and interface pick another port automatically if their defaults are taken.
 - **After a crash:** the next launch stops any server the crashed session left running, then starts normally.
+- **Backups:** the desktop app does not run scheduled backups. To back up, quit ControlWeave and copy its data folder (above); restore by copying it back while the app is closed.
 </details>
 
 <details>
@@ -166,7 +167,7 @@ The platform is **fully functional**. Every capability below is available — no
 
 ### Prerequisites
 
-- **Node.js** 20+ — [download](https://nodejs.org)
+- **Node.js** 24+ — [download](https://nodejs.org)
 - **PostgreSQL** 17+ — [download](https://www.postgresql.org/download/) (or use `brew install postgresql` on macOS / `sudo apt install postgresql` on Ubuntu)
 - **Redis** (optional) — enables distributed rate limiting and response caching
 

@@ -27,8 +27,8 @@ For developers who want to modify the code or run against a local database.
 
 ### Prerequisites
 
-- **Node.js** 20+ — [nodejs.org](https://nodejs.org)
-- **PostgreSQL** 14+ — [postgresql.org](https://www.postgresql.org/download/)
+- **Node.js** 24+ — [nodejs.org](https://nodejs.org)
+- **PostgreSQL** 17+ — [postgresql.org](https://www.postgresql.org/download/)
 
 ### Steps
 
