@@ -29,6 +29,8 @@ const { decrypt, encrypt, hashForLookup, hashToken, tokenHashCandidates } = requ
 const { log } = require('../utils/logger');
 const refreshCookie = require('../utils/refreshCookie');
 const { hasPublicColumn } = require('../utils/schema');
+const { registrationMode, isRegistrationOpen } = require('../config/registration');
+const { version: APP_VERSION } = require('../../package.json');
 const {
   MIN_PASSWORD_LENGTH,
   PASSWORD_COMPLEXITY_ERROR_MESSAGE,
@@ -463,7 +465,26 @@ async function resolveFrameworkIdsByCode(client, frameworkCodes) {
 }
 
 // POST /auth/register
+// ---------- GET /auth/server-info ----------
+// Public: identifies a ControlWeave server and whether anyone may register.
+// The desktop app calls it to check a server address before connecting, and
+// the login page to decide whether to offer registration.
+router.get('/server-info', (req, res) => {
+  res.json({
+    success: true,
+    data: { app: 'controlweave', version: APP_VERSION, registration: registrationMode() }
+  });
+});
+
 router.post('/register', validateBody((body) => requireFields(body, ['email', 'password', 'full_name'])), async (req, res) => {
+  if (!isRegistrationOpen()) {
+    log('warn', 'auth.register.closed', { ip: extractIpFromRequest(req) });
+    return res.status(403).json({
+      success: false,
+      code: 'registration_closed',
+      error: 'Registration is closed on this server. Ask your administrator for an invitation.'
+    });
+  }
   try {
     const {
       email,
