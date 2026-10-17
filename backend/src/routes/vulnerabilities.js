@@ -12,6 +12,7 @@ const { authenticate, requirePermission, requireTier } = require('../middleware/
 const { getConfigValue } = require('../services/dynamicConfigService');
 const { vulnerabilityCreated } = require('../services/realtimeEventService');
 const { mapCweToOwasp2025 } = require('../utils/owaspMapping');
+const { UPLOADS_DIR } = require('../config/paths');
 
 router.use(authenticate);
 router.use(requireTier('pro'));
@@ -509,7 +510,7 @@ async function getWorkflowItems(orgId, vulnerabilityId) {
 // ---------- Scan Import ----------
 // Upload common compliance artifacts (STIG CKL, ACAS/Nessus, SARIF, Fortify FPR).
 // For supported formats, ingest findings into vulnerability_findings (idempotent upsert by finding_key).
-const scanUploadsDir = path.join(__dirname, '../../uploads');
+const scanUploadsDir = UPLOADS_DIR;
 if (!fs.existsSync(scanUploadsDir)) {
   fs.mkdirSync(scanUploadsDir, { recursive: true });
 }
