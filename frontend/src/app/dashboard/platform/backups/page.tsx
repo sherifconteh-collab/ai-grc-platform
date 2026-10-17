@@ -7,6 +7,7 @@ import { platformAdminAPI } from '@/lib/api';
 
 interface BackupConfig {
   enabled: boolean;
+  desktopApp?: boolean;
   schedule: string;
   s3Configured: boolean;
   s3Bucket: string | null;
@@ -151,13 +152,13 @@ export default function BackupsPage() {
               Manage scheduled and manual database backups for this installation.
             </p>
           </div>
-          <button
+          {!config?.desktopApp && <button
             onClick={handleRunBackup}
             disabled={running || hasRunningBackup}
             className="px-4 py-2 text-sm font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {running || hasRunningBackup ? 'Backup Running…' : 'Run Backup Now'}
-          </button>
+          </button>}
         </div>
 
         {error && (
@@ -170,8 +171,19 @@ export default function BackupsPage() {
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">{runSuccess}</div>
         )}
 
+        {config?.desktopApp && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-3 rounded-lg text-sm space-y-1">
+            <p className="font-semibold">This is the desktop app.</p>
+            <p>
+              ControlWeave backs up its database, uploaded files and keys each time you quit, keeping the last 7 days.
+              Use the app&apos;s File menu to back up now, export the latest backup to another disk, or restore one.
+              The scheduled server backups described on this page apply to server deployments only.
+            </p>
+          </div>
+        )}
+
         {/* Config cards */}
-        {config && (
+        {config && !config.desktopApp && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className={`bg-white border rounded-lg p-4 ${config.enabled ? 'border-green-200' : 'border-gray-200'}`}>
               <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Scheduler</div>
@@ -203,6 +215,7 @@ export default function BackupsPage() {
         )}
 
         {/* Backup history */}
+        {!config?.desktopApp && (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="text-base font-semibold text-gray-900">Backup History</h2>
@@ -255,6 +268,7 @@ export default function BackupsPage() {
             </div>
           )}
         </div>
+        )}
       </div>
     </DashboardLayout>
   );

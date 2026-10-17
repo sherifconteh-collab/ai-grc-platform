@@ -1,4 +1,5 @@
 // @tier: platform
+const path = require('path');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
@@ -16,6 +17,7 @@ const {
   hasRequiredPasswordComplexity
 } = require('../utils/passwordPolicy');
 const { SECURITY_CONFIG } = require('../config/security');
+const { log, serializeError } = require('../utils/logger');
 const _backupScheduler = (() => { try { return require('../services/backupScheduler'); } catch { return null; } })();
 
 const router = express.Router();
@@ -1617,12 +1619,16 @@ router.get('/backups/config', authenticate, requirePlatformOwner, (req, res) => 
     success: true,
     data: {
       enabled: process.env.BACKUP_ENABLED === 'true',
+      // The desktop launcher sets this. Its backups run from the app's File
+      // menu; the pg_dump job below needs a pg_dump the app does not bundle.
+      desktopApp: process.env.CONTROLWEAVE_DESKTOP === 'true',
       schedule: process.env.BACKUP_CRON_SCHEDULE || '0 2 * * *',
       s3Configured: !!process.env.AWS_S3_BUCKET,
       s3Bucket: process.env.AWS_S3_BUCKET || null,
       s3Prefix: process.env.AWS_S3_PREFIX || 'backups/',
       retentionDays: parseInt(process.env.DB_BACKUP_RETENTION_DAYS || '7', 10),
-      backupDir: process.env.DB_BACKUP_DIR || '/app/backups'
+      // Same default as scripts/db-backup.js.
+      backupDir: process.env.DB_BACKUP_DIR || path.join(__dirname, '..', '..', 'backups')
     }
   });
 });
@@ -1635,14 +1641,21 @@ router.get('/backups', authenticate, requirePlatformOwner, async (req, res) => {
       `SELECT bl.id, bl.started_at, bl.completed_at, bl.status, bl.trigger,
               bl.backup_file, bl.file_size_bytes, bl.s3_key,
               bl.error_message, bl.exit_code,
-              u.email AS triggered_by_email, u.full_name AS triggered_by_name
+              u.email AS triggered_by_email,
+              NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '') AS triggered_by_name
        FROM backup_logs bl
        LEFT JOIN users u ON u.id = bl.triggered_by
        ORDER BY bl.started_at DESC
        LIMIT 50`
     );
-    res.json({ success: true, data: result.rows });
+    // users has no full_name column, and email is stored encrypted.
+    const rows = result.rows.map((row) => ({
+      ...row,
+      triggered_by_email: row.triggered_by_email ? decrypt(row.triggered_by_email) : null
+    }));
+    res.json({ success: true, data: rows });
   } catch (error) {
+    log('error', 'platform_admin.backups.list_failed', { error: serializeError(error) });
     res.status(500).json({ success: false, error: 'Failed to retrieve backup history' });
   }
 });
@@ -1653,6 +1666,12 @@ router.post('/backups/run', authenticate, requirePlatformOwner, async (req, res)
   try {
     if (!_backupScheduler) {
       return res.status(503).json({ success: false, error: 'Backup service is not available' });
+    }
+    if (process.env.CONTROLWEAVE_DESKTOP === 'true') {
+      return res.status(409).json({
+        success: false,
+        error: 'The desktop app backs up when you quit. Use File > Back Up Now in the app instead.'
+      });
     }
 
     const { rows: running } = await pool.query(
