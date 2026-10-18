@@ -78,7 +78,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-17 | PR #380: refactor(desktop): rebuild the desktop launcher and boot it for real in CI -->
+<!-- LAST_UPDATED: 2026-10-18 | PR #381: feat(desktop): backups with restore, team server mode, load-balancer-safe backend -->
 
 ## 🎯 What is This?
 
@@ -1070,7 +1070,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 176 sequential, idempotent migration files (numbered through 164; a few historical duplicate numbers are documented and never renumbered)
 - **API Routes**: 80+ route modules
-- **Services**: 65 service modules
+- **Services**: 66 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
