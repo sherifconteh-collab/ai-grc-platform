@@ -100,7 +100,7 @@
     "multer": "^2.4.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^10.1.0",
-    "openai": "^7.32.0",
+    "openai": "^7.34.0",
     "openid-client": "^6.8.3",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.20.2",
