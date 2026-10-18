@@ -37,6 +37,7 @@
 - `@sentry/node` stays on 10.x: every 11.x release adds a dependency under the Functional Source License, which the licence check does not allow (Dependabot PR #371 closed).
 
 ### Changed
+- docs(release): release notes and README for #380/#381; keep @sentry/node on 10.x ([#382](https://github.com/sherifconteh-collab/ai-grc-platform/pull/382)) — @sherifconteh-collab
 - feat(desktop): backups with restore, team server mode, load-balancer-safe backend ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381)) — @sherifconteh-collab
 - refactor(desktop): rebuild the desktop launcher and boot it for real in CI ([#380](https://github.com/sherifconteh-collab/ai-grc-platform/pull/380)) — @sherifconteh-collab
 - chore(deps): bump stripe to 23.0.0 and js-yaml to 5.4.3 in backend ([#379](https://github.com/sherifconteh-collab/ai-grc-platform/pull/379)) — @sherifconteh-collab

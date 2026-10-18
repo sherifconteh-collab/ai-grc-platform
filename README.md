@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-18 | PR #381: feat(desktop): backups with restore, team server mode, load-balancer-safe backend -->
+<!-- LAST_UPDATED: 2026-10-18 | PR #382: docs(release): release notes and README for #380/#381; keep @sentry/node on 10.x -->
 
 ## 🎯 What is This?
 
