@@ -92,6 +92,9 @@ async function runBackup(trigger = 'scheduled', triggeredBy = null) {
   });
 }
 
+// Backup schedules closer together than this are treated as one run.
+const BACKUP_LEASE_MS = 10 * 60 * 1000;
+
 function start() {
   const cron = require('node-cron');
   const schedule = process.env.BACKUP_CRON_SCHEDULE || '0 2 * * *';
@@ -103,7 +106,13 @@ function start() {
     });
   }
 
-  cronJob = cron.schedule(schedule, () => {
+  cronJob = cron.schedule(schedule, async () => {
+    // Every instance's cron fires at the same time; one of them dumps.
+    const { claimJobRun } = require('./jobLease');
+    if (!(await claimJobRun('db_backup', BACKUP_LEASE_MS))) {
+      log('info', 'backup.scheduled.skipped', { reason: 'another_instance' });
+      return;
+    }
     log('info', 'backup.scheduled.started', { schedule });
     runBackup('scheduled', null).catch((err) => {
       log('error', 'backup.scheduled.failed', { error: err.message });

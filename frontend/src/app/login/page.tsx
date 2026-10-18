@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
 import BrandLogo from '@/components/BrandLogo';
 import { passkeyAPI, ssoAPI } from '@/lib/api';
+import { useRegistrationMode } from '@/lib/useServerInfo';
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_state: 'Your sign-in session expired. Please try again.',
@@ -55,6 +56,7 @@ const SOCIAL_ICONS: Record<string, React.ReactNode> = {
 };
 
 export default function LoginPage() {
+  const registrationMode = useRegistrationMode();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
@@ -268,12 +270,18 @@ export default function LoginPage() {
         )}
 
         <div className="mt-6 text-center">
-          <p className="text-gray-600">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-purple-600 hover:text-purple-700 font-semibold">
-              Register
-            </Link>
-          </p>
+          {registrationMode === 'invite_only' ? (
+            <p className="text-gray-600">
+              Need an account? Ask your administrator for an invitation.
+            </p>
+          ) : (
+            <p className="text-gray-600">
+              Don&apos;t have an account?{' '}
+              <Link href="/register" className="text-purple-600 hover:text-purple-700 font-semibold">
+                Register
+              </Link>
+            </p>
+          )}
         </div>
 
         <div className="mt-8 pt-6 border-t border-gray-200">

@@ -466,6 +466,14 @@ jobs:
           done
 
       - name: Upload arm64 DMG to GitHub Release
+        # Same guard as the Windows upload: a manual run with no version, or a
+        # push that is not releasing, must not publish. Without it the tag name
+        # falls back to the branch name and creates a release called "main".
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
@@ -605,6 +613,14 @@ jobs:
           done
 
       - name: Upload x64 DMG to GitHub Release
+        # Same guard as the Windows upload: a manual run with no version, or a
+        # push that is not releasing, must not publish. Without it the tag name
+        # falls back to the branch name and creates a release called "main".
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
@@ -716,6 +732,14 @@ jobs:
           done
 
       - name: Upload AppImage to GitHub Release
+        # Same guard as the Windows upload: a manual run with no version, or a
+        # push that is not releasing, must not publish. Without it the tag name
+        # falls back to the branch name and creates a release called "main".
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}

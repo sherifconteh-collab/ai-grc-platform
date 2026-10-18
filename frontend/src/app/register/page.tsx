@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { APP_POSITIONING_SHORT } from '@/lib/branding';
 import BrandLogo from '@/components/BrandLogo';
+import { useRegistrationMode } from '@/lib/useServerInfo';
 
 type TierKey = 'community' | 'pro' | 'enterprise' | 'govcloud';
 type BillingCadence = 'monthly' | 'annual';
@@ -133,8 +134,29 @@ export default function RegisterPage() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
       </div>
     }>
-      <RegisterPageInner />
+      <RegisterGate />
     </Suspense>
+  );
+}
+
+/** On a server where only invited people may join, explain instead of showing the form. */
+function RegisterGate() {
+  const registrationMode = useRegistrationMode();
+  if (registrationMode !== 'invite_only') return <RegisterPageInner />;
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="max-w-md w-full bg-white rounded-lg shadow p-8 text-center space-y-4">
+        <BrandLogo className="flex justify-center" showWordmark={false} />
+        <h1 className="text-xl font-semibold text-gray-900">Registration is by invitation</h1>
+        <p className="text-gray-600 text-sm">
+          Accounts on this server are created by its administrator. Ask them for an invitation link,
+          then sign in with the account it sets up.
+        </p>
+        <Link href="/login" className="inline-block text-purple-600 hover:text-purple-700 font-semibold">
+          Back to sign in
+        </Link>
+      </div>
+    </div>
   );
 }
 

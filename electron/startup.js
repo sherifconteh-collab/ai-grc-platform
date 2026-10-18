@@ -3,10 +3,11 @@
 (function startupWindow() {
   const api = window.startup;
   const $ = (id) => document.getElementById(id);
-  const sections = ['progress', 'first-run', 'error'];
+  const sections = ['progress', 'choose', 'first-run', 'error'];
   let steps = [];
   let loaded = false;
   const queued = [];
+  const defaultNote = document.getElementById('first-launch-note').textContent;
 
   function show(id) {
     for (const name of sections) $(name).hidden = name !== id;
@@ -38,14 +39,33 @@
     output.hidden = !event.output || event.output.length === 0;
     output.textContent = (event.output || []).join('\n');
     $('error-log').textContent = event.logPath ? `Log file: ${event.logPath}` : '';
+    $('change-connection').hidden = !event.canChangeConnection;
     show('error');
+  }
+
+  function showChooser(event) {
+    const current = event.current || null;
+    $('choose-local').classList.toggle('selected', Boolean(current && current.mode === 'local'));
+    $('choose-server').classList.toggle('selected', Boolean(current && current.mode === 'server'));
+    $('server-form').hidden = !(current && current.mode === 'server');
+    if (current && current.mode === 'server') $('server-url').value = current.origin;
+    $('server-error').hidden = true;
+    show('choose');
   }
 
   function handle(event) {
     if (event.type === 'reset') {
       steps = steps.map((step) => ({ ...step, status: '' }));
       renderSteps();
+      $('first-launch-note').textContent = defaultNote;
       show('progress');
+    } else if (event.type === 'notice') {
+      // A backup or restore is running with the app stopped.
+      $('steps').replaceChildren();
+      $('first-launch-note').textContent = event.text;
+      show('progress');
+    } else if (event.type === 'choose') {
+      showChooser(event);
     } else if (event.type === 'step') {
       setStep(event.id, event.status);
     } else if (event.type === 'first-run') {
@@ -71,6 +91,32 @@
       setTimeout(() => { button.textContent = original; }, 1200);
     });
   }
+  $('choose-local').addEventListener('click', () => api.chooseLocal());
+  $('choose-server').addEventListener('click', () => {
+    $('choose-server').classList.add('selected');
+    $('choose-local').classList.remove('selected');
+    $('server-form').hidden = false;
+    $('server-url').focus();
+  });
+  $('server-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = $('connect');
+    const error = $('server-error');
+    button.disabled = true;
+    button.textContent = 'Connecting...';
+    error.hidden = true;
+    try {
+      const result = await api.chooseServer($('server-url').value);
+      if (result && result.error) {
+        error.textContent = result.error;
+        error.hidden = false;
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Connect';
+    }
+  });
+  $('change-connection').addEventListener('click', () => api.changeConnection());
   $('continue').addEventListener('click', () => api.continue());
   $('retry').addEventListener('click', () => api.retry());
   $('open-logs').addEventListener('click', () => api.openLogs());
