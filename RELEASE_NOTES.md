@@ -9,6 +9,33 @@
 
 > Changes staged but not yet released to production.
 
+### Added
+
+- **Desktop: connect to your organization's server.** The first launch asks whether ControlWeave runs on this computer only or connects to a company ControlWeave server, where each person signs in with their own account and the server's administrators manage access. Server addresses must be HTTPS and are checked before use; IT can preset one with `--server=<url>` or `CONTROLWEAVE_SERVER_URL`, which fixes the app to that server. Otherwise, switch from the **File** menu. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- **Desktop: backups.** A backup is made on every quit (one per day, last 7 kept), plus **File → Back Up Now**, **Export Latest Backup** and **Restore from Backup**. A restore keeps the data it replaces in `backups/pre-restore-*`. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- **Invite-only registration.** `REGISTRATION_MODE=invite_only` closes self-sign-up for company servers; people join only when an administrator invites or creates them. The default stays `open`. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- **`GET /ready`** for load balancers and failover monitors: 503 when the database is unreachable or read-only, or a required Redis is down. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- **Rebuilt desktop launcher.** A startup window shows each step and names the one that failed, with logs and a copyable report. Installed apps are booted end to end in CI on Windows, macOS and Linux before release. ([#380](https://github.com/sherifconteh-collab/ai-grc-platform/pull/380))
+
+### Fixed
+
+- Server backups never ran: `scripts/db-backup.js` was missing, so every scheduled and manual backup failed. The Platform Admin → Backups page also failed to load. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- With several backend servers, reminders, retention and nightly backups ran once per server. Each run is now claimed in the database, so one server runs it. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- SMTP settings saved through one server now reach the others within 5 minutes. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- Desktop: restoring a backup on Windows failed when the app ran as administrator. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- Desktop: fresh installs could fail migrations, uploads were written into the install folder, live updates were not proxied, and a crashed session could leave servers holding port 3001. ([#380](https://github.com/sherifconteh-collab/ai-grc-platform/pull/380))
+- Release workflow: a manual run with no version published the macOS and Linux installers to a release and tag named `main`. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+
+### Security
+
+- Backup output no longer contains the database password from `DATABASE_URL`; it was stored in `backup_logs`. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+
+### Upgrade notes
+
+- Run `npm run migrate` for migration 165 (`scheduler_leases`). Until it is applied, background jobs run as before.
+- Behind a load balancer: route health checks to `/ready` (not `/health`), set `REDIS_URL` with `REDIS_REQUIRED=true`, and mount one shared uploads volume on every server. See `docs/SELF_HOSTED_INSTALL.md`, "Load balancer and disaster recovery".
+- `@sentry/node` stays on 10.x: every 11.x release adds a dependency under the Functional Source License, which the licence check does not allow (Dependabot PR #371 closed).
+
 ### Changed
 - feat(desktop): backups with restore, team server mode, load-balancer-safe backend ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381)) — @sherifconteh-collab
 - refactor(desktop): rebuild the desktop launcher and boot it for real in CI ([#380](https://github.com/sherifconteh-collab/ai-grc-platform/pull/380)) — @sherifconteh-collab

@@ -16,6 +16,14 @@ updates:
     commit-message:
       prefix: "chore(backend)"
       include: "scope"
+    ignore:
+      # @sentry/node 11.x depends on @sentry/bundler-plugins, which depends on
+      # `sentry` (FSL-1.1-Apache-2.0, not on the licence allow-list in
+      # security.yml's "Check Dependency Licenses"). Stay on 10.x (patch and
+      # minor updates still arrive) until that dependency goes away or the
+      # owner accepts the licence. See the closed PR #371.
+      - dependency-name: "@sentry/node"
+        update-types: ["version-update:semver-major"]
 
   # Frontend dependencies
   - package-ecosystem: "npm"

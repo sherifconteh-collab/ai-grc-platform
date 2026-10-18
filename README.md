@@ -28,7 +28,12 @@ Desktop builds ship the full open-source feature set. All previously tier-gated 
 
 > [![Download for Windows](https://img.shields.io/badge/⬇_Download_for_Windows-_.exe-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for macOS](https://img.shields.io/badge/⬇_Download_for_macOS-_.dmg-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)&nbsp;&nbsp;[![Download for Linux](https://img.shields.io/badge/⬇_Download_for_Linux-_.AppImage-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/sherifconteh-collab/ai-grc-platform/releases/latest)
 
-After installing, launch ControlWeave. A startup window shows each step (local database, schema, API server, administrator account, interface). On the first launch it then shows the administrator account it created, `admin@controlweave.local` with a generated password; copy it, click **Open ControlWeave**, and sign in. The password stays available under **Help → Show First-Run Sign-In Details**, and is never reset once the app has set it, so a password you change inside ControlWeave stays changed. Updates are delivered automatically on packaged release builds. Releases are cut automatically on a weekly schedule (see `.claude/rules/releases.md`), and every installer (Windows `.exe`, macOS `.dmg`, Linux AppImage) is installed the way a user installs it and booted end to end in CI (database, migrations, API, interface, sign-in) before it is published.
+After installing, launch ControlWeave. The first launch asks how you will use it:
+
+- **On this computer only:** everything runs locally. A startup window shows each step (local database, schema, API server, administrator account, interface), then shows the administrator account it created, `admin@controlweave.local` with a generated password; copy it, click **Open ControlWeave**, and sign in. The password stays available under **Help → Show First-Run Sign-In Details**, and is never reset once the app has set it, so a password you change inside ControlWeave stays changed.
+- **Connect to my organization's server:** enter the HTTPS address your administrator gives you and sign in with your own account. Nothing runs locally and your data stays on the server; its administrators manage your access. IT can preset the address with `--server=<url>` or `CONTROLWEAVE_SERVER_URL`.
+
+You can switch later from the **File** menu, unless IT preset the server address, in which case the app always uses that server. Updates are delivered automatically on packaged release builds. Releases are cut automatically on a weekly schedule (see `.claude/rules/releases.md`), and every installer (Windows `.exe`, macOS `.dmg`, Linux AppImage) is installed the way a user installs it and booted end to end in CI (database, migrations, API, interface, sign-in) before it is published.
 
 > **Windows note:** the `.exe` is not currently Authenticode-signed (no code-signing certificate is configured yet), so Windows SmartScreen may show an "unrecognized app" warning on first launch. This is expected — click **More info → Run anyway** to proceed. This will be resolved once a signing certificate is added.
 
@@ -246,11 +251,19 @@ respectively.
 
 ### Optional: Redis
 
-Add `REDIS_URL=redis://localhost:6379` to `backend/.env` to enable distributed rate limiting and response caching. The platform runs without Redis — it falls back silently to in-memory rate limiting.
+Add `REDIS_URL=redis://localhost:6379` to `backend/.env` to enable distributed rate limiting and response caching. The platform runs without Redis — it falls back silently to in-memory rate limiting. With more than one backend server behind a load balancer, Redis is required (set `REDIS_REQUIRED=true` too), so rate limits and live notifications are shared across servers.
 
 ### Optional: Sentry
 
 Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and exception reporting.
+
+### Running for a team, behind a load balancer, or with a DR site
+
+- `REGISTRATION_MODE=invite_only` closes self-sign-up, so people join only when the platform administrator invites or creates them (**Settings → Users and roles**).
+- Point load balancer health checks at the backend's `GET /ready`, which returns 503 when that server cannot reach a writable database (or a required Redis). `/health` always returns 200 and is a liveness check only.
+- Background jobs (reminders, retention, scheduled reports, and nightly backups once `BACKUP_ENABLED=true` is set) run on one server at a time. Set `BACKUP_ENABLED=true` on every server; the coordination needs no other configuration.
+
+See [Running for a team](./docs/SELF_HOSTED_INSTALL.md#running-for-a-team) and [Load balancer and disaster recovery](./docs/SELF_HOSTED_INSTALL.md#load-balancer-and-disaster-recovery).
 
 ## 📚 Supported Frameworks (34)
 
@@ -712,7 +725,7 @@ graph TD
     Bcrypt["bcrypt — cost 14"]
     WebAuthn["WebAuthn / Passkeys<br/>ES384 preferred"]
     OIDC["OpenID Connect SSO"]
-    DB[("PostgreSQL 17+<br/>Row-Level Security<br/>176 migration files")]
+    DB[("PostgreSQL 17+<br/>Row-Level Security<br/>177 migration files")]
     Cache[("Redis (optional)<br/>in-memory fallback")]
     Copilot["AI Copilot + RAG<br/>25+ analysis features, BYOK"]
     Providers["Anthropic · OpenAI · Gemini<br/>xAI Grok · Groq · Ollama (GGUF)"]
@@ -751,7 +764,7 @@ controlweave/
 │   │   ├── config/          # Database, Redis, and security configuration
 │   │   └── utils/           # Logging, encryption, TOTP, AI security, password
 │   │                        #   policy, Redis cache, Sentry integration
-│   ├── migrations/          # 176 sequential migration files, numbered through 164 (a few historical duplicate numbers are documented and never renumbered)
+│   ├── migrations/          # 177 sequential migration files, numbered through 165 (a few historical duplicate numbers are documented and never renumbered)
 │   └── scripts/             # Seed data, migration runners, MCP server, utilities
 ├── frontend/
 │   ├── src/
@@ -1068,7 +1081,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **LLM Providers**: 6 supported (Anthropic, OpenAI, Gemini, Grok, Groq, Ollama)
 - **AI Models**: see the "Supported providers and models" table above — updated as providers ship new models
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
-- **Migrations**: 176 sequential, idempotent migration files (numbered through 164; a few historical duplicate numbers are documented and never renumbered)
+- **Migrations**: 177 sequential, idempotent migration files (numbered through 165; a few historical duplicate numbers are documented and never renumbered)
 - **API Routes**: 80+ route modules
 - **Services**: 66 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
