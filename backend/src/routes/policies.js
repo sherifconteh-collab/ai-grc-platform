@@ -10,6 +10,7 @@ const auditService = require('../services/auditService');
 const { decrypt } = require('../utils/encrypt');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { requireSod } = require('../middleware/sod');
+const { isUuid } = require('../middleware/validate');
 const { createOrgRateLimiter } = require('../middleware/rateLimit');
 const rateLimit = require('express-rate-limit');
 const { generatePolicyFromFrameworks } = require('../services/policyService');
@@ -27,6 +28,10 @@ const {
 router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600 }));
 router.use(authenticate);
 router.use(createOrgRateLimiter({ windowMs: 60 * 1000, max: 240, label: 'policies' }));
+
+// GET /uploads is registered after GET /:id. A path segment that is not a UUID
+// falls through to the static routes instead of reaching the uuid cast in SQL.
+router.param('id', (req, res, next, id) => (isUuid(id) ? next() : next('route')));
 
 const ALLOWED_POLICY_STATUSES = ['draft', 'under_review', 'approved', 'published', 'archived'];
 const ALLOWED_REVIEW_TYPES = ['annual', 'triggered', 'ad_hoc', 'change_driven'];
