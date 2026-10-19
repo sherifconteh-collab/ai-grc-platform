@@ -361,6 +361,9 @@ router.post(
       if (!isUuid(pendingId)) {
         return res.status(400).json({ success: false, error: 'Invalid pending evidence ID' });
       }
+      // A POST without a JSON body leaves req.body undefined (Express 5); read it
+      // before the evidence file and row are written so that cannot fail mid-way.
+      const notes = (req.body && req.body.notes) || null;
 
       const existing = await pool.query(
         'SELECT * FROM pending_evidence WHERE id = $1 AND organization_id = $2',
@@ -427,7 +430,7 @@ router.post(
          SET status = 'approved', reviewed_by = $2, reviewed_at = NOW(),
              review_notes = $3, promoted_evidence_id = $4, updated_at = NOW()
          WHERE id = $1`,
-        [pendingId, req.user.id, req.body.notes || null, evidenceRecord.id]
+        [pendingId, req.user.id, notes, evidenceRecord.id]
       );
 
       await auditService.logFromRequest(req, {
@@ -461,6 +464,7 @@ router.post(
       if (!isUuid(pendingId)) {
         return res.status(400).json({ success: false, error: 'Invalid pending evidence ID' });
       }
+      const notes = (req.body && req.body.notes) || null;
 
       const existing = await pool.query(
         'SELECT * FROM pending_evidence WHERE id = $1 AND organization_id = $2',
@@ -478,7 +482,7 @@ router.post(
          SET status = 'rejected', reviewed_by = $2, reviewed_at = NOW(),
              review_notes = $3, updated_at = NOW()
          WHERE id = $1`,
-        [pendingId, req.user.id, req.body.notes || null]
+        [pendingId, req.user.id, notes]
       );
 
       await auditService.logFromRequest(req, {
