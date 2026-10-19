@@ -9,6 +9,8 @@
 
 > Changes staged but not yet released to production.
 
+## [2026.10.2] — 2026-10-19
+
 ### Added
 
 - **Desktop: connect to your organization's server.** The first launch asks whether ControlWeave runs on this computer only or connects to a company ControlWeave server, where each person signs in with their own account and the server's administrators manage access. Server addresses must be HTTPS and are checked before use; IT can preset one with `--server=<url>` or `CONTROLWEAVE_SERVER_URL`, which fixes the app to that server. Otherwise, switch from the **File** menu. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
