@@ -469,8 +469,8 @@ This Code of Conduct is adapted from the Contributor Covenant, version 2.1.
 
 ## Prerequisites
 
-- PostgreSQL 14+
-- Node.js 18+ (for backend, when implemented)
+- PostgreSQL 17+
+- Node.js 24+ (for backend, when implemented)
 - Git
 
 ## Quick Start
