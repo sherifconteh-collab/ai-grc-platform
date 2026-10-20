@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- **Desktop: backups apply only in On this computer only mode.** A desktop connected to an organization's server keeps no data and makes no backups; the server's backups (`BACKUP_ENABLED=true`) cover it. ([#393](https://github.com/sherifconteh-collab/ai-grc-platform/pull/393))
 - security(notifications): restrict notification links to in-app paths ([#417](https://github.com/sherifconteh-collab/ai-grc-platform/pull/417)) — @sherifconteh-collab
 - security(rbac): stop users.manage holders from reaching admin ([#413](https://github.com/sherifconteh-collab/ai-grc-platform/pull/413)) — @sherifconteh-collab
 - security(tenancy): reject ids from another organization on write paths ([#415](https://github.com/sherifconteh-collab/ai-grc-platform/pull/415)) — @sherifconteh-collab
