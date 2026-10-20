@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #411: security(auth): lock the account after repeated wrong authenticator codes -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #414: security(auth): reject refresh tokens used as access tokens -->
 
 ## 🎯 What is This?
 
