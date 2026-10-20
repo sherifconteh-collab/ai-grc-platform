@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #418: security(privacy): scope copilot history and cached AI answers to the user -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #411: security(auth): lock the account after repeated wrong authenticator codes -->
 
 ## 🎯 What is This?
 

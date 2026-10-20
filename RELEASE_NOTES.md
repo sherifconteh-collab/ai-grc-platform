@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(auth): lock the account after repeated wrong authenticator codes ([#411](https://github.com/sherifconteh-collab/ai-grc-platform/pull/411)) — @sherifconteh-collab
 - security(privacy): scope copilot history and cached AI answers to the user ([#418](https://github.com/sherifconteh-collab/ai-grc-platform/pull/418)) — @sherifconteh-collab
 - fix(policies): let GET /policies/uploads reach its handler instead of the :id route ([#408](https://github.com/sherifconteh-collab/ai-grc-platform/pull/408)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-19 ([#401](https://github.com/sherifconteh-collab/ai-grc-platform/pull/401)) — @sherifconteh-collab
