@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #410: security(desktop): lock an exported backup to the current Windows user -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #418: security(privacy): scope copilot history and cached AI answers to the user -->
 
 ## 🎯 What is This?
 
