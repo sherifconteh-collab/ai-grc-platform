@@ -124,3 +124,57 @@ test('export copies a backup without overwriting an earlier export', () => {
   assert.ok(backup.readBackup(first, '17'));
   assert.ok(backup.readBackup(second, '17'));
 });
+
+/** A stand-in for spawnSync that records each command and answers like Windows would. */
+function fakeWindowsRunner({ icaclsStatus = 0 } = {}) {
+  const calls = [];
+  const run = (command, args) => {
+    calls.push({ command, args });
+    if (command === 'whoami') return { status: 0, stdout: '"DESKTOP\\\\alex","S-1-5-21-111-222-333-1001"\n' };
+    return { status: icaclsStatus, stdout: '', stderr: icaclsStatus === 0 ? '' : 'The volume does not support ACLs.' };
+  };
+  return { run, calls };
+}
+
+test('on Windows an export is restricted to the current user with icacls', () => {
+  const source = backup.createBackup(fakeDataDir('backup'));
+  const { run, calls } = fakeWindowsRunner();
+  const dest = backup.exportBackup(source, tempDir(), { platform: 'win32', run });
+  const icacls = calls.find((c) => c.command === 'icacls');
+  assert.ok(icacls, 'icacls is run on the exported folder');
+  assert.strictEqual(icacls.args[0], dest);
+  assert.ok(icacls.args.includes('/inheritance:r'), 'inherited rules from the destination are dropped');
+  assert.ok(icacls.args.includes('/grant:r'));
+  assert.ok(icacls.args.includes('*S-1-5-21-111-222-333-1001:(OI)(CI)F'), 'only the current user SID is granted');
+  assert.ok(fs.existsSync(path.join(dest, 'manifest.json')));
+});
+
+test('on Windows an export that cannot be restricted is removed and refused', () => {
+  const source = backup.createBackup(fakeDataDir('backup'));
+  const target = tempDir();
+  const { run } = fakeWindowsRunner({ icaclsStatus: 5 });
+  assert.throws(() => backup.exportBackup(source, target, { platform: 'win32', run }), /could not be restricted.*not exported/s);
+  assert.deepStrictEqual(fs.readdirSync(target), [], 'no unprotected copy of the keys is left behind');
+});
+
+test('on Windows an export is refused when the account cannot be identified', () => {
+  const source = backup.createBackup(fakeDataDir('backup'));
+  const target = tempDir();
+  const run = () => ({ status: 1, stdout: '' });
+  assert.throws(() => backup.exportBackup(source, target, { platform: 'win32', run }), /account could not be identified/);
+  assert.deepStrictEqual(fs.readdirSync(target), []);
+});
+
+test('other platforms do not call icacls', () => {
+  const source = backup.createBackup(fakeDataDir('backup'));
+  const { run, calls } = fakeWindowsRunner();
+  backup.exportBackup(source, tempDir(), { platform: 'linux', run });
+  assert.strictEqual(calls.length, 0);
+});
+
+test('network paths are recognized', () => {
+  assert.strictEqual(backup.isNetworkPath('\\\\fileserver\\backups'), true);
+  assert.strictEqual(backup.isNetworkPath('D:\\backups'), false);
+  assert.strictEqual(backup.isNetworkPath('/mnt/backups'), false);
+  assert.strictEqual(backup.isNetworkPath(''), false);
+});
