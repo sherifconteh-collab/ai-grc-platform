@@ -260,7 +260,7 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 ### Running for a team, behind a load balancer, or with a DR site
 
 - `REGISTRATION_MODE=invite_only` closes self-sign-up, so people join only when the platform administrator invites or creates them (**Settings → Users and roles**).
-- Point load balancer health checks at the backend's `GET /ready`, which returns 503 when that server cannot reach a writable database (or a required Redis). `/health` always returns 200 and is a liveness check only.
+- Point load balancer health checks at the backend's `GET /ready`, which returns 503 when that server cannot reach a writable database (or a required Redis). `/health` always returns 200 and is a liveness check only; it reports just the status and the database and Redis connection states. A platform owner can read memory, uptime and database latency at `GET /health/details`.
 - Background jobs (reminders, retention, scheduled reports, and nightly backups once `BACKUP_ENABLED=true` is set) run on one server at a time. Set `BACKUP_ENABLED=true` on every server; the coordination needs no other configuration.
 
 See [Running for a team](./docs/SELF_HOSTED_INSTALL.md#running-for-a-team) and [Load balancer and disaster recovery](./docs/SELF_HOSTED_INSTALL.md#load-balancer-and-disaster-recovery).

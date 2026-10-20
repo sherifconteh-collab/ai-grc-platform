@@ -171,7 +171,9 @@ item is required unless marked otherwise.
 - Health check: `GET /ready` on the backend (port 3001). It returns 503 when
   that server cannot reach the database, when the database is a read-only
   replica, or when Redis is required but down. `/health` always returns 200,
-  so use it only as a liveness check, never for routing.
+  so use it only as a liveness check, never for routing. It reports only the
+  status and the database and Redis connection states; memory, uptime and
+  database latency are at `GET /health/details` for a platform owner.
 - Allow WebSocket upgrades on `/socket.io`. If your load balancer cannot,
   enable sticky sessions instead, because the polling fallback needs them.
 - Sessions need no stickiness. Sign-in uses signed tokens, and refresh
