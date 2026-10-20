@@ -575,6 +575,18 @@ async function exportLatestBackup() {
     properties: ['openDirectory', 'createDirectory'],
   });
   if (canceled || !filePaths[0]) return;
+  if (backup.isNetworkPath(filePaths[0])) {
+    const choice = await dialog.showMessageBox(mainWindow || undefined, {
+      type: 'warning',
+      title: 'Network folder',
+      message: 'This folder is on a network share.',
+      detail: 'The backup will be locked to your Windows account where the share supports it, but other people who administer the share may still reach it.',
+      buttons: ['Export Anyway', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    if (choice.response !== 0) return;
+  }
   try {
     const dest = backup.exportBackup(latest.dir, filePaths[0]);
     await dialog.showMessageBox(mainWindow || undefined, { type: 'info', title: 'Backup exported', message: 'Backup exported.', detail: dest });

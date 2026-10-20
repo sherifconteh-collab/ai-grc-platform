@@ -706,12 +706,36 @@ components:
 
     HealthResponse:
       type: object
+      description: >
+        Liveness probe. Carries only the verdict and the connection states; no
+        memory, uptime, latency or platform ids. Always HTTP 200, even when the
+        database is down. The fuller report is GET /health/details (platform owner).
       required: [status, database]
       properties:
         status:
           type: string
-        database:
+          enum: [healthy, degraded]
+        timestamp:
           type: string
+          format: date-time
+        database:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [connected, disconnected, not_configured]
+        realtime:
+          type: object
+          properties:
+            websocket:
+              type: object
+              properties:
+                redis:
+                  type: object
+                  properties:
+                    status:
+                      type: string
         requestId:
           type: string
 

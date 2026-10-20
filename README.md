@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0_or_commercial-blue.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
-[![Version](https://img.shields.io/badge/version-v2026.10.1-green.svg)](./RELEASE_NOTES.md)
+[![Version](https://img.shields.io/badge/version-v2026.10.2-green.svg)](./RELEASE_NOTES.md)
 [![CNSA](https://img.shields.io/badge/CNSA-1.0%20%2B%202.0%20(PQC)-purple.svg)](#-security)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-18 | PR #382: docs(release): release notes and README for #380/#381; keep @sentry/node on 10.x -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #410: security(desktop): lock an exported backup to the current Windows user -->
 
 ## 🎯 What is This?
 
@@ -260,7 +260,7 @@ Add `SENTRY_DSN=<your-dsn>` to `backend/.env` to enable error tracking and excep
 ### Running for a team, behind a load balancer, or with a DR site
 
 - `REGISTRATION_MODE=invite_only` closes self-sign-up, so people join only when the platform administrator invites or creates them (**Settings → Users and roles**).
-- Point load balancer health checks at the backend's `GET /ready`, which returns 503 when that server cannot reach a writable database (or a required Redis). `/health` always returns 200 and is a liveness check only.
+- Point load balancer health checks at the backend's `GET /ready`, which returns 503 when that server cannot reach a writable database (or a required Redis). `/health` always returns 200 and is a liveness check only; it reports just the status and the database and Redis connection states. A platform owner can read memory, uptime and database latency at `GET /health/details`.
 - Background jobs (reminders, retention, scheduled reports, and nightly backups once `BACKUP_ENABLED=true` is set) run on one server at a time. Set `BACKUP_ENABLED=true` on every server; the coordination needs no other configuration.
 
 See [Running for a team](./docs/SELF_HOSTED_INSTALL.md#running-for-a-team) and [Load balancer and disaster recovery](./docs/SELF_HOSTED_INSTALL.md#load-balancer-and-disaster-recovery).
