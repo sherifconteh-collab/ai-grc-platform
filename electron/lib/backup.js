@@ -81,6 +81,31 @@ function grantCurrentUser(dir) {
   }
 }
 
+/**
+ * Windows: ignore whatever access rules the destination folder would pass on
+ * and leave only the current user on `dir`. The rule is set on the folder only
+ * (no /T): Windows propagates an inheritable ACE to the children that inherit
+ * from it, whereas /T with /inheritance:r strips each child's inherited rules
+ * and leaves files with no entry at all, unreadable even by the owner. mkdir/chmod modes do nothing on
+ * Windows, so without this an exported backup (which holds the encryption key
+ * and JWT secret) is as readable as the share it lands on. `run` is injectable
+ * so the command line can be tested without Windows.
+ */
+function restrictToCurrentUser(dir, run = spawnSync) {
+  const who = run('whoami', ['/user', '/fo', 'csv', '/nh'], { windowsHide: true, encoding: 'utf8' });
+  const sid = /"(S-1-[\d-]+)"/.exec((who && who.stdout) || '');
+  if (!sid) throw new BackupError('The current Windows account could not be identified.');
+  const result = run('icacls', [dir, '/inheritance:r', '/grant:r', `*${sid[1]}:(OI)(CI)F`, '/Q'], { windowsHide: true, encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new BackupError(`Access to the exported backup could not be restricted: ${(result.stderr || result.stdout || '').trim()}`);
+  }
+}
+
+/** True for a UNC path (a network share), which keeps its own access rules. */
+function isNetworkPath(p) {
+  return /^\\\\[^\\]/.test(String(p || ''));
+}
+
 /** Copy the restorable parts of a data folder (database stopped) into `dest`. */
 function copyDataSet(dataDir, dest, manifest) {
   makePrivateDir(dest);
@@ -259,12 +284,23 @@ function restoreBackup(dataDir, sourceDir, { bundledMajor }) {
 }
 
 /** Copy a backup somewhere else (another disk, a network share). */
-function exportBackup(backupDir, destParent) {
+function exportBackup(backupDir, destParent, { platform = process.platform, run = spawnSync } = {}) {
   const base = `ControlWeave-backup-${path.basename(backupDir)}`;
   let dest = path.join(destParent, base);
   for (let i = 2; fs.existsSync(dest); i++) dest = path.join(destParent, `${base}-${i}`);
   fs.cpSync(backupDir, dest, { recursive: true });
-  if (process.platform !== 'win32') fs.chmodSync(dest, 0o700);
+  if (platform !== 'win32') {
+    fs.chmodSync(dest, 0o700);
+    return dest;
+  }
+  // Fail closed: a copy holding the keys that could not be locked down (a
+  // FAT/exFAT drive, a share without ACL support) is removed, not left behind.
+  try {
+    restrictToCurrentUser(dest, run);
+  } catch (error) {
+    fs.rmSync(dest, { recursive: true, force: true });
+    throw new BackupError(`${error.message} The backup was not exported. Choose a folder on an NTFS drive.`);
+  }
   return dest;
 }
 
@@ -276,5 +312,7 @@ module.exports = {
   readBackup,
   restoreBackup,
   exportBackup,
+  restrictToCurrentUser,
+  isNetworkPath,
   KEEP_DAILY,
 };
