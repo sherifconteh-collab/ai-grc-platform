@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { notificationsAPI } from '@/lib/api';
+import { safeInternalPath } from '@/lib/safeLink';
 
 const TYPE_LABELS: Record<string, string> = {
   control_due: 'Control Due',
@@ -92,12 +93,8 @@ function NotificationCenterInner() {
 
   const handleClick = (n: Notification) => {
     if (!n.is_read) handleMarkRead(n.id);
-    if (!n.link) return;
-    if (n.link.startsWith('/')) {
-      router.push(n.link);
-      return;
-    }
-    window.location.href = n.link;
+    const target = safeInternalPath(n.link);
+    if (target) router.push(target);
   };
 
   const formatTime = (ts: string) => {

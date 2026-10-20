@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { notificationsAPI } from '@/lib/api';
+import { safeInternalPath } from '@/lib/safeLink';
 import { useNotificationEvents } from '@/contexts/WebSocketContext';
 
 interface Notification {
@@ -18,6 +20,7 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   
   // Real-time notification events
@@ -158,7 +161,11 @@ export default function NotificationBell() {
                   }`}
                   onClick={() => {
                     if (!notification.is_read) handleMarkRead(notification.id);
-                    if (notification.link) window.location.href = notification.link;
+                    const target = safeInternalPath(notification.link);
+                    if (target) {
+                      setOpen(false);
+                      router.push(target);
+                    }
                   }}
                 >
                   <div className="flex items-start gap-2">

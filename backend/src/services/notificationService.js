@@ -2,6 +2,7 @@
 'use strict';
 
 const pool = require('../config/database');
+const { normalizeInternalPath } = require('../utils/safeLink');
 
 /**
  * Create a notification for one user or broadcast to the whole org.
@@ -12,12 +13,14 @@ const pool = require('../config/database');
  * @param {string} message
  * @param {string|null} link    - optional deep link
  */
-async function createNotification(orgId, userId, type, title, message, link = null) {
+async function createNotification(orgId, userId, type, title, message, rawLink = null) {
+  // Only in-app relative paths are kept; anything else is stored as no link.
+  const link = normalizeInternalPath(rawLink);
   try {
     await pool.query(
       `INSERT INTO notifications (organization_id, user_id, type, title, message, link)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [orgId, userId || null, type, title, message, link || null]
+      [orgId, userId || null, type, title, message, link]
     );
 
     // Optionally send email if user has preferences set
