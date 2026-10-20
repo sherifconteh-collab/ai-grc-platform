@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-18 | PR #382: docs(release): release notes and README for #380/#381; keep @sentry/node on 10.x -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #403: test(api): cover passkey and pending-evidence routes -->
 
 ## 🎯 What is This?
 
