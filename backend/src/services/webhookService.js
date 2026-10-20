@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const net = require('net');
 const pool = require('../config/database');
-const { safeFetch } = require('../utils/netGuard');
+const { safeFetch, isPrivateAddress } = require('../utils/netGuard');
 
 // Outbound HMAC signatures: both HMAC-SHA256 (legacy, kept so existing
 // receivers checking the original header value keep working) and
@@ -41,39 +41,13 @@ function verifyIncomingWebhook(secret, signature, body) {
   return false;
 }
 
-function isPrivateIpv4(ip) {
-  const octets = ip.split('.').map((value) => Number.parseInt(value, 10));
-  if (octets.length !== 4 || octets.some((octet) => !Number.isFinite(octet))) return true;
-  const [a, b] = octets;
-  return (
-    a === 10 ||
-    a === 127 ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 169 && b === 254)
-  );
-}
-
-function isPrivateIpv6(ip) {
-  const normalized = ip.toLowerCase();
-  return (
-    normalized === '::1' ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    normalized.startsWith('fe8') ||
-    normalized.startsWith('fe9') ||
-    normalized.startsWith('fea') ||
-    normalized.startsWith('feb')
-  );
-}
-
 function isPrivateHostName(hostname) {
-  const lower = String(hostname || '').trim().toLowerCase();
+  // URL.hostname keeps the brackets around an IPv6 literal; strip them so the
+  // shared netGuard parser (IPv4-mapped, NAT64, 6to4 aware) sees the address.
+  const lower = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
   if (!lower) return true;
   if (lower === 'localhost' || lower.endsWith('.local')) return true;
-  const ipVersion = net.isIP(lower);
-  if (ipVersion === 4) return isPrivateIpv4(lower);
-  if (ipVersion === 6) return isPrivateIpv6(lower);
+  if (net.isIP(lower)) return isPrivateAddress(lower);
   return false;
 }
 

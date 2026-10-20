@@ -20,6 +20,7 @@
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
 ### Security
+- security(netguard): parse IPv6 literals into bytes so IPv4-mapped, NAT64 and 6to4 addresses are no longer treated as public, and reuse the guard in webhook target validation — @sherifconteh-collab
 - security(desktop): lock an exported backup to the current Windows user ([#410](https://github.com/sherifconteh-collab/ai-grc-platform/pull/410)) — @sherifconteh-collab
 
 - security(health): drop memory, uptime and platform ids from the public /health ([#409](https://github.com/sherifconteh-collab/ai-grc-platform/pull/409)) — @sherifconteh-collab
