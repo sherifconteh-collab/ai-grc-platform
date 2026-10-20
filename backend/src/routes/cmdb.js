@@ -7,6 +7,7 @@ const { requireProEdition } = require('../middleware/edition');
 const { validateBody, requireFields } = require('../middleware/validate');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { log, serializeError } = require('../utils/logger');
+const { ensureOrgUser, ensureOrgRow } = require('../utils/orgRefs');
 const rateLimit = require('express-rate-limit');
 
 // Three layers, in this specific order, matching rmfInheritance.js: (1) a
@@ -315,6 +316,22 @@ async function getCategoryId(code) {
   return result.rows.length > 0 ? result.rows[0].id : null;
 }
 
+// Owner, custodian, business owner and environment ids come from the request
+// body. Each must belong to the caller's organization before it is stored, or a
+// join on the id would return another tenant's names. Returns an error message
+// or null.
+async function foreignAssetReference(orgId, refs) {
+  for (const field of ['owner_id', 'custodian_id', 'business_owner_id']) {
+    if (!(await ensureOrgUser(orgId, refs[field]))) {
+      return `${field} must be an active user in your organization`;
+    }
+  }
+  if (!(await ensureOrgRow('environments', orgId, refs.environment_id))) {
+    return 'environment_id does not refer to an environment in your organization';
+  }
+  return null;
+}
+
 function assetRoutes(routePath, categoryCode) {
   router.get(`/${routePath}`, async (req, res) => {
     try {
@@ -325,8 +342,8 @@ function assetRoutes(routePath, categoryCode) {
         SELECT a.*, u.first_name || ' ' || u.last_name as owner_name,
                e.name as environment_name
         FROM assets a
-        LEFT JOIN users u ON u.id = a.owner_id
-        LEFT JOIN environments e ON e.id = a.environment_id
+        LEFT JOIN users u ON u.id = a.owner_id AND u.organization_id = a.organization_id
+        LEFT JOIN environments e ON e.id = a.environment_id AND e.organization_id = a.organization_id
         WHERE a.organization_id = $1 AND a.category_id = $2
         ORDER BY a.name`,
         [req.user.organization_id, catId]
@@ -354,6 +371,11 @@ function assetRoutes(routePath, categoryCode) {
       const { name, asset_tag, serial_number, model, manufacturer, owner_id, location,
               environment_id, status, criticality, ip_address, hostname, version, notes,
               ai_model_type, ai_risk_level } = req.body;
+
+      const refError = await foreignAssetReference(req.user.organization_id, {
+        owner_id, environment_id
+      });
+      if (refError) return res.status(400).json({ success: false, error: refError });
 
       const result = await pool.query(`
         INSERT INTO assets (organization_id, category_id, name, asset_tag, serial_number, model,
@@ -421,6 +443,9 @@ function assetRoutes(routePath, categoryCode) {
       }
 
       if (updates.length === 0) return res.status(400).json({ success: false, error: 'No fields to update' });
+
+      const refError = await foreignAssetReference(req.user.organization_id, req.body);
+      if (refError) return res.status(400).json({ success: false, error: refError });
 
       const setClauses = updates.map(([col], index) => `${col} = $${index + 1}`);
       const values = updates.map(([, value]) => value);
@@ -620,7 +645,7 @@ router.get('/controls/:controlId/assets', async (req, res) => {
       FROM asset_control_mappings acm
       JOIN assets a ON a.id = acm.asset_id
       JOIN asset_categories ac ON ac.id = a.category_id
-      LEFT JOIN environments e ON e.id = a.environment_id
+      LEFT JOIN environments e ON e.id = a.environment_id AND e.organization_id = a.organization_id
       WHERE acm.control_id = $1 AND acm.organization_id = $2
       ORDER BY ac.name, a.name`,
       [req.params.controlId, req.user.organization_id]

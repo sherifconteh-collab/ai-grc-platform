@@ -8,6 +8,7 @@ const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimit');
 const { requireSod } = require('../middleware/sod');
+const { ensureOrgUser, ensureOrgRow } = require('../utils/orgRefs');
 const { enqueueWebhookEvent } = require('../services/webhookService');
 const { enqueueJob } = require('../services/jobService');
 const { createNotification } = require('../services/notificationService');
@@ -166,9 +167,9 @@ router.get('/', requirePermission('controls.read'), async (req, res) => {
        FROM poam_items p
        LEFT JOIN framework_controls fc ON fc.id = p.control_id
        LEFT JOIN frameworks f ON f.id = fc.framework_id
-       LEFT JOIN vulnerability_findings vf ON vf.id = p.vulnerability_id
-       LEFT JOIN users owner ON owner.id = p.owner_id
-       LEFT JOIN users creator ON creator.id = p.created_by
+       LEFT JOIN vulnerability_findings vf ON vf.id = p.vulnerability_id AND vf.organization_id = p.organization_id
+       LEFT JOIN users owner ON owner.id = p.owner_id AND owner.organization_id = p.organization_id
+       LEFT JOIN users creator ON creator.id = p.created_by AND creator.organization_id = p.organization_id
        -- LATERAL rather than three correlated subqueries in the SELECT list,
        -- per .claude/rules/database.md, and rather than joining the three link
        -- tables directly, which would inflate rows multiplicatively.
@@ -316,9 +317,9 @@ router.get('/export',
        FROM poam_items p
        LEFT JOIN framework_controls fc ON fc.id = p.control_id
        LEFT JOIN frameworks f ON f.id = fc.framework_id
-       LEFT JOIN users owner ON owner.id = p.owner_id
-       LEFT JOIN vulnerability_findings vf ON vf.id = p.vulnerability_id
-       LEFT JOIN risk_treatments rt ON rt.id = p.treatment_id
+       LEFT JOIN users owner ON owner.id = p.owner_id AND owner.organization_id = p.organization_id
+       LEFT JOIN vulnerability_findings vf ON vf.id = p.vulnerability_id AND vf.organization_id = p.organization_id
+       LEFT JOIN risk_treatments rt ON rt.id = p.treatment_id AND rt.organization_id = p.organization_id
        LEFT JOIN LATERAL (
          SELECT
            (SELECT string_agg(DISTINCT lfc.control_id || ' (' || COALESCE(lf.code, '?') || ')', '; ')
@@ -456,7 +457,7 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
        FROM poam_items p
        LEFT JOIN framework_controls fc ON fc.id = p.control_id
        LEFT JOIN frameworks f ON f.id = fc.framework_id
-       LEFT JOIN vulnerability_findings vf ON vf.id = p.vulnerability_id
+       LEFT JOIN vulnerability_findings vf ON vf.id = p.vulnerability_id AND vf.organization_id = p.organization_id
        WHERE p.organization_id = $1 AND p.id = $2
        LIMIT 1`,
       [orgId, id]
@@ -471,7 +472,7 @@ router.get('/:id', requirePermission('controls.read'), async (req, res) => {
         `SELECT pu.*,
                 u.email AS changed_by_email
          FROM poam_item_updates pu
-         LEFT JOIN users u ON u.id = pu.changed_by
+         LEFT JOIN users u ON u.id = pu.changed_by AND u.organization_id = pu.organization_id
          WHERE pu.organization_id = $1 AND pu.poam_item_id = $2
          ORDER BY pu.created_at DESC`,
         [orgId, id]
@@ -637,6 +638,12 @@ router.post('/', requirePermission('controls.write'), async (req, res) => {
     }
     if (!ALLOWED_PRIORITY.includes(String(priority))) {
       return res.status(400).json({ success: false, error: `priority must be one of: ${ALLOWED_PRIORITY.join(', ')}` });
+    }
+    if (!(await ensureOrgUser(orgId, owner_id))) {
+      return res.status(400).json({ success: false, error: 'owner_id must be an active user in your organization' });
+    }
+    if (!(await ensureOrgRow('vulnerability_findings', orgId, vulnerability_id))) {
+      return res.status(400).json({ success: false, error: 'vulnerability_id does not refer to a finding in your organization' });
     }
 
     const itemResult = await pool.query(
@@ -934,6 +941,12 @@ router.patch('/:id', requirePermission('controls.write'), async (req, res) => {
     }
     if (!ALLOWED_PRIORITY.includes(nextPriority)) {
       return res.status(400).json({ success: false, error: `priority must be one of: ${ALLOWED_PRIORITY.join(', ')}` });
+    }
+    if (!(await ensureOrgUser(orgId, patch.owner_id))) {
+      return res.status(400).json({ success: false, error: 'owner_id must be an active user in your organization' });
+    }
+    if (!(await ensureOrgRow('risk_treatments', orgId, patch.treatment_id))) {
+      return res.status(400).json({ success: false, error: 'treatment_id does not refer to a risk treatment in your organization' });
     }
 
     const closedAt = ['closed', 'risk_accepted'].includes(nextStatus) ? new Date().toISOString() : null;
@@ -1367,8 +1380,8 @@ router.get('/:id/approval-history', requirePermission('controls.read'), async (r
          reviewer.email AS reviewed_by_email
        FROM poam_approval_requests par
        LEFT JOIN framework_controls fc ON fc.id = par.control_id
-       LEFT JOIN users submitter ON submitter.id = par.submitted_by
-       LEFT JOIN users reviewer ON reviewer.id = par.reviewed_by
+       LEFT JOIN users submitter ON submitter.id = par.submitted_by AND submitter.organization_id = par.organization_id
+       LEFT JOIN users reviewer ON reviewer.id = par.reviewed_by AND reviewer.organization_id = par.organization_id
        WHERE par.organization_id = $1 AND par.poam_item_id = $2
        ORDER BY par.submitted_at DESC`,
       [orgId, poamId]
