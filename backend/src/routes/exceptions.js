@@ -5,6 +5,7 @@ const pool = require('../config/database');
 const auditService = require('../services/auditService');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { enqueueWebhookEvent } = require('../services/webhookService');
+const { ensureOrgUser } = require('../utils/orgRefs');
 
 router.use(authenticate);
 
@@ -36,8 +37,8 @@ router.get('/', requirePermission('controls.read'), async (req, res) => {
       FROM control_exceptions ce
       JOIN framework_controls fc ON fc.id = ce.control_id
       JOIN frameworks f ON f.id = fc.framework_id
-      LEFT JOIN users owner ON owner.id = ce.owner_id
-      LEFT JOIN users approver ON approver.id = ce.approved_by
+      LEFT JOIN users owner ON owner.id = ce.owner_id AND owner.organization_id = ce.organization_id
+      LEFT JOIN users approver ON approver.id = ce.approved_by AND approver.organization_id = ce.organization_id
       WHERE ce.organization_id = $1
     `;
     if (status && VALID_STATUS.includes(status)) {
@@ -66,6 +67,9 @@ router.post('/', requirePermission('controls.write'), async (req, res) => {
     const parsedExpiresAt = expires_at ? new Date(expires_at) : null;
     if (expires_at && Number.isNaN(parsedExpiresAt?.getTime())) {
       return res.status(400).json({ success: false, error: 'expires_at must be a valid date' });
+    }
+    if (!(await ensureOrgUser(orgId, owner_id))) {
+      return res.status(400).json({ success: false, error: 'owner_id must be an active user in your organization' });
     }
 
     const insert = await pool.query(
@@ -127,6 +131,9 @@ router.patch('/:id', requirePermission('controls.write'), async (req, res) => {
     const parsedExpiresAt = expires_at ? new Date(expires_at) : null;
     if (expires_at && Number.isNaN(parsedExpiresAt?.getTime())) {
       return res.status(400).json({ success: false, error: 'expires_at must be a valid date' });
+    }
+    if (!(await ensureOrgUser(orgId, owner_id))) {
+      return res.status(400).json({ success: false, error: 'owner_id must be an active user in your organization' });
     }
 
     const existing = await pool.query(

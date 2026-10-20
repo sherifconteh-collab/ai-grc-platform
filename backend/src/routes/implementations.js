@@ -11,6 +11,7 @@ const poamGate = require('../services/poamGateService');
 const crosswalkCredits = require('../services/crosswalkCreditService');
 const rateLimit = require('express-rate-limit');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { ensureOrgUser } = require('../utils/orgRefs');
 const { decrypt } = require('../utils/encrypt');
 const { log } = require('../utils/logger');
 
@@ -96,7 +97,7 @@ router.get('/', requirePermission('implementations.read'), async (req, res) => {
       FROM control_implementations ci
       JOIN framework_controls fc ON fc.id = ci.control_id
       JOIN frameworks f ON f.id = fc.framework_id
-      LEFT JOIN users u ON u.id = ci.assigned_to
+      LEFT JOIN users u ON u.id = ci.assigned_to AND u.organization_id = ci.organization_id
       WHERE ci.organization_id = $1
     `;
     const params = [orgId];
@@ -213,7 +214,7 @@ router.get('/due/upcoming', requirePermission('implementations.read'), async (re
       FROM control_implementations ci
       JOIN framework_controls fc ON fc.id = ci.control_id
       JOIN frameworks f ON f.id = fc.framework_id
-      LEFT JOIN users u ON u.id = ci.assigned_to
+      LEFT JOIN users u ON u.id = ci.assigned_to AND u.organization_id = ci.organization_id
       WHERE ci.organization_id = $1
         AND ci.status IN ('in_progress', 'needs_review')
         AND ci.due_date IS NOT NULL
@@ -243,7 +244,7 @@ router.get('/:id', requirePermission('implementations.read'), async (req, res) =
       FROM control_implementations ci
       JOIN framework_controls fc ON fc.id = ci.control_id
       JOIN frameworks f ON f.id = fc.framework_id
-      LEFT JOIN users u ON u.id = ci.assigned_to
+      LEFT JOIN users u ON u.id = ci.assigned_to AND u.organization_id = ci.organization_id
       WHERE ci.id = $1 AND ci.organization_id = $2
     `, [req.params.id, req.user.organization_id]);
 
@@ -450,6 +451,10 @@ router.patch('/:id/assign', requirePermission('implementations.write'), validate
 }), async (req, res) => {
   try {
     const { assignedTo, dueDate, notes } = req.body;
+
+    if (!(await ensureOrgUser(req.user.organization_id, assignedTo))) {
+      return res.status(400).json({ success: false, error: 'assignedTo must be an active user in your organization' });
+    }
 
     const result = await pool.query(`
       UPDATE control_implementations SET

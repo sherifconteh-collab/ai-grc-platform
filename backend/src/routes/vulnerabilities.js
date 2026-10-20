@@ -13,6 +13,7 @@ const { getConfigValue } = require('../services/dynamicConfigService');
 const { vulnerabilityCreated } = require('../services/realtimeEventService');
 const { mapCweToOwasp2025 } = require('../utils/owaspMapping');
 const { UPLOADS_DIR } = require('../config/paths');
+const { ensureOrgUser } = require('../utils/orgRefs');
 
 router.use(authenticate);
 router.use(requireTier('pro'));
@@ -477,7 +478,7 @@ async function getWorkflowItems(orgId, vulnerabilityId) {
      JOIN framework_controls fc ON fc.id = vw.framework_control_id
      JOIN frameworks f ON f.id = fc.framework_id
      LEFT JOIN control_implementations ci ON ci.id = vw.implementation_id
-     LEFT JOIN users owner ON owner.id = vw.owner_id
+     LEFT JOIN users owner ON owner.id = vw.owner_id AND owner.organization_id = vw.organization_id
      WHERE vw.organization_id = $1
        AND vw.vulnerability_id = $2
      ORDER BY
@@ -1564,6 +1565,10 @@ router.patch('/:id/workflow/:workItemId', requirePermission('controls.write'), a
     }
     if (controlEffect !== undefined && !CONTROL_EFFECT_ORDER.includes(controlEffect)) {
       return res.status(400).json({ success: false, error: `controlEffect must be one of: ${CONTROL_EFFECT_ORDER.join(', ')}` });
+    }
+
+    if (!(await ensureOrgUser(orgId, ownerId))) {
+      return res.status(400).json({ success: false, error: 'ownerId must be an active user in your organization' });
     }
 
     const existingResult = await pool.query(

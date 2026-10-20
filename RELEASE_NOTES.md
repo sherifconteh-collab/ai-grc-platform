@@ -20,6 +20,8 @@
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
 ### Security
+- security(tenancy): reject owner, assignee, vulnerability, treatment and environment ids from another organization on control assignment, POA&M, exceptions, vulnerability workflow and CMDB assets, and scope the joins that read them to the row's organization (port of ControlWeaver-Pro#932) — @sherifconteh-collab
+
 - security(desktop): lock an exported backup to the current Windows user ([#410](https://github.com/sherifconteh-collab/ai-grc-platform/pull/410)) — @sherifconteh-collab
 
 - security(health): drop memory, uptime and platform ids from the public /health ([#409](https://github.com/sherifconteh-collab/ai-grc-platform/pull/409)) — @sherifconteh-collab
