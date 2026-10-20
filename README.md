@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #412: security(netguard): block IPv4-mapped and embedded IPv6 literals -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #415: security(tenancy): reject ids from another organization on write paths -->
 
 ## 🎯 What is This?
 
