@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #408: fix(policies): let GET /policies/uploads reach its handler instead of the :id route -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #409: security(health): drop memory, uptime and platform ids from the public /health -->
 
 ## 🎯 What is This?
 

@@ -19,6 +19,10 @@
 
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
+### Security
+
+- security(health): drop memory, uptime and platform ids from the public /health ([#409](https://github.com/sherifconteh-collab/ai-grc-platform/pull/409)) — @sherifconteh-collab
+
 ## [2026.10.2] — 2026-10-19
 
 ### Added
