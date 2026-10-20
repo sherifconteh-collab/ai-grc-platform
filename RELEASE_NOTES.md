@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- **Desktop: backups apply only in On this computer only mode.** A desktop connected to an organization's server keeps no data and makes no backups; the server's backups (`BACKUP_ENABLED=true`) cover it. ([#393](https://github.com/sherifconteh-collab/ai-grc-platform/pull/393))
 - fix(policies): let GET /policies/uploads reach its handler instead of the :id route ([#408](https://github.com/sherifconteh-collab/ai-grc-platform/pull/408)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-19 ([#401](https://github.com/sherifconteh-collab/ai-grc-platform/pull/401)) — @sherifconteh-collab
 
@@ -29,7 +30,7 @@
 ### Added
 
 - **Desktop: connect to your organization's server.** The first launch asks whether ControlWeave runs on this computer only or connects to a company ControlWeave server, where each person signs in with their own account and the server's administrators manage access. Server addresses must be HTTPS and are checked before use; IT can preset one with `--server=<url>` or `CONTROLWEAVE_SERVER_URL`, which fixes the app to that server. Otherwise, switch from the **File** menu. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
-- **Desktop: backups** (in **On this computer only** mode). A backup is made on every quit (one per day, last 7 kept), plus **File → Back Up Now**, **Export Latest Backup** and **Restore from Backup**. A restore keeps the data it replaces in `backups/pre-restore-*`. A desktop connected to an organization's server keeps no data of its own and makes no backups; the server's backups (`BACKUP_ENABLED=true`) cover it. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
+- **Desktop: backups.** A backup is made on every quit (one per day, last 7 kept), plus **File → Back Up Now**, **Export Latest Backup** and **Restore from Backup**. A restore keeps the data it replaces in `backups/pre-restore-*`. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
 - **Invite-only registration.** `REGISTRATION_MODE=invite_only` closes self-sign-up for company servers; people join only when an administrator invites or creates them. The default stays `open`. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
 - **`GET /ready`** for load balancers and failover monitors: 503 when the database is unreachable or read-only, or a required Redis is down. ([#381](https://github.com/sherifconteh-collab/ai-grc-platform/pull/381))
 - **Rebuilt desktop launcher.** A startup window shows each step and names the one that failed, with logs and a copyable report. Installed apps are booted end to end in CI on Windows, macOS and Linux before release. ([#380](https://github.com/sherifconteh-collab/ai-grc-platform/pull/380))
