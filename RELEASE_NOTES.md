@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(netguard): block IPv4-mapped and embedded IPv6 literals ([#412](https://github.com/sherifconteh-collab/ai-grc-platform/pull/412)) — @sherifconteh-collab
 - security(auth): reject refresh tokens used as access tokens ([#414](https://github.com/sherifconteh-collab/ai-grc-platform/pull/414)) — @sherifconteh-collab
 - security(auth): lock the account after repeated wrong authenticator codes ([#411](https://github.com/sherifconteh-collab/ai-grc-platform/pull/411)) — @sherifconteh-collab
 - security(privacy): scope copilot history and cached AI answers to the user ([#418](https://github.com/sherifconteh-collab/ai-grc-platform/pull/418)) — @sherifconteh-collab
