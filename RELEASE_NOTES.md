@@ -20,6 +20,7 @@
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
 ### Security
+- security(rbac): stop users.manage holders from creating, inviting or promoting an admin, assigning privileged roles or changing their own role_ids
 - security(desktop): lock an exported backup to the current Windows user ([#410](https://github.com/sherifconteh-collab/ai-grc-platform/pull/410)) — @sherifconteh-collab
 
 - security(health): drop memory, uptime and platform ids from the public /health ([#409](https://github.com/sherifconteh-collab/ai-grc-platform/pull/409)) — @sherifconteh-collab

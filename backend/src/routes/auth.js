@@ -1533,8 +1533,16 @@ router.post('/accept-invite', validateBody((body) => {
       await assignUserRole(client, user.id, invite.primary_role).catch(() => {});
 
       // Assign pre-configured custom roles
+      // Re-validate the stored ids at accept time: only roles of the invite's
+      // own organization (or system roles) may be attached.
       if (invite.role_ids && invite.role_ids.length > 0) {
-        for (const roleId of invite.role_ids) {
+        const allowedRoles = await client.query(
+          `SELECT id FROM roles
+           WHERE id = ANY($1::uuid[])
+             AND (organization_id = $2 OR is_system_role = true)`,
+          [invite.role_ids, invite.organization_id]
+        );
+        for (const { id: roleId } of allowedRoles.rows) {
           await client.query(
             'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
             [user.id, roleId]

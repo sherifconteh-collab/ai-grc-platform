@@ -15,6 +15,7 @@ const {
 } = require('../utils/passwordPolicy');
 const { encrypt, decrypt, hashForLookup } = require('../utils/encrypt');
 const { hasPublicColumn } = require('../utils/schema');
+const { assertMayAssignRoles, assertMayModifyUser } = require('../utils/roleGrantGuard');
 
 router.use(authenticate);
 const ALLOWED_PRIMARY_ROLES = new Set(['admin', 'auditor', 'user']);
@@ -161,6 +162,10 @@ router.post('/', requirePermission('users.manage'), validateBody((body) => {
     try {
       await client.query('BEGIN');
 
+      // Only an admin may create an admin or hand out a role that carries
+      // user/role management.
+      await assertMayAssignRoles(client, req, { primaryRole, roleIds: roleIdsInput });
+
       const storedEmail = emailHash ? encrypt(email) : email;
       const uCols = emailHash
         ? 'organization_id, email, email_hash, password_hash, first_name, last_name, role, is_active'
@@ -288,6 +293,14 @@ router.patch('/:userId', requirePermission('users.manage'), validateBody((body, 
       }
 
       const existingUser = existingUserResult.rows[0];
+      // A non-admin must not touch an admin account (deactivate, reactivate,
+      // re-role) and must not reach admin through role_ids.
+      assertMayModifyUser(req, existingUser.role);
+      await assertMayAssignRoles(client, req, {
+        primaryRole: req.body.primary_role,
+        roleIds: roleIdsInput,
+        targetUserId: userId
+      });
       const nextRole = req.body.primary_role !== undefined
         ? String(req.body.primary_role).toLowerCase()
         : String(existingUser.role).toLowerCase();
@@ -330,6 +343,15 @@ router.patch('/:userId', requirePermission('users.manage'), validateBody((body, 
           params
         );
         updatedUser = updated.rows[0];
+        if (req.body.primary_role !== undefined) {
+          // Keep the per-org membership role in step, otherwise switching
+          // organizations away and back restores the old (higher) role.
+          await client.query(
+            `UPDATE user_organizations SET role = $1
+             WHERE user_id = $2 AND organization_id = $3`,
+            [nextRole, userId, req.user.organization_id]
+          );
+        }
       } else {
         const current = await client.query(
           `SELECT id, email, first_name, last_name, role, is_active, created_at, updated_at
@@ -414,10 +436,18 @@ router.post('/invite', requirePermission('users.manage'), validateBody((body) =>
   try {
     const orgId = req.user.organization_id;
     const email = String(req.body.email).trim().toLowerCase();
-    const primaryRole = req.body.primary_role || 'user';
+    const primaryRole = String(req.body.primary_role || 'user').toLowerCase();
     const roleIds = Array.isArray(req.body.role_ids)
       ? req.body.role_ids.filter((id) => typeof id === 'string' && id.trim().length > 0)
       : [];
+    if (roleIds.some((id) => !isUuid(id))) {
+      return res.status(400).json({ success: false, error: 'role_ids must contain valid UUID values' });
+    }
+
+    // Same rule as direct user creation: only an admin invites an admin or a
+    // user-management role, and every role id must belong to this organization.
+    await assertMayAssignRoles(pool, req, { primaryRole, roleIds });
+    await validateAssignableRoleIds(pool, orgId, roleIds);
 
     // Check if email already exists as a user (use email_hash when available)
     const invEmailHash = (await hasEmailHashCol()) ? hashForLookup(email) : null;
@@ -473,6 +503,10 @@ router.post('/invite', requirePermission('users.manage'), validateBody((body) =>
       }
     });
   } catch (err) {
+    const statusCode = Number(err.statusCode) || 500;
+    if (statusCode !== 500) {
+      return res.status(statusCode).json({ success: false, error: String(err.message) });
+    }
     console.error('Create invite error:', err);
     res.status(500).json({ success: false, error: 'Failed to create invite' });
   }
