@@ -2,6 +2,8 @@
 
 process.env.NODE_ENV = 'test';
 
+const crypto = require('crypto');
+
 jest.mock('../../src/config/database', () => ({ query: jest.fn(), connect: jest.fn() }));
 jest.mock('../../src/middleware/auth', () => ({
   authenticate: (req, res, next) => next(),
@@ -69,9 +71,18 @@ beforeEach(() => {
 
 const createBody = (extra = {}) => ({
   email: 'new.user@example.com',
-  password: 'Str0ng!Passw0rd#2026',
+  password: `Aa1!${crypto.randomBytes(12).toString('hex')}`,
   full_name: 'New User',
   ...extra
+});
+
+describe('users router rate limit', () => {
+  it('registers a rate limiter ahead of the authenticate middleware', () => {
+    const first = router.stack[0];
+    expect(first.handle.length).toBeGreaterThanOrEqual(2);
+    expect(first.handle).not.toBe(require('../../src/middleware/auth').authenticate);
+    expect(typeof first.handle.resetKey).toBe('function');
+  });
 });
 
 describe('POST /users role-grant guard', () => {

@@ -2,6 +2,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const bcrypt = require('bcryptjs');
 const { authenticate, requireAnyPermission, requirePermission } = require('../middleware/auth');
@@ -17,6 +18,10 @@ const { encrypt, decrypt, hashForLookup } = require('../utils/encrypt');
 const { hasPublicColumn } = require('../utils/schema');
 const { assertMayAssignRoles, assertMayModifyUser } = require('../utils/roleGrantGuard');
 
+// User and role management is a privilege-escalation surface, so this router
+// carries its own limit on top of the app-wide limiter. It runs before
+// authenticate to bound request volume ahead of any JWT or database work.
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 router.use(authenticate);
 const ALLOWED_PRIMARY_ROLES = new Set(['admin', 'auditor', 'user']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
