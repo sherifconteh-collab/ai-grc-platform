@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #413: security(rbac): stop users.manage holders from reaching admin -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #417: security(notifications): restrict notification links to in-app paths -->
 
 ## 🎯 What is This?
 

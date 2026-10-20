@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(notifications): restrict notification links to in-app paths ([#417](https://github.com/sherifconteh-collab/ai-grc-platform/pull/417)) — @sherifconteh-collab
 - security(rbac): stop users.manage holders from reaching admin ([#413](https://github.com/sherifconteh-collab/ai-grc-platform/pull/413)) — @sherifconteh-collab
 - security(tenancy): reject ids from another organization on write paths ([#415](https://github.com/sherifconteh-collab/ai-grc-platform/pull/415)) — @sherifconteh-collab
 - security(netguard): block IPv4-mapped and embedded IPv6 literals ([#412](https://github.com/sherifconteh-collab/ai-grc-platform/pull/412)) — @sherifconteh-collab
