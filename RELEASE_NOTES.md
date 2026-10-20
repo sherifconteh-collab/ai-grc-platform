@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(privacy): scope copilot history and cached AI answers to the user ([#418](https://github.com/sherifconteh-collab/ai-grc-platform/pull/418)) — @sherifconteh-collab
 - fix(policies): let GET /policies/uploads reach its handler instead of the :id route ([#408](https://github.com/sherifconteh-collab/ai-grc-platform/pull/408)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-19 ([#401](https://github.com/sherifconteh-collab/ai-grc-platform/pull/401)) — @sherifconteh-collab
 
@@ -20,7 +21,7 @@
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
 ### Security
-- security(auth): count failed authenticator codes toward account lockout and clear the lockout counter only after the second factor passes (port of ControlWeaver-Pro#931 item 1) — @sherifconteh-collab
+- security(privacy): key the copilot conversation and cached AI answers by user instead of organization, and remove them when the session is cleared on logout (port of ControlWeaver-Pro#933) — @sherifconteh-collab
 
 - security(desktop): lock an exported backup to the current Windows user ([#410](https://github.com/sherifconteh-collab/ai-grc-platform/pull/410)) — @sherifconteh-collab
 
