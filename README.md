@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #404: docs(setup): correct Node and PostgreSQL floors in the setup guides -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #401: chore(deps): weekly dependency batch 2026-10-19 -->
 
 ## 🎯 What is This?
 

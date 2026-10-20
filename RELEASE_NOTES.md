@@ -10,6 +10,7 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- chore(deps): weekly dependency batch 2026-10-19 ([#401](https://github.com/sherifconteh-collab/ai-grc-platform/pull/401)) — @sherifconteh-collab
 
 - test(api): cover passkey and pending-evidence routes ([#403](https://github.com/sherifconteh-collab/ai-grc-platform/pull/403)) — @sherifconteh-collab
 
