@@ -4,7 +4,7 @@
 
 Before we start, make sure you have:
 - [ ] PostgreSQL installed
-- [ ] Node.js 18+ installed
+- [ ] Node.js 24+ installed
 - [ ] VS Code installed
 - [ ] Git installed
 
