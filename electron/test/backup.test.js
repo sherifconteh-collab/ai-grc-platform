@@ -145,6 +145,7 @@ test('on Windows an export is restricted to the current user with icacls', () =>
   assert.strictEqual(icacls.args[0], dest);
   assert.ok(icacls.args.includes('/inheritance:r'), 'inherited rules from the destination are dropped');
   assert.ok(icacls.args.includes('/grant:r'));
+  assert.ok(!icacls.args.includes('/T'), 'applied to the folder only; /T would strip the children\'s inherited rules');
   assert.ok(icacls.args.includes('*S-1-5-21-111-222-333-1001:(OI)(CI)F'), 'only the current user SID is granted');
   assert.ok(fs.existsSync(path.join(dest, 'manifest.json')));
 });
@@ -177,4 +178,12 @@ test('network paths are recognized', () => {
   assert.strictEqual(backup.isNetworkPath('D:\\backups'), false);
   assert.strictEqual(backup.isNetworkPath('/mnt/backups'), false);
   assert.strictEqual(backup.isNetworkPath(''), false);
+});
+
+test('on Windows the real icacls leaves an export readable by the current user', { skip: process.platform !== 'win32' }, () => {
+  const source = backup.createBackup(fakeDataDir('backup'));
+  const dest = backup.exportBackup(source, tempDir());
+  assert.ok(backup.readBackup(dest, '17'), 'the manifest reads back after the ACL change');
+  assert.strictEqual(read(dest, 'secrets', 'encryption-key'), 'encryption-key of backup');
+  assert.strictEqual(read(dest, 'pgdata', 'base', 'table'), 'rows from backup');
 });

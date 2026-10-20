@@ -83,7 +83,10 @@ function grantCurrentUser(dir) {
 
 /**
  * Windows: ignore whatever access rules the destination folder would pass on
- * and leave only the current user on `dir`. mkdir/chmod modes do nothing on
+ * and leave only the current user on `dir`. The rule is set on the folder only
+ * (no /T): Windows propagates an inheritable ACE to the children that inherit
+ * from it, whereas /T with /inheritance:r strips each child's inherited rules
+ * and leaves files with no entry at all, unreadable even by the owner. mkdir/chmod modes do nothing on
  * Windows, so without this an exported backup (which holds the encryption key
  * and JWT secret) is as readable as the share it lands on. `run` is injectable
  * so the command line can be tested without Windows.
@@ -92,7 +95,7 @@ function restrictToCurrentUser(dir, run = spawnSync) {
   const who = run('whoami', ['/user', '/fo', 'csv', '/nh'], { windowsHide: true, encoding: 'utf8' });
   const sid = /"(S-1-[\d-]+)"/.exec((who && who.stdout) || '');
   if (!sid) throw new BackupError('The current Windows account could not be identified.');
-  const result = run('icacls', [dir, '/inheritance:r', '/grant:r', `*${sid[1]}:(OI)(CI)F`, '/T', '/Q'], { windowsHide: true, encoding: 'utf8' });
+  const result = run('icacls', [dir, '/inheritance:r', '/grant:r', `*${sid[1]}:(OI)(CI)F`, '/Q'], { windowsHide: true, encoding: 'utf8' });
   if (result.status !== 0) {
     throw new BackupError(`Access to the exported backup could not be restricted: ${(result.stderr || result.stdout || '').trim()}`);
   }
