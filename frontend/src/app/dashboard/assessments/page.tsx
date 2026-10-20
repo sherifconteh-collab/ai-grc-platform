@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'rea
 import DashboardLayout from '@/components/DashboardLayout';
 import { assessmentsAPI, usersAPI, aiAPI } from '@/lib/api';
 import { useAutoAIResult } from '@/lib/useAutoAI';
+import { aiCacheKey } from '@/lib/aiLocalState';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessAuditorWorkspace, hasPermission } from '@/lib/access';
 import Link from 'next/link';
@@ -79,7 +80,7 @@ function AssessmentsPageInner() {
   const [error, setError] = useState('');
 
   const auditReadiness = useAutoAIResult({
-    cacheKey: `audit-readiness-${user?.organizationId}`,
+    cacheKey: aiCacheKey('audit-readiness', user?.id),
     signature: `${stats?.summary?.total_procedures ?? 0}-${stats?.by_framework?.length ?? 0}`,
     enabled: !!stats,
     ttlMs: 6 * 60 * 60 * 1000,
