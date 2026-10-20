@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #401: chore(deps): weekly dependency batch 2026-10-19 -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #408: fix(policies): let GET /policies/uploads reach its handler instead of the :id route -->
 
 ## 🎯 What is This?
 
