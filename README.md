@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #415: security(tenancy): reject ids from another organization on write paths -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #413: security(rbac): stop users.manage holders from reaching admin -->
 
 ## 🎯 What is This?
 
