@@ -10,9 +10,9 @@
 > Changes staged but not yet released to production.
 
 ### Changed
+- security(privacy): scope copilot history and cached AI answers to the user ([#418](https://github.com/sherifconteh-collab/ai-grc-platform/pull/418)) — @sherifconteh-collab
 - fix(policies): let GET /policies/uploads reach its handler instead of the :id route ([#408](https://github.com/sherifconteh-collab/ai-grc-platform/pull/408)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-19 ([#401](https://github.com/sherifconteh-collab/ai-grc-platform/pull/401)) — @sherifconteh-collab
-- chore(deps): bump js-yaml 5.5.0, sanitize-html 2.18.1 (backend) and lucide-react 1.60.0 (frontend)
 
 - test(api): cover passkey and pending-evidence routes ([#403](https://github.com/sherifconteh-collab/ai-grc-platform/pull/403)) — @sherifconteh-collab
 
@@ -21,6 +21,8 @@
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
 ### Security
+- security(privacy): key the copilot conversation and cached AI answers by user instead of organization, and remove them when the session is cleared on logout (port of ControlWeaver-Pro#933) — @sherifconteh-collab
+
 - security(desktop): lock an exported backup to the current Windows user ([#410](https://github.com/sherifconteh-collab/ai-grc-platform/pull/410)) — @sherifconteh-collab
 
 - security(health): drop memory, uptime and platform ids from the public /health ([#409](https://github.com/sherifconteh-collab/ai-grc-platform/pull/409)) — @sherifconteh-collab
