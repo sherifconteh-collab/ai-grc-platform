@@ -12,6 +12,7 @@
 ### Changed
 - fix(policies): let GET /policies/uploads reach its handler instead of the :id route ([#408](https://github.com/sherifconteh-collab/ai-grc-platform/pull/408)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-19 ([#401](https://github.com/sherifconteh-collab/ai-grc-platform/pull/401)) — @sherifconteh-collab
+- chore(deps): bump bcryptjs 2.4.3 to 3.0.3, js-yaml 5.5.0, sanitize-html 2.18.1 (backend) and lucide-react 1.60.0 (frontend)
 
 - test(api): cover passkey and pending-evidence routes ([#403](https://github.com/sherifconteh-collab/ai-grc-platform/pull/403)) — @sherifconteh-collab
 
