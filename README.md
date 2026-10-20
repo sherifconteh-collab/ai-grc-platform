@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #417: security(notifications): restrict notification links to in-app paths -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #393: docs(release): limit the desktop-backup claim to local mode -->
 
 ## 🎯 What is This?
 
