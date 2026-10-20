@@ -8,6 +8,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateBody, requireFields } = require('../middleware/validate');
 const { notificationNew, notificationRead, notificationReadAll } = require('../services/realtimeEventService');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { normalizeInternalPath } = require('../utils/safeLink');
 
 router.use(authenticate);
 
@@ -106,7 +107,16 @@ router.post('/', requirePermission('notifications.write'), validateBody((body) =
   return errors;
 }), async (req, res) => {
   try {
-    const { type, title, message, link, userId } = req.body;
+    const { type, title, message, userId } = req.body;
+
+    // The web app navigates to this value, so only an in-app relative path is stored.
+    let link = null;
+    if (req.body.link !== undefined && req.body.link !== null && req.body.link !== '') {
+      link = normalizeInternalPath(req.body.link);
+      if (link === null) {
+        return res.status(400).json({ success: false, error: 'link must be a relative in-app path that starts with a single /' });
+      }
+    }
 
     if (userId) {
       const userResult = await pool.query(
@@ -121,7 +131,7 @@ router.post('/', requirePermission('notifications.write'), validateBody((body) =
     const result = await pool.query(`
       INSERT INTO notifications (organization_id, user_id, type, title, message, link)
       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-    `, [req.user.organization_id, userId || null, type, title, message, link || null]);
+    `, [req.user.organization_id, userId || null, type, title, message, link]);
 
     // Emit real-time event
     const notification = result.rows[0];

@@ -28,11 +28,70 @@ function isPrivateIpv4(ip) {
     a >= 224;
 }
 
+/**
+ * Parse an IPv6 literal into 16 bytes, or null when it is not well formed.
+ * Handles "::" compression, a trailing dotted IPv4 part (::ffff:127.0.0.1) and
+ * a zone id. The WHATWG URL parser rewrites a dotted tail into two hex groups
+ * ([::ffff:127.0.0.1] becomes [::ffff:7f00:1]), so both spellings must parse.
+ */
+function ipv6ToBytes(input) {
+  let text = String(input).toLowerCase();
+  const zone = text.indexOf('%');
+  if (zone >= 0) text = text.slice(0, zone);
+  if (!text.includes(':')) return null;
+
+  const lastColon = text.lastIndexOf(':');
+  const dotted = text.slice(lastColon + 1);
+  if (dotted.includes('.')) {
+    const octets = dotted.split('.');
+    if (octets.length !== 4 || octets.some((part) => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return null;
+    const [a, b, c, d] = octets.map(Number);
+    text = `${text.slice(0, lastColon + 1)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+
+  const halves = text.split('::');
+  if (halves.length > 2) return null;
+  const toGroups = (part) => (part === '' ? [] : part.split(':'));
+  const head = toGroups(halves[0]);
+  const rest = halves.length === 2 ? toGroups(halves[1]) : [];
+  const fill = halves.length === 2 ? 8 - head.length - rest.length : 0;
+  if (fill < (halves.length === 2 ? 1 : 0)) return null;
+  const groups = [...head, ...new Array(fill).fill('0'), ...rest];
+  if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+
+  const bytes = [];
+  for (const group of groups) {
+    const value = parseInt(group, 16);
+    bytes.push(value >> 8, value & 0xff);
+  }
+  return bytes;
+}
+
 function isPrivateIpv6(ip) {
-  const lower = ip.toLowerCase();
-  if (lower === '::1' || lower === '::') return true;
-  if (lower.startsWith('::ffff:')) return isPrivateIpv4(lower.slice(7));
-  return /^(fc|fd|fe8|fe9|fea|feb)/.test(lower);
+  const bytes = ipv6ToBytes(ip);
+  // Fail closed: anything that does not parse is treated as private.
+  if (!bytes) return true;
+  const embedded = (offset) => bytes.slice(offset, offset + 4).join('.');
+  const zeros = (from, to) => bytes.slice(from, to).every((byte) => byte === 0);
+
+  // ::, ::1 and IPv4-compatible ::a.b.c.d (the embedded address decides)
+  if (zeros(0, 12)) return isPrivateIpv4(embedded(12));
+  // IPv4-mapped ::ffff:a.b.c.d
+  if (zeros(0, 10) && bytes[10] === 0xff && bytes[11] === 0xff) return isPrivateIpv4(embedded(12));
+  // NAT64 64:ff9b::/96 (embedded address decides) and local-use 64:ff9b:1::/48
+  if (bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b) {
+    if (zeros(4, 12)) return isPrivateIpv4(embedded(12));
+    return true;
+  }
+  // 6to4 2002::/16 (embedded address decides)
+  if (bytes[0] === 0x20 && bytes[1] === 0x02) return isPrivateIpv4(embedded(2));
+  // Teredo 2001:0::/32 hides the client address; refuse it
+  if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] === 0 && bytes[3] === 0) return true;
+  // fc00::/7 unique local, fe80::/10 link local, fec0::/10 site local, ff00::/8 multicast
+  if ((bytes[0] & 0xfe) === 0xfc) return true;
+  if (bytes[0] === 0xfe && (bytes[1] & 0x80) !== 0) return true;
+  if (bytes[0] === 0xff) return true;
+  return false;
 }
 
 function isPrivateAddress(address) {

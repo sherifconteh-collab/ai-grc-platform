@@ -210,6 +210,12 @@ const authenticate = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
 
+      // A refresh token is only for POST /auth/refresh. Accepting it here would
+      // turn a long-lived token into a bearer credential for the whole API.
+      if (decoded.type === 'refresh') {
+        return res.status(401).json({ success: false, error: 'Invalid token type' });
+      }
+
       const includeFeatureOverrides = await hasOrgFeatureOverridesColumn();
       const featureOverridesSelect = includeFeatureOverrides
         ? `COALESCE(o.feature_overrides, '{}'::jsonb) as feature_overrides`

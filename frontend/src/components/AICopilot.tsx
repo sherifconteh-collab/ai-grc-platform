@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/lib/apiBase';
 import { getAccessToken } from '@/lib/tokenStore';
+import { copilotStorageKey } from '@/lib/aiLocalState';
 import MarkdownContent from '@/components/ai/MarkdownContent';
 
 interface Message {
@@ -40,7 +41,6 @@ function getPageContext(pathname: string): string {
   return '';
 }
 
-const STORAGE_KEY = 'controlweave_copilot_messages';
 const MAX_STORED = 20;
 const MAX_CONTEXT_MESSAGES = 8;
 const AI_CHAT_URL = `${getApiBaseUrl()}/ai/chat`;
@@ -57,9 +57,15 @@ export default function AICopilot() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Load persisted messages
+  // Keyed by user id: another member of the same organization must not see this
+  // conversation. The in-memory list is reset first so a previous user's
+  // messages never linger when the signed-in user changes.
+  const storageKey = copilotStorageKey(user?.id);
   useEffect(() => {
+    setMessages([]);
+    if (!storageKey) return;
     try {
-      const stored = localStorage.getItem(`${STORAGE_KEY}_${user?.organizationId}`);
+      const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = JSON.parse(stored) as Message[];
         setMessages(parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) })));
@@ -67,18 +73,18 @@ export default function AICopilot() {
     } catch {
       // ignore
     }
-  }, [user?.organizationId]);
+  }, [storageKey]);
 
   // Persist messages
   useEffect(() => {
-    if (!user?.organizationId || messages.length === 0) return;
+    if (!storageKey || messages.length === 0) return;
     try {
       const toStore = messages.slice(-MAX_STORED);
-      localStorage.setItem(`${STORAGE_KEY}_${user.organizationId}`, JSON.stringify(toStore));
+      localStorage.setItem(storageKey, JSON.stringify(toStore));
     } catch {
       // ignore
     }
-  }, [messages, user?.organizationId]);
+  }, [messages, storageKey]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -149,8 +155,12 @@ export default function AICopilot() {
 
   const clearHistory = () => {
     setMessages([]);
-    if (user?.organizationId) {
-      localStorage.removeItem(`${STORAGE_KEY}_${user.organizationId}`);
+    if (storageKey) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // ignore
+      }
     }
   };
 

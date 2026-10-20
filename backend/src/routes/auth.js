@@ -869,23 +869,6 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
       }
     }
 
-    // Reset lockout on successful password check and update region
-    const geo = getGeolocationFromRequest(req);
-    const countryCode = geo?.country_code || null;
-    const region = geo?.region || null;
-    
-    if (user.failed_login_attempts > 0 || user.locked_until || countryCode) {
-      await pool.query(
-        `UPDATE users 
-         SET failed_login_attempts = 0, 
-             locked_until = NULL,
-             country_code = COALESCE($2, country_code),
-             region = COALESCE($3, region)
-         WHERE id = $1`,
-        [user.id, countryCode, region]
-      );
-    }
-
     if (!isPlatformAdmin && user.organization_id) {
       const trialExpired = await expireOrganizationTrialIfNeeded({
         organizationId: user.organization_id,
@@ -935,10 +918,68 @@ router.post('/login', validateBody((body) => requireFields(body, ['email', 'pass
       }
 
       if (!totpValid) {
+        // Atomic increment so parallel guesses cannot dodge the counter. The
+        // password-failure counter and lock are shared on purpose: five bad
+        // second-factor attempts lock the account for the same period.
+        let locked = false;
+        if (!lockoutExempt) {
+          const failure = await pool.query(
+            `UPDATE users
+             SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1,
+                 locked_until = CASE WHEN COALESCE(failed_login_attempts, 0) + 1 >= $2
+                                     THEN NOW() + ($3::bigint * INTERVAL '1 millisecond')
+                                     ELSE locked_until END
+             WHERE id = $1
+             RETURNING failed_login_attempts, locked_until`,
+            [user.id, lockoutMaxAttempts, lockoutDurationMs]
+          );
+          const updated = failure.rows[0];
+          locked = Boolean(updated && updated.locked_until && new Date(updated.locked_until) > new Date());
+        }
+        createAuditLog({
+          organizationId: user.organization_id,
+          userId: user.id,
+          eventType: locked ? 'user.totp_lockout' : 'user.totp_failed',
+          resourceType: 'user',
+          resourceId: user.id,
+          details: { email: user.email },
+          ipAddress: extractIpFromRequest(req),
+          userAgent: req.headers['user-agent'],
+          success: false,
+          authenticationMethod: 'totp'
+        }).catch(err => log('error', 'audit_log_error', { error: err?.message || String(err) }));
+        if (locked) {
+          res.setHeader('Retry-After', String(Math.ceil(lockoutDurationMs / 1000)));
+          return res.status(423).json({
+            success: false,
+            error: 'Account temporarily locked due to too many failed login attempts',
+            retryAfterSeconds: Math.ceil(lockoutDurationMs / 1000)
+          });
+        }
         return res.status(401).json({ success: false, error: 'Invalid authenticator code. Please try again.' });
       }
     }
     // ────────────────────────────────────────────────────────────────────────
+
+    // Reset lockout and update region only once the whole credential has been
+    // accepted. When TOTP is enabled that means after the code check above: a
+    // correct password alone must not clear the counter, or an attacker who
+    // knows the password could guess authenticator codes without limit.
+    const geo = getGeolocationFromRequest(req);
+    const countryCode = geo?.country_code || null;
+    const region = geo?.region || null;
+    
+    if (user.failed_login_attempts > 0 || user.locked_until || countryCode) {
+      await pool.query(
+        `UPDATE users 
+         SET failed_login_attempts = 0, 
+             locked_until = NULL,
+             country_code = COALESCE($2, country_code),
+             region = COALESCE($3, region)
+         WHERE id = $1`,
+        [user.id, countryCode, region]
+      );
+    }
 
     const { accessToken, refreshToken, sessionExpiresAt } = generateSessionTokens(user.id, { isDemoAccount });
 
@@ -1533,8 +1574,16 @@ router.post('/accept-invite', validateBody((body) => {
       await assignUserRole(client, user.id, invite.primary_role).catch(() => {});
 
       // Assign pre-configured custom roles
+      // Re-validate the stored ids at accept time: only roles of the invite's
+      // own organization (or system roles) may be attached.
       if (invite.role_ids && invite.role_ids.length > 0) {
-        for (const roleId of invite.role_ids) {
+        const allowedRoles = await client.query(
+          `SELECT id FROM roles
+           WHERE id = ANY($1::uuid[])
+             AND (organization_id = $2 OR is_system_role = true)`,
+          [invite.role_ids, invite.organization_id]
+        );
+        for (const { id: roleId } of allowedRoles.rows) {
           await client.query(
             'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
             [user.id, roleId]

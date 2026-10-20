@@ -11,6 +11,13 @@
 
 ### Changed
 - **Desktop: backups apply only in On this computer only mode.** A desktop connected to an organization's server keeps no data and makes no backups; the server's backups (`BACKUP_ENABLED=true`) cover it. ([#393](https://github.com/sherifconteh-collab/ai-grc-platform/pull/393))
+- security(notifications): restrict notification links to in-app paths ([#417](https://github.com/sherifconteh-collab/ai-grc-platform/pull/417)) — @sherifconteh-collab
+- security(rbac): stop users.manage holders from reaching admin ([#413](https://github.com/sherifconteh-collab/ai-grc-platform/pull/413)) — @sherifconteh-collab
+- security(tenancy): reject ids from another organization on write paths ([#415](https://github.com/sherifconteh-collab/ai-grc-platform/pull/415)) — @sherifconteh-collab
+- security(netguard): block IPv4-mapped and embedded IPv6 literals ([#412](https://github.com/sherifconteh-collab/ai-grc-platform/pull/412)) — @sherifconteh-collab
+- security(auth): reject refresh tokens used as access tokens ([#414](https://github.com/sherifconteh-collab/ai-grc-platform/pull/414)) — @sherifconteh-collab
+- security(auth): lock the account after repeated wrong authenticator codes ([#411](https://github.com/sherifconteh-collab/ai-grc-platform/pull/411)) — @sherifconteh-collab
+- security(privacy): scope copilot history and cached AI answers to the user ([#418](https://github.com/sherifconteh-collab/ai-grc-platform/pull/418)) — @sherifconteh-collab
 - fix(policies): let GET /policies/uploads reach its handler instead of the :id route ([#408](https://github.com/sherifconteh-collab/ai-grc-platform/pull/408)) — @sherifconteh-collab
 - chore(deps): weekly dependency batch 2026-10-19 ([#401](https://github.com/sherifconteh-collab/ai-grc-platform/pull/401)) — @sherifconteh-collab
 
@@ -21,6 +28,8 @@
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
 ### Security
+- security(privacy): key the copilot conversation and cached AI answers by user instead of organization, and remove them when the session is cleared on logout (port of ControlWeaver-Pro#933) — @sherifconteh-collab
+
 - security(desktop): lock an exported backup to the current Windows user ([#410](https://github.com/sherifconteh-collab/ai-grc-platform/pull/410)) — @sherifconteh-collab
 
 - security(health): drop memory, uptime and platform ids from the public /health ([#409](https://github.com/sherifconteh-collab/ai-grc-platform/pull/409)) — @sherifconteh-collab
