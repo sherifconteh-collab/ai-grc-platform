@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #403: test(api): cover passkey and pending-evidence routes -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #404: docs(setup): correct Node and PostgreSQL floors in the setup guides -->
 
 ## 🎯 What is This?
 

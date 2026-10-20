@@ -13,6 +13,10 @@
 
 - test(api): cover passkey and pending-evidence routes ([#403](https://github.com/sherifconteh-collab/ai-grc-platform/pull/403)) — @sherifconteh-collab
 
+### Documentation
+
+- docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
+
 ## [2026.10.2] — 2026-10-19
 
 ### Added
