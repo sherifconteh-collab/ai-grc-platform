@@ -271,7 +271,11 @@ app.get('/edition', attachEditionInfo, (req, res) => {
   });
 });
 
-app.get('/health', async (req, res) => {
+const { publicHealth } = require('./utils/publicHealth');
+
+// Everything /health used to say. Only the platform owner sees it now, at
+// /health/details; the public probe gets publicHealth().
+async function collectHealth(req) {
   if (!databaseConfigured) {
     const redisStatus = getRedisAdapterStatus();
     const memory = process.memoryUsage();
@@ -306,7 +310,7 @@ app.get('/health', async (req, res) => {
         deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null
       };
     }
-    return res.json(health);
+    return health;
   }
 
   try {
@@ -355,13 +359,13 @@ app.get('/health', async (req, res) => {
       };
     }
     
-    res.json(health);
+    return health;
   } catch (error) {
     const redisStatus = getRedisAdapterStatus();
 
     // Return 200 with degraded status so Railway health check treats the
     // container as alive even when the database is temporarily unavailable.
-    res.json({
+    return {
       status: 'degraded',
       timestamp: new Date().toISOString(),
       database: {
@@ -381,8 +385,13 @@ app.get('/health', async (req, res) => {
           }
         }
       }
-    });
+    };
   }
+}
+
+
+app.get('/health', async (req, res) => {
+  res.json(publicHealth(await collectHealth(req), req.requestId));
 });
 
 // Readiness for load balancers and failover monitors. /health stays 200 so a
@@ -395,6 +404,11 @@ app.get('/health', async (req, res) => {
 // sits far above that and only stops a flood from exhausting the pool.
 const expressRateLimit = require('express-rate-limit');
 const readinessRateLimiter = expressRateLimit({ windowMs: 60000, max: 600, standardHeaders: true, legacyHeaders: false });
+
+const { authenticate: authenticateHealth, requirePlatformOwner } = require('./middleware/auth');
+app.get('/health/details', readinessRateLimiter, authenticateHealth, requirePlatformOwner, async (req, res) => {
+  res.json(await collectHealth(req));
+});
 
 app.get('/ready', readinessRateLimiter, async (req, res) => {
   const redis = getRedisAdapterStatus();
