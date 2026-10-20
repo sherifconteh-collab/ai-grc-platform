@@ -144,6 +144,19 @@ describe('authenticate middleware', () => {
     expect(req.user.email).toBe('test@example.com');
   });
 
+  test('rejects a refresh token presented as an access token', async () => {
+    setupPoolForUser();
+    const token = makeValidToken({ type: 'refresh' });
+    const req = { headers: { authorization: `Bearer ${token}` }, ip: '127.0.0.1' };
+    const res = makeRes();
+    const next = jest.fn();
+    pool.query.mockClear();
+    await authenticate(req, res, next);
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
   test('rejects when DB returns no user', async () => {
     pool.query.mockImplementation(async (sql) => {
       if (sql && sql.includes('information_schema.columns')) return { rows: [{ column_name: 'feature_overrides' }] };

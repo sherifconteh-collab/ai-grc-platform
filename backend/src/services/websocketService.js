@@ -186,6 +186,11 @@ function initializeWebSocket(httpServer) {
       // Verify JWT token
       const decoded = jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTIONS);
 
+      // Refresh tokens are only for POST /auth/refresh, never a socket credential.
+      if (decoded.type === 'refresh') {
+        return next(new Error('Authentication failed'));
+      }
+
       // Service account tokens are revocable and scoped by authenticate(), which
       // sockets do not run; they are for REST/MCP only.
       if (decoded.type === 'service_account') {
