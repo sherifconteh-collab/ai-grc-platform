@@ -20,6 +20,8 @@
  * the demo-session timer can run.
  */
 
+import { clearAiLocalState } from './aiLocalState';
+
 let _accessToken: string | null = null;
 
 export function getAccessToken(): string | null {
@@ -82,4 +84,6 @@ export function clearSession(): void {
   store.removeItem(SESSION_HINT_KEY);
   store.removeItem(SESSION_EXPIRES_KEY);
   store.removeItem(LEGACY_REFRESH_KEY);
+  // Copilot history and cached AI answers belong to the user who is leaving.
+  clearAiLocalState(store);
 }
