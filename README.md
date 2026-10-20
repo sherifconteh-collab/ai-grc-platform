@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #409: security(health): drop memory, uptime and platform ids from the public /health -->
+<!-- LAST_UPDATED: 2026-10-20 | PR #410: security(desktop): lock an exported backup to the current Windows user -->
 
 ## 🎯 What is This?
 
