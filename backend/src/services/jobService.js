@@ -561,30 +561,37 @@ async function processPendingJobs({ organizationId = null, limit = 20 } = {}) {
 
   params.push(boundedLimit);
 
+  // Atomically claim queued jobs: the subselect locks the candidate rows and
+  // SKIP LOCKED makes a concurrent caller pass over them, so each job is moved
+  // to 'running' (and returned) to exactly one caller.
   const jobsResult = await pool.query(
-    `SELECT *
-     FROM platform_jobs
-     WHERE ${where}
-     ORDER BY created_at ASC
-     LIMIT $${params.length}`,
+    `UPDATE platform_jobs
+     SET status = 'running',
+         attempts = attempts + 1,
+         started_at = NOW(),
+         updated_at = NOW()
+     WHERE id IN (
+       SELECT id
+       FROM platform_jobs
+       WHERE ${where}
+       ORDER BY created_at ASC
+       LIMIT $${params.length}
+       FOR UPDATE SKIP LOCKED
+     )
+     RETURNING *`,
     params
+  );
+
+  // RETURNING does not preserve the subselect order; run oldest first.
+  const claimedJobs = [...jobsResult.rows].sort(
+    (x, y) => new Date(x.created_at).getTime() - new Date(y.created_at).getTime()
   );
 
   let completed = 0;
   let failed = 0;
   const details = [];
 
-  for (const job of jobsResult.rows) {
-    await pool.query(
-      `UPDATE platform_jobs
-       SET status = 'running',
-           attempts = attempts + 1,
-           started_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $1`,
-      [job.id]
-    );
-
+  for (const job of claimedJobs) {
     try {
       const result = await runJob(job);
       await pool.query(
@@ -600,7 +607,8 @@ async function processPendingJobs({ organizationId = null, limit = 20 } = {}) {
       details.push({ id: job.id, status: 'completed', result });
     } catch (error) {
       const maxAttempts = Number(job.max_attempts || 5);
-      const nextStatus = Number(job.attempts || 0) + 1 >= maxAttempts ? 'failed' : 'queued';
+      // job.attempts already includes this run (incremented by the claim).
+      const nextStatus = Number(job.attempts || 0) >= maxAttempts ? 'failed' : 'queued';
       await pool.query(
         `UPDATE platform_jobs
          SET status = $2,
@@ -617,7 +625,7 @@ async function processPendingJobs({ organizationId = null, limit = 20 } = {}) {
   }
 
   return {
-    attempted: jobsResult.rows.length,
+    attempted: claimedJobs.length,
     completed,
     failed,
     details
