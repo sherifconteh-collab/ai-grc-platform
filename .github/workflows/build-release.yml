@@ -21,11 +21,14 @@ on:
         required: false
         default: 'true'
 
-# Cancel in-flight runs for the same branch/tag so a quick follow-up push
-# doesn't produce duplicate release builds.
+# A quick follow-up push supersedes an in-flight push build for the same
+# branch/tag. The event name is part of the group so a push to main can never
+# cancel a workflow_dispatch release build (dispatched by cut-release.yml),
+# which may already have created the tag and Release; dispatched and release
+# runs are never cancelled, they queue instead.
 concurrency:
-  group: build-release-${{ github.ref }}
-  cancel-in-progress: true
+  group: build-release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 # Default: read-only token.  The upload job needs write access to attach assets
 # to the Release, so that job overrides permissions explicitly.
