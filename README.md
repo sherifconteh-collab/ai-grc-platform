@@ -94,7 +94,7 @@ A comprehensive GRC (Governance, Risk & Compliance) platform designed for modern
 - **Threat-Intelligent**: Live feeds from NVD, CISA KEV, MITRE, and AlienVault OTX
 - **AI-Ready**: Deep integration with NIST AI RMF, ISO 42001, MAESTRO, and AIUC-1
 - **Open Source**: AGPL-3.0 licensed, self-hostable, transparent
-- **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (21 tools)
+- **MCP-Enabled**: Acts as an AI agent via Model Context Protocol (54 tools)
 - **Enterprise-Grade**: PostgreSQL RLS, Redis caching, automated backups, SSO, Sentry
 
 ## ✅ Current Status — v4.9.0 (All Features Shipped)
@@ -543,7 +543,7 @@ Full asset and configuration inventory:
 
 ### 🏗️ Developer & Integration Features
 - Full REST API for all operations ([OpenAPI spec](./docs/openapi.yaml))
-- MCP server for AI agent integration (21 tools)
+- MCP server for AI agent integration (54 tools)
 - **Integrations Hub** — 15 connector templates: Splunk, SIEM, BitSight, AWS Security Hub, Qualys VMDR, ITSM/ServiceNow, and more
 - Webhook system for event-driven integrations
 - ControlWeave SDK for programmatic access
@@ -654,7 +654,7 @@ This platform can act as an MCP server, allowing AI agents to:
 - Analyze risk posture
 - Recommend remediation actions
 
-The MCP server lives in `backend/scripts/mcp-server-secure.js` and exposes 21 tools. See [`docs/MCP_SETUP.md`](./docs/MCP_SETUP.md) for full configuration.
+The MCP server lives in `backend/scripts/mcp-server-secure.js` and exposes 54 tools. See [`docs/MCP_SETUP.md`](./docs/MCP_SETUP.md) for full configuration.
 
 **Example tool registrations (from the server source):**
 
@@ -730,7 +730,7 @@ graph TD
     Copilot["AI Copilot + RAG<br/>25+ analysis features, BYOK"]
     Providers["Anthropic · OpenAI · Gemini<br/>xAI Grok · Groq · Ollama (GGUF)"]
     Feeds["Threat intel feeds<br/>NVD · CISA KEV · MITRE ATT&CK · AlienVault OTX"]
-    MCP["MCP Server<br/>21 tools"]
+    MCP["MCP Server<br/>54 tools"]
     Connectors["15 connector templates<br/>Splunk · AWS Security Hub · Qualys · ITSM"]
 
     Client -->|HTTPS / WSS or localhost| API
@@ -924,7 +924,7 @@ controlweave/
 - **AI**: BYOK multi-provider (Anthropic Claude, OpenAI, Google Gemini, xAI Grok, Groq, Ollama with GGUF — see the "Supported providers and models" table above for current model names); RAG; Multi-Agent Orchestration
 - **Threat Intel**: NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX
 - **API**: REST with OpenAPI specification
-- **MCP**: Model Context Protocol server (21 tools)
+- **MCP**: Model Context Protocol server (54 tools)
 - **Real-time**: WebSocket support via Socket.IO
 - **Error Tracking**: Sentry (optional, via `SENTRY_DSN`)
 - **Backups**: Automated `pg_dump` via `node-cron`
@@ -1084,7 +1084,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Migrations**: 177 sequential, idempotent migration files (numbered through 165; a few historical duplicate numbers are documented and never renumbered)
 - **API Routes**: 80+ route modules
 - **Services**: 66 service modules
-- **MCP Tools**: 21 tools exposed via Model Context Protocol
+- **MCP Tools**: 54 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)
 - **Security**: CNSA Suite 1.0 + 2.0 — HS384 JWTs, SHA-384 hashing, RSA-3072, hybrid ML-DSA-65 PQC, AES-256-GCM PII encryption, HMAC-SHA-384 webhooks, PostgreSQL RLS, Redis rate limiting, bcrypt cost 14, 15-char password policy
