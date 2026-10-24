@@ -377,61 +377,93 @@ router.post(
         return res.status(409).json({ success: false, error: `Cannot approve — current status is "${pe.status}"` });
       }
 
-      // Write raw payload to disk
-      const fileBody = Buffer.from(JSON.stringify(pe.raw_payload, null, 2), 'utf8');
-      const fileHash = createHash('sha256').update(fileBody).digest('hex');
-      const stamp = Date.now();
-      const safeName = sanitizeName(pe.ai_title);
-      const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
-      const diskName = `${stamp}-${randomBytes(8).toString('hex')}-approved.json`;
-      const filePath = path.join(uploadsDir, diskName);
-      await fs.promises.writeFile(filePath, fileBody);
-
-      const retentionUntil = getDefaultRetentionDate();
-      const description = pe.ai_description || `AI-suggested evidence from ${pe.source_type}`;
-      const tags = Array.isArray(pe.suggested_tags) ? pe.suggested_tags : [];
-
-      // Insert into official evidence table
-      const evidenceIns = await pool.query(
-        `INSERT INTO evidence (
-           organization_id, uploaded_by, file_name, file_path, file_size, mime_type,
-           description, tags, integrity_hash_sha256, evidence_version, retention_until,
-           integrity_verified_at
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, NOW())
-         RETURNING id, file_name, file_size, created_at`,
-        [
-          orgId, req.user.id, fileName, filePath, fileBody.length,
-          'application/json', description, tags, fileHash, retentionUntil
-        ]
-      );
-      const evidenceRecord = evidenceIns.rows[0];
-
-      // Link to suggested controls
-      const controlIds = Array.isArray(pe.suggested_controls) ? pe.suggested_controls : [];
-      if (controlIds.length > 0) {
-        const validRows = await pool.query(
-          'SELECT id FROM framework_controls WHERE id = ANY($1::uuid[])',
-          [controlIds]
-        );
-        for (const row of validRows.rows) {
-          await pool.query(
-            `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
-             SELECT $1, $2, $3, e.organization_id FROM evidence e WHERE e.id = $1
-             ON CONFLICT DO NOTHING`,
-            [evidenceRecord.id, row.id, `AI-suggested mapping (approved by user)`]
-          );
-        }
-      }
-
-      // Mark pending record as approved
-      await pool.query(
+      // Claim the row atomically before any file or evidence row is written. Two
+      // concurrent approvals both pass the status check above; only one UPDATE
+      // can match status = 'pending', so only one proceeds.
+      const claim = await pool.query(
         `UPDATE pending_evidence
          SET status = 'approved', reviewed_by = $2, reviewed_at = NOW(),
-             review_notes = $3, promoted_evidence_id = $4, updated_at = NOW()
-         WHERE id = $1`,
-        [pendingId, req.user.id, notes, evidenceRecord.id]
+             review_notes = $3, updated_at = NOW()
+         WHERE id = $1 AND organization_id = $4 AND status = 'pending'
+         RETURNING id`,
+        [pendingId, req.user.id, notes, orgId]
       );
+      if (claim.rows.length === 0) {
+        return res.status(409).json({ success: false, error: 'Cannot approve - suggestion was already reviewed' });
+      }
+
+      let filePath = null;
+      let evidenceRecord = null;
+      try {
+        // Write raw payload to disk
+        const fileBody = Buffer.from(JSON.stringify(pe.raw_payload, null, 2), 'utf8');
+        const fileHash = createHash('sha256').update(fileBody).digest('hex');
+        const stamp = Date.now();
+        const safeName = sanitizeName(pe.ai_title);
+        const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
+        const diskName = `${stamp}-${randomBytes(8).toString('hex')}-approved.json`;
+        filePath = path.join(uploadsDir, diskName);
+        await fs.promises.writeFile(filePath, fileBody);
+
+        const retentionUntil = getDefaultRetentionDate();
+        const description = pe.ai_description || `AI-suggested evidence from ${pe.source_type}`;
+        const tags = Array.isArray(pe.suggested_tags) ? pe.suggested_tags : [];
+
+        // Insert into official evidence table
+        const evidenceIns = await pool.query(
+          `INSERT INTO evidence (
+             organization_id, uploaded_by, file_name, file_path, file_size, mime_type,
+             description, tags, integrity_hash_sha256, evidence_version, retention_until,
+             integrity_verified_at
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, NOW())
+           RETURNING id, file_name, file_size, created_at`,
+          [
+            orgId, req.user.id, fileName, filePath, fileBody.length,
+            'application/json', description, tags, fileHash, retentionUntil
+          ]
+        );
+        evidenceRecord = evidenceIns.rows[0];
+
+        // Link to suggested controls
+        const controlIds = Array.isArray(pe.suggested_controls) ? pe.suggested_controls : [];
+        if (controlIds.length > 0) {
+          const validRows = await pool.query(
+            'SELECT id FROM framework_controls WHERE id = ANY($1::uuid[])',
+            [controlIds]
+          );
+          for (const row of validRows.rows) {
+            await pool.query(
+              `INSERT INTO evidence_control_links (evidence_id, control_id, notes, organization_id)
+               SELECT $1, $2, $3, e.organization_id FROM evidence e WHERE e.id = $1
+               ON CONFLICT DO NOTHING`,
+              [evidenceRecord.id, row.id, `AI-suggested mapping (approved by user)`]
+            );
+          }
+        }
+
+        await pool.query(
+          `UPDATE pending_evidence
+           SET promoted_evidence_id = $2, updated_at = NOW()
+           WHERE id = $1 AND organization_id = $3`,
+          [pendingId, evidenceRecord.id, orgId]
+        );
+      } catch (promoteError) {
+        // Release the claim so the suggestion can be approved again. Evidence
+        // that was already inserted is not deleted here: it stays visible for
+        // an operator rather than disappearing silently.
+        if (!evidenceRecord) {
+          await pool.query(
+            `UPDATE pending_evidence
+             SET status = 'pending', reviewed_by = NULL, reviewed_at = NULL,
+                 review_notes = NULL, updated_at = NOW()
+             WHERE id = $1 AND organization_id = $2 AND status = 'approved' AND promoted_evidence_id IS NULL`,
+            [pendingId, orgId]
+          ).catch(() => {});
+          if (filePath) await fs.promises.unlink(filePath).catch(() => {});
+        }
+        throw promoteError;
+      }
 
       await auditService.logFromRequest(req, {
         eventType: 'pending_evidence_approved',
