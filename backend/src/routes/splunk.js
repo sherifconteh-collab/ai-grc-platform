@@ -8,6 +8,7 @@ const { authenticate, requireTier, requirePermission } = require('../middleware/
 const { validateBody } = require('../middleware/validate');
 const splunk = require('../services/splunkService');
 const { UPLOADS_DIR } = require('../config/paths');
+const storageService = require('../services/storageService');
 
 const router = express.Router();
 
@@ -200,7 +201,7 @@ router.post('/splunk/import-evidence', requirePermission('evidence.write'), vali
     const fileName = `${fileNameRoot}.json`;
     const diskName = `${Date.now()}-${Math.round(Math.random() * 1E9)}-splunk.json`;
     const filePath = path.join(uploadsDir, diskName);
-    fs.writeFileSync(filePath, fileBody);
+    await storageService.writeFile(filePath, fileBody, { contentType: 'application/json' });
 
     const description = req.body.description
       || `Imported from Splunk (${searchResult.results.length} result${searchResult.results.length === 1 ? '' : 's'})`;

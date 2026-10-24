@@ -17,6 +17,7 @@
     "mcp:login": "node scripts/mcp-auth-login.js",
     "mcp:logout": "node scripts/mcp-auth-logout.js",
     "mcp:status": "node scripts/mcp-auth-status.js",
+    "storage:sync": "node scripts/storage-sync.js",
     "migrate": "node scripts/migrate-all.js",
     "migrate:one": "node scripts/run-migration.js",
     "db:backup": "node scripts/db-backup.js",
@@ -78,6 +79,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
+    "@aws-sdk/client-s3": "^3.1156.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@noble/post-quantum": "^0.7.1",
     "@sentry/node": "^10.76.2",

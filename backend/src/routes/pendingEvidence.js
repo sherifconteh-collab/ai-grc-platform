@@ -16,6 +16,7 @@ const { isUuid } = require('../middleware/validate');
 const llm = require('../services/llmService');
 const splunk = require('../services/splunkService');
 const { UPLOADS_DIR } = require('../config/paths');
+const storageService = require('../services/storageService');
 
 router.use(authenticate);
 router.use(requireTier('pro'));
@@ -385,7 +386,7 @@ router.post(
       const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
       const diskName = `${stamp}-${randomBytes(8).toString('hex')}-approved.json`;
       const filePath = path.join(uploadsDir, diskName);
-      await fs.promises.writeFile(filePath, fileBody);
+      await storageService.writeFile(filePath, fileBody, { contentType: 'application/json' });
 
       const retentionUntil = getDefaultRetentionDate();
       const description = pe.ai_description || `AI-suggested evidence from ${pe.source_type}`;
