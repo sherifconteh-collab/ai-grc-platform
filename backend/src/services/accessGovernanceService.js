@@ -15,6 +15,7 @@ const pool = require('../config/database');
 const { getRoleFallbackPermissions } = require('../middleware/auth');
 const { decrypt } = require('../utils/encrypt');
 const { UPLOADS_DIR } = require('../config/paths');
+const storageService = require('./storageService');
 
 const uploadsDir = UPLOADS_DIR;
 if (!fs.existsSync(uploadsDir)) {
@@ -369,7 +370,7 @@ async function completeCampaign(orgId, campaignId, completedBy) {
   const fileName = `access-review-${campaign.id}-${new Date().toISOString().split('T')[0]}.json`;
   const diskName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-access-review.json`;
   const filePath = path.join(uploadsDir, diskName);
-  await fs.promises.writeFile(filePath, fileBody);
+  await storageService.writeFile(filePath, fileBody, { contentType: 'application/json' });
 
   const retentionUntil = new Date();
   retentionUntil.setDate(retentionUntil.getDate() + 365);

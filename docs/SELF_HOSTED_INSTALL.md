@@ -152,10 +152,16 @@ item is required unless marked otherwise.
   whichever server they are connected to. With `REDIS_REQUIRED=true` a server
   that cannot reach Redis stops instead of running half-connected. Give the
   DR site its own Redis; nothing in it needs to survive a failover.
-- **Shared uploads.** Evidence and policy files are written to `UPLOADS_DIR`.
-  Mount the same network share (NFS, EFS, Azure Files) at that path on every
-  server, and replicate it to the DR site. On a local disk, a file uploaded
-  through one server is missing on the others.
+- **Shared uploads.** Evidence and policy files are written to `UPLOADS_DIR`;
+  on a local disk, a file uploaded through one server is missing on the
+  others. Pick one:
+  - **Object storage (recommended).** Set `S3_BUCKET` (and the credentials, see
+    [File storage](#file-storage-object-storage)) on every backend server.
+    Each upload is saved to the bucket before the request succeeds, and a file
+    missing on a server is fetched from the bucket on first read. No shared
+    volume is needed, and the bucket can be replicated to the DR site.
+  - **A shared network volume.** Mount the same share (NFS, EFS, Azure Files)
+    at `UPLOADS_DIR` on every server and replicate it to the DR site.
 - `TRUST_PROXY=true` (or the number of proxy hops), so rate limits and audit
   logs see the user's address instead of the load balancer's.
 - `CORS_ORIGIN` and `FRONTEND_URL` set to the one public address
@@ -219,7 +225,7 @@ Set these in the backend environment:
 | `DB_BACKUP_RETENTION_DAYS` | `7` | Dumps older than this are deleted after each run |
 | `DB_BACKUP_FORMAT` | `custom` | `custom` (restore with `pg_restore`) or `plain` (SQL) |
 | `PG_DUMP_PATH` | `pg_dump` | Path to `pg_dump`; it must be installed and the same major version as the server |
-| `AWS_S3_BUCKET`, `AWS_REGION`, `AWS_S3_PREFIX` | unset | Also upload each dump to S3; needs `npm install @aws-sdk/client-s3` in `backend/` |
+| `AWS_S3_BUCKET`, `AWS_REGION`, `AWS_S3_PREFIX` | unset | Also upload each dump to S3 |
 
 Platform admins can also start a backup from **Platform Admin → Backups**.
 Test a restore before you need one:
@@ -230,7 +236,47 @@ pg_restore --no-owner --dbname=controlweave_restore_test backend/backups/grc_<st
 ```
 
 A database dump does **not** include uploaded files. Back up the uploads
-directory too: `backend/uploads`, or the folder `UPLOADS_DIR` points to.
+directory too: `backend/uploads`, or the folder `UPLOADS_DIR` points to. With
+`S3_BUCKET` set the bucket holds the files; enable versioning on it.
+
+## File storage (object storage)
+
+Uploads go to `UPLOADS_DIR` on local disk unless `S3_BUCKET` is set. Nothing
+else changes without it, and the desktop app never needs it.
+
+With `S3_BUCKET` set, every upload is written locally and then to the bucket;
+if the bucket write fails the upload is rejected with HTTP 503 and nothing is
+recorded. A file missing locally is restored from the bucket on first read.
+`UPLOADS_DIR` then acts as a cache.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `S3_BUCKET` | unset | Bucket name. Setting it turns the S3 driver on. |
+| `STORAGE_DRIVER` | `s3` if `S3_BUCKET` is set, else `local` | Force a driver. |
+| `S3_REGION` | `AWS_REGION` or `us-east-1` | Bucket region. |
+| `S3_ENDPOINT` | AWS | Endpoint for S3-compatible stores (MinIO, Cloudflare R2, Backblaze B2, Wasabi). |
+| `S3_FORCE_PATH_STYLE` | `false` | `true` for MinIO and most self-hosted stores. |
+| `S3_PREFIX` | `uploads/` | Key prefix inside the bucket. |
+| `S3_SSE` | `AES256` | `AES256`, `aws:kms`, or `none` for stores that reject the header. |
+| `S3_KMS_KEY_ID` | unset | KMS key when `S3_SSE=aws:kms`. |
+| `STORAGE_LOCAL_DURABLE` | `false` | Set `true` when `UPLOADS_DIR` is on durable, backed-up disk (silences the production warning). |
+
+Credentials come from the standard AWS chain (`AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY`, or an instance or task role). Block public access on
+the bucket and give the application only `s3:PutObject`, `s3:GetObject` and
+`s3:DeleteObject` on `arn:aws:s3:::<bucket>/<prefix>*`.
+
+To move files that already exist on disk into the bucket, run once after
+turning the driver on:
+
+```bash
+cd backend
+npm run storage:sync -- --dry-run   # list what would be uploaded
+npm run storage:sync                # upload
+```
+
+At startup the backend logs `storage.configured` with the driver and whether it
+is durable.
 
 ## Upgrading an existing deployment
 

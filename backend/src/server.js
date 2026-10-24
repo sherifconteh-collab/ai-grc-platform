@@ -1011,6 +1011,8 @@ ensureLicenseFromDb()
         health: `http://localhost:${PORT}/health`,
         environment: process.env.NODE_ENV || 'development'
       });
+      const storageInfo = require('./services/storageService').warnIfEphemeral();
+      log('info', 'storage.configured', { driver: storageInfo.driver, durable: storageInfo.durable });
 
       // Initialize WebSocket server after HTTP server is ready
       const { initializeWebSocket } = require('./services/websocketService');

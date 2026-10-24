@@ -129,6 +129,10 @@ function backendEnv(ctx) {
     HMAC_KEY: secrets.hmacKey,
     // The install directory is read-only and replaced on update.
     UPLOADS_DIR: path.join(ctx.dataDir, 'uploads'),
+    // Files live in the data folder, which is backed up with the database.
+    // The desktop app never uses object storage, whatever the environment says.
+    STORAGE_DRIVER: 'local',
+    STORAGE_LOCAL_DURABLE: 'true',
     // Lets the backend point desktop users at the app's own backups.
     CONTROLWEAVE_DESKTOP: 'true',
     PLATFORM_ADMIN_EMAIL: admin.email,

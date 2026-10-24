@@ -17,6 +17,7 @@ const { createRateLimiter } = require('../middleware/rateLimit');
 const { validateBody, isUuid } = require('../middleware/validate');
 const splunk = require('../services/splunkService');
 const { UPLOADS_DIR } = require('../config/paths');
+const storageService = require('../services/storageService');
 
 router.use(authenticate);
 router.use(requireTier('pro'));
@@ -207,7 +208,7 @@ async function executeCollectionRule(rule, orgId, triggeredByUserId) {
     const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
     const diskName = `${stamp}-${Math.round(Math.random() * 1e9)}-auto.json`;
     const filePath = path.join(uploadsDir, diskName);
-    await fs.promises.writeFile(filePath, fileBody);
+    await storageService.writeFile(filePath, fileBody, { contentType: 'application/json' });
 
     const description = `Auto-collected from Splunk by rule "${rule.name}" (${searchResult.results.length} event${searchResult.results.length === 1 ? '' : 's'})`;
     const tags = Array.isArray(rule.tags) ? rule.tags : [];

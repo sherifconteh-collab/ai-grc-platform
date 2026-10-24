@@ -16,6 +16,7 @@ const rateLimit = require('express-rate-limit');
 const { generatePolicyFromFrameworks } = require('../services/policyService');
 const { createNotification } = require('../services/notificationService');
 const { UPLOADS_DIR } = require('../config/paths');
+const storageService = require('../services/storageService');
 const {
   performGapAnalysis,
   setAsBaseline,
@@ -953,7 +954,7 @@ const upload = multer({
 
 // POST /api/v1/policies/upload
 // Upload policy document for analysis
-router.post('/upload', requirePermission('controls.write'), upload.single('policy'), async (req, res) => {
+router.post('/upload', requirePermission('controls.write'), upload.single('policy'), storageService.persistUploads, async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     
@@ -973,7 +974,7 @@ router.post('/upload', requirePermission('controls.write'), upload.single('polic
     
     if (duplicateCheck.rows.length > 0) {
       // Remove uploaded file
-      fs.unlinkSync(req.file.path);
+      await storageService.removeQuietly(req.file.path);
       return res.status(400).json({
         success: false,
         error: 'This policy document has already been uploaded',
@@ -1039,8 +1040,8 @@ router.post('/upload', requirePermission('controls.write'), upload.single('polic
   } catch (error) {
     console.error('Policy upload error:', error);
     // Clean up file on error
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.file) {
+      await storageService.removeQuietly(req.file.path);
     }
     res.status(500).json({ success: false, error: 'Failed to upload policy' });
   }

@@ -13,6 +13,7 @@ const { getConfigValue } = require('../services/dynamicConfigService');
 const { vulnerabilityCreated } = require('../services/realtimeEventService');
 const { mapCweToOwasp2025 } = require('../utils/owaspMapping');
 const { UPLOADS_DIR } = require('../config/paths');
+const storageService = require('../services/storageService');
 const { ensureOrgUser } = require('../utils/orgRefs');
 
 router.use(authenticate);
@@ -1149,7 +1150,7 @@ async function upsertVulnerabilityFindings(orgId, evidenceUrl, importedAt, match
 }
 
 // POST /vulnerabilities/import
-router.post('/import', requirePermission('evidence.write'), scanUpload.single('file'), async (req, res) => {
+router.post('/import', requirePermission('evidence.write'), scanUpload.single('file'), storageService.persistUploads, async (req, res) => {
   const orgId = req.user.organization_id;
   const userId = req.user.id;
   const importedAt = new Date();
