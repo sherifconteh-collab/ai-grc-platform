@@ -86,7 +86,7 @@
 - ✅ Redis response caching via `utils/redisCache.js`
 - ✅ Sentry error tracking (optional, `SENTRY_DSN`)
 - ✅ Socket.IO realtime dashboard updates
-- ✅ MCP server — 21 tools via Model Context Protocol
+- ✅ MCP server — 54 tools via Model Context Protocol
 - ✅ REST API with OpenAPI spec
 - ✅ `@controlweave/external-ai-logger` SDK for external AI decision logging
 

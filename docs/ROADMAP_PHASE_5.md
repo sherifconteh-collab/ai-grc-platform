@@ -103,20 +103,13 @@ avoid replacing literal framework-code/name strings with dynamic
 references if any CI regression guard depends on grep-matching those
 literals.
 
-### 5.8 MCP tool registry — same unfinished-refactor bug as CW-Pro had
+### 5.8 MCP tool registry
 
-**Found while researching this doc, not yet fixed**: `backend/scripts/mcp-tool-registry.js`
-defines the full tool set (54 tools, matching ControlWeaver-Pro's count),
-but `backend/scripts/mcp-server-secure.js` only hand-codes 21 of them via
-individual `server.registerTool(...)` calls — it never requires or loops
-over the registry. This is the exact same unfinished refactor that
-ControlWeaver-Pro had before it was fixed this cycle (registry replaced/
-duplicated the 21 existing tools and added 33 more, but the server was
-never updated to consume it dynamically). The fix there (`mcp-server-secure.js`
-now loops over `require('./mcp-tool-registry').getTools()`, with `grc_health`
-kept special-cased for its `noAuth` bypass) should port directly — same
-adapter shape, same schema compatibility. This should be an early Phase 5
-item given how mechanical the known fix is.
+Done: `backend/scripts/mcp-server-secure.js` registers `grc_health` (the only
+`noAuth` entry) by hand and loops over `require('./mcp-tool-registry').getTools()`
+for the other 53, each wrapped by `createSecureTool` (authentication, rate
+limit, prompt-injection scan, audit log). `backend/__tests__/scripts/mcpToolRegistry.test.js`
+starts the server over stdio and asserts that it lists all 54 tools.
 
 ### 5.9 Stale tier-language cleanup
 
