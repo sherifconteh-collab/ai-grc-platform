@@ -71,7 +71,7 @@ jobs:
           PYEOF
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ github.sha }}
           path: sbom-output/sbom-*.cdx.json
@@ -105,7 +105,7 @@ jobs:
           node backend/scripts/generate-aibom.js
 
       - name: Upload AIBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aibom-${{ github.sha }}
           path: sbom-output/aibom.cdx.json
@@ -125,13 +125,13 @@ jobs:
 
     steps:
       - name: Download SBOM artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: sbom-${{ github.sha }}
           path: release-assets
 
       - name: Download AIBOM artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: aibom-${{ github.sha }}
           path: release-assets
