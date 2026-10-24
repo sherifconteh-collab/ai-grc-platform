@@ -4,10 +4,13 @@ updates:
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
     open-pull-requests-limit: 5
+    groups:
+      npm-backend-monthly:
+        patterns:
+          - "*"
     reviewers:
       - "sherifconteh-collab"
     labels:
@@ -29,10 +32,13 @@ updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
     open-pull-requests-limit: 5
+    groups:
+      npm-frontend-monthly:
+        patterns:
+          - "*"
     reviewers:
       - "sherifconteh-collab"
     labels:
@@ -46,9 +52,12 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
+    groups:
+      github-actions-monthly:
+        patterns:
+          - "*"
     reviewers:
       - "sherifconteh-collab"
     labels:
@@ -61,10 +70,13 @@ updates:
   - package-ecosystem: "npm"
     directory: "/controlweave-sdk"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
     open-pull-requests-limit: 5
+    groups:
+      npm-sdk-monthly:
+        patterns:
+          - "*"
     reviewers:
       - "sherifconteh-collab"
     labels:
