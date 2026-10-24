@@ -120,7 +120,7 @@ jobs:
                   f"> Changes staged but not yet released to production.\n\n"
                   f"### {section}\n\n{entry}\n"
               )
-              content = re.sub(r"(---\n)", r"\1" + block, content, count=1)
+              content = re.sub(r"(---\n)", lambda m: m.group(1) + block, content, count=1)
           else:
               section_header = f"### {section}"
               unreleased_pos = content.index(unreleased_header)
@@ -169,7 +169,7 @@ jobs:
           with open("README.md", "r") as f:
               content = f.read()
 
-          content = re.sub(r"<!-- LAST_UPDATED:.*?-->", new_marker, content)
+          content = re.sub(r"<!-- LAST_UPDATED:.*?-->", lambda m: new_marker, content)
 
           with open("README.md", "w") as f:
               f.write(content)
