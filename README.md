@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-20 | PR #393: docs(release): limit the desktop-backup claim to local mode -->
+<!-- LAST_UPDATED: 2026-10-24 | PR #426: chore(deps): group Dependabot updates into one monthly PR per ecosystem -->
 
 ## 🎯 What is This?
 
