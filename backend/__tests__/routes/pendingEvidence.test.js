@@ -51,6 +51,11 @@ function installFakeDb() {
         source_type: 'splunk', raw_payload: RAW_PAYLOAD, suggested_controls: [CONTROL_1], suggested_tags: ['splunk']
       }] : [] };
     }
+    if (/^\s*UPDATE pending_evidence\s+SET status = 'approved'.*status = 'pending'/s.test(q)) {
+      if (state.status !== 'pending' || params[3] !== ORG_A) return { rows: [], rowCount: 0 };
+      state.status = 'approved';
+      return { rows: [{ id: params[0] }], rowCount: 1 };
+    }
     if (/^\s*INSERT INTO evidence \(/.test(q)) return { rows: [{ id: NEW_EVIDENCE, file_name: params[2], file_size: params[4], created_at: 'now' }] };
     if (/FROM framework_controls WHERE id = ANY/.test(q)) return { rows: [{ id: CONTROL_1 }] };
     if (/GROUP BY status/.test(q)) return { rows: params[0] === ORG_A ? [{ status: 'pending', count: 3 }, { status: 'approved', count: 1 }] : [] };
@@ -197,11 +202,42 @@ describe('pendingEvidence routes (AI suggestions that need human approval)', () 
       expect(linkParams[0]).toBe(NEW_EVIDENCE);
       expect(linkParams[1]).toBe(CONTROL_1);
 
-      const [, update] = callsMatching(/^\s*UPDATE pending_evidence\s+SET status = 'approved'/)[0];
-      expect(update).toEqual([PENDING_A, mockUsers.writerA.id, 'Checked against the SIEM', NEW_EVIDENCE]);
+      const [claimSql, claim] = callsMatching(/^\s*UPDATE pending_evidence\s+SET status = 'approved'/)[0];
+      expect(claimSql).toMatch(/WHERE id = \$1 AND organization_id = \$4 AND status = 'pending'/);
+      expect(claim).toEqual([PENDING_A, mockUsers.writerA.id, 'Checked against the SIEM', ORG_A]);
+      const [, promoted] = callsMatching(/^\s*UPDATE pending_evidence\s+SET promoted_evidence_id/)[0];
+      expect(promoted).toEqual([PENDING_A, NEW_EVIDENCE, ORG_A]);
       expect(auditService.logFromRequest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         eventType: 'pending_evidence_approved', resourceId: PENDING_A
       }));
+    });
+
+    it('creates exactly one evidence record when the same suggestion is approved twice at once', async () => {
+      const [first, second] = await Promise.all([approve('writerA', {}), approve('writerA', {})]);
+      expect([first.status, second.status].sort()).toEqual([200, 409]);
+      expect(callsMatching(/^\s*INSERT INTO evidence \(/)).toHaveLength(1);
+      expect(writeFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers 409 and writes nothing when another reviewer claims the row after the status check', async () => {
+      const base = pool.query.getMockImplementation();
+      pool.query.mockImplementation(async (sql, params) => {
+        if (/SET status = 'approved'.*status = 'pending'/s.test(String(sql))) return { rows: [], rowCount: 0 };
+        return base(sql, params);
+      });
+      const res = await approve('writerA', {});
+      expect(res.status).toBe(409);
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(callsMatching(/^\s*INSERT INTO evidence/)).toHaveLength(0);
+      expect(auditService.logFromRequest).not.toHaveBeenCalled();
+    });
+
+    it('releases the claim when writing the evidence fails', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      writeFile.mockRejectedValueOnce(new Error('disk full'));
+      const res = await approve('writerA', {});
+      expect(res.status).toBe(500);
+      expect(callsMatching(/SET status = 'pending'/)).toHaveLength(1);
     });
 
     it('rejects a suggestion without creating any evidence and audits the decision', async () => {
@@ -220,6 +256,7 @@ describe('pendingEvidence routes (AI suggestions that need human approval)', () 
       expect(callsMatching(/^\s*UPDATE pending_evidence\s+SET status = 'approved'/)[0][1][2]).toBeNull();
 
       pool.query.mockClear();
+      state.status = 'pending';
       const rejected = await call('POST', `/${PENDING_A}/reject`, { as: 'writerA' });
       expect(rejected.status).toBe(200);
       expect(callsMatching(/^\s*UPDATE pending_evidence\s+SET status = 'rejected'/)[0][1][2]).toBeNull();

@@ -2914,6 +2914,36 @@ router.get('/children/:childId/summary', requirePermission('organizations.read')
   }
 });
 
+// GET /children/:childId/delegates — list delegated admins of a child org (parent org only)
+router.get('/children/:childId/delegates', requirePermission('organizations.read'), async (req, res) => {
+  try {
+    if (!isUuid(req.params.childId)) {
+      return res.status(400).json({ error: 'Invalid child organization ID' });
+    }
+    const childCheck = await pool.query(
+      'SELECT id FROM organizations WHERE id = $1 AND parent_org_id = $2',
+      [req.params.childId, req.user.organization_id]
+    );
+    if (childCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied to child organization' });
+    }
+    const result = await pool.query(
+      `SELECT d.user_id, u.email, d.granted_at, d.expires_at
+         FROM org_delegated_admins d
+         JOIN users u ON u.id = d.user_id
+        WHERE d.parent_org_id = $1 AND d.child_org_id = $2
+          AND (d.expires_at IS NULL OR d.expires_at > NOW())
+        ORDER BY d.granted_at DESC
+        LIMIT 200`,
+      [req.user.organization_id, req.params.childId]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    log('error', 'organizations.delegates_list_failed', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /children/:childId/delegate — grant delegated admin access
 router.post('/children/:childId/delegate', requirePermission('organizations.write'), async (req, res) => {
   const { user_id, expires_at } = req.body;
