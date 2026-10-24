@@ -483,9 +483,24 @@ jobs:
           files: |
             electron/dist/*.dmg
             electron/dist/*.dmg.blockmap
-            electron/dist/latest-mac.yml
+            electron/dist/*.zip
+            electron/dist/*.zip.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the arm64 update feed for merging
+        # Both macOS jobs write a feed named latest-mac.yml listing only their own
+        # artifacts; publish-mac-update-feed merges them into the one the app reads.
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-feed-macos-arm64
+          path: electron/dist/latest-mac.yml
+          retention-days: 7
 
       - name: Upload arm64 DMG as workflow artifact
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
@@ -630,8 +645,22 @@ jobs:
           files: |
             electron/dist/*.dmg
             electron/dist/*.dmg.blockmap
+            electron/dist/*.zip
+            electron/dist/*.zip.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the x64 update feed for merging
+        if: >-
+          github.event_name == 'release'
+          || startsWith(github.ref, 'refs/tags/v')
+          || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '')
+          || needs.check-release.outputs.should_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-feed-macos-x64
+          path: electron/dist/latest-mac.yml
+          retention-days: 7
 
       - name: Upload x64 DMG as workflow artifact
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.upload_artifact == 'true'
@@ -641,6 +670,46 @@ jobs:
           path: |
             electron/dist/*.dmg
           retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Publish the macOS update feed (latest-mac.yml) listing both architectures.
+  # electron-updater reads a single latest-mac.yml per release; each macOS job
+  # produces one for its own architecture only.
+  # ────────────────────────────────────────────────────────────────────────────
+  publish-mac-update-feed:
+    name: Publish macOS update feed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [check-release, build-macos-arm64, build-macos-x64]
+    if: |
+      always() && needs.build-macos-arm64.result == 'success' && needs.build-macos-x64.result == 'success' && (
+        github.event_name == 'release' ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '') ||
+        needs.check-release.outputs.should_release == 'true'
+      )
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: '24' }
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: update-feed-macos-*
+          path: feeds
+      - name: Merge the arm64 and x64 feeds
+        run: node electron/scripts/merge-latest-mac-yml.js latest-mac.yml feeds/update-feed-macos-arm64/latest-mac.yml feeds/update-feed-macos-x64/latest-mac.yml
+      - name: Upload latest-mac.yml to GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
+          name: ${{ needs.check-release.outputs.version || github.event.inputs.version || github.ref_name }}
+          draft: false
+          prerelease: false
+          files: latest-mac.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ────────────────────────────────────────────────────────────────────────────
   # Build Linux AppImage

@@ -144,6 +144,9 @@ function fromStartupWindow(event) {
   return startupWindow && event.sender === startupWindow.webContents;
 }
 
+// True while a server address from the chooser is being probed.
+let choosing = false;
+
 function registerStartupIpc() {
   ipcMain.handle('startup:info', (event) => {
     if (!fromStartupWindow(event)) return null;
@@ -153,13 +156,17 @@ function registerStartupIpc() {
     if (fromStartupWindow(event)) start();
   });
   ipcMain.handle('startup:choose-local', (event) => {
-    if (!fromStartupWindow(event) || presetServer || busy()) return;
+    if (!fromStartupWindow(event) || presetServer || busy() || choosing) return;
     mode = connection.save(dataDir(), { mode: 'local' });
     buildMenu();
     start();
   });
   ipcMain.handle('startup:choose-server', async (event, input) => {
-    if (!fromStartupWindow(event) || presetServer || busy()) return { error: 'ControlWeave is busy; try again in a moment.' };
+    if (!fromStartupWindow(event) || presetServer || busy() || choosing) return { error: 'ControlWeave is busy; try again in a moment.' };
+    // Held across the probe: busy() only turns true once start() runs, so without
+    // this a second click, or "use this computer", could pass the check above while
+    // the probe is pending and the two choices would overwrite each other.
+    choosing = true;
     let origin;
     try {
       origin = connection.normalizeServerUrl(input);
@@ -167,6 +174,8 @@ function registerStartupIpc() {
     } catch (error) {
       if (!(error instanceof connection.ConnectionError)) return { error: `Could not connect: ${error.message}` };
       return { error: error.hint ? `${error.message} ${error.hint}` : error.message };
+    } finally {
+      choosing = false;
     }
     mode = connection.save(dataDir(), { mode: 'server', origin });
     buildMenu();

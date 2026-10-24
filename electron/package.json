@@ -105,6 +105,9 @@
       "target": [
         {
           "target": "dmg"
+        },
+        {
+          "target": "zip"
         }
       ],
       "icon": "build/icon.png",
