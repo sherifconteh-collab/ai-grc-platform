@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 
 // Upper bound for an explicit page request. The catalog is heading past
@@ -30,6 +31,8 @@ const VALID_TARGET_BASELINES = ['low', 'moderate', 'high'];
 
 
 
+// Router-level limiter ahead of authentication (CodeQL js/missing-rate-limiting).
+router.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 router.use(authenticate);
 
 // ---------- Shared constants and helpers (extracted to ./organizations/_helpers) ----------

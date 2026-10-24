@@ -25,10 +25,18 @@ jest.mock('../../src/middleware/rateLimit', () => ({
 jest.mock('../../src/services/auditService', () => ({ logFromRequest: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('../../src/services/llmService', () => ({}));
 jest.mock('exceljs', () => ({}));
+jest.mock('express-rate-limit', () => jest.fn(() => { const mw = (req, res, next) => next(); mw.isLimiter = true; return mw; }));
 
 const pool = require('../../src/config/database');
 const router = require('../../src/routes/organizations');
 const { startApp } = require('./_httpHarness');
+
+describe('organizations router rate limiting', () => {
+  it('registers an express-rate-limit limiter before authenticate', () => {
+    const layers = router.stack.filter((l) => !l.route);
+    expect(layers[0].handle.isLimiter).toBe(true);
+  });
+});
 
 describe('GET /organizations/children/:childId/delegates', () => {
   let app;
