@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-25 | PR #438: chore(backend)(deps): Bump the npm-backend-monthly group across 1 directory with 4 updates -->
+<!-- LAST_UPDATED: 2026-10-25 | PR #437: chore(desktop)(deps): Bump the npm-electron-monthly group in /electron with 3 updates -->
 
 ## 🎯 What is This?
 
