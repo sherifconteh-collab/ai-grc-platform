@@ -37,7 +37,7 @@
     "eslint-config-next": "^16.4.2",
     "openapi-typescript": "^7.10.1",
     "tailwindcss": "^4.3.0",
-    "typescript": "~7.0.2"
+    "typescript": "~6.0.3"
   },
   "overrides": {
     "minimatch": "^10.2.3",
