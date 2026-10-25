@@ -17,4 +17,4 @@ export const POSTGRES_VERSION_LABEL = '17+';
 
 export const ROUTE_MODULES_COUNT = 86;
 export const MIGRATIONS_COUNT = 177;
-export const MCP_TOOLS_COUNT = 21;
+export const MCP_TOOLS_COUNT = 54;
