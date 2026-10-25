@@ -31,6 +31,7 @@
 - docs(setup): correct Node and PostgreSQL floors in the setup guides ([#404](https://github.com/sherifconteh-collab/ai-grc-platform/pull/404)) — @sherifconteh-collab
 
 ### Security
+- chore(backend)(deps): Bump the npm-backend-monthly group across 1 directory with 4 updates ([#438](https://github.com/sherifconteh-collab/ai-grc-platform/pull/438)) — @dependabot[bot]
 - chore(frontend)(deps): Bump lucide-react from 1.60.0 to 1.61.0 in /frontend in the npm-frontend-monthly group across 1 directory ([#436](https://github.com/sherifconteh-collab/ai-grc-platform/pull/436)) — @dependabot[bot]
 - security(privacy): key the copilot conversation and cached AI answers by user instead of organization, and remove them when the session is cleared on logout (port of ControlWeaver-Pro#933) — @sherifconteh-collab
 
