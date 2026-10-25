@@ -3,7 +3,7 @@
 ## Backend
 
 - Pin transitive vulns via `overrides` in `backend/package.json`. Current overrides include `path-to-regexp` (express + router), `follow-redirects`, `@xmldom/xmldom`, `socket.io-parser`, `yauzl`.
-- `firebase-admin` is an `optionalDependency` (Android push); routes that import it should use `safeRequire`. iOS (APNs) push is not implemented; the `apn` package was removed because its `node-forge` dependency has an unpatched high-severity advisory.
+- No mobile push dependency: `firebase-admin` (Android push) was removed with the Android app, and `apn` (iOS) earlier because its `node-forge` dependency has an unpatched high-severity advisory. The `device_push_tokens` table and `/api/v1/push-tokens` route remain for a future mobile client, but nothing sends pushes.
 - Always check the GH advisory DB before adding a new dependency.
 - After any package.json change, regenerate the lockfile and run `npm audit --audit-level=moderate` (must exit 0).
 
