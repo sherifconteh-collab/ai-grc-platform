@@ -153,7 +153,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ci_test_password
@@ -167,7 +167,7 @@ jobs:
         with: { node-version: '24' }
       - name: Install backend dependencies
         run: cd backend && npm ci
-      - name: Run all migrations against a fresh Postgres 16 instance
+      - name: Run all migrations against a fresh Postgres 17 instance
         working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:ci_test_password@localhost:5432/grc_ci_test
