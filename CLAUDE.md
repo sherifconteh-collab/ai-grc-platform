@@ -17,7 +17,7 @@ Skim this file before any non-trivial change. Detailed conventions live under
 |---|---|---|
 | Backend syntax | `cd backend && npm run check:syntax` | Fastest gate; runs in seconds. Always run after backend edits. |
 | Backend build | `cd backend && npm run build` | Per-module require check; use after structural changes. |
-| Backend audit | `cd backend && npm audit --audit-level=moderate` | CI gate. Low-severity findings in `firebase-admin` transitive chain are accepted. |
+| Backend audit | `cd backend && npm audit --audit-level=moderate` | CI gate. |
 | Backend tests | `cd backend && npx jest` | Unit-only; no DB required. |
 | Frontend typecheck | `cd frontend && npm run typecheck` | TS strict. |
 | Frontend audit | `cd frontend && npm audit --audit-level=moderate` | CI gate. |

@@ -159,7 +159,6 @@ The platform is **fully functional**. Every capability below is available — no
 - 🔌 **Integrations Hub** — connector templates and instances for enterprise integrations
 - 🔐 **SSO (Single Sign-On)** — OpenID Connect / OIDC integration with session management
 - ⚡ **Realtime** — Socket.IO-backed live dashboard updates and presence
-- 🔔 **Mobile Push Notifications** — iOS (APNs) and Android (FCM) device token lifecycle
 - 📧 **Forgot / Reset Password** — full self-service password recovery flow
 - 🔁 **Refresh Token Rotation** — single-use refresh tokens, kept by the browser in an HttpOnly cookie that page scripts cannot read; concurrent session cap (configurable, default 10)
 - 🐛 **Sentry Integration** — optional error tracking via `SENTRY_DSN`
@@ -511,7 +510,6 @@ Full asset and configuration inventory:
 - Mark read / mark all read functionality
 - Email delivery with per-org SMTP configuration
 - User-configurable preferences for in-app vs. email delivery
-- Mobile push notifications (iOS APNs + Android FCM) via device token lifecycle
 
 ### 🧩 Custom Compliance Framework Builder *(v4.2.0)*
 - Create fully custom compliance frameworks with org-defined controls
@@ -972,7 +970,6 @@ controlweave/
 - ✅ Evidence management with PII classification and auto-collection
 - ✅ Policy management with AI gap analysis
 - ✅ Notification and webhook systems (HMAC-SHA-384)
-- ✅ Mobile push notifications (iOS APNs + Android FCM)
 - ✅ POA&M tracking
 - ✅ Security posture dashboard
 - ✅ AI Analysis, Regulatory News, and AI Threat Library (PLOT4ai)

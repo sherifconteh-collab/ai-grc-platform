@@ -120,9 +120,6 @@
     "globals": "^17.11.0",
     "jest": "^30.5.2"
   },
-  "optionalDependencies": {
-    "firebase-admin": "^14.2.0"
-  },
   "overrides": {
     "express-rate-limit": "$express-rate-limit",
     "ip-address": ">=10.7.2",
