@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-25 | PR #435: chore(ci): Bump the github-actions-monthly group with 3 updates -->
+<!-- LAST_UPDATED: 2026-10-25 | PR #436: chore(frontend)(deps): Bump lucide-react from 1.60.0 to 1.61.0 in /frontend in the npm-frontend-monthly group across 1 directory -->
 
 ## 🎯 What is This?
 
