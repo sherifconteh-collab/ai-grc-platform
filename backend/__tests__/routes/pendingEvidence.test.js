@@ -12,8 +12,9 @@ const mockUsers = {
 };
 
 jest.mock('../../src/config/database', () => ({ query: jest.fn() }));
-// An existing directory, so the router's load-time mkdir is a no-op; nothing is written (fs.promises.writeFile is spied below).
+// An existing directory, so the router's load-time mkdir is a no-op; nothing is written (storageService.writeFile is mocked below).
 jest.mock('../../src/config/paths', () => ({ UPLOADS_DIR: require('os').tmpdir() }));
+jest.mock('../../src/services/storageService', () => ({ writeFile: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('../../src/middleware/auth', () => require('./_httpHarness').mockAuthModule(mockUsers));
 jest.mock('../../src/middleware/rateLimit', () => ({ createRateLimiter: () => (req, res, next) => next() }));
 jest.mock('../../src/services/auditService', () => ({ logFromRequest: jest.fn().mockResolvedValue(undefined) }));
@@ -21,12 +22,11 @@ jest.mock('../../src/services/llmService', () => ({}));
 jest.mock('../../src/services/splunkService', () => ({ getOrgSplunkSettings: jest.fn(), runSearch: jest.fn() }));
 
 const crypto = require('crypto');
-const fs = require('fs');
 
 const os = require('os');
 const path = require('path');
 const router = require('../../src/routes/pendingEvidence');
-const writeFile = jest.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
+const { writeFile } = require('../../src/services/storageService');
 
 const pool = require('../../src/config/database');
 const auditService = require('../../src/services/auditService');
@@ -180,10 +180,11 @@ describe('pendingEvidence routes (AI suggestions that need human approval)', () 
       expect(res.json.data).toMatchObject({ pending_id: PENDING_A, evidence_id: NEW_EVIDENCE });
 
       const body = Buffer.from(JSON.stringify(RAW_PAYLOAD, null, 2), 'utf8');
-      const [filePath, written] = writeFile.mock.calls[0];
+      const [filePath, written, options] = writeFile.mock.calls[0];
       expect(path.dirname(filePath)).toBe(os.tmpdir());
       expect(path.basename(filePath)).toMatch(/^\d+-[0-9a-f]{16}-approved\.json$/);
       expect(written.equals(body)).toBe(true);
+      expect(options).toEqual({ contentType: 'application/json' });
 
       const [, insert] = callsMatching(/^\s*INSERT INTO evidence \(/)[0];
       expect(insert[0]).toBe(ORG_A);

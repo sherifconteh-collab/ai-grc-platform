@@ -9,6 +9,7 @@ const { sendReportEmail } = require('./emailService');
 const { log, serializeError } = require('../utils/logger');
 const { BASELINE_SCOPE_PREDICATE } = require('./baselineScope');
 const { UPLOADS_DIR } = require('../config/paths');
+const storageService = require('./storageService');
 
 const SCHEDULE_INTERVAL_MS = Object.freeze({
   daily: 24 * 60 * 60 * 1000,
@@ -84,12 +85,10 @@ async function runRetentionCleanup({ organizationId }) {
       [organizationId, row.id]
     );
 
-    if (row.file_path && fs.existsSync(row.file_path)) {
-      try {
-        fs.unlinkSync(row.file_path);
-      } catch (error) {
-        // Ignore file delete errors, DB record is removed.
-      }
+    if (row.file_path) {
+      // Removes the local copy and the object-storage copy; failures are
+      // logged and ignored because the DB record is already removed.
+      await storageService.removeQuietly(row.file_path);
     }
 
     removed += 1;
@@ -465,7 +464,7 @@ async function runScheduledEvidenceCollection({ organizationId }) {
         const fileName = `${safeName}-${new Date().toISOString().split('T')[0]}.json`;
         const diskName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-auto.json`;
         const filePath = path.join(uploadsDir, diskName);
-        fs.writeFileSync(filePath, fileBody);
+        await storageService.writeFile(filePath, fileBody, { contentType: 'application/json' });
 
         const retentionDays = Number(process.env.EVIDENCE_DEFAULT_RETENTION_DAYS || 365);
         const retentionDate = new Date();
