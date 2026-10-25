@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-24 | PR #426: chore(deps): group Dependabot updates into one monthly PR per ecosystem -->
+<!-- LAST_UPDATED: 2026-10-25 | PR #425: fix(deps): clear body-parser, multer, fast-uri, ip-address, zod and undici advisories -->
 
 ## 🎯 What is This?
 
@@ -159,7 +159,6 @@ The platform is **fully functional**. Every capability below is available — no
 - 🔌 **Integrations Hub** — connector templates and instances for enterprise integrations
 - 🔐 **SSO (Single Sign-On)** — OpenID Connect / OIDC integration with session management
 - ⚡ **Realtime** — Socket.IO-backed live dashboard updates and presence
-- 🔔 **Mobile Push Notifications** — iOS (APNs) and Android (FCM) device token lifecycle
 - 📧 **Forgot / Reset Password** — full self-service password recovery flow
 - 🔁 **Refresh Token Rotation** — single-use refresh tokens, kept by the browser in an HttpOnly cookie that page scripts cannot read; concurrent session cap (configurable, default 10)
 - 🐛 **Sentry Integration** — optional error tracking via `SENTRY_DSN`
@@ -511,7 +510,6 @@ Full asset and configuration inventory:
 - Mark read / mark all read functionality
 - Email delivery with per-org SMTP configuration
 - User-configurable preferences for in-app vs. email delivery
-- Mobile push notifications (iOS APNs + Android FCM) via device token lifecycle
 
 ### 🧩 Custom Compliance Framework Builder *(v4.2.0)*
 - Create fully custom compliance frameworks with org-defined controls
@@ -972,7 +970,6 @@ controlweave/
 - ✅ Evidence management with PII classification and auto-collection
 - ✅ Policy management with AI gap analysis
 - ✅ Notification and webhook systems (HMAC-SHA-384)
-- ✅ Mobile push notifications (iOS APNs + Android FCM)
 - ✅ POA&M tracking
 - ✅ Security posture dashboard
 - ✅ AI Analysis, Regulatory News, and AI Threat Library (PLOT4ai)
@@ -1083,7 +1080,7 @@ This project aims to provide an **open, transparent, affordable** alternative th
 - **Tables**: 200+ database tables (custom_frameworks, custom_framework_controls, compliance_snapshots, scheduled_reports, org_delegated_admins added in v4.2.0)
 - **Migrations**: 177 sequential, idempotent migration files (numbered through 165; a few historical duplicate numbers are documented and never renumbered)
 - **API Routes**: 80+ route modules
-- **Services**: 66 service modules
+- **Services**: 65 service modules
 - **MCP Tools**: 21 tools exposed via Model Context Protocol
 - **SDK**: `@controlweave/external-ai-logger` for external AI decision logging
 - **Threat Intel Feeds**: 4 (NVD, CISA KEV, MITRE ATT&CK, AlienVault OTX)

@@ -78,7 +78,6 @@
 ### Notifications & Communication
 - ✅ In-app notification center with unread tracking
 - ✅ Email delivery with per-org SMTP configuration
-- ✅ Mobile push notifications (iOS APNs + Android FCM)
 - ✅ Regulatory news feed with source filtering
 
 ### Infrastructure

@@ -27,6 +27,13 @@ updates:
       # owner accepts the licence. See the closed PR #371.
       - dependency-name: "@sentry/node"
         update-types: ["version-update:semver-major"]
+      # @anthropic-ai/sdk 1.0 switches to API version 2026-10-21, which rejects
+      # temperature/top_p/top_k on every model. llmService still sends task
+      # temperatures to Claude 4.6 and earlier, so moving needs the owner's
+      # decision on dropping them (see #434). Minor and patch
+      # updates on 0.x still arrive.
+      - dependency-name: "@anthropic-ai/sdk"
+        update-types: ["version-update:semver-major"]
 
   # Frontend dependencies
   - package-ecosystem: "npm"
@@ -46,6 +53,33 @@ updates:
       - "security"
     commit-message:
       prefix: "chore(frontend)"
+      include: "scope"
+    ignore:
+      # TypeScript 7 (the native typescript-go compiler) has no JavaScript
+      # compiler API, which openapi-typescript (npm run generate:api-types) needs, so
+      # typecheck fails. Stay on 6.x until openapi-typescript supports 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+
+  # Desktop app. Electron supports only its three newest majors; this entry
+  # keeps the pinned version from falling out of support unnoticed again.
+  - package-ecosystem: "npm"
+    directory: "/electron"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    groups:
+      npm-electron-monthly:
+        patterns:
+          - "*"
+    reviewers:
+      - "sherifconteh-collab"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(desktop)"
       include: "scope"
 
   # GitHub Actions
