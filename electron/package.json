@@ -143,7 +143,7 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.3",
+    "electron-updater": "^6.8.11",
     "pg": "^8.23.0"
   },
   "optionalDependencies": {
@@ -154,7 +154,7 @@
     "@embedded-postgres/windows-x64": "17.9.0-beta.17"
   },
   "devDependencies": {
-    "electron": "44.9.3",
-    "electron-builder": "26.15.3"
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
   }
 }
