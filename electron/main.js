@@ -79,6 +79,14 @@ function dataDir() {
   return app.getPath('userData');
 }
 
+// Electron 44 made clipboard.writeText asynchronous; a failed copy is logged
+// instead of surfacing as an unhandled rejection.
+function copyText(text) {
+  Promise.resolve()
+    .then(() => clipboard.writeText(text))
+    .catch((error) => { if (logger) logger.log('warn', `Clipboard write failed: ${error.message}`); });
+}
+
 function openSafeExternal(url) {
   try {
     const { protocol } = new URL(url);
@@ -187,7 +195,7 @@ function registerStartupIpc() {
       password: admin.password,
       details: lastError ? formatErrorReport(lastError) : '',
     };
-    if (Object.prototype.hasOwnProperty.call(values, what)) clipboard.writeText(values[what]);
+    if (Object.prototype.hasOwnProperty.call(values, what)) copyText(values[what]);
   });
   ipcMain.handle('startup:continue', (event) => {
     if (!fromStartupWindow(event) || !stack) return;
@@ -639,7 +647,7 @@ function showSignInDetails() {
     buttons: ['Copy password', 'Close'],
     defaultId: 1,
   }).then(({ response }) => {
-    if (response === 0) clipboard.writeText(admin.password);
+    if (response === 0) copyText(admin.password);
   });
 }
 
