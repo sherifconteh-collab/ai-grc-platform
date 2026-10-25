@@ -83,7 +83,7 @@ The resulting installer is in `electron/dist/`.
 
 ---
 
-<!-- LAST_UPDATED: 2026-10-25 | PR #425: fix(deps): clear body-parser, multer, fast-uri, ip-address, zod and undici advisories -->
+<!-- LAST_UPDATED: 2026-10-25 | PR #435: chore(ci): Bump the github-actions-monthly group with 3 updates -->
 
 ## 🎯 What is This?
 
