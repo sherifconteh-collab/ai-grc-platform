@@ -9,6 +9,8 @@
 
 > Changes staged but not yet released to production.
 
+## [2026.10.3] — 2026-10-26
+
 ### Changed
 - chore(ci): Bump the github-actions-monthly group with 3 updates ([#435](https://github.com/sherifconteh-collab/ai-grc-platform/pull/435)) — @dependabot[bot]
 - fix(deps): clear body-parser, multer, fast-uri, ip-address, zod and undici advisories ([#425](https://github.com/sherifconteh-collab/ai-grc-platform/pull/425)) — @sherifconteh-collab
